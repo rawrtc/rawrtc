@@ -42,13 +42,13 @@ case "$openssl_version" in
 esac
 
 # Get openssl
-if [ ! -d "${OPENSSL_PATH}" ]; then
+if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
     wget ${OPENSSL_URL}
     tar -xzf ${OPENSSL_TAR}
 fi
 
 # Get zf_log
-if [ ! -d "${ZF_LOG_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
+if [ ! -d "${ZF_LOG_PATH}" ]; then
     git clone --depth=1 ${ZF_LOG_GIT}
 else
     cd ${ZF_LOG_PATH}
