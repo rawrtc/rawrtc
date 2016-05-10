@@ -1,8 +1,9 @@
 project('anyrtc', 'c')
+compiler = meson.get_compiler('c')
 anyrtc_dependencies = []
 
 prefix = get_option('prefix')
-lib_zf_log = find_library('zf_log', dirs: prefix + '/lib')
+lib_zf_log = compiler.find_library('zf_log', dirs: prefix + '/lib')
 lib_re = dependency('libre', version: '>=0.4.15')
 lib_rew = dependency('librew', version: '>=0.4.0')
 anyrtc_dependencies = [lib_zf_log, lib_re, lib_rew]
