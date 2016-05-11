@@ -16,6 +16,11 @@
 
 #include <re.h>
 
+enum anyrtc_code {
+    ANYRTC_CODE_SUCCESS = 0,
+    /* TODO */
+}
+
 /*
  * ICE gather policy.
  */
