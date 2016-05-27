@@ -11,9 +11,9 @@ export LIB_PREFIX=anyrtc_
 export BUILD_PATH=${PWD}/build
 
 # Dependencies
-OPENSSL_URL="https://www.openssl.org/source/openssl-1.0.2g.tar.gz"
-OPENSSL_TAR="openssl-1.0.2g.tar.gz"
-OPENSSL_PATH="openssl-1.0.2g"
+OPENSSL_URL="https://www.openssl.org/source/openssl-1.0.2h.tar.gz"
+OPENSSL_TAR="openssl-1.0.2h.tar.gz"
+OPENSSL_PATH="openssl-1.0.2h"
 ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
 ZF_LOG_PATH="zf_log"
 ZF_LOG_BUILD_PATH="zf_log.build"
