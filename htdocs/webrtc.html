@@ -172,8 +172,8 @@ var dc = pc.createDataChannel("therme", {
 dc.onopen = function() {
     console.log("Data Channel is open");
 }
-dc.openmessage = function(event) {
-    console.log("Received data: ", data);
+dc.onmessage = function(event) {
+    console.log("Received data: ", event.data);
 }
 
 // Create offer
