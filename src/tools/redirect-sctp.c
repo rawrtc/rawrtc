@@ -19,6 +19,8 @@
 #define EXIT_ON_ERROR(code) exit_on_error(code, __FILE__, __LINE__)
 #define EXIT_ON_NULL(ptr) exit_on_null(ptr, __FILE__, __LINE__)
 
+#define SCTP_PORT 6000
+
 static void before_exit() {
     // Close
     libre_close();
@@ -255,7 +257,7 @@ static void redirect_from_machine(int flags, void* const arg) {
         EXIT_ON_ERROR(sa_set_sa(&from, (struct sockaddr*) &from_address));
         DEBUG_PRINTF("Received %zu bytes via RAW from %j\n", mbuf_get_left(buffer), &from);
         if (!sa_isset(&from, SA_ADDR) && !sa_cmp(&agent->redirect_address, &from, SA_ADDR)) {
-            DEBUG_WARNING("Ignored data from unknown address!\n");
+            DEBUG_WARNING("Ignored data from unknown address");
             return;
         }
         
@@ -265,6 +267,19 @@ static void redirect_from_machine(int flags, void* const arg) {
         DEBUG_PRINTF("RAW IPv4 header length: %zu\n", header_length);
         mbuf_advance(buffer, header_length * 4);
         trace_packet(agent, buffer);
+        
+        // Read source and destination port
+        uint16_t source = ntohs(mbuf_read_u16(buffer));
+        uint16_t destination = ntohs(mbuf_read_u16(buffer));
+        sa_set_port(&from, source);
+        DEBUG_PRINTF("RAW from %J to %"PRIu16"\n", &from, destination);
+        mbuf_advance(buffer, -4);
+        
+        // Is this from the correct source?
+        if (source != sa_port(&agent->redirect_address)) {
+            DEBUG_WARNING("Ignored data from different source\n");
+            return;
+        }
         
         // Send data
         DEBUG_INFO("Sending %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
@@ -779,7 +794,7 @@ int main(int argc, char* argv[argc + 1]) {
     agent.dtls_helper = NULL;
     
     // Create redirect raw socket
-    EXIT_ON_ERROR(sa_set_str(&agent.redirect_address, argv[2], 0));
+    EXIT_ON_ERROR(sa_set_str(&agent.redirect_address, argv[2], SCTP_PORT));
     agent.redirect_socket = socket(AF_INET, SOCK_RAW, IPPROTO_SCTP);
     if (agent.redirect_socket == -1) {
         EXIT_ON_ERROR(errno);
