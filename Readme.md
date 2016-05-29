@@ -10,7 +10,8 @@ A WebRTC and ORTC library with a small footprint that runs everywhere.
 
 ## Build
 
-The following instruction will use a custom *prefix* to avoid installing the necessary dependencies and this library system-wide.
+The following instruction will use a custom *prefix* to avoid installing
+the necessary dependencies and this library system-wide.
 
 ### Dependencies & Meson Configuration
 
@@ -31,7 +32,8 @@ The following instruction will use a custom *prefix* to avoid installing the nec
 
 ## Run
 
-Because we have used a custom *prefix*, we need to add the prefix to the path to run the various binaries.
+Because we have used a custom *prefix*, we need to add the prefix to the
+path to run the various binaries.  
 Note: We assume that you are in the `build` directory.
 
 ```

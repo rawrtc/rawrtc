@@ -6,4 +6,3 @@ redirect_sctp = executable(
     link_with: lib_anyrtc,
     install: true
 )
-
