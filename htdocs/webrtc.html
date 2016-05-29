@@ -106,12 +106,13 @@ var generateAnswer = function(remoteInfo) {
     var ufrag = remoteInfoList.shift();
     var pwd = remoteInfoList.shift();
     var fingerprint = remoteInfoList.shift();
+    var remoteSctpPort = 6000;
     remoteCandidates = remoteInfoList;
     
     // Create SDP
     var sdp = SDPUtils.writeSessionBoilerplate();
     sdp += 'a=msid-semantic: WMS\r\n';
-    sdp += 'm=application 9 DTLS/SCTP 5000\r\n';
+    sdp += 'm=application 9 DTLS/SCTP {0}\r\n'.format(remoteSctpPort);
     sdp += 'c=IN IP4 0.0.0.0\r\n';
     sdp += SDPUtils.writeIceParameters({
         usernameFragment: ufrag,
@@ -124,7 +125,7 @@ var generateAnswer = function(remoteInfo) {
         }]
     }, 'passive');
     sdp += 'a=mid:{0}\r\n'.format(localMid);
-    sdp += 'a=sctpmap:5000 webrtc-datachannel 1024\r\n';
+    sdp += 'a=sctpmap:{0} webrtc-datachannel 1024\r\n'.format(remoteSctpPort);
     
     // Create answer
     return new RTCSessionDescription({
