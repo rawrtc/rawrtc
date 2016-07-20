@@ -1,7 +1,9 @@
+# Library sources
 anyrtc_sources = [
-    'null.c',
+    'dcep.c',
 ]
 
+# Setup library (link & install)
 lib_anyrtc = library(
     'anyrtc',
     anyrtc_sources,

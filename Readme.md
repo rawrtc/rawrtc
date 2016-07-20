@@ -4,9 +4,15 @@ A WebRTC and ORTC library with a small footprint that runs everywhere.
 
 ## Prerequisites
 
+* [cmake](https://cmake.org) >= 3.2 (*zf_log* dependency)
+
+### Meson (Alternative Build System)
+
+If you want to use Meson instead of CMake, you have to install both the Meson
+build system and Ninja.
+
 * [meson](https://github.com/mesonbuild/meson)
 * [ninja](https://ninja-build.org)
-* [cmake](https://cmake.org) >= 3.2 (*zf_log* dependency)
 
 ## Build
 
@@ -18,16 +24,37 @@ the necessary dependencies and this library system-wide.
 ```
 > cd <path-to-anyrtc>
 > ./make-dependencies.sh
-> export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig:${PWD}/build/prefix/lib/x86_64-linux-gnu/pkgconfig
-> meson build --default-library=static --prefix=${PWD}/build/prefix
 ```
+
+### Package Configuration Path
+
+The following environment variable is required for both Meson and CMake to find
+the previously built dependencies:
+
+```
+> export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig:${PWD}/build/prefix/lib/x86_64-linux-gnu/pkgconfig
+```
+
+Note that this command will need to be repeated once the terminal has been
+closed.
 
 ### Compile
 
+#### Meson
+
 ```
+> cd <path-to-anyrtc>
+> meson build --default-library=static --prefix=${PWD}/build/prefix
 > cd build
-> export PKG_CONFIG_PATH=${PWD}/prefix/lib/pkgconfig:${PWD}/build/prefix/lib/x86_64-linux-gnu/pkgconfig
 > ninja install
+```
+
+#### CMake
+
+```
+> cd <path-to-anyrtc>/build
+> cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
+> make install
 ```
 
 ## Run

@@ -266,7 +266,6 @@ static void redirect_from_machine(int flags, void* const arg) {
         mbuf_advance(buffer, -1);
         DEBUG_PRINTF("RAW IPv4 header length: %zu\n", header_length);
         mbuf_advance(buffer, header_length * 4);
-        trace_packet(agent, buffer);
         
         // Read source and destination port
         uint16_t source = ntohs(mbuf_read_u16(buffer));
@@ -282,6 +281,7 @@ static void redirect_from_machine(int flags, void* const arg) {
         }
         
         // Send data
+        trace_packet(agent, buffer);
         DEBUG_INFO("Sending %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
         int error = dtls_send(agent->dtls_connection, buffer);
         if (error) {

@@ -8,7 +8,9 @@ export THREADS=12
 export LIB_PREFIX=anyrtc_
 
 # Build path
-export BUILD_PATH=${PWD}/build
+if [ -z "$BUILD_PATH" ]; then
+    export BUILD_PATH=${PWD}/build
+fi
 
 # Dependencies
 OPENSSL_URL="https://www.openssl.org/source/openssl-1.0.2h.tar.gz"
@@ -21,6 +23,8 @@ LIBRE_GIT="vcs@vcs.zwuenf.org:anyrtc/re.git"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/alfredh/rew.git"
 LIBREW_PATH="rew"
+USRSCTP_GIT="https://github.com/sctplab/usrsctp.git"
+USRSCTP_PATH="usrsctp"
 
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
@@ -52,6 +56,15 @@ if [ ! -d "${ZF_LOG_PATH}" ]; then
     git clone --depth=1 ${ZF_LOG_GIT}
 else
     cd ${ZF_LOG_PATH}
+    git pull
+    cd ${MAIN_DIR}
+fi
+
+# Get usrsctp
+if [ ! -d "${USRSCTP_PATH}" ]; then
+    git clone --depth=1 ${USRSCTP_GIT}
+else
+    cd ${USRSCTP_PATH}
     git pull
     cd ${MAIN_DIR}
 fi
@@ -219,11 +232,11 @@ fi
 
 # Build openssl
 if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
-cd ${OPENSSL_PATH}
-./config --prefix=${PREFIX}
-make
-make install
-cd ${MAIN_DIR}
+    cd ${OPENSSL_PATH}
+    ./config --prefix=${PREFIX}
+    make
+    make install
+    cd ${MAIN_DIR}
 fi
 
 # Build zf_log
@@ -235,17 +248,26 @@ CFLAGS=-fPIC cmake ../${ZF_LOG_PATH} -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_L
 make install -j${THREADS}
 cd ${MAIN_DIR}
 
+# Build usrsctp
+cd ${USRSCTP_PATH}
+./bootstrap
+./configure --prefix=${PREFIX} --disable-shared --enable-static
+make install -j${THREADS}
+# we have a name conflict for 'mbuf_init'
+objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a
+cd ${MAIN_DIR}
+
 # Build libre
 cd ${LIBRE_PATH}
 if [ "$have_dtls_1_2" = false ]; then
-OPENSSL_SYSROOT=${PREFIX} make install -j${THREADS}
+    OPENSSL_SYSROOT=${PREFIX} make install
 else
-make install -j${THREADS}
+    make install
 fi
 rm ${PREFIX}/lib/libre.so
 cd ${MAIN_DIR}
 
 # Build librew
 cd ${LIBREW_PATH}
-LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include make install-static -j${THREADS}
+LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include make install-static
 cd ${MAIN_DIR}
