@@ -19,7 +19,7 @@
 enum anyrtc_code {
     ANYRTC_CODE_SUCCESS = 0,
     /* TODO */
-}
+};
 
 /*
  * ICE gather policy.
@@ -36,7 +36,7 @@ enum anyrtc_ice_gather_policy {
 enum anyrtc_ice_credential_type {
     ANYRTC_ICE_CREDENTIAL_PASSWORD,
     ANYRTC_ICE_CREDENTIAL_TOKEN,
-}
+};
 
 /*
  * ICE gatherer state.
@@ -46,7 +46,7 @@ enum anyrtc_ice_gatherer_state {
     ANYRTC_ICE_GATHERER_GATHERING,
     ANYRTC_ICE_GATHERER_COMPLETE,
     ANYRTC_ICE_GATHERER_CLOSED,
-}
+};
 
 /*
  * ICE component.
@@ -56,7 +56,7 @@ enum anyrtc_ice_gatherer_state {
 enum anyrtc_ice_component {
     ANYRTC_ICE_COMPONENT_RTP,
     ANYRTC_ICE_COMPONENT_RTCP,
-}
+};
 
 /*
  * Current role of the ICE transport.
@@ -64,7 +64,7 @@ enum anyrtc_ice_component {
 enum anyrtc_ice_role {
     ANYRTC_ICE_ROLE_CONTROLLING,
     ANYRTC_ICE_ROLE_CONTROLLED,
-}
+};
 
 /*
  * ICE transport state.
@@ -77,7 +77,7 @@ enum anyrtc_ice_role {
      ANYRTC_ICE_TRANSPORT_DISCONNECTED,
      ANYRTC_ICE_TRANSPORT_FAILED,
      ANYRTC_ICE_TRANSPORT_CLOSED,
- }
+ };
 
 /*
  * Data channel SCTP payload protocol identifier.
@@ -86,7 +86,7 @@ enum anyrtc_data_channel_sctp_ppid {
     ANYRTC_DATA_CHANNEL_SCTP_PPID_CONTROL = 50,
     ANYRTC_DATA_CHANNEL_SCTP_PPID_DOMSTRING = 51,
     ANYRTC_DATA_CHANNEL_SCTP_PPID_BINARY = 52,
-}
+};
  
  
  
@@ -207,7 +207,7 @@ typedef void (anyrtc_sctp_transport_data_channel_handler)(
 struct anyrtc_ice_gather_options {
     enum anyrtc_ice_gather_policy gather_policy;
     struct list* ice_servers; // referenced
-}
+};
 
 /*
  * ICE server. (private)
@@ -217,7 +217,7 @@ struct anyrtc_ice_server {
     char* username; // copied
     char* credential; // copied
     enum anyrtc_ice_credential_type credential_type;
-}
+};
 
 /*
  * ICE gatherer. (private)
@@ -225,7 +225,7 @@ struct anyrtc_ice_server {
 struct anyrtc_ice_gatherer {
     struct anyrtc_ice_gather_options* options; // referenced
     enum anyrtc_ice_gatherer_state state;
-}
+};
 
 /*
  * ICE transport. (private)
@@ -234,7 +234,7 @@ struct anyrtc_ice_transport {
     struct anyrtc_ice_gatherer* gatherer; // referenced
     enum anyrtc_ice_role role;
     enum anyrtc_ice_transport_state state;
-}
+};
 
 
 
@@ -257,7 +257,7 @@ int anyrtc_ice_gather_options_create(
  */
 int anyrtc_ice_gather_options_append_server(
     struct anyrtc_ice_gather_options* const options,
-    struct anyrtc_ice_server* const ice_server, // referenced
+    struct anyrtc_ice_server* const ice_server // referenced
 );
 
 /*
@@ -267,8 +267,8 @@ int anyrtc_ice_server_create(
     struct anyrtc_ice_server** const server, // de-referenced
     struct list const * const urls, // nullable, deep-copied
     char const * const username, // nullable, copied
-    char const * const credential // nullable, copied
-    enum anyrtc_ice_credential_type const credential_type;
+    char const * const credential, // nullable, copied
+    enum anyrtc_ice_credential_type const credential_type
 );
 
 /*
@@ -294,7 +294,7 @@ int anyrtc_ice_gatherer_create(
  * Close the ICE gatherer.
  */
 int anyrtc_ice_gatherer_close(
-    struct anyrtc_ice_gatherer* const gatherer,
+    struct anyrtc_ice_gatherer* const gatherer
 );
 
 /*
@@ -302,7 +302,7 @@ int anyrtc_ice_gatherer_close(
  */
 int anyrtc_ice_gatherer_gather(
     struct anyrtc_ice_gatherer* const gatherer,
-    struct anyrtc_ice_gather_options* const options, // referenced, nullable
+    struct anyrtc_ice_gather_options* const options // referenced, nullable
 );
 
 /*
@@ -428,7 +428,7 @@ int anyrtc_data_channel_send(
     struct anyrtc_data_channel* const channel,
     enum anyrtc_data_channel_sctp_ppid const,
     uint8_t const * const data,
-    uint32_t size const,
+    uint32_t size const
 );
 
 /*
@@ -462,7 +462,7 @@ int anyrtc_sctp_transport_create(
  */
 int anyrtc_sctp_transport_start(
     struct anyrtc_sctp_transport* const transport,
-    struct anyrtc_sctp_capabilities const * const remote_capabilities, // copied
+    struct anyrtc_sctp_capabilities const * const remote_capabilities // copied
 );
 
 /*
