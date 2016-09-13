@@ -118,6 +118,12 @@ enum anyrtc_sctp_transport_state {
 struct anyrtc_ice_candidate;
 struct anyrtc_data_channel;
 struct anyrtc_ice_parameters;
+struct anyrtc_dtls_transport;
+struct anyrtc_dtls_parameters;
+struct anyrtc_data_channel_parameters;
+struct anyrtc_data_transport;
+struct anyrtc_sctp_transport;
+struct anyrtc_sctp_capabilities;
 
  
  
@@ -468,7 +474,7 @@ int anyrtc_data_channel_send(
     struct anyrtc_data_channel* const channel,
     enum anyrtc_data_channel_sctp_ppid const,
     uint8_t const * const data,
-    uint32_t size const
+    uint32_t const size
 );
 
 /*
