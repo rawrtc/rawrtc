@@ -1,6 +1,6 @@
 # Library sources
 set(anyrtc_SOURCES
-        null.c)
+        ice_gatherer.c)
 
 # Setup library (link & install)
 add_library(anyrtc SHARED ${anyrtc_SOURCES})
