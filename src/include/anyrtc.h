@@ -17,6 +17,8 @@
 #include <re.h>
 
 enum anyrtc_code {
+    ANYRTC_CODE_UNKNOWN_ERROR = -2,
+    ANYRTC_CODE_NOT_IMPLEMENTED = -1,
     ANYRTC_CODE_SUCCESS = 0,
     ANYRTC_CODE_INITIALISE_FAIL,
     ANYRTC_CODE_INVALID_ARGUMENT,
@@ -36,6 +38,7 @@ enum anyrtc_ice_gather_policy {
  * ICE credential type
  */
 enum anyrtc_ice_credential_type {
+    ANYRTC_ICE_CREDENTIAL_NONE,
     ANYRTC_ICE_CREDENTIAL_PASSWORD,
     ANYRTC_ICE_CREDENTIAL_TOKEN,
 };
@@ -262,10 +265,19 @@ struct anyrtc_ice_gather_options {
  * TODO: private
  */
 struct anyrtc_ice_server {
-    struct list* const urls; // deep-copied
+    struct list urls; // deep-copied
     char* username; // copied
     char* credential; // copied
     enum anyrtc_ice_credential_type credential_type;
+};
+
+/*
+ * ICE server URL. (list element)
+ * TODO: private
+ */
+struct anyrtc_ice_server_url {
+    struct le le;
+    char* url;
 };
 
 /*
@@ -302,7 +314,6 @@ enum anyrtc_code anyrtc_close();
 
 /*
  * Create a new ICE gather options.
- * @optionsp Must be a valid address.
  */
 enum anyrtc_code anyrtc_ice_gather_options_create(
     struct anyrtc_ice_gather_options** const optionsp, // de-referenced
@@ -315,22 +326,23 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
  */
 
 /*
+ * Create a new ICE server.
+ */
+enum anyrtc_code anyrtc_ice_server_create(
+    struct anyrtc_ice_server** const serverp, // de-referenced
+    char* const * const urls, // copied
+    size_t const n_urls,
+    char* const username, // nullable, copied
+    char* const credential, // nullable, copied
+    enum anyrtc_ice_credential_type const credential_type
+);
+
+/*
  * Add an ICE server to the gather options.
  */
 enum anyrtc_code anyrtc_ice_gather_options_add_server(
     struct anyrtc_ice_gather_options* const options,
     struct anyrtc_ice_server* const ice_server // referenced
-);
-
-/*
- * Create a new ICE server.
- */
-enum anyrtc_code anyrtc_ice_server_create(
-    struct anyrtc_ice_server** const server, // de-referenced
-    struct list const * const urls, // nullable, deep-copied
-    char const * const username, // nullable, copied
-    char const * const credential, // nullable, copied
-    enum anyrtc_ice_credential_type const credential_type
 );
 
 /*
