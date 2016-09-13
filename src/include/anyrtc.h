@@ -218,7 +218,7 @@ typedef void (anyrtc_data_channel_close_handler)(
 typedef void (anyrtc_data_channel_message_handler)(
     enum anyrtc_data_channel_sctp_ppid const,
     uint8_t const * const data, // read-only
-    uint32_t size const,
+    uint32_t const size,
     void* const arg
 );
 
