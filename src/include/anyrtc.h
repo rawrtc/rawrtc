@@ -125,9 +125,15 @@ struct anyrtc_data_transport;
 struct anyrtc_sctp_transport;
 struct anyrtc_sctp_capabilities;
 
- 
- 
- 
+/*
+ * ICE gatherer structs (private).
+ */
+struct anyrtc_ice_gather_options;
+struct anyrtc_ice_server;
+struct anyrtc_ice_gatherer;
+
+
+
 /*
  * ICE gatherer state change handler.
  */
@@ -246,32 +252,6 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
 );
 
 
-
-/*
- * ICE gather options. (private)
- */
-struct anyrtc_ice_gather_options {
-    enum anyrtc_ice_gather_policy gather_policy;
-    struct list* ice_servers; // referenced
-};
-
-/*
- * ICE server. (private)
- */
-struct anyrtc_ice_server {
-    struct list* const urls; // deep-copied
-    char* username; // copied
-    char* credential; // copied
-    enum anyrtc_ice_credential_type credential_type;
-};
-
-/*
- * ICE gatherer. (private)
- */
-struct anyrtc_ice_gatherer {
-    struct anyrtc_ice_gather_options* options; // referenced
-    enum anyrtc_ice_gatherer_state state;
-};
 
 /*
  * ICE transport. (private)
