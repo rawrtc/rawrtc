@@ -1,7 +1,7 @@
 # Tool: ice-gatherer
 add_executable(ice-gatherer ice-gatherer.c)
 target_link_libraries(ice-gatherer
-        anyrtc)
+        anyrtc-static)
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
