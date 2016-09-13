@@ -117,6 +117,7 @@ enum anyrtc_sctp_transport_state {
  */
 struct anyrtc_ice_candidate;
 struct anyrtc_data_channel;
+struct anyrtc_ice_parameters;
 
  
  
@@ -374,7 +375,7 @@ int anyrtc_ice_transport_start(
     struct anyrtc_ice_transport* const transport,
     struct anyrtc_ice_gatherer* const gatherer, // referenced
     struct anyrtc_ice_parameters const * const remote_parameters, // copied
-    struct anyrtc_ice_role const role
+    enum anyrtc_ice_role const role
 );
 
 /*
