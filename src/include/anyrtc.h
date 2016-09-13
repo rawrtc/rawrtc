@@ -267,7 +267,7 @@ struct anyrtc_ice_transport {
 /*
  * Create a new ICE gather options.
  */
-int anyrtc_ice_gather_options_create(
+enum anyrtc_code anyrtc_ice_gather_options_create(
     struct anyrtc_ice_gather_options** const options, // de-referenced
     enum anyrtc_ice_gather_policy const gather_policy,
     struct list* const ice_servers // nullable, referenced
@@ -281,7 +281,7 @@ int anyrtc_ice_gather_options_create(
 /*
  * Add an ICE server to the gather options.
  */
-int anyrtc_ice_gather_options_add_server(
+enum anyrtc_code anyrtc_ice_gather_options_add_server(
     struct anyrtc_ice_gather_options* const options,
     struct anyrtc_ice_server* const ice_server // referenced
 );
@@ -289,7 +289,7 @@ int anyrtc_ice_gather_options_add_server(
 /*
  * Create a new ICE server.
  */
-int anyrtc_ice_server_create(
+enum anyrtc_code anyrtc_ice_server_create(
     struct anyrtc_ice_server** const server, // de-referenced
     struct list const * const urls, // nullable, deep-copied
     char const * const username, // nullable, copied
@@ -307,7 +307,7 @@ int anyrtc_ice_server_create(
  /*
   * Create a new ICE gatherer.
   */
-int anyrtc_ice_gatherer_create(
+enum anyrtc_code anyrtc_ice_gatherer_create(
     struct anyrtc_ice_gatherer** const gatherer, // de-referenced
     struct anyrtc_ice_gather_options* const options, // referenced
     anyrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
@@ -319,14 +319,14 @@ int anyrtc_ice_gatherer_create(
 /*
  * Close the ICE gatherer.
  */
-int anyrtc_ice_gatherer_close(
+enum anyrtc_code anyrtc_ice_gatherer_close(
     struct anyrtc_ice_gatherer* const gatherer
 );
 
 /*
  * Start gathering using an ICE gatherer.
  */
-int anyrtc_ice_gatherer_gather(
+enum anyrtc_code anyrtc_ice_gatherer_gather(
     struct anyrtc_ice_gatherer* const gatherer,
     struct anyrtc_ice_gather_options* const options // referenced, nullable
 );
@@ -346,7 +346,7 @@ int anyrtc_ice_gatherer_gather(
 /*
  * Create a new ICE transport.
  */
-int anyrtc_ice_transport_create(
+enum anyrtc_code anyrtc_ice_transport_create(
     struct anyrtc_ice_transport** const transport, // de-referenced
     struct anyrtc_ice_gatherer* const gatherer, // referenced, nullable
     anyrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
@@ -357,7 +357,7 @@ int anyrtc_ice_transport_create(
 /*
  * Start the ICE transport.
  */
-int anyrtc_ice_transport_start(
+enum anyrtc_code anyrtc_ice_transport_start(
     struct anyrtc_ice_transport* const transport,
     struct anyrtc_ice_gatherer* const gatherer, // referenced
     struct anyrtc_ice_parameters const * const remote_parameters, // copied
@@ -367,7 +367,7 @@ int anyrtc_ice_transport_start(
 /*
  * Stop and close the ICE transport.
  */
-int anyrtc_ice_transport_stop(
+enum anyrtc_code anyrtc_ice_transport_stop(
     struct anyrtc_ice_transport* const transport
 );
 
@@ -388,7 +388,7 @@ int anyrtc_ice_transport_stop(
 /*
  * Create a new DTLS transport.
  */
-int anyrtc_dtls_transport_create(
+enum anyrtc_code anyrtc_dtls_transport_create(
     struct anyrtc_dtls_transport** const transport, // de-referenced
     struct anyrtc_ice_transport* const ice_transport, // referenced
     struct list const * const certificates, // deep-copied
@@ -400,7 +400,7 @@ int anyrtc_dtls_transport_create(
 /*
  * Start the DTLS transport.
  */
-int anyrtc_dtls_transport_start(
+enum anyrtc_code anyrtc_dtls_transport_start(
     struct anyrtc_dtls_transport* const transport,
     struct anyrtc_dtls_parameters const * const remote_parameters // copied
 );
@@ -408,7 +408,7 @@ int anyrtc_dtls_transport_start(
 /*
  * Stop and close the DTLS transport.
  */
-int anyrtc_dtls_transport_stop(
+enum anyrtc_code anyrtc_dtls_transport_stop(
     struct anyrtc_dtls_transport* const transport
 );
 
@@ -428,7 +428,7 @@ int anyrtc_dtls_transport_stop(
 /*
  * Create a data channel.
  */
-int anyrtc_data_channel_create(
+enum anyrtc_code anyrtc_data_channel_create(
     struct anyrtc_data_channel** const channel, // de-referenced
     struct anyrtc_data_transport* const transport, // referenced
     struct anyrtc_data_channel_parameters const * const parameters, // copied
@@ -443,14 +443,14 @@ int anyrtc_data_channel_create(
 /*
  * Close the data channel.
  */
-int anyrtc_data_channel_close(
+enum anyrtc_code anyrtc_data_channel_close(
     struct anyrtc_data_channel* const channel
 );
 
 /*
  * Send data via the data channel.
  */
-int anyrtc_data_channel_send(
+enum anyrtc_code anyrtc_data_channel_send(
     struct anyrtc_data_channel* const channel,
     enum anyrtc_data_channel_sctp_ppid const,
     uint8_t const * const data,
@@ -475,7 +475,7 @@ int anyrtc_data_channel_send(
 /*
  * Create an SCTP transport.
  */
-int anyrtc_sctp_transport_create(
+enum anyrtc_code anyrtc_sctp_transport_create(
     struct anyrtc_sctp_transport** const transport, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
     uint16_t const port, // zeroable
@@ -486,7 +486,7 @@ int anyrtc_sctp_transport_create(
 /*
  * Start the SCTP transport.
  */
-int anyrtc_sctp_transport_start(
+enum anyrtc_code anyrtc_sctp_transport_start(
     struct anyrtc_sctp_transport* const transport,
     struct anyrtc_sctp_capabilities const * const remote_capabilities // copied
 );
@@ -494,7 +494,7 @@ int anyrtc_sctp_transport_start(
 /*
  * Stop and close the SCTP transport.
  */
-int anyrtc_sctp_transport_stop(
+enum anyrtc_code anyrtc_sctp_transport_stop(
     struct anyrtc_sctp_transport* const transport
 );
 
