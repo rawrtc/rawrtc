@@ -1,5 +1,6 @@
 # Library sources
 set(anyrtc_SOURCES
+        init.c
         ice_gatherer.c)
 
 # Setup library (link & install)

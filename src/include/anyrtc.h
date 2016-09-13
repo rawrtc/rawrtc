@@ -18,7 +18,9 @@
 
 enum anyrtc_code {
     ANYRTC_CODE_SUCCESS = 0,
-    /* TODO */
+    ANYRTC_CODE_INITIALISE_FAIL,
+    ANYRTC_CODE_INVALID_ARGUMENT,
+    ANYRTC_CODE_NO_MEMORY,
 };
 
 /*
@@ -124,13 +126,6 @@ struct anyrtc_data_channel_parameters;
 struct anyrtc_data_transport;
 struct anyrtc_sctp_transport;
 struct anyrtc_sctp_capabilities;
-
-/*
- * ICE gatherer structs (private).
- */
-struct anyrtc_ice_gather_options;
-struct anyrtc_ice_server;
-struct anyrtc_ice_gatherer;
 
 
 
@@ -254,7 +249,37 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
 
 
 /*
- * ICE transport. (private)
+ * ICE gather options.
+ * TODO: private
+ */
+struct anyrtc_ice_gather_options {
+    enum anyrtc_ice_gather_policy gather_policy;
+    struct list ice_servers;
+};
+
+/*
+ * ICE server.
+ * TODO: private
+ */
+struct anyrtc_ice_server {
+    struct list* const urls; // deep-copied
+    char* username; // copied
+    char* credential; // copied
+    enum anyrtc_ice_credential_type credential_type;
+};
+
+/*
+ * ICE gatherer.
+ * TODO: private
+ */
+struct anyrtc_ice_gatherer {
+    struct anyrtc_ice_gather_options* options; // referenced
+    enum anyrtc_ice_gatherer_state state;
+};
+
+/*
+ * ICE transport.
+ * TODO: private
  */
 struct anyrtc_ice_transport {
     struct anyrtc_ice_gatherer* gatherer; // referenced
@@ -265,12 +290,23 @@ struct anyrtc_ice_transport {
 
 
 /*
+ * Initialise anyrtc. Must be called before making a call to any other
+ * function
+ */
+enum anyrtc_code anyrtc_init();
+
+/*
+ * Close anyrtc and free up all resources.
+ */
+enum anyrtc_code anyrtc_close();
+
+/*
  * Create a new ICE gather options.
+ * @optionsp Must be a valid address.
  */
 enum anyrtc_code anyrtc_ice_gather_options_create(
-    struct anyrtc_ice_gather_options** const options, // de-referenced
-    enum anyrtc_ice_gather_policy const gather_policy,
-    struct list* const ice_servers // nullable, referenced
+    struct anyrtc_ice_gather_options** const optionsp, // de-referenced
+    enum anyrtc_ice_gather_policy const gather_policy
 );
 
 /*

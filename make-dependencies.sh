@@ -233,7 +233,7 @@ fi
 # Build openssl
 if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
     cd ${OPENSSL_PATH}
-    ./config --prefix=${PREFIX}
+    ./config shared --prefix=${PREFIX}
     make
     make install
     cd ${MAIN_DIR}
