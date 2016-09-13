@@ -87,6 +87,16 @@ enum anyrtc_data_channel_sctp_ppid {
     ANYRTC_DATA_CHANNEL_SCTP_PPID_DOMSTRING = 51,
     ANYRTC_DATA_CHANNEL_SCTP_PPID_BINARY = 52,
 };
+
+/*
+ * SCTP transport state.
+ */
+enum anyrtc_sctp_transport_state {
+    ANYRTC_SCTP_TRANSPORT_STATE_NEW,
+    ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING,
+    ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED,
+    ANYRTC_SCTP_TRANSPORT_STATE_CLOSED
+};
  
  
  
@@ -148,7 +158,7 @@ typedef void (anyrtc_dtls_transport_state_change_handler)(
  * DTLS transport error handler.
  */
 typedef void (anyrtc_dtls_transport_error_handler)(
-    /* TODO */
+    /* TODO: error.message (probably from OpenSSL) */
     void* const arg
 );
 
@@ -196,6 +206,14 @@ typedef void (anyrtc_data_channel_message_handler)(
  */
 typedef void (anyrtc_sctp_transport_data_channel_handler)(
     struct anyrtc_data_channel* const, // read-only, MUST be referenced when used
+    void* const arg
+);
+
+/*
+ * SCTP transport state change handler.
+ */
+typedef void (anyrtc_sctp_transport_state_change_handler)(
+    enum anyrtc_sctp_transport_state const,
     void* const arg
 );
 
@@ -253,9 +271,9 @@ int anyrtc_ice_gather_options_create(
  */
 
 /*
- * Append an ICE server to the gather options.
+ * Add an ICE server to the gather options.
  */
-int anyrtc_ice_gather_options_append_server(
+int anyrtc_ice_gather_options_add_server(
     struct anyrtc_ice_gather_options* const options,
     struct anyrtc_ice_server* const ice_server // referenced
 );
