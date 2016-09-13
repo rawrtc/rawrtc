@@ -80,6 +80,17 @@ enum anyrtc_ice_role {
  };
 
 /*
+ * DTLS transport state.
+ */
+enum anyrtc_dtls_transport_state {
+    ANYRTC_DTLS_TRANSPORT_STATE_NEW,
+    ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING,
+    ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED,
+    ANYRTC_DTLS_TRANSPORT_STATE_CLOSED,
+    ANYRTC_DTLS_TRANSPORT_STATE_FAILED
+};
+
+/*
  * Data channel SCTP payload protocol identifier.
  */ 
 enum anyrtc_data_channel_sctp_ppid {
@@ -97,6 +108,16 @@ enum anyrtc_sctp_transport_state {
     ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED,
     ANYRTC_SCTP_TRANSPORT_STATE_CLOSED
 };
+
+
+
+/*
+ * Struct prototypes.
+ * TODO: Remove
+ */
+struct anyrtc_ice_candidate;
+struct anyrtc_data_channel;
+
  
  
  
