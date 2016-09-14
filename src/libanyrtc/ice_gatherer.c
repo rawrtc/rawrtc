@@ -163,3 +163,47 @@ out:
     }
     return error;
 }
+
+static void anyrtc_ice_gatherer_destroy(void* arg) {
+    struct anyrtc_ice_gatherer* gatherer = arg;
+
+    // Dereference
+    mem_deref(gatherer->options);
+}
+
+/*
+ * Create a new ICE gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_create(
+        struct anyrtc_ice_gatherer** const gathererp, // de-referenced
+        struct anyrtc_ice_gather_options* const options, // referenced
+        anyrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
+        anyrtc_ice_gatherer_error_handler* const error_handler, // nullable
+        anyrtc_ice_gatherer_local_candidate_handler* const local_candidate_handler, // nullable
+        void* const arg // nullable
+) {
+    struct anyrtc_ice_gatherer* gatherer;
+
+    // Check arguments
+    if (!gathererp || !options) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    gatherer = mem_alloc(sizeof(struct anyrtc_ice_gatherer), anyrtc_ice_gatherer_destroy);
+    if (!gatherer) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields/reference
+    gatherer->state = ANYRTC_ICE_GATHERER_NEW;
+    gatherer->options = mem_ref(options);
+    gatherer->state_change_handler = state_change_handler;
+    gatherer->error_handler = error_handler;
+    gatherer->local_candidate_handler = local_candidate_handler;
+    gatherer->arg = arg;
+
+    // Set pointer and return
+    *gathererp = gatherer;
+    return ANYRTC_CODE_SUCCESS;
+}

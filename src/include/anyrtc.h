@@ -286,8 +286,12 @@ struct anyrtc_ice_server_url {
  * TODO: private
  */
 struct anyrtc_ice_gatherer {
-    struct anyrtc_ice_gather_options* options; // referenced
     enum anyrtc_ice_gatherer_state state;
+    struct anyrtc_ice_gather_options* options; // referenced
+    anyrtc_ice_gatherer_state_change_handler* state_change_handler; // nullable
+    anyrtc_ice_gatherer_error_handler* error_handler; // nullable
+    anyrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
+    void* arg; // nullable
 };
 
 /*
@@ -349,7 +353,7 @@ enum anyrtc_code anyrtc_ice_gather_options_add_server(
   * Create a new ICE gatherer.
   */
 enum anyrtc_code anyrtc_ice_gatherer_create(
-    struct anyrtc_ice_gatherer** const gatherer, // de-referenced
+    struct anyrtc_ice_gatherer** const gathererp, // de-referenced
     struct anyrtc_ice_gather_options* const options, // referenced
     anyrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
     anyrtc_ice_gatherer_error_handler* const error_handler, // nullable
