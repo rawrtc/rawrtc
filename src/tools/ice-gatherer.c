@@ -20,7 +20,8 @@ static void before_exit() {
 }
 
 static void exit_on_error(enum anyrtc_code code, char const* const file, uint32_t line) {
-    if (code != 0) {
+    // TODO: Un-ignore not implemented
+    if (code != ANYRTC_CODE_SUCCESS && code != ANYRTC_CODE_NOT_IMPLEMENTED) {
         fprintf(stderr, "Error in %s %"PRIu32" (%d): NO TRANSLATION\n",
                 file, line, code);
         before_exit();

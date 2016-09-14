@@ -205,5 +205,21 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
 
     // Set pointer and return
     *gathererp = gatherer;
-    return ANYRTC_CODE_SUCCESS;
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Close the ICE gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_close(
+        struct anyrtc_ice_gatherer* const gatherer
+) {
+    // Check arguments
+    if (!gatherer) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set state to closed and return
+    gatherer->state = ANYRTC_ICE_GATHERER_CLOSED;
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
 }
