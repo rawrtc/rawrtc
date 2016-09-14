@@ -265,6 +265,7 @@ struct anyrtc_ice_gather_options {
  * TODO: private
  */
 struct anyrtc_ice_server {
+    struct le le;
     struct list urls; // deep-copied
     char* username; // copied
     char* credential; // copied
@@ -326,23 +327,15 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
  */
 
 /*
- * Create a new ICE server.
+ * Add an ICE server to the gather options.
  */
-enum anyrtc_code anyrtc_ice_server_create(
-    struct anyrtc_ice_server** const serverp, // de-referenced
+enum anyrtc_code anyrtc_ice_gather_options_add_server(
+    struct anyrtc_ice_gather_options* const options,
     char* const * const urls, // copied
     size_t const n_urls,
     char* const username, // nullable, copied
     char* const credential, // nullable, copied
     enum anyrtc_ice_credential_type const credential_type
-);
-
-/*
- * Add an ICE server to the gather options.
- */
-enum anyrtc_code anyrtc_ice_gather_options_add_server(
-    struct anyrtc_ice_gather_options* const options,
-    struct anyrtc_ice_server* const ice_server // referenced
 );
 
 /*

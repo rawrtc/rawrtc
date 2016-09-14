@@ -88,10 +88,10 @@ static void anyrtc_ice_server_destroy(void* arg) {
 }
 
 /*
- * Create a new ICE server.
+ * Add an ICE server to the gather options.
  */
-enum anyrtc_code anyrtc_ice_server_create(
-        struct anyrtc_ice_server** const serverp, // de-referenced
+enum anyrtc_code anyrtc_ice_gather_options_add_server(
+        struct anyrtc_ice_gather_options* const options,
         char* const * const urls, // copied
         size_t const n_urls,
         char* const username, // nullable, copied
@@ -103,7 +103,7 @@ enum anyrtc_code anyrtc_ice_server_create(
     size_t i;
 
     // Check arguments
-    if (!serverp || !urls) {
+    if (!options || !urls) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -134,7 +134,7 @@ enum anyrtc_code anyrtc_ice_server_create(
         list_append(&server->urls, &url->le, url);
     }
 
-    // Set fields/reference
+    // Set fields
     if (credential_type != ANYRTC_ICE_CREDENTIAL_NONE) {
         if (username) {
             error = anyrtc_strdup(&server->username, username);
@@ -151,28 +151,15 @@ enum anyrtc_code anyrtc_ice_server_create(
     }
     server->credential_type = credential_type; // TODO: Validation needed in case TOKEN is used?
 
+    // Add to options
+    list_append(&options->ice_servers, &server->le, server);
+
 out:
     if (error) {
         list_flush(&server->urls);
         mem_deref(server->username);
         mem_deref(server->credential);
         mem_deref(server);
-    } else {
-        // Set pointer and return
-        *serverp = server;
     }
     return error;
-}
-
-/*
- * Add an ICE server to the gather options.
- */
-enum anyrtc_code anyrtc_ice_gather_options_add_server(
-        struct anyrtc_ice_gather_options* const options,
-        struct anyrtc_ice_server* const ice_server // referenced
-) {
-    if (!options) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
 }

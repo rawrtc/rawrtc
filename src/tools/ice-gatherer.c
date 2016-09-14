@@ -24,8 +24,6 @@ static void exit_on_error(enum anyrtc_code code, char const* const file, uint32_
 }
 
 int main(int argc, char* argv[argc + 1]) {
-    struct anyrtc_ice_server* stun_google_com;
-    struct anyrtc_ice_server* turn_zwuenf_org;
     struct anyrtc_ice_gather_options* gather_options;
 
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
@@ -34,22 +32,20 @@ int main(int argc, char* argv[argc + 1]) {
     // Initialise
     EOR(anyrtc_init());
 
-    // Create ICE servers
-    EOR(anyrtc_ice_server_create(
-            &stun_google_com, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(char *),
-            NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
-    EOR(anyrtc_ice_server_create(
-            &turn_zwuenf_org, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org) / sizeof(char *),
-            "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
-
     // Create ICE gather options
     EOR(anyrtc_ice_gather_options_create(&gather_options, ANYRTC_ICE_GATHER_ALL));
 
+    // Add ICE servers to ICE gather options
+    EOR(anyrtc_ice_gather_options_add_server(
+            gather_options, stun_google_com_urls,
+            sizeof(stun_google_com_urls) / sizeof(char *),
+            NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
+    EOR(anyrtc_ice_gather_options_add_server(
+            gather_options, turn_zwuenf_org_urls,
+            sizeof(turn_zwuenf_org_urls) / sizeof(char *),
+            "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
+
     // Dereference & close
-    mem_deref(turn_zwuenf_org);
-    mem_deref(stun_google_com);
     mem_deref(gather_options);
 
     // Bye
