@@ -4,7 +4,7 @@
 #include <anyrtc.h>
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "redirect-sctp"
+#define DEBUG_MODULE "ice-gatherer-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
@@ -57,12 +57,16 @@ static void ice_gatherer_local_candidate_handler(
 int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
     struct anyrtc_ice_gatherer* gatherer;
-
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
 
     // Initialise
     EOE(anyrtc_init());
+
+    // Debug
+    // TODO: This should be replaced by our own debugging system
+    dbg_init(DBG_DEBUG, DBG_ALL);
+    DEBUG_PRINTF("Init\n");
 
     // Create ICE gather options
     EOE(anyrtc_ice_gather_options_create(&gather_options, ANYRTC_ICE_GATHER_ALL));
@@ -82,6 +86,9 @@ int main(int argc, char* argv[argc + 1]) {
             &gatherer, gather_options,
             ice_gatherer_state_change_handler, ice_gatherer_error_handler,
             ice_gatherer_local_candidate_handler, NULL));
+
+    // Start gathering
+    EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
 
     // Dereference & close
     mem_deref(gatherer);

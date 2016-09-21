@@ -786,6 +786,9 @@ int main(int argc, char* argv[argc + 1]) {
     EXIT_ON_ERROR(tls_alloc(&agent.dtls_context, TLS_METHOD_DTLS, NULL, NULL));
     EXIT_ON_ERROR(tls_set_selfsigned(agent.dtls_context, "anyrtc"));
     EXIT_ON_ERROR(tls_set_dh_param(agent.dtls_context));
+//    char const* dtls_cipher_suites[] = {
+//            "ECDH-ECDSA-DES-CBC3-SHA",
+//    };
     EXIT_ON_ERROR(tls_set_ciphers(agent.dtls_context, dtls_cipher_suites,
                                   sizeof(dtls_cipher_suites) / sizeof(*dtls_cipher_suites)));
     tls_set_verify_client(agent.dtls_context);

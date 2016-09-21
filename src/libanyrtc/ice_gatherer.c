@@ -2,6 +2,10 @@
 #include "utils.h"
 #include "ice_gatherer.h"
 
+#define DEBUG_MODULE "ice-gatherer"
+#define DEBUG_LEVEL 7
+#include <re_dbg.h>
+
 static void anyrtc_ice_gather_options_destroy(void* arg) {
     struct anyrtc_ice_gather_options* options = arg;
 
@@ -39,6 +43,9 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
     return ANYRTC_CODE_SUCCESS;
 }
 
+/*
+ * Destructor for URLs of the ICE gatherer.
+ */
 static void anyrtc_ice_server_url_destroy(void* arg) {
     struct anyrtc_ice_server_url* url = arg;
 
@@ -46,6 +53,9 @@ static void anyrtc_ice_server_url_destroy(void* arg) {
     mem_deref(url->url);
 }
 
+/*
+ * Copy a URL for the ICE gatherer.
+ */
 static enum anyrtc_code anyrtc_ice_server_url_create(
         struct anyrtc_ice_server_url** const urlp, // de-referenced
         char* const url_s // copied
@@ -78,6 +88,9 @@ static enum anyrtc_code anyrtc_ice_server_url_create(
     return ANYRTC_CODE_SUCCESS;
 }
 
+/*
+ * Destructor for an existing ICE server.
+ */
 static void anyrtc_ice_server_destroy(void* arg) {
     struct anyrtc_ice_server* server = arg;
 
@@ -164,6 +177,9 @@ out:
     return error;
 }
 
+/*
+ * Destructor for an existing ICE gatherer.
+ */
 static void anyrtc_ice_gatherer_destroy(void* arg) {
     struct anyrtc_ice_gatherer* gatherer = arg;
 
@@ -221,5 +237,57 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
 
     // Set state to closed and return
     gatherer->state = ANYRTC_ICE_GATHERER_CLOSED;
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Local interfaces callback.
+ */
+static bool interface_handler(
+        char const* const interface,
+        struct sa const* const address,
+        void* const arg
+) {
+    struct anyrtc_ice_gatherer* const gatherer = arg;
+
+    // Ignore loopback and linklocal addresses
+    if (sa_is_linklocal(address) || sa_is_loopback(address)) {
+        return false; // Continue gathering
+    }
+
+    // Create UDP ICE candidate
+    // TODO: Continue here
+
+    // Calculate priority of candidate
+    // TODO
+
+    // Add candidate to ICE gatherer
+    // TODO
+
+    // Continue gathering
+    return false;
+}
+
+/*
+ * Start gathering using an ICE gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_gather(
+        struct anyrtc_ice_gatherer* const gatherer,
+        struct anyrtc_ice_gather_options* options // referenced, nullable
+) {
+
+    // Check arguments
+    if (!gatherer) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+    if (!options) {
+        options = gatherer->options;
+    }
+
+    // Start gathering host candidates
+    if (options->gather_policy != ANYRTC_ICE_GATHER_NOHOST) {
+        net_if_apply(interface_handler, gatherer);
+    }
+
     return ANYRTC_CODE_NOT_IMPLEMENTED;
 }

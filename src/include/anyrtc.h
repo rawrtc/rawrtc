@@ -282,6 +282,17 @@ struct anyrtc_ice_server_url {
 };
 
 /*
+ * ICE candidate.
+ * TODO: private
+ */
+struct anyrtc_ice_candidate {
+    char* foundation;
+    uint32_t priority;
+    struct sa* address;
+
+};
+
+/*
  * ICE gatherer.
  * TODO: private
  */
