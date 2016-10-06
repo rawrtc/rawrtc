@@ -297,10 +297,13 @@ struct anyrtc_ice_server_url {
  * TODO: private
  */
 struct anyrtc_ice_candidate {
-    char* foundation;
+    char foundation[32];
     uint32_t priority;
     struct sa address;
-
+    enum anyrtc_ice_protocol protocol;
+    enum ice_cand_type type;
+    enum ice_tcptype tcp_type;
+    struct sa related_address;
 };
 
 /*

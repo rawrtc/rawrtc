@@ -1,4 +1,5 @@
 #include <netinet/in.h>
+#include <inttypes.h>
 #include <anyrtc.h>
 #include "ice_candidate.h"
 #include "utils.h"
@@ -23,21 +24,18 @@ static uint32_t calculate_candidate_priority(
  * Copied from rew/src/trice/lcand.c as it's not exported and we need it earlier.
  */
 static enum anyrtc_code set_foundation(
-        char* const foundationp, // de-referenced
+        char* const foundation, // copied into, MUST be an array
         const struct sa const* const address,
         enum ice_cand_type const tcp_type
 ) {
-    uint32_t v;
+    uint32_t hash;
 
     /* Foundation is a hash of IP address and candidate type */
-    v  = sa_hash(address, SA_ADDR);
-    v ^= tcp_type;  // Uh... I hope that's still unique...
+    hash  = sa_hash(address, SA_ADDR);
+    hash ^= tcp_type;  // Uh... I hope that's still unique...
 
-    if (re_snprintf(cand->attr.foundation, sizeof(cand->attr.foundation),
-                    "%08x", v) < 0)
-        return ENOMEM;
-
-    return ANYRTC_CODE_SUCCESS;
+    // Copy
+    return anyrtc_snprintf(foundation, sizeof(foundation), "%08x", hash);
 }
 
 /*
@@ -75,7 +73,6 @@ static void anyrtc_ice_candidate_destroy(void* arg) {
     struct anyrtc_ice_candidate* candidate = arg;
 
     // Dereference
-//    list_flush(&options->ice_servers);
 }
 
 /*
@@ -92,6 +89,7 @@ enum anyrtc_code anyrtc_ice_candidate_create(
     enum anyrtc_ice_protocol ice_protocol;
     struct anyrtc_ice_candidate* candidate;
     uint32_t priority;
+    enum anyrtc_code error;
 
     // Check arguments
     if (!candidatep || !gatherer || !address) {
@@ -112,36 +110,27 @@ enum anyrtc_code anyrtc_ice_candidate_create(
     // Calculate priority
     priority = calculate_candidate_priority(candidate_type, protocol, tcp_type);
 
-    // Create local candidate using librew
-    trice_lcand_add(&local_candidate, agent->ice, COMPONENT_ID, protocol,
-                    priority, address, NULL, ICE_CAND_TYPE_HOST, NULL, tcp_type, NULL, LAYER_ICE);
+    // Set foundation
+    error = set_foundation(candidate->foundation, address, candidate_type);
+    if (error) {
+        goto out;
+    }
+
+    // TODO: Continue here setting fields
 
     // Set fields/reference
-    candidate->is_local = true;
-    candidate->local_candidate = mem_ref(local_candidate);
 
-    // Set pointer and return
+
+    // Set pointer
     *candidatep = candidate;
-
     DEBUG_PRINTF("Created local candidate %j, type: %s, protocol: %s, priority: %"PRIu32""
                  ", tcp type: %s\n",
                  address, "host", net_proto2name(protocol), priority,
                  protocol == IPPROTO_TCP ? ice_tcptype_name(tcp_type) : "n/a");
-    return ANYRTC_CODE_SUCCESS;
-    // Add local candidate
 
-    struct ice_lcand* local_candidate;
-    int error = trice_lcand_add(&local_candidate, agent->ice, COMPONENT_ID, protocol,
-                                priority, address, NULL, ICE_CAND_TYPE_HOST, NULL, tcp_type, NULL, LAYER_ICE);
+out:
     if (error) {
-        DEBUG_WARNING("Failed to add local candidate (%m)\n", error);
-        return error;
+        mem_deref(candidate);
     }
-
-    // TODO: Gather srflx candidates
-    DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);
-    // TODO: Gather relay candidates
-    DEBUG_PRINTF("TODO: Gather relay candidates for %j\n", address);
-
     return error;
 }
