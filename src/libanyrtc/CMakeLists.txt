@@ -1,5 +1,6 @@
 # Library sources
 set(anyrtc_SOURCES
+        ice_candidate.c
         ice_gatherer.c
         init.c
         utils.c)

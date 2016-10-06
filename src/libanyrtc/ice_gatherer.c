@@ -1,6 +1,7 @@
 #include <anyrtc.h>
 #include "utils.h"
 #include "ice_gatherer.h"
+#include "ice_candidate.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 #define DEBUG_LEVEL 7
@@ -255,14 +256,20 @@ static bool interface_handler(
         return false; // Continue gathering
     }
 
+    DEBUG_PRINTF("Gathered local interface %j\n", address);
+
     // Create UDP ICE candidate
-    // TODO: Continue here
+    anyrtc_ice_candidate_create(&candidate, gatherer, address, IPPROTO_UDP, 0);
 
-    // Calculate priority of candidate
+    // TODO: Create TCP ICE candidate (?)
+
+    // Add candidate to ICE gatherer (if not already added)
     // TODO
 
-    // Add candidate to ICE gatherer
-    // TODO
+    // TODO: Gather srflx candidates
+    DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);
+    // TODO: Gather relay candidates
+    DEBUG_PRINTF("TODO: Gather relay candidates for %j\n", address);
 
     // Continue gathering
     return false;

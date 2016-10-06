@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <netinet/in.h>
 
 #define ZF_LOG_LIBRARY_PREFIX anyrtc_
 #ifdef ANYRTC_DEBUG
@@ -15,6 +16,7 @@
 #include <zf_log.h>
 
 #include <re.h>
+#include <rew.h>
 
 enum anyrtc_code {
     ANYRTC_CODE_UNKNOWN_ERROR = -2,
@@ -23,6 +25,7 @@ enum anyrtc_code {
     ANYRTC_CODE_INITIALISE_FAIL,
     ANYRTC_CODE_INVALID_ARGUMENT,
     ANYRTC_CODE_NO_MEMORY,
+    ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
 };
 
 /*
@@ -112,6 +115,14 @@ enum anyrtc_sctp_transport_state {
     ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING,
     ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED,
     ANYRTC_SCTP_TRANSPORT_STATE_CLOSED
+};
+
+/*
+ * ICE protocol
+ */
+enum anyrtc_ice_protocol {
+    ANYRTC_ICE_PROTOCOL_UDP = IPPROTO_UDP,
+    ANYRTC_ICE_PROTOCOL_TCP = IPPROTO_TCP
 };
 
 
@@ -288,7 +299,7 @@ struct anyrtc_ice_server_url {
 struct anyrtc_ice_candidate {
     char* foundation;
     uint32_t priority;
-    struct sa* address;
+    struct sa address;
 
 };
 
