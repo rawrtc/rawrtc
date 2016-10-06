@@ -185,6 +185,8 @@ static void anyrtc_ice_gatherer_destroy(void* arg) {
     struct anyrtc_ice_gatherer* gatherer = arg;
 
     // Dereference
+    hash_flush(gatherer->local_ice_candidates);
+    mem_deref(gatherer->local_ice_candidates);
     mem_deref(gatherer->options);
 }
 
@@ -200,6 +202,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
         void* const arg // nullable
 ) {
     struct anyrtc_ice_gatherer* gatherer;
+    enum anyrtc_code error;
 
     // Check arguments
     if (!gathererp || !options) {
@@ -219,10 +222,23 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     gatherer->error_handler = error_handler;
     gatherer->local_candidate_handler = local_candidate_handler;
     gatherer->arg = arg;
+    error = anyrtc_code_re_translate(
+            hash_alloc(&gatherer->local_ice_candidates, BUCKET_SIZE_ICE_CANDIDATES));
+    if (error) {
+        goto out;
+    }
 
-    // Set pointer and return
-    *gathererp = gatherer;
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+out:
+    if (error) {
+        hash_flush(gatherer->local_ice_candidates);
+        mem_deref(gatherer->local_ice_candidates);
+        mem_deref(gatherer->options);
+        mem_deref(gatherer);
+    } else {
+        // Set pointer
+        *gathererp = gatherer;
+    }
+    return error;
 }
 
 /*
@@ -242,14 +258,26 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
 }
 
 /*
- * Local interfaces callback.
+ * Check if a candidate has already been added.
  */
+static bool candidate_hash_compare_handler(struct le* const le, void* const arg) {
+    uint32_t const key = *((uint32_t*) arg);
+    struct anyrtc_ice_candidate const* const candidate = le->data;
+
+    // Check if another candidate has the same key
+    return candidate->key == key;
+}
+
+/*
+ * Local interfaces callback.
+  */
 static bool interface_handler(
         char const* const interface,
         struct sa const* const address,
         void* const arg
 ) {
     struct anyrtc_ice_gatherer* const gatherer = arg;
+    struct anyrtc_ice_candidate* candidate;
 
     // Ignore loopback and linklocal addresses
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
@@ -259,12 +287,19 @@ static bool interface_handler(
     DEBUG_PRINTF("Gathered local interface %j\n", address);
 
     // Create UDP ICE candidate
-    anyrtc_ice_candidate_create(&candidate, gatherer, address, IPPROTO_UDP, 0);
+    anyrtc_ice_candidate_create(&candidate, gatherer, address, ICE_CAND_TYPE_HOST,
+                                IPPROTO_UDP, ICE_TCP_ACTIVE, NULL);
+
+    // Add candidate to ICE gatherer (if not already added)
+    if (list_ledata(hash_lookup(gatherer->local_ice_candidates, candidate->key,
+                                candidate_hash_compare_handler, &candidate->key))) {
+        DEBUG_PRINTF("Interface already added");
+        // Continue gathering
+        return false;
+    }
 
     // TODO: Create TCP ICE candidate (?)
 
-    // Add candidate to ICE gatherer (if not already added)
-    // TODO
 
     // TODO: Gather srflx candidates
     DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);
@@ -290,6 +325,9 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     if (!options) {
         options = gatherer->options;
     }
+
+    // Update state
+    gatherer->state = ANYRTC_ICE_GATHERER_GATHERING;
 
     // Start gathering host candidates
     if (options->gather_policy != ANYRTC_ICE_GATHER_NOHOST) {

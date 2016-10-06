@@ -21,10 +21,10 @@ static uint32_t calculate_candidate_priority(
 }
 
 /*
+ * Return the foundation of an ICE candidate.
  * Copied from rew/src/trice/lcand.c as it's not exported and we need it earlier.
  */
-static enum anyrtc_code set_foundation(
-        char* const foundation, // copied into, MUST be an array
+static uint32_t compute_foundation(
         const struct sa const* const address,
         enum ice_cand_type const tcp_type
 ) {
@@ -34,8 +34,7 @@ static enum anyrtc_code set_foundation(
     hash  = sa_hash(address, SA_ADDR);
     hash ^= tcp_type;  // Uh... I hope that's still unique...
 
-    // Copy
-    return anyrtc_snprintf(foundation, sizeof(foundation), "%08x", hash);
+    return hash;
 }
 
 /*
@@ -69,12 +68,6 @@ static bool is_supported_protocol(
     }
 }
 
-static void anyrtc_ice_candidate_destroy(void* arg) {
-    struct anyrtc_ice_candidate* candidate = arg;
-
-    // Dereference
-}
-
 /*
  * Create a new local ICE candidate.
  */
@@ -84,11 +77,11 @@ enum anyrtc_code anyrtc_ice_candidate_create(
         struct sa const* const address,
         enum ice_cand_type const candidate_type,
         int const protocol,
-        enum ice_tcptype const tcp_type
+        enum ice_tcptype const tcp_type,
+        struct sa const* const related_address // nullable
 ) {
     enum anyrtc_ice_protocol ice_protocol;
     struct anyrtc_ice_candidate* candidate;
-    uint32_t priority;
     enum anyrtc_code error;
 
     // Check arguments
@@ -102,31 +95,38 @@ enum anyrtc_code anyrtc_ice_candidate_create(
     }
 
     // Allocate
-    candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate), anyrtc_ice_candidate_destroy);
+    candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate), NULL);
     if (!candidate) {
         return ANYRTC_CODE_NO_MEMORY;
     }
 
-    // Calculate priority
-    priority = calculate_candidate_priority(candidate_type, protocol, tcp_type);
+    // Calculate and set priority
+    candidate->priority = calculate_candidate_priority(candidate_type, protocol, tcp_type);
 
-    // Set foundation
-    error = set_foundation(candidate->foundation, address, candidate_type);
+    // Compute and set foundation
+    candidate->key = compute_foundation(address, candidate_type);
+    error = anyrtc_snprintf(candidate->foundation, sizeof(candidate->foundation),
+                            "%08x", candidate->key);
     if (error) {
         goto out;
     }
 
-    // TODO: Continue here setting fields
-
     // Set fields/reference
-
+    candidate->address = *address;
+    candidate->protocol = ice_protocol;
+    candidate->type = candidate_type;
+    candidate->tcp_type = tcp_type;
+    if (related_address) {
+        candidate->related_address = *related_address;
+    }
 
     // Set pointer
     *candidatep = candidate;
-    DEBUG_PRINTF("Created local candidate %j, type: %s, protocol: %s, priority: %"PRIu32""
-                 ", tcp type: %s\n",
-                 address, "host", net_proto2name(protocol), priority,
-                 protocol == IPPROTO_TCP ? ice_tcptype_name(tcp_type) : "n/a");
+    DEBUG_PRINTF(
+            "Created local candidate %j, type: %s, protocol: %s, priority: %"PRIu32""
+            ", tcp type: %s\n",
+            address, ice_cand_type2name(candidate_type), net_proto2name(protocol),
+            candidate->priority, protocol == IPPROTO_TCP ? ice_tcptype_name(tcp_type) : "n/a");
 
 out:
     if (error) {

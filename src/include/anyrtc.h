@@ -297,13 +297,15 @@ struct anyrtc_ice_server_url {
  * TODO: private
  */
 struct anyrtc_ice_candidate {
+    struct le le;
+    uint32_t key;
     char foundation[32];
     uint32_t priority;
     struct sa address;
     enum anyrtc_ice_protocol protocol;
     enum ice_cand_type type;
     enum ice_tcptype tcp_type;
-    struct sa related_address;
+    struct sa related_address; // zero if host candidate
 };
 
 /*
@@ -317,6 +319,7 @@ struct anyrtc_ice_gatherer {
     anyrtc_ice_gatherer_error_handler* error_handler; // nullable
     anyrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
     void* arg; // nullable
+    struct hash* local_ice_candidates;
 };
 
 /*

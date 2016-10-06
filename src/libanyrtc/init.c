@@ -20,4 +20,5 @@ enum anyrtc_code anyrtc_init() {
 enum anyrtc_code anyrtc_close() {
     // Close re
     libre_close();
+    return ANYRTC_CODE_SUCCESS;
 }

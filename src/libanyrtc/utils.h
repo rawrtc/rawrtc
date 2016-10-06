@@ -12,7 +12,7 @@ enum anyrtc_code anyrtc_strdup(
 
 enum anyrtc_code anyrtc_snprintf(
     char* const destination,
-    size_t size const,
+    size_t const size,
     char* const formatter,
     ...
 );

@@ -90,6 +90,9 @@ int main(int argc, char* argv[argc + 1]) {
     // Start gathering
     EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
 
+    // Close gatherer
+    EOE(anyrtc_ice_gatherer_close(gatherer));
+
     // Dereference & close
     mem_deref(gatherer);
     mem_deref(gather_options);
