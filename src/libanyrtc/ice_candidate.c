@@ -10,7 +10,7 @@
 
 /*
  * Calculate the ICE candidate priority.
- * TODO: Couldn't find a related RFC/draft, yet. :/
+ * TODO: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-04#section-4.1.2.1
  */
 static uint32_t calculate_candidate_priority(
         enum ice_cand_type const candidate_type,
