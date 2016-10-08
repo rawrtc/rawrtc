@@ -19,8 +19,6 @@
 #define EXIT_ON_ERROR(code) exit_on_error(code, __FILE__, __LINE__)
 #define EXIT_ON_NULL(ptr) exit_on_null(ptr, __FILE__, __LINE__)
 
-#define SCTP_PORT 6000
-
 static void before_exit() {
     // Close
     libre_close();
@@ -752,11 +750,25 @@ long tls_set_dh_param(struct tls* const tls) {
     return 0;
 }
 
+static bool
+str_to_uint16(const char *str, uint16_t *res)
+{
+    char *end;
+    errno = 0;
+    intmax_t val = strtoimax(str, &end, 10);
+    if (errno == ERANGE || val < 0 || val > UINT16_MAX || end == str || *end != '\0')
+        return false;
+    *res = (uint16_t) val;
+    return true;
+}
+
 int main(int argc, char* argv[argc + 1]) {
     struct agent_t agent = {0};
-    // Offerer?
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <0|1 (offerer)> <redirect-ip>", argv[0]);
+    uint16_t sctp_port;
+
+    // Offerer? SCTP sctp_port?
+    if (argc < 4 || !str_to_uint16(argv[3], &sctp_port)) {
+        fprintf(stderr, "Usage: %s <0|1 (offerer)> <redirect-ip> <redirect-sctp_port>", argv[0]);
         return 1;
     }
     
@@ -797,7 +809,7 @@ int main(int argc, char* argv[argc + 1]) {
     agent.dtls_helper = NULL;
     
     // Create redirect raw socket
-    EXIT_ON_ERROR(sa_set_str(&agent.redirect_address, argv[2], SCTP_PORT));
+    EXIT_ON_ERROR(sa_set_str(&agent.redirect_address, argv[2], sctp_port));
     agent.redirect_socket = socket(AF_INET, SOCK_RAW, IPPROTO_SCTP);
     if (agent.redirect_socket == -1) {
         EXIT_ON_ERROR(errno);
