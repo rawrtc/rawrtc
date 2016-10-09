@@ -110,7 +110,8 @@ struct agent_t {
 struct trice_conf default_config = {
     .debug = true,
     .trace = true,
-    .ansi = true
+    .ansi = true,
+    .enable_prflx = true,
 };
 
 static uint16_t local_tcp_preference(enum ice_tcptype tcp_type, uint16_t other_preference) {
@@ -784,8 +785,9 @@ int main(int argc, char* argv[argc + 1]) {
     agent.config = default_config;
     rand_str(agent.ufrag, sizeof(agent.ufrag));
     rand_str(agent.pwd, sizeof(agent.pwd));
-    EXIT_ON_ERROR(trice_alloc(&agent.ice, &agent.config, agent.offerer,
-        agent.ufrag, agent.pwd));
+    EXIT_ON_ERROR(trice_alloc(&agent.ice, &agent.config,
+         agent.offerer ? ROLE_CONTROLLING : ROLE_CONTROLLED,
+         agent.ufrag, agent.pwd));
     agent.pacing_interval = 20;
     agent.have_remote = false;
     agent.selected_pair = NULL;
