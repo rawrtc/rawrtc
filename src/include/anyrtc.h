@@ -25,6 +25,7 @@ enum anyrtc_code {
     ANYRTC_CODE_INITIALISE_FAIL,
     ANYRTC_CODE_INVALID_ARGUMENT,
     ANYRTC_CODE_NO_MEMORY,
+    ANYRTC_CODE_INVALID_STATE,
     ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
 };
 
@@ -319,7 +320,10 @@ struct anyrtc_ice_gatherer {
     anyrtc_ice_gatherer_error_handler* error_handler; // nullable
     anyrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
     void* arg; // nullable
-    struct hash* local_ice_candidates;
+    char ice_username_fragment[9];
+    char ice_password[33];
+    struct trice* ice;
+    struct trice_conf ice_config;
 };
 
 /*
@@ -330,6 +334,19 @@ struct anyrtc_ice_transport {
     struct anyrtc_ice_gatherer* gatherer; // referenced
     enum anyrtc_ice_role role;
     enum anyrtc_ice_transport_state state;
+};
+
+/*
+ * Layers.
+ * TODO: private
+ */
+enum {
+    ANYRTC_LAYER_SCTP = 3,
+    ANYRTC_LAYER_DCEP = 2,
+    ANYRTC_LAYER_DTLS = 1,
+    ANYRTC_LAYER_ICE = 0,
+    ANYRTC_LAYER_STUN = -10,
+    ANYRTC_LAYER_TURN = -10
 };
 
 

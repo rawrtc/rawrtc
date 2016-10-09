@@ -1,15 +1,10 @@
 #pragma once
-#include <anyrtc.h>
 
 /*
- * Create a new ICE candidate.
+ * Calculate the ICE candidate priority.
  */
-enum anyrtc_code anyrtc_ice_candidate_create(
-    struct anyrtc_ice_candidate** const candidatep, // de-referenced
-    struct anyrtc_ice_gatherer* const gatherer,
-    struct sa const* const address,
+uint32_t anyrtc_ice_candidate_calculate_priority(
     enum ice_cand_type const candidate_type,
     int const protocol,
-    enum ice_tcptype const tcp_type,
-    struct sa const* const related_address // nullable
+    enum ice_tcptype const tcp_type
 );

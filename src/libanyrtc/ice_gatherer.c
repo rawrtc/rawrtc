@@ -1,3 +1,4 @@
+#include <netinet/in.h> // IPPROTO_UDP, IPPROTO_SCTP
 #include <anyrtc.h>
 #include "utils.h"
 #include "ice_gatherer.h"
@@ -185,8 +186,7 @@ static void anyrtc_ice_gatherer_destroy(void* arg) {
     struct anyrtc_ice_gatherer* gatherer = arg;
 
     // Dereference
-    hash_flush(gatherer->local_ice_candidates);
-    mem_deref(gatherer->local_ice_candidates);
+    mem_deref(gatherer->ice);
     mem_deref(gatherer->options);
 }
 
@@ -222,16 +222,27 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     gatherer->error_handler = error_handler;
     gatherer->local_candidate_handler = local_candidate_handler;
     gatherer->arg = arg;
-    error = anyrtc_code_re_translate(
-            hash_alloc(&gatherer->local_ice_candidates, BUCKET_SIZE_ICE_CANDIDATES));
+
+    // Generate random username fragment and password for ICE
+    rand_str(gatherer->ice_username_fragment, sizeof(gatherer->ice_username_fragment));
+    rand_str(gatherer->ice_password, sizeof(gatherer->ice_password));
+
+    // Set ICE configuration
+    // TODO: Add parameters to function arguments?
+    gatherer->ice_config.debug = true;
+    gatherer->ice_config.trace = true;
+    gatherer->ice_config.ansi = true;
+    gatherer->ice_config.enable_prflx = true;
+    error = anyrtc_code_re_translate(trice_alloc(
+            &gatherer->ice, &gatherer->ice_config, ROLE_UNKNOWN,
+            gatherer->ice_username_fragment, gatherer->ice_password));
     if (error) {
         goto out;
     }
 
 out:
     if (error) {
-        hash_flush(gatherer->local_ice_candidates);
-        mem_deref(gatherer->local_ice_candidates);
+        mem_deref(gatherer->ice);
         mem_deref(gatherer->options);
         mem_deref(gatherer);
     } else {
@@ -252,20 +263,20 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // Already closed?
+    if (gatherer->state == ANYRTC_ICE_GATHERER_CLOSED) {
+        return ANYRTC_CODE_SUCCESS;
+    }
+
+    // Stop ICE checklist (if running)
+    trice_checklist_stop(gatherer->ice);
+
+    // Remove ICE agent
+    gatherer->ice = mem_deref(gatherer->ice);
+
     // Set state to closed and return
     gatherer->state = ANYRTC_ICE_GATHERER_CLOSED;
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
-}
-
-/*
- * Check if a candidate has already been added.
- */
-static bool candidate_hash_compare_handler(struct le* const le, void* const arg) {
-    uint32_t const key = *((uint32_t*) arg);
-    struct anyrtc_ice_candidate const* const candidate = le->data;
-
-    // Check if another candidate has the same key
-    return candidate->key == key;
+    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
@@ -277,7 +288,9 @@ static bool interface_handler(
         void* const arg
 ) {
     struct anyrtc_ice_gatherer* const gatherer = arg;
-    struct anyrtc_ice_candidate* candidate;
+    struct ice_lcand* candidate;
+    uint32_t priority;
+    int error;
 
     // Ignore loopback and linklocal addresses
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
@@ -286,20 +299,20 @@ static bool interface_handler(
 
     DEBUG_PRINTF("Gathered local interface %j\n", address);
 
-    // Create UDP ICE candidate
-    anyrtc_ice_candidate_create(&candidate, gatherer, address, ICE_CAND_TYPE_HOST,
-                                IPPROTO_UDP, ICE_TCP_ACTIVE, NULL);
-
-    // Add candidate to ICE gatherer (if not already added)
-    if (list_ledata(hash_lookup(gatherer->local_ice_candidates, candidate->key,
-                                candidate_hash_compare_handler, &candidate->key))) {
-        DEBUG_PRINTF("Interface already added");
-        // Continue gathering
-        return false;
+    // Add UDP candidate to ICE gatherer (if not already added)
+    // TODO: Check if already added?
+    // TODO: Set component id properly
+    priority = anyrtc_ice_candidate_calculate_priority(
+            ICE_CAND_TYPE_HOST, IPPROTO_UDP, ICE_TCP_ACTIVE);
+    error = trice_lcand_add(
+            &candidate, gatherer->ice, 1, IPPROTO_UDP, priority, address,
+            NULL, ICE_CAND_TYPE_HOST, NULL, ICE_TCP_ACTIVE, NULL, ANYRTC_LAYER_ICE);
+    if (error) {
+        DEBUG_WARNING("Could not add UDP candidate: %m", error);
+        return false; // Continue gathering
     }
 
-    // TODO: Create TCP ICE candidate (?)
-
+    // TODO: Add TCP candidate to ICE gatherer (if not already added) (?)
 
     // TODO: Gather srflx candidates
     DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);
@@ -317,6 +330,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
         struct anyrtc_ice_gatherer* const gatherer,
         struct anyrtc_ice_gather_options* options // referenced, nullable
 ) {
+    enum anyrtc_code error;
 
     // Check arguments
     if (!gatherer) {
@@ -324,6 +338,16 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     }
     if (!options) {
         options = gatherer->options;
+    }
+
+    // Check state
+    if (gatherer->state == ANYRTC_ICE_GATHERER_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Already gathering?
+    if (gatherer->state == ANYRTC_ICE_GATHERER_GATHERING) {
+        return ANYRTC_CODE_SUCCESS;
     }
 
     // Update state
@@ -334,5 +358,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
         net_if_apply(interface_handler, gatherer);
     }
 
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    // TODO: Debug only
+    error = anyrtc_code_re_translate(trice_debug(&anyrtc_stdout, gatherer->ice));
+    return error;
 }

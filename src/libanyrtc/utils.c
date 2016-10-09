@@ -2,6 +2,11 @@
 #include <anyrtc.h>
 #include "utils.h"
 
+struct re_printf anyrtc_stdout = {anyrtc_stdout_handler, NULL};
+
+/*
+ * TODO: Add codes from trice_lcand_add
+ */
 enum anyrtc_code anyrtc_code_re_translate(
         int code
 ) {
@@ -15,6 +20,20 @@ enum anyrtc_code anyrtc_code_re_translate(
         default:
             return ANYRTC_CODE_UNKNOWN_ERROR;
     }
+}
+
+int anyrtc_stdout_handler(
+        char const* const str,
+        size_t const size,
+        void* const arg
+) {
+    (void) arg;
+
+    if (fwrite(str, size, 1, stdout) != 1) {
+        return ENOMEM;
+    }
+
+    return 0;
 }
 
 enum anyrtc_code anyrtc_strdup(
