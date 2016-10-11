@@ -84,6 +84,25 @@ enum anyrtc_code anyrtc_ice_transport_create(
 }
 
 /*
+ * Change the state of the ICE transport.
+ * Will call the corresponding handler.
+ */
+static enum anyrtc_code set_state(
+        struct anyrtc_ice_transport* const transport,
+        enum anyrtc_ice_transport_state const state
+) {
+    // Set state
+    transport->state = state;
+
+    // Call handler (if any)
+    if (transport->state_change_handler) {
+        transport->state_change_handler(state, transport->arg);
+    }
+
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Start the ICE transport.
  */
 enum anyrtc_code anyrtc_ice_transport_start(
