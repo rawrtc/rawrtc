@@ -2,6 +2,7 @@
 set(anyrtc_SOURCES
         ice_candidate.c
         ice_gatherer.c
+        ice_parameters.c
         ice_transport.c
         main.c
         utils.c)

@@ -1,14 +1,15 @@
 # Tool: ice-gatherer
 add_executable(ice-gatherer ice-gatherer.c)
 target_link_libraries(ice-gatherer
-        anyrtc)  # TODO: static leads to undefined references of rew
+        anyrtc
+        ${anyrtc_DEP_LIBRARIES})
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
 # Tool: ice-gatherer
 add_executable(ice-transport ice-transport.c)
 target_link_libraries(ice-transport
-        anyrtc)  # TODO: static leads to undefined references of rew
+        anyrtc)
 install(TARGETS ice-transport
         DESTINATION bin)
 

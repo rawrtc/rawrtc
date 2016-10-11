@@ -402,6 +402,18 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     }
 
     // TODO: Debug only
-    error = anyrtc_code_re_translate(trice_debug(&anyrtc_stdout, gatherer->ice));
-    return error;
+    DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get local ICE parameters of a gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
+        struct anyrtc_ice_gatherer* const gatherer,
+        struct anyrtc_ice_parameters** const parametersp // de-referenced
+) {
+    // Create and return ICE parameters instance
+    return anyrtc_ice_parameters_create(
+            parametersp, gatherer->ice_username_fragment, gatherer->ice_password, false);
 }

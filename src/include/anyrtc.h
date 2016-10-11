@@ -135,7 +135,6 @@ enum anyrtc_ice_protocol {
  */
 struct anyrtc_ice_candidate;
 struct anyrtc_data_channel;
-struct anyrtc_ice_parameters;
 struct anyrtc_dtls_transport;
 struct anyrtc_dtls_parameters;
 struct anyrtc_data_channel_parameters;
@@ -296,7 +295,7 @@ struct anyrtc_ice_server_url {
 
 /*
  * ICE candidate.
- * TODO: private
+ * TODO: private, needs update
  */
 struct anyrtc_ice_candidate {
     struct le le;
@@ -308,6 +307,15 @@ struct anyrtc_ice_candidate {
     enum ice_cand_type type;
     enum ice_tcptype tcp_type;
     struct sa related_address; // zero if host candidate
+};
+
+/*
+ * ICE parameters.
+ */
+struct anyrtc_ice_parameters {
+    char* username_fragment; // copied
+    char* password; // copied
+    bool ice_lite;
 };
 
 /*
@@ -337,6 +345,7 @@ struct anyrtc_ice_transport {
     anyrtc_ice_transport_state_change_handler* state_change_handler; // nullable
     anyrtc_ice_transport_candidate_pair_change_handler* candidate_pair_change_handler; // nullable
     void* arg; // nullable
+    struct anyrtc_ice_parameters* remote_parameters; // referenced
     enum anyrtc_ice_role role;
 };
 
@@ -365,6 +374,16 @@ enum anyrtc_code anyrtc_init();
  * Close anyrtc and free up all resources.
  */
 enum anyrtc_code anyrtc_close();
+
+/*
+ * Create a new ICE parameters instance.
+ */
+enum anyrtc_code anyrtc_ice_parameters_create(
+        struct anyrtc_ice_parameters** const parametersp, // de-referenced
+        char* const username_fragment, // copied
+        char* const password, // copied
+        bool const ice_lite
+);
 
 /*
  * Create a new ICE gather options.
@@ -437,6 +456,18 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  * anyrtc_ice_gatherer_get_component
  * anyrtc_ice_gatherer_get_state
  * anyrtc_ice_gatherer_get_local_parameters
+ */
+
+/*
+ * Get local ICE parameters of a gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
+        struct anyrtc_ice_gatherer* const gatherer,
+        struct anyrtc_ice_parameters** const parametersp // de-referenced
+);
+
+/*
+ * TODO (from RTCIceGatherer interface)
  * anyrtc_ice_gatherer_get_local_candidates
  * anyrtc_ice_gatherer_create_associated_gatherer (unsupported)
  * anyrtc_ice_gatherer_set_state_change_handler
@@ -468,7 +499,7 @@ enum anyrtc_code anyrtc_ice_transport_create(
 enum anyrtc_code anyrtc_ice_transport_start(
     struct anyrtc_ice_transport* const transport,
     struct anyrtc_ice_gatherer* const gatherer, // referenced
-    struct anyrtc_ice_parameters const * const remote_parameters, // copied
+    struct anyrtc_ice_parameters* const remote_parameters, // referenced
     enum anyrtc_ice_role const role
 );
 

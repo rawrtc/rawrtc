@@ -10,6 +10,15 @@
 
 #define EOE(code) exit_on_error(code, __FILE__, __LINE__)
 
+struct client {
+    char* name;
+    struct anyrtc_ice_gather_options* gather_options;
+    struct anyrtc_ice_parameters* remote_parameters;
+    enum anyrtc_ice_role const role;
+    struct anyrtc_ice_gatherer* gatherer;
+    struct anyrtc_ice_transport* ice_transport;
+};
+
 static void before_exit() {
     // Close
     anyrtc_close();
@@ -20,12 +29,18 @@ static void before_exit() {
 }
 
 static void exit_on_error(enum anyrtc_code code, char const* const file, uint32_t line) {
-    // TODO: Un-ignore not implemented
-    if (code != ANYRTC_CODE_SUCCESS && code != ANYRTC_CODE_NOT_IMPLEMENTED) {
-        fprintf(stderr, "Error in %s %"PRIu32" (%d): NO TRANSLATION\n",
-                file, line, code);
-        before_exit();
-        exit((int) code);
+    switch (code) {
+        case ANYRTC_CODE_SUCCESS:
+            return;
+        case ANYRTC_CODE_NOT_IMPLEMENTED:
+            fprintf(stderr, "Not implemented in %s %"PRIu32"\n",
+                    file, line);
+            return;
+        default:
+            fprintf(stderr, "Error in %s %"PRIu32" (%d): NO TRANSLATION\n",
+                    file, line, code);
+            before_exit();
+            exit((int) code);
     }
 }
 
@@ -33,8 +48,10 @@ static void ice_gatherer_state_change_handler(
         enum anyrtc_ice_gatherer_state const state, // read-only
         void* const arg
 ) {
+    struct client* const client = arg;
+    char const * const state_name = anyrtc_ice_gatherer_state_to_name(state);
     (void) arg;
-    DEBUG_PRINTF("ICE gatherer state: %s\n", anyrtc_ice_gatherer_state_to_name(state));
+    DEBUG_PRINTF("(%s) ICE gatherer state: %s\n", client->name, state_name);
 }
 
 static void ice_gatherer_error_handler(
@@ -44,8 +61,9 @@ static void ice_gatherer_error_handler(
         char const * const error_text, // read-only
         void* const arg
 ) {
+    struct client* const client = arg;
     (void) host_candidate; (void) error_code; (void) arg;
-    DEBUG_PRINTF("ICE gatherer error, URL: %s, reason: %s\n", url, error_text);
+    DEBUG_PRINTF("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
 static void ice_gatherer_local_candidate_handler(
@@ -53,16 +71,19 @@ static void ice_gatherer_local_candidate_handler(
         char const * const url, // read-only
         void* const arg
 ) {
+    struct client* const client = arg;
     (void) candidate; (void) arg;
-    DEBUG_PRINTF("ICE gatherer local candidate, URL: %s\n", url);
+    DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
 }
 
 static void ice_transport_state_change_handler(
         enum anyrtc_ice_transport_state const state,
         void* const arg
 ) {
+    struct client* const client = arg;
+    char const * const state_name = anyrtc_ice_transport_state_to_name(state);
     (void) arg;
-    DEBUG_PRINTF("ICE transport state: %s\n", anyrtc_ice_transport_state_to_name(state));
+    DEBUG_PRINTF("(%s) ICE transport state: %s\n", client->name, state_name);
 }
 
 static void ice_transport_candidate_pair_change_handler(
@@ -70,8 +91,9 @@ static void ice_transport_candidate_pair_change_handler(
         struct anyrtc_ice_candidate* const remote, // read-only
         void* const arg
 ) {
-    (void) local; (void) remote; (void) arg;
-    DEBUG_PRINTF("ICE transport candidate pair change\n");
+    struct client* const client = arg;
+    (void) local; (void) remote;
+    DEBUG_PRINTF("(%s) ICE transport candidate pair change\n", client->name);
 }
 
 static void signal_handler(
@@ -81,13 +103,55 @@ static void signal_handler(
     re_cancel();
 }
 
+struct anyrtc_ice_parameters* client_init(
+        struct client* const client
+) {
+    struct anyrtc_ice_parameters* local_parameters;
+
+    // Create ICE gatherer
+    EOE(anyrtc_ice_gatherer_create(
+            &client->gatherer, client->gather_options,
+            ice_gatherer_state_change_handler, ice_gatherer_error_handler,
+            ice_gatherer_local_candidate_handler, client));
+
+    // Create ICE transport
+    EOE(anyrtc_ice_transport_create(
+            &client->ice_transport, client->gatherer,
+            ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
+            client));
+
+    // Get and return local parameters
+    EOE(anyrtc_ice_gatherer_get_local_parameters(client->gatherer, &local_parameters));
+    return local_parameters;
+}
+
+void client_start(
+        struct client* const client
+) {
+    // Start gathering & transport
+    EOE(anyrtc_ice_gatherer_gather(client->gatherer, NULL));
+    EOE(anyrtc_ice_transport_start(
+            client->ice_transport, client->gatherer, client->remote_parameters, client->role));
+}
+
+void client_stop(
+        struct client* const client
+) {
+    // Stop transport & close gatherer
+    EOE(anyrtc_ice_transport_stop(client->ice_transport));
+    EOE(anyrtc_ice_gatherer_close(client->gatherer));
+
+    // Dereference & close
+    client->ice_transport = mem_deref(client->ice_transport);
+    client->gatherer = mem_deref(client->gatherer);
+}
+
 int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
-    struct anyrtc_ice_gatherer* gatherer;
-    struct anyrtc_ice_transport* transport;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
-    enum anyrtc_ice_role local_role = ANYRTC_ICE_ROLE_CONTROLLING;
+    struct anyrtc_ice_parameters* parameters_a;
+    struct anyrtc_ice_parameters* parameters_b;
 
     // Initialise
     EOE(anyrtc_init());
@@ -110,34 +174,26 @@ int main(int argc, char* argv[argc + 1]) {
             sizeof(turn_zwuenf_org_urls) / sizeof(char *),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
-    // Create ICE gatherer
-    EOE(anyrtc_ice_gatherer_create(
-            &gatherer, gather_options,
-            ice_gatherer_state_change_handler, ice_gatherer_error_handler,
-            ice_gatherer_local_candidate_handler, NULL));
-
-    // Create ICE transport
-    EOE(anyrtc_ice_transport_create(
-            &transport, gatherer,
-            ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
-            NULL));
-
-    // Start gathering & transport
-    EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
-    EOE(anyrtc_ice_transport_start(transport, NULL, NULL, local_role));
+    // Start clients
+    struct client a = {"A", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLING, NULL, NULL};
+    struct client b = {"B", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLED, NULL, NULL};
+    b.remote_parameters = client_init(&a);
+    a.remote_parameters = client_init(&b);
+    client_start(&a);
+    client_start(&b);
 
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
     EOE(anyrtc_code_re_translate(re_main(signal_handler)));
 
-    // Stop transport & close gatherer
-    EOE(anyrtc_ice_transport_stop(transport));
-    EOE(anyrtc_ice_gatherer_close(gatherer));
+    // Stop clients
+    client_stop(&a);
+    client_stop(&b);
 
-    // Dereference & close
-    mem_deref(transport);
-    mem_deref(gatherer);
+    // Free
+    mem_deref(a.remote_parameters);
+    mem_deref(b.remote_parameters);
     mem_deref(gather_options);
 
     // Bye
