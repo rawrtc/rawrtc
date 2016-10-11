@@ -393,7 +393,14 @@ enum anyrtc_code anyrtc_ice_gather_options_add_server(
  * anyrtc_ice_server_set_credential
  * anyrtc_ice_server_set_credential_type
  */
- 
+
+/*
+ * Get the corresponding name for an ICE gatherer state.
+ */
+char const * const anyrtc_ice_gatherer_state_to_name(
+    enum anyrtc_ice_gatherer_state state
+);
+
  /*
   * Create a new ICE gatherer.
   */
@@ -596,3 +603,12 @@ enum anyrtc_code anyrtc_sctp_transport_stop(
  * anyrtc_sctp_transport_get_capabilities
  * anyrtc_sctp_transport_set_data_channel_handler
  */
+
+
+
+/*
+ * Translate an re error to an anyrtc code.
+ */
+enum anyrtc_code anyrtc_code_re_translate(
+    int code
+);

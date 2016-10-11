@@ -5,6 +5,7 @@
 struct re_printf anyrtc_stdout = {anyrtc_stdout_handler, NULL};
 
 /*
+ * Translate an re error to an anyrtc code.
  * TODO: Add codes from trice_lcand_add
  */
 enum anyrtc_code anyrtc_code_re_translate(

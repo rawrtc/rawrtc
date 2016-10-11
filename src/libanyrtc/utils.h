@@ -1,10 +1,6 @@
 #pragma once
 #include <anyrtc.h>
 
-enum anyrtc_code anyrtc_code_re_translate(
-    int code
-);
-
 int anyrtc_stdout_handler(
     char const* const str,
     size_t const size,

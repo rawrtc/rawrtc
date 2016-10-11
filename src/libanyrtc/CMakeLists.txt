@@ -2,7 +2,7 @@
 set(anyrtc_SOURCES
         ice_candidate.c
         ice_gatherer.c
-        init.c
+        main.c
         utils.c)
 
 # Setup library (link & install)

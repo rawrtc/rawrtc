@@ -191,6 +191,26 @@ static void anyrtc_ice_gatherer_destroy(void* arg) {
 }
 
 /*
+ * Get the corresponding name for an ICE gatherer state.
+ */
+char const * const anyrtc_ice_gatherer_state_to_name(
+        enum anyrtc_ice_gatherer_state state
+) {
+    switch (state) {
+        case ANYRTC_ICE_GATHERER_NEW:
+            return "new";
+        case ANYRTC_ICE_GATHERER_GATHERING:
+            return "gathering";
+        case ANYRTC_ICE_GATHERER_COMPLETE:
+            return "complete";
+        case ANYRTC_ICE_GATHERER_CLOSED:
+            return "closed";
+        default:
+            return "???";
+    }
+}
+
+/*
  * Create a new ICE gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_create(
@@ -253,6 +273,26 @@ out:
 }
 
 /*
+ * Change the state of the ICE gatherer.
+ * Will call the corresponding handler.
+ * TODO: https://github.com/w3c/ortc/issues/606
+ */
+static enum anyrtc_code set_state(
+        struct anyrtc_ice_gatherer* const gatherer,
+        enum anyrtc_ice_gatherer_state const state
+) {
+    // Set state
+    gatherer->state = state;
+
+    // Call handler (if any)
+    if (gatherer->state_change_handler) {
+        gatherer->state_change_handler(state, gatherer->arg);
+    }
+
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Close the ICE gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_close(
@@ -275,8 +315,7 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
     gatherer->ice = mem_deref(gatherer->ice);
 
     // Set state to closed and return
-    gatherer->state = ANYRTC_ICE_GATHERER_CLOSED;
-    return ANYRTC_CODE_SUCCESS;
+    return set_state(gatherer, ANYRTC_ICE_GATHERER_CLOSED);
 }
 
 /*
@@ -351,7 +390,10 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     }
 
     // Update state
-    gatherer->state = ANYRTC_ICE_GATHERER_GATHERING;
+    error = set_state(gatherer, ANYRTC_ICE_GATHERER_GATHERING);
+    if (error) {
+        return error;
+    }
 
     // Start gathering host candidates
     if (options->gather_policy != ANYRTC_ICE_GATHER_NOHOST) {
@@ -362,3 +404,5 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     error = anyrtc_code_re_translate(trice_debug(&anyrtc_stdout, gatherer->ice));
     return error;
 }
+
+#pragma clang diagnostic pop

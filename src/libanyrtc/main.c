@@ -1,6 +1,5 @@
 #include <anyrtc.h>
-#include <re.h>
-#include "init.h"
+#include "main.h"
 
 /*
  * Initialise anyrtc. Must be called before making a call to any other

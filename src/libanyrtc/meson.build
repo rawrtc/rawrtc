@@ -1,6 +1,9 @@
 # Library sources
 anyrtc_sources = [
-    'dcep.c',
+    'ice_candidate.c',
+    'ice_gatherer.c',
+    'main.c',
+    'utils.c',
 ]
 
 # Setup library (link & install)

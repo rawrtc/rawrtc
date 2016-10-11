@@ -33,7 +33,7 @@ static void ice_gatherer_state_change_handler(
         enum anyrtc_ice_gatherer_state const state, // read-only
         void* const arg
 ) {
-    DEBUG_PRINTF("ICE gatherer state change: %d\n", state);
+    DEBUG_PRINTF("ICE gatherer state: %s\n", anyrtc_ice_gatherer_state_to_name(state));
 }
 
 static void ice_gatherer_error_handler(
@@ -52,6 +52,13 @@ static void ice_gatherer_local_candidate_handler(
         void* const arg
 ) {
     DEBUG_PRINTF("ICE gatherer local candidate, URL: %s\n", url);
+}
+
+static void signal_handler(
+        int sig
+) {
+    DEBUG_INFO("\rGot signal: %d, terminating...\n", sig);
+    re_cancel();
 }
 
 int main(int argc, char* argv[argc + 1]) {
@@ -89,6 +96,11 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Start gathering
     EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
+
+    // Start main loop
+    // TODO: Wrap re_main?
+    // TODO: Stop main loop once gathering is complete
+    EOE(anyrtc_code_re_translate(re_main(signal_handler)));
 
     // Close gatherer
     EOE(anyrtc_ice_gatherer_close(gatherer));

@@ -1,6 +1,5 @@
 #include <anyrtc.h>
 #include "ice_candidate.h"
-#include "utils.h"
 
 #define DEBUG_MODULE "ice-candidate"
 #define DEBUG_LEVEL 7
