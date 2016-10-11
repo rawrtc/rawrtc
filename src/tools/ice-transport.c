@@ -87,6 +87,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_transport* transport;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    enum anyrtc_ice_role local_role = ANYRTC_ICE_ROLE_CONTROLLING;
 
     // Initialise
     EOE(anyrtc_init());
@@ -121,15 +122,17 @@ int main(int argc, char* argv[argc + 1]) {
             ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
             NULL));
 
-    // Start gathering
+    // Start gathering & transport
     EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
+    EOE(anyrtc_ice_transport_start(transport, NULL, NULL, local_role));
 
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
     EOE(anyrtc_code_re_translate(re_main(signal_handler)));
 
-    // Close gatherer
+    // Stop transport & close gatherer
+    EOE(anyrtc_ice_transport_stop(transport));
     EOE(anyrtc_ice_gatherer_close(gatherer));
 
     // Dereference & close

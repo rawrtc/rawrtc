@@ -78,6 +78,8 @@ enum anyrtc_code anyrtc_ice_transport_create(
     transport->arg = arg;
     transport->role = ANYRTC_ICE_ROLE_UNKNOWN;
 
+    // Set pointer
+    *transportp = transport;
     return ANYRTC_CODE_SUCCESS;
 }
 
