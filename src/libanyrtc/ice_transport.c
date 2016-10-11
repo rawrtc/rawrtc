@@ -223,3 +223,27 @@ enum anyrtc_code anyrtc_ice_transport_stop(
 
     return ANYRTC_CODE_SUCCESS;
 }
+
+/*
+ * Add a remote candidate ot the ICE transport.
+ * Note: 'candidate' must be NULL to inform the transport that the
+ * remote site finished gathering.
+ */
+enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
+        struct anyrtc_ice_candidate* candidate // referenced, nullable
+) {
+    // TODO: Implement (continue here)
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Set the remote candidates on the ICE transport overwriting all
+ * existing remote candidates.
+ */
+enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
+        struct anyrtc_ice_candidate* candidate[], // referenced (each item)
+        size_t const length
+) {
+    // TODO: Implement
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}

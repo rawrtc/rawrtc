@@ -150,8 +150,6 @@ int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
-    struct anyrtc_ice_parameters* parameters_a;
-    struct anyrtc_ice_parameters* parameters_b;
 
     // Initialise
     EOE(anyrtc_init());
