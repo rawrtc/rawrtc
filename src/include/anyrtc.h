@@ -71,8 +71,9 @@ enum anyrtc_ice_component {
  * Current role of the ICE transport.
  */
 enum anyrtc_ice_role {
-    ANYRTC_ICE_ROLE_CONTROLLING,
-    ANYRTC_ICE_ROLE_CONTROLLED,
+    ANYRTC_ICE_ROLE_UNKNOWN = ROLE_UNKNOWN,
+    ANYRTC_ICE_ROLE_CONTROLLING = ROLE_CONTROLLING,
+    ANYRTC_ICE_ROLE_CONTROLLED = ROLE_CONTROLLED,
 };
 
 /*
@@ -177,7 +178,7 @@ typedef void (anyrtc_ice_gatherer_local_candidate_handler)(
  * ICE transport state change handler.
  */
 typedef void (anyrtc_ice_transport_state_change_handler)(
-    enum anyrtc_ice_transport_state const state, // read-only
+    enum anyrtc_ice_transport_state const state,
     void* const arg
 );
 
@@ -331,9 +332,12 @@ struct anyrtc_ice_gatherer {
  * TODO: private
  */
 struct anyrtc_ice_transport {
-    struct anyrtc_ice_gatherer* gatherer; // referenced
-    enum anyrtc_ice_role role;
     enum anyrtc_ice_transport_state state;
+    struct anyrtc_ice_gatherer* gatherer; // referenced
+    anyrtc_ice_transport_state_change_handler* state_change_handler; // nullable
+    anyrtc_ice_transport_candidate_pair_change_handler* candidate_pair_change_handler; // nullable
+    void* arg; // nullable
+    enum anyrtc_ice_role role;
 };
 
 /*
@@ -439,12 +443,19 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  * anyrtc_ice_gatherer_set_error_handler
  * anyrtc_ice_gatherer_set_local_candidate_handler
  */
- 
+
+/*
+ * Get the corresponding name for an ICE transport state.
+ */
+char const * const anyrtc_ice_transport_state_to_name(
+    enum anyrtc_ice_transport_state state
+);
+
 /*
  * Create a new ICE transport.
  */
 enum anyrtc_code anyrtc_ice_transport_create(
-    struct anyrtc_ice_transport** const transport, // de-referenced
+    struct anyrtc_ice_transport** const transportp, // de-referenced
     struct anyrtc_ice_gatherer* const gatherer, // referenced, nullable
     anyrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
     anyrtc_ice_transport_candidate_pair_change_handler* const candidate_pair_change_handler, // nullable

@@ -4,7 +4,7 @@
 #include <anyrtc.h>
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "ice-gatherer-app"
+#define DEBUG_MODULE "ice-transport-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
@@ -57,6 +57,23 @@ static void ice_gatherer_local_candidate_handler(
     DEBUG_PRINTF("ICE gatherer local candidate, URL: %s\n", url);
 }
 
+static void ice_transport_state_change_handler(
+        enum anyrtc_ice_transport_state const state,
+        void* const arg
+) {
+    (void) arg;
+    DEBUG_PRINTF("ICE transport state: %s\n", anyrtc_ice_transport_state_to_name(state));
+}
+
+static void ice_transport_candidate_pair_change_handler(
+        struct anyrtc_ice_candidate* const local, // read-only
+        struct anyrtc_ice_candidate* const remote, // read-only
+        void* const arg
+) {
+    (void) local; (void) remote; (void) arg;
+    DEBUG_PRINTF("ICE transport candidate pair change\n");
+}
+
 static void signal_handler(
         int sig
 ) {
@@ -67,6 +84,7 @@ static void signal_handler(
 int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
     struct anyrtc_ice_gatherer* gatherer;
+    struct anyrtc_ice_transport* transport;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
 
@@ -97,6 +115,12 @@ int main(int argc, char* argv[argc + 1]) {
             ice_gatherer_state_change_handler, ice_gatherer_error_handler,
             ice_gatherer_local_candidate_handler, NULL));
 
+    // Create ICE transport
+    EOE(anyrtc_ice_transport_create(
+            &transport, gatherer,
+            ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
+            NULL));
+
     // Start gathering
     EOE(anyrtc_ice_gatherer_gather(gatherer, NULL));
 
@@ -109,6 +133,7 @@ int main(int argc, char* argv[argc + 1]) {
     EOE(anyrtc_ice_gatherer_close(gatherer));
 
     // Dereference & close
+    mem_deref(transport);
     mem_deref(gatherer);
     mem_deref(gather_options);
 

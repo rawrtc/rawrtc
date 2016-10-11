@@ -180,17 +180,6 @@ out:
 }
 
 /*
- * Destructor for an existing ICE gatherer.
- */
-static void anyrtc_ice_gatherer_destroy(void* arg) {
-    struct anyrtc_ice_gatherer* gatherer = arg;
-
-    // Dereference
-    mem_deref(gatherer->ice);
-    mem_deref(gatherer->options);
-}
-
-/*
  * Get the corresponding name for an ICE gatherer state.
  */
 char const * const anyrtc_ice_gatherer_state_to_name(
@@ -208,6 +197,17 @@ char const * const anyrtc_ice_gatherer_state_to_name(
         default:
             return "???";
     }
+}
+
+/*
+ * Destructor for an existing ICE gatherer.
+ */
+static void anyrtc_ice_gatherer_destroy(void* arg) {
+    struct anyrtc_ice_gatherer* gatherer = arg;
+
+    // Dereference
+    mem_deref(gatherer->ice);
+    mem_deref(gatherer->options);
 }
 
 /*
@@ -341,6 +341,7 @@ static bool interface_handler(
     // Add UDP candidate to ICE gatherer (if not already added)
     // TODO: Check if already added?
     // TODO: Set component id properly
+    // TODO: Raise on_local_candidate event
     priority = anyrtc_ice_candidate_calculate_priority(
             ICE_CAND_TYPE_HOST, IPPROTO_UDP, ICE_TCP_ACTIVE);
     error = trice_lcand_add(
@@ -404,5 +405,3 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     error = anyrtc_code_re_translate(trice_debug(&anyrtc_stdout, gatherer->ice));
     return error;
 }
-
-#pragma clang diagnostic pop

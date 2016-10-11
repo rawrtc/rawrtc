@@ -5,6 +5,13 @@ target_link_libraries(ice-gatherer
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
+# Tool: ice-gatherer
+add_executable(ice-transport ice-transport.c)
+target_link_libraries(ice-transport
+        anyrtc)  # TODO: static leads to undefined references of rew
+install(TARGETS ice-transport
+        DESTINATION bin)
+
 # Tool: redirect-sctp
 add_executable(redirect-sctp redirect-sctp.c)
 target_link_libraries(redirect-sctp
