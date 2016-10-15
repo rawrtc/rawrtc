@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <anyrtc.h>
 #include "ice_transport.h"
 #include "utils.h"
@@ -105,6 +106,46 @@ static enum anyrtc_code set_state(
 }
 
 /*
+ * ICE connection established callback.
+ */
+static void ice_established_handler(
+        struct ice_candpair* const candidate_pair,
+        struct stun_msg const* const message,
+        void* const arg
+) {
+    struct anyrtc_ice_transport* const transport = arg;
+    DEBUG_PRINTF("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
+
+    // TODO: Continue here
+
+    // Completed all candidate pairs?
+    if (trice_checklist_iscompleted(transport->gatherer->ice)) {
+        DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+    }
+}
+
+/*
+ * ICE connection failed callback.
+ */
+static void ice_failed_handler(
+        int err,
+        uint16_t stun_code,
+        struct ice_candpair* const candidate_pair,
+        void* const arg
+) {
+    struct anyrtc_ice_transport* const transport = arg;
+    DEBUG_PRINTF("Candidate pair failed: %H (%m %"PRIu16")\n",
+                 trice_candpair_debug, candidate_pair, err, stun_code);
+
+    // TODO: Continue here
+
+    // Completed all candidate pairs?
+    if (trice_checklist_iscompleted(transport->gatherer->ice)) {
+        DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+    }
+}
+
+/*
  * Start the ICE transport.
  * TODO https://github.com/w3c/ortc/issues/607
  */
@@ -196,6 +237,17 @@ enum anyrtc_code anyrtc_ice_transport_start(
         return error;
     }
 
+    // Starting checklist
+    // TODO: Is this the correct place?
+    // TODO: Get config from struct
+    // TODO: Why are there no keep-alive messages?
+    error = anyrtc_translate_re_code(trice_checklist_start(
+            transport->gatherer->ice, NULL, anyrtc_default_config.pacing_interval, true,
+            ice_established_handler, ice_failed_handler, transport));
+    if (error) {
+        return error;
+    }
+
     // TODO: Debug only
     DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
     return ANYRTC_CODE_SUCCESS;
@@ -233,8 +285,110 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
         struct anyrtc_ice_transport* const transport,
         struct anyrtc_ice_candidate* candidate // referenced, nullable
 ) {
-    // TODO: Implement (continue here)
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    struct ice_rcand* re_candidate = NULL;
+    enum anyrtc_code error;
+    char* foundation = NULL;
+    enum anyrtc_ice_protocol protocol;
+    uint32_t priority;
+    char* ip = NULL;
+    uint16_t port;
+    enum anyrtc_ice_candidate_type type;
+    enum anyrtc_ice_tcp_candidate_type tcp_type;
+    char* related_address = NULL;
+    struct sa address;
+
+    // Check arguments
+    if (!transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check ICE transport state
+    if (transport->state == ANYRTC_ICE_TRANSPORT_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Get necessary vars
+    error = anyrtc_ice_candidate_get_foundation(candidate, &foundation);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_protocol(candidate, &protocol);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_priority(candidate, &priority);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_ip(candidate, &ip);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_port(candidate, &port);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_type(candidate, &type);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_tcp_type(candidate, &tcp_type);
+    switch (error) {
+        case ANYRTC_CODE_SUCCESS:
+            break;
+        case ANYRTC_CODE_NO_VALUE:
+            // Doesn't matter what we choose here, protocol is not TCP anyway
+            tcp_type = ANYRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
+            break;
+        default:
+            goto out;
+    }
+    error = anyrtc_translate_re_code(sa_set_str(&address, ip, port));
+    if (error) {
+        goto out;
+    }
+
+    // Add remote candidate
+    // TODO: Set correct component ID
+    error = anyrtc_translate_re_code(trice_rcand_add(
+            &re_candidate, transport->gatherer->ice, 1, foundation,
+            anyrtc_translate_ice_protocol(protocol), priority, &address,
+            anyrtc_translate_ice_candidate_type(type),
+            anyrtc_translate_ice_tcp_candidate_type(tcp_type)));
+    if (error) {
+        goto out;
+    }
+
+    // Set related address (if any)
+    error = anyrtc_ice_candidate_get_related_address(candidate, &related_address);
+    if (!error) {
+        error = anyrtc_ice_candidate_get_related_port(candidate, &port);
+        if (!error) {
+            error = anyrtc_translate_re_code(sa_set_str(
+                    &re_candidate->attr.rel_addr, related_address, port));
+            if (error) {
+                goto out;
+            }
+        }
+    }
+    if (error != ANYRTC_CODE_NO_VALUE) {
+        goto out;
+    }
+
+    // Done
+    DEBUG_PRINTF("Added remote candidate: %j\n", &address);
+    error = ANYRTC_CODE_SUCCESS;
+
+out:
+    if (error) {
+        mem_deref(re_candidate);
+    } else {
+        // Free vars
+        mem_deref(related_address);
+        mem_deref(ip);
+        mem_deref(foundation);
+    }
+    return error;
 }
 
 /*

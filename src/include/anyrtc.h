@@ -298,6 +298,16 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
 
 
 /*
+ * Configuration.
+ * TODO: Add to a constructor... somewhere
+ */
+struct anyrtc_config {
+    uint32_t pacing_interval;
+};
+
+
+
+/*
  * ICE gather options.
  * TODO: private
  */
@@ -349,9 +359,9 @@ struct anyrtc_ice_candidate_raw {
 struct anyrtc_ice_candidate {
     enum anyrtc_ice_candidate_storage storage_type;
     union {
-        struct anyrtc_ice_candidate_raw *raw_candidate;
-        struct ice_lcand *local_candidate;
-        struct ice_rcand *remote_candidate;
+        struct anyrtc_ice_candidate_raw* raw_candidate;
+        struct ice_lcand* local_candidate;
+        struct ice_rcand* remote_candidate;
     } candidate;
 };
 

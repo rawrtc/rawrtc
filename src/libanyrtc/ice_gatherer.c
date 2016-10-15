@@ -362,9 +362,10 @@ static bool interface_handler(
     if (error) {
         // TODO: Convert error code to string
         DEBUG_WARNING("Could not create local candidate instance: %d", error);
+    } else {
+        gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
+        mem_deref(candidate);
     }
-    gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
-    mem_deref(candidate);
 
     // TODO: Add TCP candidate to ICE gatherer (if not already added) (?)
 

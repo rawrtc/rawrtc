@@ -87,6 +87,7 @@ out:
     } else {
         // Set pointer
         *candidatep = candidate;
+        DEBUG_PRINTF("Created candidate (raw): %s\n", ip);
     }
     return error;
 }
@@ -171,6 +172,11 @@ enum anyrtc_code anyrtc_ice_candidate_create_from_local_candidate(
 ) {
     struct anyrtc_ice_candidate* candidate;
 
+    // Check arguments
+    if (!candidatep || !local_candidate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
     // Allocate
     candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate), anyrtc_ice_candidate_destroy);
     if (!candidate) {
@@ -183,6 +189,8 @@ enum anyrtc_code anyrtc_ice_candidate_create_from_local_candidate(
 
     // Set pointer
     *candidatep = candidate;
+    DEBUG_PRINTF("Created candidate (lcand): %J\n",
+                 &candidate->candidate.local_candidate->attr.addr);
     return ANYRTC_CODE_SUCCESS;
 }
 
@@ -194,6 +202,11 @@ enum anyrtc_code anyrtc_ice_candidate_create_from_remote_candidate(
         struct ice_rcand* const remote_candidate // referenced
 ) {
     struct anyrtc_ice_candidate* candidate;
+
+    // Check arguments
+    if (!candidatep || !remote_candidate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
 
     // Allocate
     candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate), anyrtc_ice_candidate_destroy);
@@ -207,6 +220,8 @@ enum anyrtc_code anyrtc_ice_candidate_create_from_remote_candidate(
 
     // Set pointer
     *candidatep = candidate;
+    DEBUG_PRINTF("Created candidate (rcand): %j\n",
+                 &candidate->candidate.remote_candidate->attr.addr);
     return ANYRTC_CODE_SUCCESS;
 }
 
@@ -286,9 +301,9 @@ enum anyrtc_code anyrtc_ice_candidate_get_ip(
         case ANYRTC_ICE_CANDIDATE_STORAGE_RAW:
             return anyrtc_strdup(ipp, candidate->candidate.raw_candidate->ip);
         case ANYRTC_ICE_CANDIDATE_STORAGE_LCAND:
-            return anyrtc_sdprintf(ipp, "%j", candidate->candidate.local_candidate->attr.addr);
+            return anyrtc_sdprintf(ipp, "%j", &candidate->candidate.local_candidate->attr.addr);
         case ANYRTC_ICE_CANDIDATE_STORAGE_RCAND:
-            return anyrtc_sdprintf(ipp, "%j", candidate->candidate.remote_candidate->attr.addr);
+            return anyrtc_sdprintf(ipp, "%j", &candidate->candidate.remote_candidate->attr.addr);
         default:
             return ANYRTC_CODE_INVALID_STATE;
     }
@@ -458,7 +473,7 @@ enum anyrtc_code anyrtc_ice_candidate_get_related_address(
     // Set copied related IP address from re candidate
     if (re_candidate && sa_isset(&re_candidate->rel_addr, SA_ADDR)) {
         return anyrtc_sdprintf(
-                related_addressp, "%j", candidate->candidate.local_candidate->attr.rel_addr);
+                related_addressp, "%j", &candidate->candidate.local_candidate->attr.rel_addr);
     } else {
         return ANYRTC_CODE_NO_VALUE;
     }

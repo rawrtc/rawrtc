@@ -79,7 +79,12 @@ static void ice_gatherer_local_candidate_handler(
     DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
 
     // Add to other client as remote candidate
-    anyrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate);
+    if (candidate) {
+        EOE(anyrtc_ice_transport_add_remote_candidate(
+                client->other_client->ice_transport, candidate));
+    } else {
+        DEBUG_PRINTF("(%s) ICE gatherer last candidate\n", client->name);
+    }
 }
 
 static void ice_transport_state_change_handler(
@@ -105,7 +110,7 @@ static void ice_transport_candidate_pair_change_handler(
 static void signal_handler(
         int sig
 ) {
-    DEBUG_INFO("\nGot signal: %d, terminating...\n", sig);
+    DEBUG_INFO("Got signal: %d, terminating...\n", sig);
     re_cancel();
 }
 

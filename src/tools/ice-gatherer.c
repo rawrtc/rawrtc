@@ -66,7 +66,7 @@ static void ice_gatherer_local_candidate_handler(
 static void signal_handler(
         int sig
 ) {
-    DEBUG_INFO("\rGot signal: %d, terminating...\n", sig);
+    DEBUG_INFO("Got signal: %d, terminating...\n", sig);
     re_cancel();
 }
 

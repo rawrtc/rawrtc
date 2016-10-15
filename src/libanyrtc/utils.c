@@ -3,6 +3,10 @@
 #include <anyrtc.h>
 #include "utils.h"
 
+struct anyrtc_config anyrtc_default_config = {
+        .pacing_interval = 20
+};
+
 /*
  * Translate an re error to an anyrtc code.
  * TODO: Add codes from trice_lcand_add
@@ -57,6 +61,13 @@ enum anyrtc_code anyrtc_translate_ipproto(
     }
 }
 
+enum ice_cand_type anyrtc_translate_ice_candidate_type(
+        enum anyrtc_ice_candidate_type type
+) {
+    // No conversion needed
+    return (enum ice_cand_type) type;
+}
+
 enum anyrtc_code anyrtc_translate_re_ice_cand_type(
         enum ice_cand_type re_type,
         enum anyrtc_ice_candidate_type* const typep // de-referenced
@@ -83,6 +94,13 @@ enum anyrtc_code anyrtc_translate_re_ice_cand_type(
         default:
             return ANYRTC_CODE_INVALID_ARGUMENT;
     }
+}
+
+enum ice_tcptype anyrtc_translate_ice_tcp_candidate_type(
+        enum anyrtc_ice_tcp_candidate_type type
+) {
+    // No conversion needed
+    return (enum ice_tcptype) type;
 }
 
 enum anyrtc_code anyrtc_translate_re_ice_tcptype(
