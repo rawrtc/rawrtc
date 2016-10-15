@@ -264,7 +264,7 @@ cd ${MAIN_DIR}
 # Build libre
 cd ${LIBRE_PATH}
 if [ "$have_dtls_1_2" = false ]; then
-    OPENSSL_SYSROOT=${PREFIX} make install
+    OPENSSL_SYSROOT=${PREFIX} EXTRA_CFLAGS=-Werror make install
 else
     make install
 fi
@@ -273,5 +273,5 @@ cd ${MAIN_DIR}
 
 # Build librew
 cd ${LIBREW_PATH}
-LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include make install-static
+LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include EXTRA_CFLAGS=-Werror make install-static
 cd ${MAIN_DIR}

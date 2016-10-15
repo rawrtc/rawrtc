@@ -1,10 +1,14 @@
 #pragma once
 #include <anyrtc.h>
 
-int anyrtc_stdout_handler(
-    char const* const str,
-    size_t const size,
-    void* const arg
+enum anyrtc_code anyrtc_translate_re_ice_cand_type(
+    enum ice_cand_type re_type,
+    enum anyrtc_ice_candidate_type* const typep // de-referenced
+);
+
+enum anyrtc_code anyrtc_translate_re_ice_tcptype(
+    enum ice_tcptype re_type,
+    enum anyrtc_ice_tcp_candidate_type* const typep // de-referenced
 );
 
 enum anyrtc_code anyrtc_strdup(
@@ -19,4 +23,8 @@ enum anyrtc_code anyrtc_snprintf(
     ...
 );
 
-extern struct re_printf anyrtc_stdout;
+enum anyrtc_code anyrtc_sdprintf(
+    char** const destinationp,
+    char* const formatter,
+    ...
+);

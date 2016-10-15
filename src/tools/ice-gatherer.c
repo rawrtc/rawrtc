@@ -55,7 +55,7 @@ static void ice_gatherer_error_handler(
 }
 
 static void ice_gatherer_local_candidate_handler(
-        struct anyrtc_ice_candidate* const candidate, // read-only
+        struct anyrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
@@ -109,7 +109,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
-    EOE(anyrtc_code_re_translate(re_main(signal_handler)));
+    EOE(anyrtc_translate_re_code(re_main(signal_handler)));
 
     // Close gatherer
     EOE(anyrtc_ice_gatherer_close(gatherer));

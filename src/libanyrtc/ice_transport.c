@@ -165,7 +165,7 @@ enum anyrtc_code anyrtc_ice_transport_start(
         default:
             return ANYRTC_CODE_INVALID_ARGUMENT;
     }
-    error = anyrtc_code_re_translate(trice_set_role(transport->gatherer->ice, translated_role));
+    error = anyrtc_translate_re_code(trice_set_role(transport->gatherer->ice, translated_role));
     if (error) {
         return error;
     }
@@ -173,12 +173,12 @@ enum anyrtc_code anyrtc_ice_transport_start(
     // New/first remote parameters?
     if (transport->remote_parameters != remote_parameters) {
         // Apply username fragment and password on trice
-        error = anyrtc_code_re_translate(trice_set_remote_ufrag(
+        error = anyrtc_translate_re_code(trice_set_remote_ufrag(
                 transport->gatherer->ice, remote_parameters->username_fragment));
         if (error) {
             return error;
         }
-        error = anyrtc_code_re_translate(trice_set_remote_pwd(
+        error = anyrtc_translate_re_code(trice_set_remote_pwd(
                 transport->gatherer->ice, remote_parameters->password));
         if (error) {
             return error;
@@ -230,6 +230,7 @@ enum anyrtc_code anyrtc_ice_transport_stop(
  * remote site finished gathering.
  */
 enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
+        struct anyrtc_ice_transport* const transport,
         struct anyrtc_ice_candidate* candidate // referenced, nullable
 ) {
     // TODO: Implement (continue here)
@@ -241,6 +242,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
  * existing remote candidates.
  */
 enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
+        struct anyrtc_ice_transport* const transport,
         struct anyrtc_ice_candidate* candidate[], // referenced (each item)
         size_t const length
 ) {

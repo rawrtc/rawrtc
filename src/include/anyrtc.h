@@ -18,6 +18,9 @@
 #include <re.h>
 #include <rew.h>
 
+/*
+ * Return codes.
+ */
 enum anyrtc_code {
     ANYRTC_CODE_UNKNOWN_ERROR = -2,
     ANYRTC_CODE_NOT_IMPLEMENTED = -1,
@@ -27,6 +30,17 @@ enum anyrtc_code {
     ANYRTC_CODE_NO_MEMORY,
     ANYRTC_CODE_INVALID_STATE,
     ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
+    ANYRTC_CODE_NO_VALUE
+};
+
+/*
+ * ICE candidate type (internal).
+ * TODO: Private
+ */
+enum anyrtc_ice_candidate_storage {
+    ANYRTC_ICE_CANDIDATE_STORAGE_RAW,
+    ANYRTC_ICE_CANDIDATE_STORAGE_LCAND,
+    ANYRTC_ICE_CANDIDATE_STORAGE_RCAND,
 };
 
 /*
@@ -35,7 +49,7 @@ enum anyrtc_code {
 enum anyrtc_ice_gather_policy {
     ANYRTC_ICE_GATHER_ALL,
     ANYRTC_ICE_GATHER_NOHOST,
-    ANYRTC_ICE_GATHER_RELAY,
+    ANYRTC_ICE_GATHER_RELAY
 };
 
 /*
@@ -44,7 +58,7 @@ enum anyrtc_ice_gather_policy {
 enum anyrtc_ice_credential_type {
     ANYRTC_ICE_CREDENTIAL_NONE,
     ANYRTC_ICE_CREDENTIAL_PASSWORD,
-    ANYRTC_ICE_CREDENTIAL_TOKEN,
+    ANYRTC_ICE_CREDENTIAL_TOKEN
 };
 
 /*
@@ -54,7 +68,7 @@ enum anyrtc_ice_gatherer_state {
     ANYRTC_ICE_GATHERER_NEW,
     ANYRTC_ICE_GATHERER_GATHERING,
     ANYRTC_ICE_GATHERER_COMPLETE,
-    ANYRTC_ICE_GATHERER_CLOSED,
+    ANYRTC_ICE_GATHERER_CLOSED
 };
 
 /*
@@ -64,7 +78,7 @@ enum anyrtc_ice_gatherer_state {
  */
 enum anyrtc_ice_component {
     ANYRTC_ICE_COMPONENT_RTP,
-    ANYRTC_ICE_COMPONENT_RTCP,
+    ANYRTC_ICE_COMPONENT_RTCP
 };
 
 /*
@@ -73,7 +87,7 @@ enum anyrtc_ice_component {
 enum anyrtc_ice_role {
     ANYRTC_ICE_ROLE_UNKNOWN = ROLE_UNKNOWN,
     ANYRTC_ICE_ROLE_CONTROLLING = ROLE_CONTROLLING,
-    ANYRTC_ICE_ROLE_CONTROLLED = ROLE_CONTROLLED,
+    ANYRTC_ICE_ROLE_CONTROLLED = ROLE_CONTROLLED
 };
 
 /*
@@ -86,7 +100,7 @@ enum anyrtc_ice_role {
      ANYRTC_ICE_TRANSPORT_COMPLETED,
      ANYRTC_ICE_TRANSPORT_DISCONNECTED,
      ANYRTC_ICE_TRANSPORT_FAILED,
-     ANYRTC_ICE_TRANSPORT_CLOSED,
+     ANYRTC_ICE_TRANSPORT_CLOSED
  };
 
 /*
@@ -106,7 +120,7 @@ enum anyrtc_dtls_transport_state {
 enum anyrtc_data_channel_sctp_ppid {
     ANYRTC_DATA_CHANNEL_SCTP_PPID_CONTROL = 50,
     ANYRTC_DATA_CHANNEL_SCTP_PPID_DOMSTRING = 51,
-    ANYRTC_DATA_CHANNEL_SCTP_PPID_BINARY = 52,
+    ANYRTC_DATA_CHANNEL_SCTP_PPID_BINARY = 52
 };
 
 /*
@@ -120,11 +134,30 @@ enum anyrtc_sctp_transport_state {
 };
 
 /*
- * ICE protocol
+ * ICE protocol.
  */
 enum anyrtc_ice_protocol {
     ANYRTC_ICE_PROTOCOL_UDP = IPPROTO_UDP,
     ANYRTC_ICE_PROTOCOL_TCP = IPPROTO_TCP
+};
+
+/*
+ * ICE candidate type.
+ */
+enum anyrtc_ice_candidate_type {
+    ANYRTC_ICE_CANDIDATE_TYPE_HOST = ICE_CAND_TYPE_HOST,
+    ANYRTC_ICE_CANDIDATE_TYPE_SRFLX = ICE_CAND_TYPE_SRFLX,
+    ANYRTC_ICE_CANDIDATE_TYPE_PRFLX = ICE_CAND_TYPE_PRFLX,
+    ANYRTC_ICE_CANDIDATE_TYPE_RELAY = ICE_CAND_TYPE_RELAY
+};
+
+/*
+ * ICE TCP candidate type.
+ */
+enum anyrtc_ice_tcp_candidate_type {
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE = ICE_TCP_ACTIVE,
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_PASSIVE = ICE_TCP_PASSIVE,
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_SO = ICE_TCP_SO
 };
 
 
@@ -166,9 +199,10 @@ typedef void (anyrtc_ice_gatherer_error_handler)(
 /*
  * ICE gatherer local candidate handler.
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
+ * 'url' will be NULL in case a host candidate has been gathered.
  */
 typedef void (anyrtc_ice_gatherer_local_candidate_handler)(
-    struct anyrtc_ice_candidate* const candidate, // read-only
+    struct anyrtc_ice_candidate* const candidate,
     char const * const url, // read-only
     void* const arg
 );
@@ -294,19 +328,31 @@ struct anyrtc_ice_server_url {
 };
 
 /*
+ * Raw ICE candidate (pending candidate).
+ */
+struct anyrtc_ice_candidate_raw {
+    char* foundation; // copied
+    uint32_t priority;
+    char* ip; // copied
+    enum anyrtc_ice_protocol protocol;
+    uint16_t port;
+    enum anyrtc_ice_candidate_type type;
+    enum anyrtc_ice_tcp_candidate_type tcp_type;
+    char* related_address; // copied
+    uint16_t related_port;
+};
+
+/*
  * ICE candidate.
- * TODO: private, needs update
+ * TODO: private
  */
 struct anyrtc_ice_candidate {
-    struct le le;
-    uint32_t key;
-    char foundation[32];
-    uint32_t priority;
-    struct sa address;
-    enum anyrtc_ice_protocol protocol;
-    enum ice_cand_type type;
-    enum ice_tcptype tcp_type;
-    struct sa related_address; // zero if host candidate
+    enum anyrtc_ice_candidate_storage storage_type;
+    union {
+        struct anyrtc_ice_candidate_raw *raw_candidate;
+        struct ice_lcand *local_candidate;
+        struct ice_rcand *remote_candidate;
+    } candidate;
 };
 
 /*
@@ -376,13 +422,110 @@ enum anyrtc_code anyrtc_init();
 enum anyrtc_code anyrtc_close();
 
 /*
+ * Create an ICE candidate.
+ */
+enum anyrtc_code anyrtc_ice_candidate_create(
+    struct anyrtc_ice_candidate** const candidatep, // de-referenced
+    char* const foundation, // copied
+    uint32_t const priority,
+    char* const ip, // copied
+    enum anyrtc_ice_protocol const protocol,
+    uint16_t const port,
+    enum anyrtc_ice_candidate_type const type,
+    enum anyrtc_ice_tcp_candidate_type const tcp_type,
+    char* const related_address, // copied, nullable
+    uint16_t const related_port
+);
+
+/*
+ * Get the ICE candidate's foundation.
+ * `*foundationp` will be set to a copy of the IP address that must be
+ * unreferenced.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_foundation(
+    struct anyrtc_ice_candidate* const candidate,
+    char** const foundationp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's priority.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_priority(
+    struct anyrtc_ice_candidate* const candidate,
+    uint32_t* const priorityp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's IP address.
+ * `*ipp` will be set to a copy of the IP address that must be
+ * unreferenced.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_ip(
+    struct anyrtc_ice_candidate* const candidate,
+    char** const ipp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's protocol.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_protocol(
+    struct anyrtc_ice_candidate* const candidate,
+    enum anyrtc_ice_protocol* const protocolp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's port.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_port(
+    struct anyrtc_ice_candidate* const candidate,
+    uint16_t* const portp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's type.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_type(
+    struct anyrtc_ice_candidate* const candidate,
+    enum anyrtc_ice_candidate_type* typep // de-referenced
+);
+
+/*
+ * Get the ICE candidate's TCP type.
+ * `*typep` will be set to `NULL` in case the protocol is not TCP.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_tcp_type(
+    struct anyrtc_ice_candidate* const candidate,
+    enum anyrtc_ice_tcp_candidate_type* typep // de-referenced
+);
+
+/*
+ * Get the ICE candidate's related IP address.
+ * `*related_address` will be set to a copy of the related address that
+ * must be unreferenced or `NULL` in case no related address exists.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_related_address(
+    struct anyrtc_ice_candidate* const candidate,
+    char** const related_addressp // de-referenced
+);
+
+/*
+ * Get the ICE candidate's related IP address' port.
+ * `*related_portp` will be set to a copy of the related address'
+ * port or `0` in case no related address exists.
+ */
+enum anyrtc_code anyrtc_ice_candidate_get_related_port(
+    struct anyrtc_ice_candidate* const candidate,
+    uint16_t* const related_portp // de-referenced
+);
+
+/*
  * Create a new ICE parameters instance.
  */
 enum anyrtc_code anyrtc_ice_parameters_create(
-        struct anyrtc_ice_parameters** const parametersp, // de-referenced
-        char* const username_fragment, // copied
-        char* const password, // copied
-        bool const ice_lite
+    struct anyrtc_ice_parameters** const parametersp, // de-referenced
+    char* const username_fragment, // copied
+    char* const password, // copied
+    bool const ice_lite
 );
 
 /*
@@ -462,8 +605,8 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  * Get local ICE parameters of a gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
-        struct anyrtc_ice_gatherer* const gatherer,
-        struct anyrtc_ice_parameters** const parametersp // de-referenced
+    struct anyrtc_ice_gatherer* const gatherer,
+    struct anyrtc_ice_parameters** const parametersp // de-referenced
 );
 
 /*
@@ -528,6 +671,7 @@ enum anyrtc_code anyrtc_ice_transport_stop(
  * remote site finished gathering.
  */
 enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
+    struct anyrtc_ice_transport* const transport,
     struct anyrtc_ice_candidate* candidate // referenced, nullable
 );
 
@@ -536,6 +680,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
  * existing remote candidates.
  */
 enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
+    struct anyrtc_ice_transport* const transport,
     struct anyrtc_ice_candidate* candidate[], // referenced (each item)
     size_t const length
 );
@@ -551,7 +696,7 @@ enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
 enum anyrtc_code anyrtc_dtls_transport_create(
     struct anyrtc_dtls_transport** const transport, // de-referenced
     struct anyrtc_ice_transport* const ice_transport, // referenced
-    struct list const * const certificates, // deep-copied
+    struct list const * const certificates, // deep-copied, TODO: Change to array + length
     anyrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
     anyrtc_dtls_transport_error_handler* const error_handler, // nullable
     void* const arg // nullable
@@ -672,6 +817,21 @@ enum anyrtc_code anyrtc_sctp_transport_stop(
 /*
  * Translate an re error to an anyrtc code.
  */
-enum anyrtc_code anyrtc_code_re_translate(
+enum anyrtc_code anyrtc_translate_re_code(
     int code
+);
+
+/*
+ * Translate a protocol to the corresponding IPPROTO_*.
+ */
+int anyrtc_translate_ice_protocol(
+    enum anyrtc_ice_protocol const protocol
+);
+
+/*
+ * Translate a IPPROTO_* to the corresponding protocol.
+ */
+enum anyrtc_code anyrtc_translate_ipproto(
+    int const ipproto,
+    enum anyrtc_ice_protocol* const protocolp // de-referenced
 );

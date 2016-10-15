@@ -10,6 +10,8 @@
 
 #define EOE(code) exit_on_error(code, __FILE__, __LINE__)
 
+struct client;
+
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
@@ -17,6 +19,7 @@ struct client {
     enum anyrtc_ice_role const role;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
+    struct client* other_client;
 };
 
 static void before_exit() {
@@ -67,13 +70,16 @@ static void ice_gatherer_error_handler(
 }
 
 static void ice_gatherer_local_candidate_handler(
-        struct anyrtc_ice_candidate* const candidate, // read-only
+        struct anyrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
     struct client* const client = arg;
     (void) candidate; (void) arg;
     DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
+
+    // Add to other client as remote candidate
+    anyrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate);
 }
 
 static void ice_transport_state_change_handler(
@@ -99,7 +105,7 @@ static void ice_transport_candidate_pair_change_handler(
 static void signal_handler(
         int sig
 ) {
-    DEBUG_INFO("\rGot signal: %d, terminating...\n", sig);
+    DEBUG_INFO("\nGot signal: %d, terminating...\n", sig);
     re_cancel();
 }
 
@@ -175,6 +181,8 @@ int main(int argc, char* argv[argc + 1]) {
     // Start clients
     struct client a = {"A", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLING, NULL, NULL};
     struct client b = {"B", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLED, NULL, NULL};
+    a.other_client = &b;
+    b.other_client = &a;
     b.remote_parameters = client_init(&a);
     a.remote_parameters = client_init(&b);
     client_start(&a);
@@ -183,7 +191,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
-    EOE(anyrtc_code_re_translate(re_main(signal_handler)));
+    EOE(anyrtc_translate_re_code(re_main(signal_handler)));
 
     // Stop clients
     client_stop(&a);
