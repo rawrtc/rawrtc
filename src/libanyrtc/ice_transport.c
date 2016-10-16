@@ -114,13 +114,25 @@ static void ice_established_handler(
         void* const arg
 ) {
     struct anyrtc_ice_transport* const transport = arg;
+
     DEBUG_PRINTF("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
 
-    // TODO: Continue here
+    // Ignore if closed
+    if (transport->state == ANYRTC_ICE_TRANSPORT_CLOSED) {
+        return;
+    }
+
+    // State: checking -> connected
+    if (transport->state != ANYRTC_ICE_TRANSPORT_CONNECTED) {
+        set_state(transport, ANYRTC_ICE_TRANSPORT_CONNECTED);
+    }
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
         DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+
+        // At least one candidate pair succeeded, transition to completed
+        set_state(transport, ANYRTC_ICE_TRANSPORT_COMPLETED);
     }
 }
 
@@ -134,14 +146,27 @@ static void ice_failed_handler(
         void* const arg
 ) {
     struct anyrtc_ice_transport* const transport = arg;
+
     DEBUG_PRINTF("Candidate pair failed: %H (%m %"PRIu16")\n",
                  trice_candpair_debug, candidate_pair, err, stun_code);
 
-    // TODO: Continue here
+    // Ignore if closed
+    if (transport->state == ANYRTC_ICE_TRANSPORT_CLOSED) {
+        return;
+    }
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
         DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+
+        // Do we have one candidate pair that succeeded?
+        if (list_head(trice_validl(transport->gatherer->ice))) {
+            // Yes, transition to completed
+            set_state(transport, ANYRTC_ICE_TRANSPORT_COMPLETED);
+        } else {
+            // No, transition to failed
+            set_state(transport, ANYRTC_ICE_TRANSPORT_FAILED);
+        }
     }
 }
 
@@ -268,6 +293,11 @@ enum anyrtc_code anyrtc_ice_transport_stop(
     // Already closed?
     if (transport->state == ANYRTC_ICE_TRANSPORT_CLOSED) {
         return ANYRTC_CODE_SUCCESS;
+    }
+
+    // Stop ICE checklist (if running)
+    if (trice_checklist_isrunning(transport->gatherer->ice)) {
+        trice_checklist_stop(transport->gatherer->ice);
     }
 
     // TODO: Remove remote candidates, role, username fragment and password from rew
