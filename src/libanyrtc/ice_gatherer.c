@@ -1,3 +1,4 @@
+#include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <anyrtc.h>
 #include "utils.h"
@@ -206,6 +207,7 @@ static void anyrtc_ice_gatherer_destroy(void* arg) {
     struct anyrtc_ice_gatherer* gatherer = arg;
 
     // Dereference
+    mem_deref(gatherer->stun);
     mem_deref(gatherer->ice);
     mem_deref(gatherer->options);
 }
@@ -247,7 +249,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     rand_str(gatherer->ice_username_fragment, sizeof(gatherer->ice_username_fragment));
     rand_str(gatherer->ice_password, sizeof(gatherer->ice_password));
 
-    // Set ICE configuration
+    // Set ICE configuration and create trice instance
     // TODO: Add parameters to function arguments?
     gatherer->ice_config.debug = true;
     gatherer->ice_config.trace = true;
@@ -260,8 +262,22 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
         goto out;
     }
 
+    // Set STUN configuration and create stun instance
+    // TODO: Add parameters to function arguments?
+    gatherer->stun_config.rto = STUN_DEFAULT_RTO;
+    gatherer->stun_config.rc = STUN_DEFAULT_RC;
+    gatherer->stun_config.rm = STUN_DEFAULT_RM;
+    gatherer->stun_config.ti = STUN_DEFAULT_TI;
+    gatherer->stun_config.tos = 0x00;
+    error = anyrtc_translate_re_code(stun_alloc(
+            &gatherer->stun, &gatherer->stun_config, NULL, NULL));
+    if (error) {
+        goto out;
+    }
+
 out:
     if (error) {
+        mem_deref(gatherer->stun);
         mem_deref(gatherer->ice);
         mem_deref(gatherer->options);
         mem_deref(gatherer);
@@ -320,12 +336,14 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
 
 /*
  * Local interfaces callback.
+ * TODO: Consider ICE gather policy
   */
 static bool interface_handler(
         char const* const interface,
         struct sa const* const address,
         void* const arg
 ) {
+    int af;
     struct anyrtc_ice_gatherer* const gatherer = arg;
     struct ice_lcand* re_candidate;
     uint32_t priority;
@@ -341,33 +359,53 @@ static bool interface_handler(
         return false; // Continue gathering
     }
 
-    DEBUG_PRINTF("Gathered local interface %j\n", address);
-
-    // Add UDP candidate to ICE gatherer (if not already added)
-    // TODO: Check if already added?
-    // TODO: Set component id properly
-    // TODO: Raise on_local_candidate event
-    priority = anyrtc_ice_candidate_calculate_priority(
-            ICE_CAND_TYPE_HOST, IPPROTO_UDP, ICE_TCP_ACTIVE);
-    err = trice_lcand_add(
-            &re_candidate, gatherer->ice, 1, IPPROTO_UDP, priority, address,
-            NULL, ICE_CAND_TYPE_HOST, NULL, ICE_TCP_ACTIVE, NULL, ANYRTC_LAYER_ICE);
-    if (err) {
-        DEBUG_WARNING("Could not add UDP candidate: %m", err);
+    // Skip IPv4, IPv6?
+    // TODO: Get config from struct
+    af = sa_af(address);
+    if (!anyrtc_default_config.ipv6_enable && af == AF_INET6
+            || !anyrtc_default_config.ipv4_enable && af == AF_INET) {
         return false; // Continue gathering
     }
 
-    // Create ICE candidate, call local candidate handler, unreference ICE candidate
-    error = anyrtc_ice_candidate_create_from_local_candidate(&candidate, re_candidate);
-    if (error) {
-        // TODO: Convert error code to string
-        DEBUG_WARNING("Could not create local candidate instance: %d", error);
-    } else {
-        gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
-        mem_deref(candidate);
+    // TODO: Ignore interfaces gatherered twice
+
+    DEBUG_PRINTF("Gathered local interface %j\n", address);
+
+    // Add UDP candidate
+    // TODO: Set component id properly
+    // TODO: Get config from struct
+    if (anyrtc_default_config.udp_enable) {
+        priority = anyrtc_ice_candidate_calculate_priority(
+                ICE_CAND_TYPE_HOST, IPPROTO_UDP, ICE_TCP_ACTIVE);
+        err = trice_lcand_add(
+                &re_candidate, gatherer->ice, 1, IPPROTO_UDP, priority, address,
+                NULL, ICE_CAND_TYPE_HOST, NULL, ICE_TCP_ACTIVE, NULL, ANYRTC_LAYER_ICE);
+        if (err) {
+            DEBUG_WARNING("Could not add UDP candidate: %m", err);
+            return false; // Continue gathering
+        }
+
+        // Create ICE candidate, call local candidate handler, unreference ICE candidate
+        error = anyrtc_ice_candidate_create_from_local_candidate(&candidate, re_candidate);
+        if (error) {
+            // TODO: Convert error code to string
+            DEBUG_WARNING("Could not create local candidate instance: %d", error);
+        } else {
+            gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
+            mem_deref(candidate);
+        }
     }
 
-    // TODO: Add TCP candidate to ICE gatherer (if not already added) (?)
+    // Add TCP candidate
+    if (anyrtc_default_config.tcp_enable) {
+        priority = anyrtc_ice_candidate_calculate_priority(
+                ICE_CAND_TYPE_HOST, IPPROTO_UDP, ICE_TCP_ACTIVE);
+
+        // TODO: Add TCP candidate
+        (void) priority;
+
+        // TODO: Call local_candidate_handler
+    }
 
     // TODO: Gather srflx candidates
     DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);

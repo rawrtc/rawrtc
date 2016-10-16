@@ -303,9 +303,11 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
  */
 struct anyrtc_config {
     uint32_t pacing_interval;
+    bool ipv4_enable;
+    bool ipv6_enable;
+    bool udp_enable;
+    bool tcp_enable;
 };
-
-
 
 /*
  * ICE gather options.
@@ -389,6 +391,8 @@ struct anyrtc_ice_gatherer {
     char ice_password[33];
     struct trice* ice;
     struct trice_conf ice_config;
+    struct stun* stun;
+    struct stun_conf stun_config;
 };
 
 /*
@@ -410,9 +414,9 @@ struct anyrtc_ice_transport {
  * TODO: private
  */
 enum {
-    ANYRTC_LAYER_SCTP = 3,
-    ANYRTC_LAYER_DCEP = 2,
-    ANYRTC_LAYER_DTLS = 1,
+    ANYRTC_LAYER_DCEP = 30,
+    ANYRTC_LAYER_SRTP = 20,
+    ANYRTC_LAYER_DTLS = 10,
     ANYRTC_LAYER_ICE = 0,
     ANYRTC_LAYER_STUN = -10,
     ANYRTC_LAYER_TURN = -10
@@ -682,7 +686,7 @@ enum anyrtc_code anyrtc_ice_transport_stop(
  */
 enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     struct anyrtc_ice_transport* const transport,
-    struct anyrtc_ice_candidate* candidate // referenced, nullable
+    struct anyrtc_ice_candidate* candidate // nullable
 );
 
 /*

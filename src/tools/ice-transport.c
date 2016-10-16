@@ -76,15 +76,15 @@ static void ice_gatherer_local_candidate_handler(
 ) {
     struct client* const client = arg;
     (void) candidate; (void) arg;
-    DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
+
+    if (candidate) {
+        DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
+    } else {
+        DEBUG_PRINTF("(%s) ICE gatherer last local candidate\n", client->name);
+    }
 
     // Add to other client as remote candidate
-    if (candidate) {
-        EOE(anyrtc_ice_transport_add_remote_candidate(
-                client->other_client->ice_transport, candidate));
-    } else {
-        DEBUG_PRINTF("(%s) ICE gatherer last candidate\n", client->name);
-    }
+    EOE(anyrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate));
 }
 
 static void ice_transport_state_change_handler(

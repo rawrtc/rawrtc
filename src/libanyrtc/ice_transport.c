@@ -241,6 +241,7 @@ enum anyrtc_code anyrtc_ice_transport_start(
     // TODO: Is this the correct place?
     // TODO: Get config from struct
     // TODO: Why are there no keep-alive messages?
+    // TODO: Set 'use_cand' properly
     error = anyrtc_translate_re_code(trice_checklist_start(
             transport->gatherer->ice, NULL, anyrtc_default_config.pacing_interval, true,
             ice_established_handler, ice_failed_handler, transport));
@@ -283,19 +284,20 @@ enum anyrtc_code anyrtc_ice_transport_stop(
  */
 enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
         struct anyrtc_ice_transport* const transport,
-        struct anyrtc_ice_candidate* candidate // referenced, nullable
+        struct anyrtc_ice_candidate* candidate // nullable
 ) {
     struct ice_rcand* re_candidate = NULL;
     enum anyrtc_code error;
-    char* foundation = NULL;
-    enum anyrtc_ice_protocol protocol;
-    uint32_t priority;
     char* ip = NULL;
     uint16_t port;
+    struct sa address;
+    int af;
+    enum anyrtc_ice_protocol protocol;
+    char* foundation = NULL;
+    uint32_t priority;
     enum anyrtc_ice_candidate_type type;
     enum anyrtc_ice_tcp_candidate_type tcp_type;
     char* related_address = NULL;
-    struct sa address;
 
     // Check arguments
     if (!transport) {
@@ -305,6 +307,49 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     // Check ICE transport state
     if (transport->state == ANYRTC_ICE_TRANSPORT_CLOSED) {
         return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Remote site completed gathering?
+    if (!candidate) {
+        DEBUG_PRINTF("Remote site gathering complete\n%H", trice_debug, transport->gatherer->ice);
+        return ANYRTC_CODE_SUCCESS;
+    }
+
+    // Get IP and port
+    error = anyrtc_ice_candidate_get_ip(candidate, &ip);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_ice_candidate_get_port(candidate, &port);
+    if (error) {
+        goto out;
+    }
+    error = anyrtc_translate_re_code(sa_set_str(&address, ip, port));
+    if (error) {
+        goto out;
+    }
+
+    // Skip IPv4, IPv6 if requested
+    // TODO: Get config from struct
+    af = sa_af(&address);
+    if (!anyrtc_default_config.ipv6_enable && af == AF_INET6
+            || !anyrtc_default_config.ipv4_enable && af == AF_INET) {
+        DEBUG_PRINTF("Skipping remote candidate due to IP version: %J\n", &address);
+        goto out;
+    }
+
+    // Get protocol
+    error = anyrtc_ice_candidate_get_protocol(candidate, &protocol);
+    if (error) {
+        goto out;
+    }
+
+    // Skip UDP/TCP if requested
+    // TODO: Get config from struct
+    if (!anyrtc_default_config.udp_enable && protocol == ANYRTC_ICE_PROTOCOL_UDP
+            || !anyrtc_default_config.tcp_enable && protocol == ANYRTC_ICE_PROTOCOL_TCP) {
+        DEBUG_PRINTF("Skipping remote candidate due to protocol: %J\n", &address);
+        goto out;
     }
 
     // Get necessary vars
@@ -317,14 +362,6 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
         goto out;
     }
     error = anyrtc_ice_candidate_get_priority(candidate, &priority);
-    if (error) {
-        goto out;
-    }
-    error = anyrtc_ice_candidate_get_ip(candidate, &ip);
-    if (error) {
-        goto out;
-    }
-    error = anyrtc_ice_candidate_get_port(candidate, &port);
     if (error) {
         goto out;
     }
@@ -342,10 +379,6 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
             break;
         default:
             goto out;
-    }
-    error = anyrtc_translate_re_code(sa_set_str(&address, ip, port));
-    if (error) {
-        goto out;
     }
 
     // Add remote candidate
@@ -376,7 +409,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     }
 
     // Done
-    DEBUG_PRINTF("Added remote candidate: %j\n", &address);
+    DEBUG_PRINTF("Added remote candidate: %J\n", &address);
     error = ANYRTC_CODE_SUCCESS;
 
 out:
@@ -385,8 +418,8 @@ out:
     } else {
         // Free vars
         mem_deref(related_address);
-        mem_deref(ip);
         mem_deref(foundation);
+        mem_deref(ip);
     }
     return error;
 }

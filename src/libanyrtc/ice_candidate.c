@@ -9,6 +9,7 @@
 
 /*
  * Calculate the ICE candidate priority.
+ * TODO: Update argument types, use own
  * TODO: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-04#section-4.1.2.1
  */
 uint32_t anyrtc_ice_candidate_calculate_priority(

@@ -4,7 +4,11 @@
 #include "utils.h"
 
 struct anyrtc_config anyrtc_default_config = {
-        .pacing_interval = 20
+        .pacing_interval = 20,
+        .ipv4_enable = true,
+        .ipv6_enable = false, // TODO: true by default
+        .udp_enable = true,
+        .tcp_enable = false // TODO: true by default
 };
 
 /*
