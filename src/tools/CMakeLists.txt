@@ -6,11 +6,18 @@ target_link_libraries(ice-gatherer
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
-# Tool: ice-gatherer
+# Tool: ice-transport
 add_executable(ice-transport ice-transport.c)
 target_link_libraries(ice-transport
         anyrtc)
 install(TARGETS ice-transport
+        DESTINATION bin)
+
+# Tool: dtls-transport
+add_executable(dtls-transport dtls-transport.c)
+target_link_libraries(dtls-transport
+        anyrtc)
+install(TARGETS dtls-transport
         DESTINATION bin)
 
 # Tool: redirect-sctp

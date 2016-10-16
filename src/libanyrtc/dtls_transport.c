@@ -9,8 +9,8 @@
  * Let the DTLS transport attach itself to a candidate pair.
  */
 enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
-        struct anyrtc_dtls_transport *const transport,
-        struct ice_candpair *const candidate_pair
+        struct anyrtc_dtls_transport* const transport,
+        struct ice_candpair* const candidate_pair
 ) {
     // Check arguments
     if (!transport || !candidate_pair) {

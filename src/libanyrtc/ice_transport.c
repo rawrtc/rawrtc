@@ -41,6 +41,7 @@ static void anyrtc_ice_transport_destroy(void* arg) {
     struct anyrtc_ice_transport* transport = arg;
 
     // Dereference
+    mem_deref(transport->dtls_transport);
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
 }
@@ -69,7 +70,7 @@ enum anyrtc_code anyrtc_ice_transport_create(
     }
 
     // Allocate
-    transport = mem_alloc(sizeof(struct anyrtc_ice_transport), anyrtc_ice_transport_destroy);
+    transport = mem_zalloc(sizeof(struct anyrtc_ice_transport), anyrtc_ice_transport_destroy);
     if (!transport) {
         return ANYRTC_CODE_NO_MEMORY;
     }
