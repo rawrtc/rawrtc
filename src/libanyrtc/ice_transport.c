@@ -1,6 +1,7 @@
 #include <inttypes.h>
 #include <anyrtc.h>
 #include "ice_transport.h"
+#include "dtls_transport.h"
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-transport"
@@ -114,6 +115,8 @@ static void ice_established_handler(
         void* const arg
 ) {
     struct anyrtc_ice_transport* const transport = arg;
+    enum anyrtc_code error;
+    (void) message;
 
     DEBUG_PRINTF("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
 
@@ -134,6 +137,18 @@ static void ice_established_handler(
         // At least one candidate pair succeeded, transition to completed
         set_state(transport, ANYRTC_ICE_TRANSPORT_COMPLETED);
     }
+
+    // Offer candidate pair to DTLS transport (if any)
+    if (transport->dtls_transport) {
+        error = anyrtc_dtls_transport_add_candidate_pair(
+                transport->dtls_transport, candidate_pair);
+        if (error) {
+            // TODO: Convert error code to string
+            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %d\n", error);
+        }
+    }
+
+    // TODO: Call candidate_pair_change_handler (?)
 }
 
 /*

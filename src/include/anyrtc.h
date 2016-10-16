@@ -407,6 +407,15 @@ struct anyrtc_ice_transport {
     void* arg; // nullable
     struct anyrtc_ice_parameters* remote_parameters; // referenced
     enum anyrtc_ice_role role;
+    struct anyrtc_dtls_transport* dtls_transport; // referenced, nullable
+};
+
+/*
+ * DTLS transport.
+ * TODO: private
+ */
+struct anyrtc_dtls_transport {
+    enum anyrtc_dtls_transport_state state;
 };
 
 /*
