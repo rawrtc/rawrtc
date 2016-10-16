@@ -221,8 +221,8 @@ static enum anyrtc_code generate_self_signed_certificate(
         goto out;
     }
 
-    // Certificate is valid from now until whatever has been provided in parameters
-    if (!X509_gmtime_adj(X509_get_notBefore(certificate), 0)
+    // Certificate is valid from now (-1 day) until whatever has been provided in parameters
+    if (!X509_gmtime_adj(X509_get_notBefore(certificate), -3600 * 24)
             || !X509_gmtime_adj(X509_get_notAfter(certificate), (long) valid_until)) {
         goto out;
     }
