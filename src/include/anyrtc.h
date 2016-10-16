@@ -445,6 +445,15 @@ enum anyrtc_code anyrtc_init();
 enum anyrtc_code anyrtc_close();
 
 /*
+ * TODO http://draft.ortc.org/#dom-rtccertificate
+ * anyrtc_certificate_create
+ * anyrtc_certificate_get_expires
+ * anyrtc_certificate_get_fingerprint
+ * anyrtc_certificate_get_algorithm
+ * anyrtc_certificate_generate_certificate
+ */
+
+/*
  * Create an ICE candidate.
  */
 enum anyrtc_code anyrtc_ice_candidate_create(

@@ -1,5 +1,6 @@
 # Library sources
 set(anyrtc_SOURCES
+        certificate.c
         dtls_transport.c
         ice_candidate.c
         ice_gatherer.c
