@@ -90,11 +90,11 @@ int main(int argc, char* argv[argc + 1]) {
     // Add ICE servers to ICE gather options
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(char *),
+            sizeof(stun_google_com_urls) / sizeof(char*),
             NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org_urls) / sizeof(char *),
+            sizeof(turn_zwuenf_org_urls) / sizeof(char*),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Create ICE gatherer

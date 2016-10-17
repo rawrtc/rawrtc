@@ -31,7 +31,7 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
     }
 
     // Allocate
-    options = mem_alloc(sizeof(struct anyrtc_ice_gather_options),
+    options = mem_zalloc(sizeof(struct anyrtc_ice_gather_options),
                         anyrtc_ice_gather_options_destroy);
     if (!options) {
         return ANYRTC_CODE_NO_MEMORY;
@@ -232,7 +232,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     }
 
     // Allocate
-    gatherer = mem_alloc(sizeof(struct anyrtc_ice_gatherer), anyrtc_ice_gatherer_destroy);
+    gatherer = mem_zalloc(sizeof(struct anyrtc_ice_gatherer), anyrtc_ice_gatherer_destroy);
     if (!gatherer) {
         return ANYRTC_CODE_NO_MEMORY;
     }

@@ -1,4 +1,3 @@
-#include <inttypes.h>
 #include <anyrtc.h>
 #include "ice_transport.h"
 #include "dtls_transport.h"

@@ -3,12 +3,27 @@
 #include <anyrtc.h>
 #include "utils.h"
 
+/*
+ * Default anyrtc options.
+ */
 struct anyrtc_config anyrtc_default_config = {
         .pacing_interval = 20,
         .ipv4_enable = true,
         .ipv6_enable = false, // TODO: true by default
         .udp_enable = true,
-        .tcp_enable = false // TODO: true by default
+        .tcp_enable = false, // TODO: true by default
+};
+
+/*
+ * Default certificate options.
+ */
+struct anyrtc_certificate_options anyrtc_default_certificate_options = {
+        .key_type = ANYRTC_CERTIFICATE_KEY_TYPE_ECC,
+        .common_name = "anonymous@anyrtc.org",
+        .valid_until = 3600 * 24 * 30, // 30 days
+        .sign_algorithm = ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+        .named_curve = "prime256v1",
+        .modulus_length = 2048
 };
 
 /*

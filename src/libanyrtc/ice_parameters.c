@@ -31,7 +31,7 @@ enum anyrtc_code anyrtc_ice_parameters_create(
     }
 
     // Allocate
-    parameters = mem_alloc(sizeof(struct anyrtc_ice_parameters), anyrtc_ice_parameters_destroy);
+    parameters = mem_zalloc(sizeof(struct anyrtc_ice_parameters), anyrtc_ice_parameters_destroy);
     if (!parameters) {
         return ANYRTC_CODE_NO_MEMORY;
     }

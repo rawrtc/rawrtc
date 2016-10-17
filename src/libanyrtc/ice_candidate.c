@@ -51,7 +51,7 @@ static enum anyrtc_code anyrtc_ice_candidate_raw_create(
     enum anyrtc_code error;
 
     // Allocate
-    candidate = mem_alloc(sizeof(struct anyrtc_ice_candidate_raw),
+    candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate_raw),
                           anyrtc_ice_candidate_raw_destroy);
     if (!candidate) {
         return ANYRTC_CODE_NO_MEMORY;
@@ -137,7 +137,7 @@ enum anyrtc_code anyrtc_ice_candidate_create(
     }
 
     // Allocate
-    candidate = mem_alloc(sizeof(struct anyrtc_ice_candidate), anyrtc_ice_candidate_destroy);
+    candidate = mem_zalloc(sizeof(struct anyrtc_ice_candidate), anyrtc_ice_candidate_destroy);
     if (!candidate) {
         return ANYRTC_CODE_NO_MEMORY;
     }

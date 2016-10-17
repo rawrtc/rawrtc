@@ -17,6 +17,7 @@ struct client {
     struct anyrtc_ice_gather_options* gather_options;
     struct anyrtc_ice_parameters* remote_parameters;
     enum anyrtc_ice_role const role;
+    struct anyrtc_certificate* certificate;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct client* other_client;
@@ -119,6 +120,9 @@ struct anyrtc_ice_parameters* client_init(
 ) {
     struct anyrtc_ice_parameters* local_parameters;
 
+    // Generate certificates
+    EOE(anyrtc_certificate_generate(&client->certificate, NULL));
+
     // Create ICE gatherer
     EOE(anyrtc_ice_gatherer_create(
             &client->gatherer, client->gather_options,
@@ -155,6 +159,7 @@ void client_stop(
     // Dereference & close
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
+    client->certificate = mem_deref(client->certificate);
 }
 
 int main(int argc, char* argv[argc + 1]) {
@@ -176,11 +181,11 @@ int main(int argc, char* argv[argc + 1]) {
     // Add ICE servers to ICE gather options
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(char *),
+            sizeof(stun_google_com_urls) / sizeof(char*),
             NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org_urls) / sizeof(char *),
+            sizeof(turn_zwuenf_org_urls) / sizeof(char*),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Start clients

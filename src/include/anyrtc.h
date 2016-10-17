@@ -2,10 +2,11 @@
 // TODO: Move this section into meson build
 #define ANYRTC_DEBUG 1
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <netinet/in.h>
+#include <inttypes.h> // uint8_t, UINT8_MAX, ...
+#include <stdlib.h> // TODO: Why?
+#include <stdbool.h> // bool
+#include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, ...
+#include <openssl/evp.h> // EVP_PKEY
 
 #define ZF_LOG_LIBRARY_PREFIX anyrtc_
 #ifdef ANYRTC_DEBUG
@@ -31,6 +32,24 @@ enum anyrtc_code {
     ANYRTC_CODE_INVALID_STATE,
     ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
     ANYRTC_CODE_NO_VALUE
+};
+
+/*
+ * Certificate private key types.
+ */
+enum anyrtc_certificate_key_type {
+    ANYRTC_CERTIFICATE_KEY_TYPE_ECC,
+    ANYRTC_CERTIFICATE_KEY_TYPE_RSA
+};
+
+/*
+ * Certificate signing hash algorithms.
+ */
+enum anyrtc_certificate_sign_algorithm {
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE = 0,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512
 };
 
 /*
@@ -310,6 +329,28 @@ struct anyrtc_config {
 };
 
 /*
+ * Certificate options.
+ * TODO: private
+ */
+struct anyrtc_certificate_options {
+    enum anyrtc_certificate_key_type key_type;
+    char* common_name; // copied
+    uint32_t valid_until;
+    enum anyrtc_certificate_sign_algorithm sign_algorithm;
+    char* named_curve; // nullable, copied, ignored for RSA
+    uint_least32_t modulus_length; // ignored for ECC
+};
+
+/*
+ * Certificate.
+ * TODO: private
+ */
+struct anyrtc_certificate {
+    X509* certificate;
+    EVP_PKEY* key;
+};
+
+/*
  * ICE gather options.
  * TODO: private
  */
@@ -445,12 +486,47 @@ enum anyrtc_code anyrtc_init();
 enum anyrtc_code anyrtc_close();
 
 /*
+ * Create certificate options.
+ *
+ * All arguments but `key_type` are optional. Sane and safe default
+ * values will be applied, don't worry!
+ *
+ * If `common_name` is `NULL` the default common name will be applied.
+ * If `valid_until` is `0` the default certificate lifetime will be
+ * applied.
+ * If the key type is `ECC` and `named_curve` is `NULL`, the default
+ * named curve will be used.
+ * If the key type is `RSA` and `modulus_length` is `0`, the default
+ * amount of bits will be used. The same applies to the
+ * `sign_algorithm` if it has been set to `NONE`.
+ */
+enum anyrtc_code anyrtc_certificate_options_create(
+    struct anyrtc_certificate_options** const optionsp, // de-referenced
+    enum anyrtc_certificate_key_type const key_type,
+    char* common_name, // nullable, copied
+    uint32_t valid_until,
+    enum anyrtc_certificate_sign_algorithm sign_algorithm,
+    char* named_curve, // nullable, copied, ignored for RSA
+    uint_least32_t modulus_length // ignored for ECC
+);
+
+/*
+ * Create and generate a self-signed certificate.
+ *
+ * Sane and safe default options will be applied if `options` is
+ * `NULL`.
+ */
+enum anyrtc_code anyrtc_certificate_generate(
+    struct anyrtc_certificate** const certificatep,
+    struct anyrtc_certificate_options* options // nullable
+);
+
+/*
  * TODO http://draft.ortc.org/#dom-rtccertificate
- * anyrtc_certificate_create
+ * anyrtc_certificate_from_bytes
  * anyrtc_certificate_get_expires
  * anyrtc_certificate_get_fingerprint
  * anyrtc_certificate_get_algorithm
- * anyrtc_certificate_generate_certificate
  */
 
 /*
