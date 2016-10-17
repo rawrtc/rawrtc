@@ -346,6 +346,7 @@ struct anyrtc_certificate_options {
  * TODO: private
  */
 struct anyrtc_certificate {
+    struct le le;
     X509* certificate;
     EVP_PKEY* key;
 };
@@ -457,6 +458,11 @@ struct anyrtc_ice_transport {
  */
 struct anyrtc_dtls_transport {
     enum anyrtc_dtls_transport_state state;
+    struct anyrtc_ice_transport* ice_transport; // referenced
+    struct list certificates; // deep-copied
+    anyrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
+    anyrtc_dtls_transport_error_handler* error_handler; // nullable
+    void* arg; // nullable
 };
 
 /*
@@ -672,7 +678,7 @@ enum anyrtc_code anyrtc_ice_gather_options_add_server(
  * Get the corresponding name for an ICE gatherer state.
  */
 char const * const anyrtc_ice_gatherer_state_to_name(
-    enum anyrtc_ice_gatherer_state state
+    enum anyrtc_ice_gatherer_state const state
 );
 
  /*
@@ -730,7 +736,7 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
  * Get the corresponding name for an ICE transport state.
  */
 char const * const anyrtc_ice_transport_state_to_name(
-    enum anyrtc_ice_transport_state state
+    enum anyrtc_ice_transport_state const state
 );
 
 /*
@@ -789,22 +795,27 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
  */
 enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
     struct anyrtc_ice_transport* const transport,
-    struct anyrtc_ice_candidate* candidate[], // referenced (each item)
-    size_t const length
+    struct anyrtc_ice_candidate* const candidates[], // referenced (each item)
+    size_t const n_candidates
 );
 
 /* TODO (from RTCIceTransport interface)
  * anyrtc_ice_transport_set_state_change_handler
  * anyrtc_ice_transport_set_candidate_pair_change_handler
  */
-  
+
+char const * const anyrtc_dtls_transport_state_to_name(
+    enum anyrtc_dtls_transport_state const state
+);
+
 /*
  * Create a new DTLS transport.
  */
 enum anyrtc_code anyrtc_dtls_transport_create(
-    struct anyrtc_dtls_transport** const transport, // de-referenced
+    struct anyrtc_dtls_transport** const transportp, // de-referenced
     struct anyrtc_ice_transport* const ice_transport, // referenced
-    struct list const * const certificates, // deep-copied, TODO: Change to array + length
+    struct anyrtc_certificate* const certificates[], // copied (each item)
+    size_t const n_certificates,
     anyrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
     anyrtc_dtls_transport_error_handler* const error_handler, // nullable
     void* const arg // nullable

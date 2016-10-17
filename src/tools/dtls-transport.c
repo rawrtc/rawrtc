@@ -20,6 +20,7 @@ struct client {
     struct anyrtc_certificate* certificate;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
+    struct anyrtc_dtls_transport* dtls_transport;
     struct client* other_client;
 };
 
@@ -108,6 +109,24 @@ static void ice_transport_candidate_pair_change_handler(
     DEBUG_PRINTF("(%s) ICE transport candidate pair change\n", client->name);
 }
 
+static void dtls_transport_state_change_handler(
+        enum anyrtc_dtls_transport_state const state, // read-only
+        void* const arg
+) {
+    struct client* const client = arg;
+    char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
+    DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
+}
+
+static void dtls_transport_error_handler(
+    /* TODO: error.message (probably from OpenSSL) */
+    void* const arg
+) {
+    struct client* const client = arg;
+    // TODO: Print error message
+    DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
+}
+
 static void signal_handler(
         int sig
 ) {
@@ -122,6 +141,7 @@ struct anyrtc_ice_parameters* client_init(
 
     // Generate certificates
     EOE(anyrtc_certificate_generate(&client->certificate, NULL));
+    struct anyrtc_certificate* certificates[] = {client->certificate};
 
     // Create ICE gatherer
     EOE(anyrtc_ice_gatherer_create(
@@ -134,6 +154,12 @@ struct anyrtc_ice_parameters* client_init(
             &client->ice_transport, client->gatherer,
             ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
             client));
+
+    // Create DTLS transport
+    EOE(anyrtc_dtls_transport_create(
+            &client->dtls_transport, client->ice_transport, certificates,
+            sizeof(certificates) / sizeof(struct anyrtc_certificate*),
+            dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
     // Get and return local parameters
     EOE(anyrtc_ice_gatherer_get_local_parameters(client->gatherer, &local_parameters));
@@ -152,11 +178,13 @@ void client_start(
 void client_stop(
         struct client* const client
 ) {
-    // Stop transport & close gatherer
+    // Stop transports & close gatherer
+//    EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
+    client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
     client->certificate = mem_deref(client->certificate);
@@ -189,8 +217,28 @@ int main(int argc, char* argv[argc + 1]) {
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Start clients
-    struct client a = {"A", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLING, NULL, NULL};
-    struct client b = {"B", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLED, NULL, NULL};
+    struct client a = {
+            .name = "A",
+            .gather_options = gather_options,
+            .remote_parameters = NULL,
+            .role = ANYRTC_ICE_ROLE_CONTROLLING,
+            .certificate = NULL,
+            .gatherer = NULL,
+            .ice_transport = NULL,
+            .dtls_transport = NULL,
+            .other_client = NULL,
+    };
+    struct client b = {
+            .name = "B",
+            .gather_options = gather_options,
+            .remote_parameters = NULL,
+            .role = ANYRTC_ICE_ROLE_CONTROLLED,
+            .certificate = NULL,
+            .gatherer = NULL,
+            .ice_transport = NULL,
+            .dtls_transport = NULL,
+            .other_client = NULL,
+    };
     a.other_client = &b;
     b.other_client = &a;
     b.remote_parameters = client_init(&a);

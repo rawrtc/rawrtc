@@ -11,7 +11,7 @@
  * Get the corresponding name for an ICE transport state.
  */
 char const * const anyrtc_ice_transport_state_to_name(
-        enum anyrtc_ice_transport_state state
+        enum anyrtc_ice_transport_state const state
 ) {
     switch (state) {
         case ANYRTC_ICE_TRANSPORT_NEW:
@@ -40,7 +40,6 @@ static void anyrtc_ice_transport_destroy(void* arg) {
     struct anyrtc_ice_transport* transport = arg;
 
     // Dereference
-    mem_deref(transport->dtls_transport);
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
 }
@@ -475,8 +474,8 @@ out:
  */
 enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
         struct anyrtc_ice_transport* const transport,
-        struct anyrtc_ice_candidate* candidate[], // referenced (each item)
-        size_t const length
+        struct anyrtc_ice_candidate* const candidates[], // referenced (each item)
+        size_t const n_candidates
 ) {
     // TODO: Implement
     return ANYRTC_CODE_NOT_IMPLEMENTED;

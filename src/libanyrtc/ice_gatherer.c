@@ -184,7 +184,7 @@ out:
  * Get the corresponding name for an ICE gatherer state.
  */
 char const * const anyrtc_ice_gatherer_state_to_name(
-        enum anyrtc_ice_gatherer_state state
+        enum anyrtc_ice_gatherer_state const state
 ) {
     switch (state) {
         case ANYRTC_ICE_GATHERER_NEW:

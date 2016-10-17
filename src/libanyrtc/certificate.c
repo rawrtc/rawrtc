@@ -7,6 +7,7 @@
 #include <openssl/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
+#include <openssl/crypto.h>
 #include <string.h>
 #include <limits.h>
 #include <anyrtc.h>
@@ -65,7 +66,7 @@ static enum anyrtc_code generate_key_rsa(
     }
 
     // Allocate BIGNUM
-    // TODO: Use BN_secure_new when version is >= 1.1.0
+    // TODO: Use BN_secure_new when OpenSSL version is >= 1.1.0
     bn = BN_new();
     if (!bn) {
         DEBUG_WARNING("Could not allocate BIGNUM\n");
@@ -284,7 +285,7 @@ static enum anyrtc_code generate_self_signed_certificate(
         goto out;
     }
 
-    // No error
+    // Done
     error = ANYRTC_CODE_SUCCESS;
 
 out:
@@ -503,5 +504,57 @@ out:
         *certificatep = certificate;
     }
     return error;
+}
 
+/*
+ * Copy a certificate.
+ * References the x509 certificate and private key.
+ */
+enum anyrtc_code anyrtc_certificate_copy(
+        struct anyrtc_certificate** const certificatep, // de-referenced
+        struct anyrtc_certificate* const source_certificate
+) {
+    enum anyrtc_code error = ANYRTC_CODE_UNKNOWN_ERROR;
+    struct anyrtc_certificate *certificate;
+
+    // Check arguments
+    if (!certificatep || !source_certificate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    certificate = mem_zalloc(sizeof(struct anyrtc_certificate), anyrtc_certificate_destroy);
+    if (!certificate) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Increment reference count of certificate and private key, copy the pointers
+    // TODO: Use X509_up_ref when OpenSSL version is >= 1.1.0
+    if (!CRYPTO_add(&source_certificate->certificate->references, 1, CRYPTO_LOCK_X509)) {
+        goto out;
+    }
+    certificate->certificate = source_certificate->certificate;
+    // TODO: Use EVP_PKEY_up_ref when OpenSSL version is >= 1.1.0
+    if (!CRYPTO_add(&source_certificate->key->references, 1, CRYPTO_LOCK_EVP_PKEY)) {
+        goto out;
+    }
+    certificate->key = source_certificate->key;
+
+    // Done
+    error = ANYRTC_CODE_SUCCESS;
+
+out:
+    if (error) {
+        if (certificate->certificate) {
+            X509_free(certificate->certificate);
+        }
+        if (certificate->key) {
+            EVP_PKEY_free(certificate->key);
+        }
+        mem_deref(certificate);
+    } else {
+        // Set pointer
+        *certificatep = certificate;
+    }
+    return error;
 }
