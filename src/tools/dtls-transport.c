@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdint.h> // uint16t, ...
-#include <inttypes.h> // PRIu16, ...
 #include <anyrtc.h>
 
 /* TODO: Replace with zf_log */

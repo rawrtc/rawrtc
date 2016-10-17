@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdint.h> // uint16t, ...
-#include <inttypes.h> // PRIu16, ...
 #include <anyrtc.h>
 
 /* TODO: Replace with zf_log */
@@ -184,8 +182,24 @@ int main(int argc, char* argv[argc + 1]) {
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Start clients
-    struct client a = {"A", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLING, NULL, NULL};
-    struct client b = {"B", gather_options, NULL, ANYRTC_ICE_ROLE_CONTROLLED, NULL, NULL};
+    struct client a = {
+            .name = "A",
+            .gather_options = gather_options,
+            .remote_parameters = NULL,
+            .role = ANYRTC_ICE_ROLE_CONTROLLING,
+            .gatherer = NULL,
+            .ice_transport = NULL,
+            .other_client = NULL,
+    };
+    struct client b = {
+            .name = "B",
+            .gather_options = gather_options,
+            .remote_parameters = NULL,
+            .role = ANYRTC_ICE_ROLE_CONTROLLED,
+            .gatherer = NULL,
+            .ice_transport = NULL,
+            .other_client = NULL,
+    };
     a.other_client = &b;
     b.other_client = &a;
     b.remote_parameters = client_init(&a);
