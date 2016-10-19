@@ -68,7 +68,8 @@ char const* dtls_cipher_suites[] = {
 
 // Defs
 enum {
-    COMPONENT_ID = 1
+    COMPONENT_ID = 1,
+    MTU = 1400
 };
 
 enum {
@@ -98,7 +99,6 @@ struct agent_t {
     struct tls* dtls_context;
     struct dtls_sock* dtls_socket;
     struct tls_conn* dtls_connection;
-    struct udp_helper* dtls_helper;
     uint32_t packet_counter;
     FILE* wireshark_hex;
     int redirect_socket;
@@ -301,9 +301,10 @@ static void redirect_to_machine(struct agent_t* const agent, struct mbuf* const 
     mbuf_advance(buffer, length);
 }
 
-static bool dtls_send_helper(int* err, struct sa* original_destination, struct mbuf* const buffer, void* const arg) {
+static int dtls_send_handler(struct tls_conn* const tc, const struct sa* original_destination, struct mbuf* const buffer, void* const arg) {
+    (void)tc;
     struct agent_t* const agent = arg;
-    
+
     // Send on selected candidate pair
     struct udp_sock* const udp_socket = trice_lcand_sock(agent->ice, agent->selected_pair->lcand);
     EXIT_ON_NULL(udp_socket);
@@ -312,20 +313,13 @@ static bool dtls_send_helper(int* err, struct sa* original_destination, struct m
     struct sa const* const destination = &agent->selected_pair->rcand->attr.addr;
     EXIT_ON_NULL(destination);
     DEBUG_PRINTF("Relaying DTLS packet of %zu bytes to %J (originally: %J) from %J\n",
-        mbuf_get_left(buffer), destination, original_destination, source);
+                 mbuf_get_left(buffer), destination, original_destination, source);
     // TODO: I'm guessing here that err can be used to propagate the error code... ?
-    *err |= udp_send(udp_socket, destination, buffer);
-    if (*err) {
+    int err = udp_send(udp_socket, destination, buffer);
+    if (err) {
         DEBUG_WARNING("Could not send, error: %m\n", err);
     }
-    // TODO: Should we return true in error case as well?
-    return true;
-}
-
-static void dtls_close_handler(int err, void* const arg) {
-    (void)(arg);
-    DEBUG_WARNING("dtls_close_handler(err: %m)\n", err);
-    EXIT_ON_ERROR(err);
+    return err;
 }
 
 static void dtls_receive_handler(struct mbuf* const buffer, void *arg) {
@@ -333,6 +327,12 @@ static void dtls_receive_handler(struct mbuf* const buffer, void *arg) {
     DEBUG_PRINTF("Received %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
     trace_packet(agent, buffer);
     redirect_to_machine(agent, buffer);
+}
+
+static void dtls_close_handler(int err, void* const arg) {
+    (void)(arg);
+    DEBUG_WARNING("dtls_close_handler(err: %m)\n", err);
+    EXIT_ON_ERROR(err);
 }
 
 static void dtls_establish_handler(void *arg) {
@@ -372,10 +372,6 @@ static void remove_dtls_socket(struct agent_t* const agent) {
         mem_deref(agent->dtls_connection);
         agent->dtls_connection = NULL;
     }
-    if (agent->dtls_helper != NULL) {
-        DEBUG_PRINTF("Removing DTLS send helper\n");
-        mem_deref(agent->dtls_helper);
-    }
     if (agent->dtls_socket != NULL) {
         DEBUG_PRINTF("Removing DTLS socket\n");
         mem_deref(agent->dtls_socket);
@@ -383,22 +379,18 @@ static void remove_dtls_socket(struct agent_t* const agent) {
     }
 }
 
+static void udp_receive_handler(struct sa const * const source, struct mbuf* const buffer, void* const arg) {
+    struct agent_t* const agent = arg;
+    dtls_receive(agent->dtls_socket, (struct sa* const) source, buffer);
+}
+
 static void dtls_attach_candidate(struct agent_t* const agent, struct udp_sock* const udp_socket, struct sa* const peer) {
-    if (agent->dtls_socket == NULL) {
-        // Create DTLS socket
-        DEBUG_PRINTF("Creating DTLS socket\n");
-        EXIT_ON_ERROR(dtls_listen(&agent->dtls_socket, NULL, udp_socket, 0,
-            LAYER_DTLS, dtls_connect_handler, agent));
-     
-        // TODO: Add send helper to send on chosen candidate's UDP socket
-        
-        // Do DTLS handshake
-        dtls_start_handshake(agent, peer);
-    } else {
-        // Attach to DTLS socket
-        DEBUG_PRINTF("Attaching to DTLS socket\n");
-        EXIT_ON_ERROR(dtls_attach_udp_sock(agent->dtls_socket, udp_socket, LAYER_DTLS));
-    }
+    // Do DTLS handshake (if required)
+    dtls_start_handshake(agent, peer);
+
+    // Attach to UDP socket
+    DEBUG_PRINTF("Setting receive handler on UDP socket\n");
+    udp_handler_set(udp_socket, udp_receive_handler, agent);
 }
 
 static void clear_selected_candidate_pair(struct agent_t* const agent) {
@@ -433,14 +425,6 @@ static void ice_completed_handler(struct agent_t* const agent) {
     struct ice_candpair* const candidate_pair = element->data;
     EXIT_ON_NULL(candidate_pair);
     set_selected_candidate_pair(agent, candidate_pair);
-    
-    // Add DTLS send helper: Send data to the selected candidate
-    if (agent->dtls_helper == NULL) {
-        DEBUG_PRINTF("Adding DTLS send helper\n");
-        struct udp_sock* const udp_socket = dtls_udp_sock(agent->dtls_socket);
-        EXIT_ON_ERROR(udp_register_helper(&agent->dtls_helper, udp_socket, LAYER_REDIRECT,
-            dtls_send_helper, NULL, agent));
-    }
 }
 
 static void udp_error_handler(int const err, void* const arg) {
@@ -763,6 +747,11 @@ str_to_uint16(const char *str, uint16_t *res)
     return true;
 }
 
+size_t dtls_mtu_handler(struct tls_conn* const tc, void* const arg) {
+    (void)tc; (void)arg;
+    return MTU;
+}
+
 int main(int argc, char* argv[argc + 1]) {
     struct agent_t agent = {0};
     uint16_t sctp_port;
@@ -808,7 +797,11 @@ int main(int argc, char* argv[argc + 1]) {
     tls_set_verify_client(agent.dtls_context);
     agent.dtls_socket = NULL;
     agent.dtls_connection = NULL;
-    agent.dtls_helper = NULL;
+
+    // Create DTLS socket
+    DEBUG_PRINTF("Creating DTLS socket\n");
+    EXIT_ON_ERROR(dtls_socketless(&agent.dtls_socket, 0, dtls_connect_handler,
+            dtls_send_handler, dtls_mtu_handler, &agent));
     
     // Create redirect raw socket
     EXIT_ON_ERROR(sa_set_str(&agent.redirect_address, argv[2], sctp_port));
