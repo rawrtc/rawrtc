@@ -1,10 +1,54 @@
 #include <anyrtc.h>
 #include "dtls_transport.h"
 #include "certificate.h"
+#include "utils.h"
 
 #define DEBUG_MODULE "dtls-transport"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
+
+/*
+ * Embedded DH parameters (bits: 2048)
+ */
+char const anyrtc_default_dh_parameters[] = ""
+    "-----BEGIN DH PARAMETERS-----\n"
+    "MIIBCAKCAQEAqkwfHsnt/lxQLf/0lfSAac/DhCmH1SxP9p6Iolth0n14l85HOZ3A\n"
+    "lRSYH6mjQpNYST2t62w9eS0nlGdM3JQxv8EAnZZKkadPq0hEzFQaTiqOoYFL6+rD\n"
+    "utYD+/KaSB/IunOJhiUuuhCAKuv54ijxz4UN6y9hURHh54Llp11xCu+K4ZdIQazX\n"
+    "xffO1c1mHmsOgk53XYk74pR6EO5bXTYHKYsGtkkeFxdXyMGAJBUinLhZVQhBZwfK\n"
+    "qFQa0beRL0F4wM0vB0lLuQX06nI6zwRpy1vky09yQORWH8ruMyspGoDaAT8Dpr8y\n"
+    "Amz7sbWB2jJvoUufQi4XyZUw2ha3mnz0gwIBAg==\n"
+    "-----END DH PARAMETERS-----";
+size_t const anyrtc_default_dh_parameters_length =
+        sizeof(anyrtc_default_dh_parameters) / sizeof(*anyrtc_default_dh_parameters);
+
+/*
+ * List of default DTLS cipher suites.
+ */
+char const* anyrtc_default_dtls_cipher_suites[] = {
+    "ECDHE-ECDSA-CHACHA20-POLY1305",
+    "ECDHE-RSA-CHACHA20-POLY1305",
+    "ECDHE-ECDSA-AES128-GCM-SHA256", // recommended
+    "ECDHE-RSA-AES128-GCM-SHA256",
+    "ECDHE-ECDSA-AES256-GCM-SHA384",
+    "ECDHE-RSA-AES256-GCM-SHA384",
+    "DHE-RSA-AES128-GCM-SHA256",
+    "DHE-RSA-AES256-GCM-SHA384",
+    "ECDHE-ECDSA-AES128-SHA256",
+    "ECDHE-RSA-AES128-SHA256",
+    "ECDHE-ECDSA-AES128-SHA", // required
+    "ECDHE-RSA-AES256-SHA384",
+    "ECDHE-RSA-AES128-SHA",
+    "ECDHE-ECDSA-AES256-SHA384",
+    "ECDHE-ECDSA-AES256-SHA",
+    "ECDHE-RSA-AES256-SHA",
+    "DHE-RSA-AES128-SHA256",
+    "DHE-RSA-AES128-SHA",
+    "DHE-RSA-AES256-SHA256",
+    "DHE-RSA-AES256-SHA"
+};
+size_t const anyrtc_default_dtls_cipher_suites_length =
+        sizeof(anyrtc_default_dtls_cipher_suites) / sizeof(*anyrtc_default_dtls_cipher_suites);
 
 /*
  * Get the corresponding name for an ICE transport state.
@@ -58,7 +102,27 @@ static void anyrtc_dtls_transport_destroy(void* arg) {
 
     // Dereference
     list_flush(&transport->certificates);
+    mem_deref(transport->socket);
+    mem_deref(transport->context);
     mem_deref(transport->ice_transport);
+}
+
+static void connect_handler(
+        const struct sa* const peer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* transport = arg;
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        return;
+    }
+
+    // Role set?
+    // TODO: If role is not determined, buffer incoming connect request
+
+    // Server role?
+    // TODO: If server role, accept, if not ignore
 }
 
 /*
@@ -75,8 +139,11 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 ) {
     struct anyrtc_dtls_transport* transport;
     size_t i;
+    struct anyrtc_certificate* certificate;
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
     struct le* le;
+    uint8_t* certificate_der;
+    size_t certificate_der_length;
 
     // Check arguments
     if (!transportp || !ice_transport || !certificates || !n_certificates) {
@@ -112,18 +179,71 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
     // Append and reference certificates
     for (i = 0; i < n_certificates; ++i) {
-        struct anyrtc_certificate* copied_certificate;
-
         // Copy certificate
         // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
-        error = anyrtc_certificate_copy(&copied_certificate, certificates[i]);
+        error = anyrtc_certificate_copy(&certificate, certificates[i]);
         if (error) {
             goto out;
         }
 
         // Append to list
-        list_append(&transport->certificates, &copied_certificate->le, copied_certificate);
+        list_append(&transport->certificates, &certificate->le, certificate);
     }
+
+    // Create (D)TLS context
+    DEBUG_PRINTF("Creating DTLS context\n");
+    error = anyrtc_translate_re_code(tls_alloc(&transport->context, TLS_METHOD_DTLS, NULL, NULL));
+    if (error) {
+        goto out;
+    }
+
+    // Get DER encoded certificate of choice
+    // TODO: Which certificate should we use?
+    certificate = list_ledata(list_head(&transport->certificates));
+    error = anyrtc_certificate_get_der(
+            &certificate_der, &certificate_der_length, certificate, ANYRTC_CERTIFICATE_ENCODE_BOTH);
+    if (error) {
+        goto out;
+    }
+
+    // Set certificate
+    DEBUG_PRINTF("Setting certificate on DTLS context\n");
+    error = anyrtc_translate_re_code(tls_set_certificate_der(
+            transport->context, anyrtc_translate_certificate_key_type(certificate->key_type),
+            certificate_der, certificate_der_length, NULL, 0));
+    mem_deref(certificate_der);
+    if (error) {
+        goto out;
+    }
+
+    // Set Diffie-Hellman parameters
+    // TODO: Get DH params from config
+    DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
+    error = anyrtc_translate_re_code(tls_set_dh_params_pem(transport->context,
+            anyrtc_default_dh_parameters, anyrtc_default_dh_parameters_length));
+    if (error) {
+        goto out;
+    }
+
+    // Set cipher suites
+    // TODO: Get cipher suites from config
+    DEBUG_PRINTF("Setting cipher suites on DTLS context\n");
+    error = anyrtc_translate_re_code(tls_set_ciphers(transport->context,
+            anyrtc_default_dtls_cipher_suites, anyrtc_default_dtls_cipher_suites_length));
+    if (error) {
+        goto out;
+    }
+
+    // Send client certificate (client) / request client certificate (server)
+    tls_set_verify_client(transport->context);
+
+//    // Create DTLS socket
+//    DEBUG_PRINTF("Creating DTLS socket\n");
+//    error = anyrtc_translate_re_code(dtls_socketless(
+//            &transport->socket, 0, connect_handler, send_handler, mtu_handler, transport));
+//    if (error) {
+//        goto out;
+//    }
 
     // Attach to existing candidate pairs
     for (le = list_head(trice_validl(ice_transport->gatherer->ice)); le != NULL; le = le->next) {
@@ -142,6 +262,8 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 out:
     if (error) {
         list_flush(&transport->certificates);
+        mem_deref(transport->socket);
+        mem_deref(transport->context);
         mem_deref(transport->ice_transport);
         mem_deref(transport);
     } else {
@@ -158,6 +280,8 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
         struct anyrtc_dtls_transport* const transport,
         struct ice_candpair* const candidate_pair
 ) {
+    struct udp_sock* socket;
+
     // Check arguments
     if (!transport || !candidate_pair) {
         return ANYRTC_CODE_INVALID_ARGUMENT;

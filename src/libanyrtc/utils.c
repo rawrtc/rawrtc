@@ -18,7 +18,7 @@ struct anyrtc_config anyrtc_default_config = {
  * Default certificate options.
  */
 struct anyrtc_certificate_options anyrtc_default_certificate_options = {
-        .key_type = ANYRTC_CERTIFICATE_KEY_TYPE_ECC,
+        .key_type = ANYRTC_CERTIFICATE_KEY_TYPE_EC,
         .common_name = "anonymous@anyrtc.org",
         .valid_until = 3600 * 24 * 30, // 30 days
         .sign_algorithm = ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
@@ -141,6 +141,35 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
             return ANYRTC_CODE_SUCCESS;
         case ICE_TCP_SO:
             *typep = ANYRTC_ICE_TCP_CANDIDATE_TYPE_SO;
+            return ANYRTC_CODE_SUCCESS;
+        default:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+}
+
+enum tls_key_type anyrtc_translate_certificate_key_type(
+        enum anyrtc_certificate_key_type type
+) {
+    // No conversion needed
+    return (enum tls_key_type) type;
+}
+
+enum anyrtc_code anyrtc_translate_re_tls_key_type(
+        enum tls_key_type re_type,
+        enum anyrtc_certificate_key_type* const typep // de-referenced
+) {
+    // Check arguments
+    if (!typep) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert ice_cand_type
+    switch (re_type) {
+        case TLS_KEY_TYPE_RSA:
+            *typep = ANYRTC_CERTIFICATE_KEY_TYPE_RSA;
+            return ANYRTC_CODE_SUCCESS;
+        case TLS_KEY_TYPE_EC:
+            *typep = ANYRTC_CERTIFICATE_KEY_TYPE_EC;
             return ANYRTC_CODE_SUCCESS;
         default:
             return ANYRTC_CODE_INVALID_ARGUMENT;

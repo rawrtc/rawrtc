@@ -8,6 +8,8 @@
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/crypto.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
 #include <string.h>
 #include <limits.h>
 #include <anyrtc.h>
@@ -360,17 +362,6 @@ enum anyrtc_code anyrtc_certificate_options_create(
 
     // Set defaults depending on key type
     switch (key_type) {
-        case ANYRTC_CERTIFICATE_KEY_TYPE_ECC:
-            // Unset RSA vars
-            modulus_length = 0;
-
-            // Set default named curve (if required)
-            if (!named_curve) {
-                named_curve = anyrtc_default_certificate_options.named_curve;
-            }
-
-            break;
-
         case ANYRTC_CERTIFICATE_KEY_TYPE_RSA:
             // Unset ECC vars
             named_curve = NULL;
@@ -378,6 +369,17 @@ enum anyrtc_code anyrtc_certificate_options_create(
             // Prevent user from being stupid
             if (modulus_length < ANYRTC_MODULUS_LENGTH_MIN) {
                 modulus_length = anyrtc_default_certificate_options.modulus_length;
+            }
+
+            break;
+
+        case ANYRTC_CERTIFICATE_KEY_TYPE_EC:
+            // Unset RSA vars
+            modulus_length = 0;
+
+            // Set default named curve (if required)
+            if (!named_curve) {
+                named_curve = anyrtc_default_certificate_options.named_curve;
             }
 
             break;
@@ -469,11 +471,11 @@ enum anyrtc_code anyrtc_certificate_generate(
 
     // Generate key pair
     switch (options->key_type) {
-        case ANYRTC_CERTIFICATE_KEY_TYPE_ECC:
-            error = generate_key_ecc(&certificate->key, options->named_curve);
-            break;
         case ANYRTC_CERTIFICATE_KEY_TYPE_RSA:
             error = generate_key_rsa(&certificate->key, options->modulus_length);
+            break;
+        case ANYRTC_CERTIFICATE_KEY_TYPE_EC:
+            error = generate_key_ecc(&certificate->key, options->named_curve);
             break;
         default:
             return ANYRTC_CODE_INVALID_STATE;
@@ -489,6 +491,9 @@ enum anyrtc_code anyrtc_certificate_generate(
     if (error) {
         goto out;
     }
+
+    // Set key type
+    certificate->key_type = options->key_type;
 
 out:
     if (error) {
@@ -539,6 +544,7 @@ enum anyrtc_code anyrtc_certificate_copy(
         goto out;
     }
     certificate->key = source_certificate->key;
+    certificate->key_type = source_certificate->key_type;
 
     // Done
     error = ANYRTC_CODE_SUCCESS;
@@ -555,6 +561,178 @@ out:
     } else {
         // Set pointer
         *certificatep = certificate;
+    }
+    return error;
+}
+
+static enum anyrtc_code what_to_encode(
+        enum anyrtc_certificate_encode const to_encode,
+        bool* encode_certificatep,  // de-referenced
+        bool* encode_keyp  // de-referenced
+) {
+    *encode_certificatep = false;
+    *encode_keyp = false;
+
+    // What to encode?
+    switch (to_encode) {
+        case ANYRTC_CERTIFICATE_ENCODE_CERTIFICATE:
+            *encode_certificatep = true;
+            break;
+        case ANYRTC_CERTIFICATE_ENCODE_PRIVATE_KEY:
+            *encode_keyp = true;
+            break;
+        case ANYRTC_CERTIFICATE_ENCODE_BOTH:
+            *encode_certificatep = true;
+            *encode_keyp = true;
+            break;
+        default:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get PEM of the certificate and/or the private key if requested.
+ * *pemp will NOT be null-terminated!
+ */
+enum anyrtc_code anyrtc_certificate_get_pem(
+        char** const pemp,  // de-referenced
+        size_t* const pem_lengthp,  // de-referenced
+        struct anyrtc_certificate* const certificate,
+        enum anyrtc_certificate_encode const to_encode
+) {
+    bool encode_certificate;
+    bool encode_key;
+    enum anyrtc_code error;
+    BIO* bio = NULL;
+    char* pem = NULL;
+    size_t length;
+
+    // Check arguments
+    if (!pemp || !certificate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // What to encode?
+    error = what_to_encode(to_encode, &encode_certificate, &encode_key);
+    if (error) {
+        return error;
+    }
+    error = ANYRTC_CODE_UNKNOWN_ERROR;
+
+    // Create bio structure
+    // TODO: Use BIO_s_secmem when OpenSSL version is >= 1.1.0
+    bio = BIO_new(BIO_s_mem());
+
+    // Write certificate
+    if (encode_certificate && !PEM_write_bio_X509(bio, certificate->certificate)) {
+        goto out;
+    }
+
+    // Write private key (if requested)
+    if (encode_key && !PEM_write_bio_PrivateKey(bio, certificate->key, NULL, NULL, 0, 0, NULL)) {
+        goto out;
+    }
+
+    // Allocate buffer
+    length = bio->num_write;
+    pem = mem_alloc(length, NULL);
+
+    // Copy to buffer
+    if (length > INT_MAX) {
+        return ANYRTC_CODE_UNKNOWN_ERROR;
+    }
+    if (BIO_read(bio, pem, (int) length) < length) {
+        goto out;
+    }
+
+    // Done
+    error = ANYRTC_CODE_SUCCESS;
+
+out:
+    if (bio) {
+        BIO_free(bio);
+    }
+    if (error) {
+        mem_deref(pem);
+    } else {
+        // Set pointers
+        *pemp = pem;
+        *pem_lengthp = length;
+    }
+    return error;
+}
+
+/*
+ * Get DER of the certificate and/or the private key if requested.
+ * *derp will NOT be null-terminated!
+ */
+enum anyrtc_code anyrtc_certificate_get_der(
+        uint8_t** const derp,  // de-referenced
+        size_t* const der_lengthp,  // de-referenced
+        struct anyrtc_certificate* const certificate,
+        enum anyrtc_certificate_encode const to_encode
+) {
+    bool encode_certificate;
+    bool encode_key;
+    enum anyrtc_code error;
+    int length_certificate = 0;
+    int length_key = 0;
+    size_t length;
+    uint8_t* der = NULL;
+    uint8_t* der_i2d;
+
+    // Check arguments
+    if (!derp || !certificate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // What to encode?
+    error = what_to_encode(to_encode, &encode_certificate, &encode_key);
+    if (error) {
+        return error;
+    }
+    error = ANYRTC_CODE_UNKNOWN_ERROR;
+
+    // Allocate buffer
+    if (encode_certificate) {
+        length_certificate = i2d_X509(certificate->certificate, NULL);
+        if (length_certificate < 1) {
+            return ANYRTC_CODE_UNKNOWN_ERROR;
+        }
+    }
+    if (encode_key) {
+        length_key = i2d_PrivateKey(certificate->key, NULL);
+        if (length_key < 1) {
+            return ANYRTC_CODE_UNKNOWN_ERROR;
+        }
+    }
+    length = (size_t) (length_certificate + length_key);
+    der = mem_alloc(length, NULL);
+    der_i2d = der;
+
+    // Write certificate
+    if (encode_certificate && i2d_X509(certificate->certificate, &der_i2d) < length_certificate) {
+        goto out;
+    }
+
+    // Write private key (if requested)
+    if (encode_key && i2d_PrivateKey(certificate->key, &der_i2d) < length_key) {
+        goto out;
+    }
+
+    // Done
+    error = ANYRTC_CODE_SUCCESS;
+
+out:
+    if (error) {
+        mem_deref(der);
+    } else {
+        // Set pointers
+        *derp = der;
+        *der_lengthp = length;
     }
     return error;
 }

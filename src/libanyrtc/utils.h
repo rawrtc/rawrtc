@@ -24,6 +24,15 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
     enum anyrtc_ice_tcp_candidate_type* const typep // de-referenced
 );
 
+enum tls_key_type anyrtc_translate_certificate_key_type(
+    enum anyrtc_certificate_key_type type
+);
+
+enum anyrtc_code anyrtc_translate_re_tls_key_type(
+    enum tls_key_type re_type,
+    enum anyrtc_certificate_key_type* const typep // de-referenced
+);
+
 enum anyrtc_code anyrtc_strdup(
     char** const destination,
     char const * const source

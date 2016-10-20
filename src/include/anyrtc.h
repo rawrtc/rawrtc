@@ -38,8 +38,8 @@ enum anyrtc_code {
  * Certificate private key types.
  */
 enum anyrtc_certificate_key_type {
-    ANYRTC_CERTIFICATE_KEY_TYPE_ECC,
-    ANYRTC_CERTIFICATE_KEY_TYPE_RSA
+    ANYRTC_CERTIFICATE_KEY_TYPE_RSA = TLS_KEY_TYPE_RSA,
+    ANYRTC_CERTIFICATE_KEY_TYPE_EC = TLS_KEY_TYPE_EC
 };
 
 /*
@@ -50,6 +50,15 @@ enum anyrtc_certificate_sign_algorithm {
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512
+};
+
+/*
+ * Certificate encoding.
+ */
+enum anyrtc_certificate_encode {
+    ANYRTC_CERTIFICATE_ENCODE_CERTIFICATE,
+    ANYRTC_CERTIFICATE_ENCODE_PRIVATE_KEY,
+    ANYRTC_CERTIFICATE_ENCODE_BOTH
 };
 
 /*
@@ -349,6 +358,7 @@ struct anyrtc_certificate {
     struct le le;
     X509* certificate;
     EVP_PKEY* key;
+    enum anyrtc_certificate_key_type key_type;
 };
 
 /*
@@ -463,6 +473,8 @@ struct anyrtc_dtls_transport {
     anyrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
     anyrtc_dtls_transport_error_handler* error_handler; // nullable
     void* arg; // nullable
+    struct tls* context;
+    struct dtls_sock* socket;
 };
 
 /*
