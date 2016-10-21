@@ -91,22 +91,6 @@ static enum anyrtc_code set_state(
     return ANYRTC_CODE_SUCCESS;
 }
 
-/*
- * Destructor for an existing ICE transport.
- */
-static void anyrtc_dtls_transport_destroy(void* arg) {
-    struct anyrtc_dtls_transport* transport = arg;
-
-    // Remove from ICE transport
-    transport->ice_transport->dtls_transport = NULL;
-
-    // Dereference
-    list_flush(&transport->certificates);
-    mem_deref(transport->socket);
-    mem_deref(transport->context);
-    mem_deref(transport->ice_transport);
-}
-
 static void connect_handler(
         const struct sa* const peer,
         void* const arg
@@ -123,6 +107,24 @@ static void connect_handler(
 
     // Server role?
     // TODO: If server role, accept, if not ignore
+}
+
+/*
+ * Destructor for an existing ICE transport.
+ */
+static void anyrtc_dtls_transport_destroy(void* arg) {
+    struct anyrtc_dtls_transport* transport = arg;
+
+    // Remove from ICE transport
+    if (transport->ice_transport) {
+        transport->ice_transport->dtls_transport = NULL;
+    }
+
+    // Dereference
+    list_flush(&transport->certificates);
+    mem_deref(transport->socket);
+    mem_deref(transport->context);
+    mem_deref(transport->ice_transport);
 }
 
 /*
@@ -261,10 +263,6 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
 out:
     if (error) {
-        list_flush(&transport->certificates);
-        mem_deref(transport->socket);
-        mem_deref(transport->context);
-        mem_deref(transport->ice_transport);
         mem_deref(transport);
     } else {
         // Set pointer

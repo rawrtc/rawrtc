@@ -415,8 +415,6 @@ enum anyrtc_code anyrtc_certificate_options_create(
 
 out:
     if (error) {
-        mem_deref(options->named_curve);
-        mem_deref(options->common_name);
         mem_deref(options);
     } else {
         // Set pointer
@@ -497,12 +495,6 @@ enum anyrtc_code anyrtc_certificate_generate(
 
 out:
     if (error) {
-        if (certificate->certificate) {
-            X509_free(certificate->certificate);
-        }
-        if (certificate->key) {
-            EVP_PKEY_free(certificate->key);
-        }
         mem_deref(certificate);
     } else {
         // Set pointer
@@ -551,12 +543,6 @@ enum anyrtc_code anyrtc_certificate_copy(
 
 out:
     if (error) {
-        if (certificate->certificate) {
-            X509_free(certificate->certificate);
-        }
-        if (certificate->key) {
-            EVP_PKEY_free(certificate->key);
-        }
         mem_deref(certificate);
     } else {
         // Set pointer

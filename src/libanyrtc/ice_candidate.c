@@ -81,9 +81,6 @@ static enum anyrtc_code anyrtc_ice_candidate_raw_create(
 
 out:
     if (error) {
-        mem_deref(candidate->related_address);
-        mem_deref(candidate->ip);
-        mem_deref(candidate->foundation);
         mem_deref(candidate);
     } else {
         // Set pointer
@@ -155,7 +152,6 @@ enum anyrtc_code anyrtc_ice_candidate_create(
 
 out:
     if (error) {
-        mem_deref(candidate->candidate.raw_candidate);
         mem_deref(candidate);
     } else {
         // Set pointer

@@ -47,10 +47,9 @@ enum anyrtc_code anyrtc_ice_parameters_create(
     }
     parameters->ice_lite = ice_lite;
 
-    out:
+out:
     if (error) {
-        mem_deref(parameters->username_fragment);
-        mem_deref(parameters->password);
+        mem_deref(parameters);
     } else {
         // Set pointer
         *parametersp = parameters;

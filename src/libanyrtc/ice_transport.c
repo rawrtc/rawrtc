@@ -458,13 +458,14 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
 
 out:
     if (error) {
-        mem_deref(re_candidate);
-    } else {
-        // Free vars
-        mem_deref(related_address);
-        mem_deref(foundation);
-        mem_deref(ip);
+        mem_deref(re_candidate); // TODO: Not entirely sure about that
     }
+
+    // Free vars
+    mem_deref(related_address);
+    mem_deref(foundation);
+    mem_deref(ip);
+
     return error;
 }
 

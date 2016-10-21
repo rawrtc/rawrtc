@@ -64,7 +64,7 @@ static enum anyrtc_code anyrtc_ice_server_url_create(
         char* const url_s // copied
 ) {
     struct anyrtc_ice_server_url* url;
-    enum anyrtc_code error;
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
     char* copy;
 
     // Check arguments
@@ -81,14 +81,20 @@ static enum anyrtc_code anyrtc_ice_server_url_create(
     // Copy URL
     error = anyrtc_strdup(&copy, url_s);
     if (error) {
-        mem_deref(url);
-        return error;
+        goto out;
     }
 
-    // Set pointer and return
+    // Set URL
     url->url = copy;
-    *urlp = url;
-    return ANYRTC_CODE_SUCCESS;
+
+out:
+    if (error) {
+        mem_deref(url);
+    } else {
+        // Set pointer
+        *urlp = url;
+    }
+    return error;
 }
 
 /*
@@ -172,9 +178,6 @@ enum anyrtc_code anyrtc_ice_gather_options_add_server(
 
 out:
     if (error) {
-        list_flush(&server->urls);
-        mem_deref(server->username);
-        mem_deref(server->credential);
         mem_deref(server);
     }
     return error;
@@ -277,9 +280,6 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
 
 out:
     if (error) {
-        mem_deref(gatherer->stun);
-        mem_deref(gatherer->ice);
-        mem_deref(gatherer->options);
         mem_deref(gatherer);
     } else {
         // Set pointer
