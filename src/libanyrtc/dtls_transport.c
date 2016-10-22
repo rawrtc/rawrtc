@@ -8,7 +8,7 @@
 #include <re_dbg.h>
 
 /*
- * Embedded DH parameters (bits: 2048)
+ * Embedded DH parameters in DER encoding (bits: 2048)
  */
 uint8_t anyrtc_default_dh_parameters[] = {
     0x30, 0x82, 0x01, 0x08, 0x02, 0x82, 0x01, 0x01, 0x00, 0xaa, 0x4c, 0x1f,
@@ -107,6 +107,58 @@ static enum anyrtc_code set_state(
     return ANYRTC_CODE_SUCCESS;
 }
 
+/*
+ * Handle MTU queries.
+ */
+static size_t mtu_handler(
+        struct tls_conn* const tc,
+        void* const arg
+) {
+    (void) tc; (void) arg;
+    // TODO: Choose a sane value.
+    return 1400;
+}
+
+/*
+ * Handle outgoing DTLS messages.
+ */
+static int send_handler(
+        struct tls_conn* const tc,
+        struct sa const* const original_destination,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    (void) tc;
+    struct anyrtc_dtls_transport* transport = arg;
+    struct trice* const ice = transport->ice_transport->gatherer->ice;
+
+    // Get selected candidate pair
+    struct ice_candpair* const candidate_pair = list_ledata(list_head(trice_validl(ice)));
+    if (!candidate_pair) {
+        DEBUG_WARNING("Cannot send message, no selected candidate pair\n");
+    }
+
+    // Get local candidate's UDP socket
+    // TODO: What about TCP?
+    struct udp_sock* const udp_socket = trice_lcand_sock(ice, candidate_pair->lcand);
+    if (!udp_socket) {
+        DEBUG_WARNING("Cannot send message, selected candidate pair has no socket\n");
+    }
+
+    // Send
+    DEBUG_PRINTF("Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n",
+            mbuf_get_left(buffer), candidate_pair->rcand->attr.addr, original_destination,
+            candidate_pair->lcand->attr.addr);
+    int err = udp_send(udp_socket, &candidate_pair->rcand->attr.addr, buffer);
+    if (err) {
+        DEBUG_WARNING("Could not send, error: %m\n", err);
+    }
+    return err;
+}
+
+/*
+ * Handle incoming DTLS connection.
+ */
 static void connect_handler(
         const struct sa* const peer,
         void* const arg
@@ -255,13 +307,13 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     // Send client certificate (client) / request client certificate (server)
     tls_set_verify_client(transport->context);
 
-//    // Create DTLS socket
-//    DEBUG_PRINTF("Creating DTLS socket\n");
-//    error = anyrtc_translate_re_code(dtls_socketless(
-//            &transport->socket, 0, connect_handler, send_handler, mtu_handler, transport));
-//    if (error) {
-//        goto out;
-//    }
+    // Create DTLS socket
+    DEBUG_PRINTF("Creating DTLS socket\n");
+    error = anyrtc_translate_re_code(dtls_socketless(
+            &transport->socket, 0, connect_handler, send_handler, mtu_handler, transport));
+    if (error) {
+        goto out;
+    }
 
     // Attach to existing candidate pairs
     for (le = list_head(trice_validl(ice_transport->gatherer->ice)); le != NULL; le = le->next) {

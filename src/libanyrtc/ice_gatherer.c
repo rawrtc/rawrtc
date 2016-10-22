@@ -337,6 +337,7 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
 /*
  * Local interfaces callback.
  * TODO: Consider ICE gather policy
+ * TODO: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-01
   */
 static bool interface_handler(
         char const* const interface,
