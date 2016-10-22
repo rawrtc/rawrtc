@@ -26,7 +26,7 @@
 static int print_openssl_error(
         char const * const message,
         size_t const length,
-        void* arg
+        void* const arg
 ) {
     (void) arg;
     DEBUG_WARNING("%b", message, length);
@@ -308,8 +308,10 @@ out:
 /*
  * Destructor for existing certificate options.
  */
-static void anyrtc_certificate_options_destroy(void* arg) {
-    struct anyrtc_certificate_options* options = arg;
+static void anyrtc_certificate_options_destroy(
+        void* const arg
+) {
+    struct anyrtc_certificate_options* const options = arg;
 
     // Dereference
     mem_deref(options->named_curve);
@@ -426,8 +428,10 @@ out:
 /*
  * Destructor for existing certificate.
  */
-static void anyrtc_certificate_destroy(void* arg) {
-    struct anyrtc_certificate* certificate = arg;
+static void anyrtc_certificate_destroy(
+        void* const arg
+) {
+    struct anyrtc_certificate* const certificate = arg;
 
     // Free
     if (certificate->certificate) {

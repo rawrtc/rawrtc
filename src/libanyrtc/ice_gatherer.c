@@ -9,8 +9,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-static void anyrtc_ice_gather_options_destroy(void* arg) {
-    struct anyrtc_ice_gather_options* options = arg;
+static void anyrtc_ice_gather_options_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_gather_options* const options = arg;
 
     // Dereference
     list_flush(&options->ice_servers);
@@ -49,8 +51,10 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
 /*
  * Destructor for URLs of the ICE gatherer.
  */
-static void anyrtc_ice_server_url_destroy(void* arg) {
-    struct anyrtc_ice_server_url* url = arg;
+static void anyrtc_ice_server_url_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_server_url* const url = arg;
 
     // Dereference
     mem_deref(url->url);
@@ -64,7 +68,7 @@ static enum anyrtc_code anyrtc_ice_server_url_create(
         char* const url_s // copied
 ) {
     struct anyrtc_ice_server_url* url;
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum anyrtc_code error;
     char* copy;
 
     // Check arguments
@@ -100,8 +104,10 @@ out:
 /*
  * Destructor for an existing ICE server.
  */
-static void anyrtc_ice_server_destroy(void* arg) {
-    struct anyrtc_ice_server* server = arg;
+static void anyrtc_ice_server_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_server* const server = arg;
 
     // Dereference
     list_flush(&server->urls);
@@ -206,8 +212,10 @@ char const * const anyrtc_ice_gatherer_state_to_name(
 /*
  * Destructor for an existing ICE gatherer.
  */
-static void anyrtc_ice_gatherer_destroy(void* arg) {
-    struct anyrtc_ice_gatherer* gatherer = arg;
+static void anyrtc_ice_gatherer_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_gatherer* const gatherer = arg;
 
     // Dereference
     mem_deref(gatherer->stun);

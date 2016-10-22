@@ -108,15 +108,88 @@ static enum anyrtc_code set_state(
 }
 
 /*
- * Handle MTU queries.
+ * DTLS connection closed handler.
  */
-static size_t mtu_handler(
-        struct tls_conn* const tc,
+static void close_handler(
+        int err,
         void* const arg
 ) {
-    (void) tc; (void) arg;
-    // TODO: Choose a sane value.
-    return 1400;
+    struct anyrtc_dtls_transport* const transport = arg;
+    DEBUG_INFO("DTLS connection closed, reason %m\n", err);
+
+    // Remove connection
+    transport->connection = mem_deref(transport->connection);
+}
+
+/*
+ * Handle incoming DTLS messages.
+ */
+static void dtls_receive_handler(
+        struct mbuf *const buffer,
+        void *const arg
+) {
+    (void) buffer;
+    struct anyrtc_dtls_transport* const transport = arg;
+    DEBUG_PRINTF("Received %zu bytes on DTLS connection\n", mbuf_get_left(buffer));
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
+        return;
+    }
+
+    // TODO: Implement
+    DEBUG_WARNING("TODO: Buffer DTLS message: %b\n", buffer->buf, mbuf_get_left(buffer));
+}
+
+/*
+ * Handle DTLS connection established event.
+ */
+static void establish_handler(
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        DEBUG_WARNING("Ignoring established DTLS connection, transport is closed\n");
+    } else {
+        DEBUG_INFO("DTLS connection established\n");
+    }
+}
+
+/*
+ * Handle incoming DTLS connection.
+ */
+static void connect_handler(
+        const struct sa* const peer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+    int err;
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
+        return;
+    }
+
+    // Update role if "auto"
+    if (transport->role == ANYRTC_DTLS_ROLE_AUTO) {
+        transport->role = ANYRTC_DTLS_ROLE_SERVER;
+    }
+    
+    // Accept?
+    if (transport->role == ANYRTC_DTLS_ROLE_SERVER && transport->connection) {
+        DEBUG_PRINTF("Accepting incoming DTLS connection from %J\n", peer);
+        err = dtls_accept(&transport->connection, transport->context, transport->socket,
+                          establish_handler, dtls_receive_handler, close_handler, transport);
+        if (err) {
+            DEBUG_WARNING("Could not accept incoming DTLS connection, reason: %m\n", err);
+        }
+    } else {
+        DEBUG_WARNING("Incoming DTLS connect but role is client\n");
+    }
 }
 
 /*
@@ -128,9 +201,15 @@ static int send_handler(
         struct mbuf* const buffer,
         void* const arg
 ) {
-    (void) tc;
-    struct anyrtc_dtls_transport* transport = arg;
+    struct anyrtc_dtls_transport* const transport = arg;
     struct trice* const ice = transport->ice_transport->gatherer->ice;
+    (void) tc;
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        DEBUG_WARNING("Ignoring sending message request, DTLS transport is closed\n");
+        return ECONNABORTED;
+    }
 
     // Get selected candidate pair
     struct ice_candpair* const candidate_pair = list_ledata(list_head(trice_validl(ice)));
@@ -146,9 +225,10 @@ static int send_handler(
     }
 
     // Send
+    // TODO: Is destination correct?
     DEBUG_PRINTF("Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n",
-            mbuf_get_left(buffer), candidate_pair->rcand->attr.addr, original_destination,
-            candidate_pair->lcand->attr.addr);
+                 mbuf_get_left(buffer), candidate_pair->rcand->attr.addr, original_destination,
+                 candidate_pair->lcand->attr.addr);
     int err = udp_send(udp_socket, &candidate_pair->rcand->attr.addr, buffer);
     if (err) {
         DEBUG_WARNING("Could not send, error: %m\n", err);
@@ -157,31 +237,24 @@ static int send_handler(
 }
 
 /*
- * Handle incoming DTLS connection.
+ * Handle MTU queries.
  */
-static void connect_handler(
-        const struct sa* const peer,
+static size_t mtu_handler(
+        struct tls_conn* const tc,
         void* const arg
 ) {
-    struct anyrtc_dtls_transport* transport = arg;
-
-    // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
-        return;
-    }
-
-    // Role set?
-    // TODO: If role is not determined, buffer incoming connect request
-
-    // Server role?
-    // TODO: If server role, accept, if not ignore
+    (void) tc; (void) arg;
+    // TODO: Choose a sane value.
+    return 1400;
 }
 
 /*
  * Destructor for an existing ICE transport.
  */
-static void anyrtc_dtls_transport_destroy(void* arg) {
-    struct anyrtc_dtls_transport* transport = arg;
+static void anyrtc_dtls_transport_destroy(
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
 
     // Remove from ICE transport
     if (transport->ice_transport) {
@@ -189,6 +262,8 @@ static void anyrtc_dtls_transport_destroy(void* arg) {
     }
 
     // Dereference
+    list_flush(&transport->candidate_helpers);
+    mem_deref(transport->connection);
     list_flush(&transport->certificates);
     mem_deref(transport->socket);
     mem_deref(transport->context);
@@ -210,7 +285,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     struct anyrtc_dtls_transport* transport;
     size_t i;
     struct anyrtc_certificate* certificate;
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum anyrtc_code error;
     struct le* le;
     uint8_t* certificate_der;
     size_t certificate_der_length;
@@ -246,6 +321,8 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     transport->state_change_handler = state_change_handler;
     transport->error_handler = error_handler;
     transport->arg = arg;
+    transport->role = ANYRTC_DTLS_ROLE_AUTO;
+    list_init(&transport->candidate_helpers);
 
     // Append and reference certificates
     for (i = 0; i < n_certificates; ++i) {
@@ -340,14 +417,51 @@ out:
 }
 
 /*
+ * Handle received UDP messages.
+ */
+static bool udp_receive_handler(
+        struct sa * const source,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+
+    // Check state
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+        DEBUG_WARNING("Ignoring incoming UDP message, DTLS transport is closed\n");
+    } else {
+        // Receive & decrypt
+        dtls_receive(transport->socket, source, buffer);
+    }
+
+    // Handled
+    return true;
+}
+
+/*
+ * Destructor for an existing DTLS candidate helper.
+ */
+static void anyrtc_dtls_candidate_helper_destroy(
+        void* const arg
+) {
+    struct anyrtc_dtls_candidate_helper* const candidate_helper = arg;
+
+    // Dereference
+    mem_deref(candidate_helper->helper);
+    mem_deref(candidate_helper->candidate);
+}
+
+/*
  * Let the DTLS transport attach itself to a candidate pair.
  */
 enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
         struct anyrtc_dtls_transport* const transport,
         struct ice_candpair* const candidate_pair
 ) {
-    struct udp_sock* socket;
-
+    enum anyrtc_code error;
+    struct ice_lcand* candidate;
+    struct anyrtc_dtls_candidate_helper* candidate_helper;
+    
     // Check arguments
     if (!transport || !candidate_pair) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
@@ -358,6 +472,46 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // TODO: Implement
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    // Get local candidate
+    candidate = candidate_pair->lcand;
+
+    // TODO: Check if local candidate is already in our list
+
+    // Get local candidate's UDP socket
+    // TODO: What about TCP?
+    struct udp_sock* const udp_socket = trice_lcand_sock(
+            transport->ice_transport->gatherer->ice, candidate);
+    if (!udp_socket) {
+        return ANYRTC_CODE_NO_SOCKET;
+    }
+
+    // Create DTLS candidate helper
+    candidate_helper = mem_zalloc(sizeof(struct anyrtc_dtls_candidate_helper),
+                                  anyrtc_dtls_candidate_helper_destroy);
+    if (!candidate_helper) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set candidate
+    candidate_helper->candidate = mem_ref(candidate);
+
+    // Create & attach UDP helper
+    error = anyrtc_translate_re_code(udp_register_helper(
+            &candidate_helper->helper, udp_socket, ANYRTC_LAYER_DTLS, NULL,
+            udp_receive_handler, transport));
+    if (error) {
+        goto out;
+    }
+
+    // TODO: What about TCP helpers?
+
+out:
+    if (error) {
+        mem_deref(candidate_helper);
+    } else {
+        // Add to list
+        list_append(&transport->candidate_helpers, &candidate_helper->le, candidate_helper);
+        DEBUG_PRINTF("Attached DTLS transport to candidate pair\n");
+    }
+    return error;
 }

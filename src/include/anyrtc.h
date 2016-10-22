@@ -31,7 +31,8 @@ enum anyrtc_code {
     ANYRTC_CODE_NO_MEMORY,
     ANYRTC_CODE_INVALID_STATE,
     ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
-    ANYRTC_CODE_NO_VALUE
+    ANYRTC_CODE_NO_VALUE,
+    ANYRTC_CODE_NO_SOCKET,
 };
 
 /*
@@ -110,7 +111,7 @@ enum anyrtc_ice_component {
 };
 
 /*
- * Current role of the ICE transport.
+ * ICE role.
  */
 enum anyrtc_ice_role {
     ANYRTC_ICE_ROLE_UNKNOWN = ROLE_UNKNOWN,
@@ -130,6 +131,15 @@ enum anyrtc_ice_role {
      ANYRTC_ICE_TRANSPORT_FAILED,
      ANYRTC_ICE_TRANSPORT_CLOSED
  };
+
+/*
+ * DTLS role.
+ */
+enum anyrtc_dtls_role {
+    ANYRTC_DTLS_ROLE_AUTO,
+    ANYRTC_DTLS_ROLE_CLIENT,
+    ANYRTC_DTLS_ROLE_SERVER
+};
 
 /*
  * DTLS transport state.
@@ -463,6 +473,16 @@ struct anyrtc_ice_transport {
 };
 
 /*
+ * DTLS local candidate helper.
+ * TODO: private
+ */
+struct anyrtc_dtls_candidate_helper {
+    struct le le;
+    struct ice_lcand* candidate;
+    struct udp_helper* helper;
+};
+
+/*
  * DTLS transport.
  * TODO: private
  */
@@ -473,8 +493,11 @@ struct anyrtc_dtls_transport {
     anyrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
     anyrtc_dtls_transport_error_handler* error_handler; // nullable
     void* arg; // nullable
+    enum anyrtc_dtls_role role;
+    struct list candidate_helpers;
     struct tls* context;
     struct dtls_sock* socket;
+    struct tls_conn* connection;
 };
 
 /*

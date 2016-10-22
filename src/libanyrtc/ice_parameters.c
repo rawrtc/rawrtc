@@ -5,8 +5,10 @@
 /*
  * Destructor for an existing ICE parameters instance.
  */
-static void anyrtc_ice_parameters_destroy(void* arg) {
-    struct anyrtc_ice_parameters* parameters = arg;
+static void anyrtc_ice_parameters_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_parameters* const parameters = arg;
 
     // Dereference
     mem_deref(parameters->username_fragment);

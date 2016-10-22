@@ -36,8 +36,10 @@ char const * const anyrtc_ice_transport_state_to_name(
 /*
  * Destructor for an existing ICE transport.
  */
-static void anyrtc_ice_transport_destroy(void* arg) {
-    struct anyrtc_ice_transport* transport = arg;
+static void anyrtc_ice_transport_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_transport* const transport = arg;
 
     // Dereference
     mem_deref(transport->remote_parameters);

@@ -23,8 +23,10 @@ uint32_t anyrtc_ice_candidate_calculate_priority(
 /*
  * Destructor for an existing ICE candidate.
  */
-static void anyrtc_ice_candidate_raw_destroy(void *arg) {
-    struct anyrtc_ice_candidate_raw* candidate = arg;
+static void anyrtc_ice_candidate_raw_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_candidate_raw* const candidate = arg;
 
     // Dereference
     mem_deref(candidate->related_address);
@@ -93,8 +95,10 @@ out:
 /*
  * Destructor for an existing ICE candidate.
  */
-static void anyrtc_ice_candidate_destroy(void *arg) {
-    struct anyrtc_ice_candidate* candidate = arg;
+static void anyrtc_ice_candidate_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_candidate* const candidate = arg;
 
     // Dereference
     switch (candidate->storage_type) {
