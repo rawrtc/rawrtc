@@ -1,5 +1,7 @@
+#include <string.h> // memcmp
 #include <anyrtc.h>
 #include "dtls_transport.h"
+#include "dtls_parameters.h"
 #include "certificate.h"
 #include "utils.h"
 
@@ -108,6 +110,21 @@ static enum anyrtc_code set_state(
 }
 
 /*
+ * Check if the state is 'closed' or 'failed'.
+ */
+static bool is_closed(
+        struct anyrtc_dtls_transport* const transport // not checked
+) {
+    switch (transport->state) {
+        case ANYRTC_DTLS_TRANSPORT_STATE_CLOSED:
+        case ANYRTC_DTLS_TRANSPORT_STATE_FAILED:
+            return true;
+        default:
+            return false;
+    }
+}
+
+/*
  * DTLS connection closed handler.
  */
 static void close_handler(
@@ -116,6 +133,10 @@ static void close_handler(
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
     DEBUG_INFO("DTLS connection closed, reason %m\n", err);
+
+    // Set state
+    // TODO: Call .stop to clean up
+    set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
 
     // Remove connection
     transport->connection = mem_deref(transport->connection);
@@ -133,13 +154,92 @@ static void dtls_receive_handler(
     DEBUG_PRINTF("Received %zu bytes on DTLS connection\n", mbuf_get_left(buffer));
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
         return;
     }
 
     // TODO: Implement
+    // TODO: Buffer if no handler, also buffer if state is not CONNECTED
     DEBUG_WARNING("TODO: Buffer DTLS message: %b\n", buffer->buf, mbuf_get_left(buffer));
+}
+
+/*
+ * Either called by a DTLS connection established event or by the
+ * `start` method of the DTLS transport.
+ * The caller MUST make sure that remote parameters are available!
+ */
+static void verify_certificate(
+        struct anyrtc_dtls_transport* const transport // not checked
+) {
+    enum anyrtc_code error;
+    bool valid = false;
+    struct le* le;
+    enum tls_fingerprint algorithm;
+    int err;
+    uint8_t expected_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
+    uint8_t actual_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
+
+    // Verify the peer's certificate
+    error = anyrtc_translate_re_code(tls_peer_verify(transport->connection));
+    if (error) {
+        goto out;
+    }
+    DEBUG_PRINTF("Peer's certificate verified\n");
+
+    // Check if any of the fingerprints provided matches
+    // TODO: Is this correct?
+    for (le = list_head(&transport->remote_parameters->fingerprints); le != NULL; le = le->next) {
+        struct anyrtc_dtls_fingerprint* const fingerprint = le->data;
+        size_t length;
+
+        // Get algorithm
+        error = anyrtc_translate_certificate_sign_algorithm(&algorithm, fingerprint->algorithm);
+        if (error) {
+            if (error == ANYRTC_CODE_UNSUPPORTED_ALGORITHM) {
+                continue;
+            }
+            goto out;
+        }
+
+        // Get algorithm digest size
+        error = anyrtc_get_sign_algorithm_length(&length, fingerprint->algorithm);
+        if (error) {
+            if (error == ANYRTC_CODE_UNSUPPORTED_ALGORITHM) {
+                continue;
+            }
+            goto out;
+        }
+
+        // Convert hex-encoded value to binary
+        err = anyrtc_translate_re_code(str_hex(
+                expected_fingerprint, sizeof(expected_fingerprint), fingerprint->value));
+        if (err) {
+            DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %m\n", err);
+            continue;
+        }
+
+        // Get remote fingerprint
+        error = anyrtc_translate_re_code(tls_peer_fingerprint(
+                transport->connection, algorithm, actual_fingerprint, sizeof(actual_fingerprint)));
+        if (error) {
+            goto out;
+        }
+
+        // Compare fingerprints
+        // TODO: Constant-time equality comparison needed?
+        if (memcmp(expected_fingerprint, actual_fingerprint, length) == 0) {
+            DEBUG_PRINTF("Peer's certificate fingerprint is valid\n");
+            valid = true;
+        }
+    }
+
+out:
+    if (error || !valid) {
+        // TODO: Call .stop to clean up
+        DEBUG_PRINTF("TODO: Stop DTLS transport\n");
+        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+    }
 }
 
 /*
@@ -151,10 +251,19 @@ static void establish_handler(
     struct anyrtc_dtls_transport* const transport = arg;
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring established DTLS connection, transport is closed\n");
-    } else {
-        DEBUG_INFO("DTLS connection established\n");
+        return;
+    }
+
+    // Connection established
+    // Note: State is either 'NEW', 'CONNECTING' or 'FAILED' here
+    DEBUG_INFO("DTLS connection established\n");
+    transport->connection_established = true;
+
+    // Verify certificate & fingerprint (if remote parameters are available)
+    if (transport->remote_parameters) {
+        verify_certificate(transport);
     }
 }
 
@@ -166,10 +275,13 @@ static void connect_handler(
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
+    bool role_is_server;
+    bool have_connection;
+    enum anyrtc_code error;
     int err;
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
         return;
     }
@@ -180,7 +292,19 @@ static void connect_handler(
     }
     
     // Accept?
-    if (transport->role == ANYRTC_DTLS_ROLE_SERVER && transport->connection) {
+    role_is_server = transport->role == ANYRTC_DTLS_ROLE_SERVER;
+    have_connection = transport->connection != NULL;
+    if (role_is_server && have_connection) {
+        // Set state to connecting (if not already set)
+        if (transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
+            error = set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
+            if (error) {
+                // TODO: Print error
+                DEBUG_WARNING("Could not set DTLS transport state to connecting, reason: TODO\n");
+            }
+        }
+
+        // Accept and create connection
         DEBUG_PRINTF("Accepting incoming DTLS connection from %J\n", peer);
         err = dtls_accept(&transport->connection, transport->context, transport->socket,
                           establish_handler, dtls_receive_handler, close_handler, transport);
@@ -188,8 +312,27 @@ static void connect_handler(
             DEBUG_WARNING("Could not accept incoming DTLS connection, reason: %m\n", err);
         }
     } else {
-        DEBUG_WARNING("Incoming DTLS connect but role is client\n");
+        if (role_is_server) {
+            DEBUG_WARNING("Incoming DTLS connect but role is client\n");
+        }
+        if (have_connection) {
+            DEBUG_WARNING("Incoming DTLS connect but we already have a connection\n");
+        }
     }
+}
+
+/*
+ * Initiate a DTLS connect.
+ */
+static enum anyrtc_code do_connect(
+        struct anyrtc_dtls_transport *const transport,
+        const struct sa *const peer
+) {
+    // Connect
+    DEBUG_PRINTF("Starting DTLS connection to %J\n", peer);
+    return anyrtc_translate_re_code(dtls_connect(
+            &transport->connection, transport->context, transport->socket, peer,
+            establish_handler, dtls_receive_handler, close_handler, transport));
 }
 
 /*
@@ -206,7 +349,7 @@ static int send_handler(
     (void) tc;
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring sending message request, DTLS transport is closed\n");
         return ECONNABORTED;
     }
@@ -262,11 +405,13 @@ static void anyrtc_dtls_transport_destroy(
     }
 
     // Dereference
-    list_flush(&transport->candidate_helpers);
     mem_deref(transport->connection);
-    list_flush(&transport->certificates);
     mem_deref(transport->socket);
     mem_deref(transport->context);
+    list_flush(&transport->fingerprints);
+    list_flush(&transport->candidate_helpers);
+    mem_deref(transport->remote_parameters);
+    list_flush(&transport->certificates);
     mem_deref(transport->ice_transport);
 }
 
@@ -322,7 +467,9 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     transport->error_handler = error_handler;
     transport->arg = arg;
     transport->role = ANYRTC_DTLS_ROLE_AUTO;
+    transport->connection_established = false;
     list_init(&transport->candidate_helpers);
+    list_init(&transport->fingerprints);
 
     // Append and reference certificates
     for (i = 0; i < n_certificates; ++i) {
@@ -427,7 +574,7 @@ static bool udp_receive_handler(
     struct anyrtc_dtls_transport* const transport = arg;
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring incoming UDP message, DTLS transport is closed\n");
     } else {
         // Receive & decrypt
@@ -468,7 +615,7 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
     }
 
     // Check state
-    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED) {
+    if (is_closed(transport)) {
         return ANYRTC_CODE_INVALID_STATE;
     }
 
@@ -505,6 +652,14 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
 
     // TODO: What about TCP helpers?
 
+    // Do connect (if no connection)
+    if (!transport->connection) {
+        error = do_connect(transport, &candidate_pair->lcand->attr.addr);
+        if (error) {
+            goto out;
+        }
+    }
+
 out:
     if (error) {
         mem_deref(candidate_helper);
@@ -514,4 +669,168 @@ out:
         DEBUG_PRINTF("Attached DTLS transport to candidate pair\n");
     }
     return error;
+}
+
+/*
+ * Start the DTLS transport.
+ * The caller MUST ensure that the corresponding ICE transport has
+ * been started already.
+ */
+enum anyrtc_code anyrtc_dtls_transport_start(
+        struct anyrtc_dtls_transport* const transport,
+        struct anyrtc_dtls_parameters* const remote_parameters // referenced
+) {
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!transport || !remote_parameters) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Validate parameters
+    if (!list_head(&remote_parameters->fingerprints)) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    // Note: Checking for 'ice_remote_parameters' ensures that 'start' is not called twice
+    if (transport->remote_parameters || is_closed(transport)) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Set state to connecting (if not already set)
+    if (transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
+        error = set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
+        if (error) {
+            return error;
+        }
+    }
+
+    // Determine role
+    if (remote_parameters->role == ANYRTC_DTLS_ROLE_AUTO) {
+        switch (transport->ice_transport->role) {
+            case ANYRTC_ICE_ROLE_CONTROLLED:
+                transport->role = ANYRTC_DTLS_ROLE_CLIENT;
+                break;
+            case ANYRTC_ICE_ROLE_CONTROLLING:
+                transport->role = ANYRTC_DTLS_ROLE_SERVER;
+                break;
+            default:
+                // Cannot continue if ICE transport role is unknown
+                DEBUG_WARNING("ICE role must be set before DTLS transport can be started!\n");
+                return ANYRTC_CODE_INVALID_STATE;
+        }
+    } else if (remote_parameters->role == ANYRTC_DTLS_ROLE_SERVER) {
+        transport->role = ANYRTC_DTLS_ROLE_CLIENT;
+    } else {
+        transport->role = ANYRTC_DTLS_ROLE_SERVER;
+    }
+
+    // Connect (if client)
+    if (transport->role == ANYRTC_DTLS_ROLE_CLIENT) {
+        // Reset existing connections
+        if (transport->connection) {
+            // Note: This is needed as ORTC requires us to reset previous DTLS connections
+            //       if the remote role is 'server'
+            DEBUG_PRINTF("Resetting DTLS connection\n");
+            transport->connection = mem_deref(transport->connection);
+            transport->connection_established = false;
+        }
+
+        // Do connect
+        error = do_connect(transport, NULL);
+        if (error) {
+            goto out;
+        }
+    } else {
+        // Verify certificate & fingerprint (if connection is established)
+        if (transport->connection_established) {
+            verify_certificate(transport);
+        }
+    }
+
+out:
+    if (error) {
+        transport->connection = mem_deref(transport->connection);
+    } else {
+        // Set remote parameters
+        transport->remote_parameters = mem_ref(remote_parameters);
+    }
+    return error;
+}
+
+/*
+ * Stop and close the DTLS transport.
+ */
+enum anyrtc_code anyrtc_dtls_transport_stop(
+        struct anyrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (is_closed(transport)) {
+        return ANYRTC_CODE_SUCCESS;
+    }
+
+    // Remove connection
+    transport->connection = mem_deref(transport->connection);
+
+    // Remove self from ICE transport
+    transport->ice_transport->dtls_transport = NULL;
+
+    // TODO: Implement
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Get local DTLS parameters of a transport.
+ * Return `NULL` in case the transport has not been started, yet.
+ */
+enum anyrtc_code anyrtc_dtls_transport_get_local_parameters(
+        struct anyrtc_dtls_parameters** const parametersp, // de-referenced
+        struct anyrtc_dtls_transport* const transport
+) {
+    // TODO: Get config from struct
+    enum anyrtc_certificate_sign_algorithm const algorithm = anyrtc_default_config.sign_algorithm;
+    struct le* le;
+    struct anyrtc_dtls_fingerprint* fingerprint;
+    enum anyrtc_code error;
+
+    // Check arguments
+    if (!parametersp || !transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (is_closed(transport)) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Lazy-create fingerprints
+    if (!list_head(&transport->fingerprints)) {
+        for (le = list_head(&transport->certificates); le != NULL; le = le->next) {
+            struct anyrtc_certificate* certificate = le->data;
+
+            // Create fingerprint
+            error = anyrtc_dtls_fingerprint_create_empty(&fingerprint, algorithm);
+            if (error) {
+                return error;
+            }
+
+            // Get and set fingerprint of certificate
+            error = anyrtc_certificate_get_fingerprint(&fingerprint->value, certificate, algorithm);
+            if (error) {
+                return error;
+            }
+
+            // Append fingerprint
+            list_append(&transport->fingerprints, &fingerprint->le, fingerprint);
+        }
+    }
+
+    // Create and return DTLS parameters instance
+    return anyrtc_dtls_parameters_create_local(parametersp, transport);
 }

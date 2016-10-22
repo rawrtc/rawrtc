@@ -13,7 +13,7 @@ struct client;
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
-    struct anyrtc_ice_parameters* remote_parameters;
+    struct anyrtc_ice_parameters* ice_remote_parameters;
     enum anyrtc_ice_role const role;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
@@ -130,7 +130,7 @@ struct anyrtc_ice_parameters* client_init(
             client));
 
     // Get and return local parameters
-    EOE(anyrtc_ice_gatherer_get_local_parameters(client->gatherer, &local_parameters));
+    EOE(anyrtc_ice_gatherer_get_local_parameters(&local_parameters, client->gatherer));
     return local_parameters;
 }
 
@@ -140,7 +140,7 @@ void client_start(
     // Start gathering & transport
     EOE(anyrtc_ice_gatherer_gather(client->gatherer, NULL));
     EOE(anyrtc_ice_transport_start(
-            client->ice_transport, client->gatherer, client->remote_parameters, client->role));
+            client->ice_transport, client->gatherer, client->ice_remote_parameters, client->role));
 }
 
 void client_stop(
@@ -185,7 +185,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct client a = {
             .name = "A",
             .gather_options = gather_options,
-            .remote_parameters = NULL,
+            .ice_remote_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLING,
             .gatherer = NULL,
             .ice_transport = NULL,
@@ -194,7 +194,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct client b = {
             .name = "B",
             .gather_options = gather_options,
-            .remote_parameters = NULL,
+            .ice_remote_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLED,
             .gatherer = NULL,
             .ice_transport = NULL,
@@ -202,8 +202,8 @@ int main(int argc, char* argv[argc + 1]) {
     };
     a.other_client = &b;
     b.other_client = &a;
-    b.remote_parameters = client_init(&a);
-    a.remote_parameters = client_init(&b);
+    b.ice_remote_parameters = client_init(&a);
+    a.ice_remote_parameters = client_init(&b);
     client_start(&a);
     client_start(&b);
 
@@ -217,8 +217,8 @@ int main(int argc, char* argv[argc + 1]) {
     client_stop(&b);
 
     // Free
-    mem_deref(a.remote_parameters);
-    mem_deref(b.remote_parameters);
+    mem_deref(a.ice_remote_parameters);
+    mem_deref(b.ice_remote_parameters);
     mem_deref(gather_options);
 
     // Bye

@@ -480,9 +480,19 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  * Get local ICE parameters of a gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
-        struct anyrtc_ice_gatherer* const gatherer,
-        struct anyrtc_ice_parameters** const parametersp // de-referenced
+        struct anyrtc_ice_parameters** const parametersp, // de-referenced
+        struct anyrtc_ice_gatherer* const gatherer
 ) {
+    // Check arguments
+    if (!parametersp || !gatherer) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (gatherer->state == ANYRTC_ICE_GATHERER_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
     // Create and return ICE parameters instance
     return anyrtc_ice_parameters_create(
             parametersp, gatherer->ice_username_fragment, gatherer->ice_password, false);

@@ -31,8 +31,11 @@ enum anyrtc_code {
     ANYRTC_CODE_NO_MEMORY,
     ANYRTC_CODE_INVALID_STATE,
     ANYRTC_CODE_UNSUPPORTED_PROTOCOL,
+    ANYRTC_CODE_UNSUPPORTED_ALGORITHM,
     ANYRTC_CODE_NO_VALUE,
     ANYRTC_CODE_NO_SOCKET,
+    ANYRTC_CODE_INVALID_CERTIFICATE,
+    ANYRTC_CODE_INVALID_FINGERPRINT,
 };
 
 /*
@@ -48,7 +51,8 @@ enum anyrtc_certificate_key_type {
  */
 enum anyrtc_certificate_sign_algorithm {
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE = 0,
-    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1 = TLS_FINGERPRINT_SHA1,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256 = TLS_FINGERPRINT_SHA256,
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
     ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512
 };
@@ -345,6 +349,7 @@ struct anyrtc_config {
     bool ipv6_enable;
     bool udp_enable;
     bool tcp_enable;
+    enum anyrtc_certificate_sign_algorithm sign_algorithm;
 };
 
 /*
@@ -483,6 +488,24 @@ struct anyrtc_dtls_candidate_helper {
 };
 
 /*
+ * DTLS fingerprint.
+ */
+struct anyrtc_dtls_fingerprint {
+    struct le le;
+    enum anyrtc_certificate_sign_algorithm algorithm;
+    char* value; // copied
+};
+
+/*
+ * DTLS parameters.
+ * TODO: private
+ */
+struct anyrtc_dtls_parameters {
+    enum anyrtc_dtls_role role;
+    struct list fingerprints;
+};
+
+/*
  * DTLS transport.
  * TODO: private
  */
@@ -493,8 +516,11 @@ struct anyrtc_dtls_transport {
     anyrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
     anyrtc_dtls_transport_error_handler* error_handler; // nullable
     void* arg; // nullable
+    struct anyrtc_dtls_parameters* remote_parameters; // referenced
     enum anyrtc_dtls_role role;
+    bool connection_established;
     struct list candidate_helpers;
+    struct list fingerprints;
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
@@ -678,6 +704,13 @@ enum anyrtc_code anyrtc_ice_parameters_create(
 );
 
 /*
+ * TODO
+ * anyrtc_ice_parameters_get_username_fragment
+ * anyrtc_ice_parameters_get_password
+ * anyrtc_ice_parameters_get_ice_lite
+ */
+
+/*
  * Create a new ICE gather options.
  */
 enum anyrtc_code anyrtc_ice_gather_options_create(
@@ -754,8 +787,8 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  * Get local ICE parameters of a gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
-    struct anyrtc_ice_gatherer* const gatherer,
-    struct anyrtc_ice_parameters** const parametersp // de-referenced
+    struct anyrtc_ice_parameters** const parametersp, // de-referenced
+    struct anyrtc_ice_gatherer* const gatherer
 );
 
 /*
@@ -839,6 +872,37 @@ enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
  * anyrtc_ice_transport_set_candidate_pair_change_handler
  */
 
+/*
+ * Create a new DTLS fingerprint instance.
+ */
+enum anyrtc_code anyrtc_dtls_fingerprint_create(
+    struct anyrtc_dtls_fingerprint** const fingerprintp, // de-referenced
+    enum anyrtc_certificate_sign_algorithm const algorithm,
+    char* const value // copied
+);
+
+/*
+ * TODO
+ * anyrtc_dtls_fingerprint_get_algorithm
+ * anyrtc_dtls_fingerprint_get_value
+ */
+
+/*
+ * Create a new DTLS parameters instance.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_create(
+    struct anyrtc_dtls_parameters** const parametersp, // de-referenced
+    enum anyrtc_dtls_role const role,
+    struct anyrtc_dtls_fingerprint* const fingerprints[], // referenced (each item)
+    size_t const n_fingerprints
+);
+
+/*
+ * TODO
+ * anyrtc_dtls_parameters_get_role
+ * anyrtc_dtls_parameters_get_fingerprints
+ */
+
 char const * const anyrtc_dtls_transport_state_to_name(
     enum anyrtc_dtls_transport_state const state
 );
@@ -861,7 +925,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
  */
 enum anyrtc_code anyrtc_dtls_transport_start(
     struct anyrtc_dtls_transport* const transport,
-    struct anyrtc_dtls_parameters const * const remote_parameters // copied
+    struct anyrtc_dtls_parameters* const remote_parameters // copied
 );
 
 /*
@@ -877,7 +941,18 @@ enum anyrtc_code anyrtc_dtls_transport_stop(
  * anyrtc_dtls_transport_get_certificates
  * anyrtc_dtls_transport_get_transport
  * anyrtc_dtls_transport_get_state
- * anyrtc_dtls_transport_get_local_parameters
+ */
+
+/*
+ * Get local DTLS parameters of a transport.
+ */
+enum anyrtc_code anyrtc_dtls_transport_get_local_parameters(
+    struct anyrtc_dtls_parameters** const parametersp, // de-referenced
+    struct anyrtc_dtls_transport* const transport
+);
+
+/*
+ * TODO (from RTCIceTransport interface)
  * anyrtc_dtls_transport_get_remote_parameters
  * anyrtc_dtls_transport_get_remote_certificates
  * anyrtc_dtls_transport_set_state_change_handler

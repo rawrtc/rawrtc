@@ -13,7 +13,8 @@ struct client;
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
-    struct anyrtc_ice_parameters* remote_parameters;
+    struct anyrtc_ice_parameters* ice_parameters;
+    struct anyrtc_dtls_parameters* dtls_parameters;
     enum anyrtc_ice_role const role;
     struct anyrtc_certificate* certificate;
     struct anyrtc_ice_gatherer* gatherer;
@@ -132,11 +133,9 @@ static void signal_handler(
     re_cancel();
 }
 
-struct anyrtc_ice_parameters* client_init(
+void client_init(
         struct client* const client
 ) {
-    struct anyrtc_ice_parameters* local_parameters;
-
     // Generate certificates
     EOE(anyrtc_certificate_generate(&client->certificate, NULL));
     struct anyrtc_certificate* certificates[] = {client->certificate};
@@ -158,19 +157,29 @@ struct anyrtc_ice_parameters* client_init(
             &client->dtls_transport, client->ice_transport, certificates,
             sizeof(certificates) / sizeof(struct anyrtc_certificate*),
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
+}
 
-    // Get and return local parameters
-    EOE(anyrtc_ice_gatherer_get_local_parameters(client->gatherer, &local_parameters));
-    return local_parameters;
+void client_exchange(
+        struct client* const local,
+        struct client* const remote
+) {
+    // Get & set ICE parameters
+    EOE(anyrtc_ice_gatherer_get_local_parameters(&local->ice_parameters, remote->gatherer));
+
+    // Get & set DTLS parameters
+    EOE(anyrtc_dtls_transport_get_local_parameters(
+            &local->dtls_parameters, remote->dtls_transport));
 }
 
 void client_start(
         struct client* const client
 ) {
-    // Start gathering & transport
+    // Start gathering & transports
     EOE(anyrtc_ice_gatherer_gather(client->gatherer, NULL));
     EOE(anyrtc_ice_transport_start(
-            client->ice_transport, client->gatherer, client->remote_parameters, client->role));
+            client->ice_transport, client->gatherer, client->ice_parameters, client->role));
+    EOE(anyrtc_dtls_transport_start(
+            client->dtls_transport, client->dtls_parameters));
 }
 
 void client_stop(
@@ -182,6 +191,8 @@ void client_stop(
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
+    client->dtls_parameters = mem_deref(client->dtls_parameters);
+    client->ice_parameters = mem_deref(client->ice_parameters);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -214,11 +225,12 @@ int main(int argc, char* argv[argc + 1]) {
             sizeof(turn_zwuenf_org_urls) / sizeof(char*),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
-    // Start clients
+    // Initialise clients
     struct client a = {
             .name = "A",
             .gather_options = gather_options,
-            .remote_parameters = NULL,
+            .ice_parameters = NULL,
+            .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLING,
             .certificate = NULL,
             .gatherer = NULL,
@@ -229,7 +241,8 @@ int main(int argc, char* argv[argc + 1]) {
     struct client b = {
             .name = "B",
             .gather_options = gather_options,
-            .remote_parameters = NULL,
+            .ice_parameters = NULL,
+            .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLED,
             .certificate = NULL,
             .gatherer = NULL,
@@ -239,8 +252,14 @@ int main(int argc, char* argv[argc + 1]) {
     };
     a.other_client = &b;
     b.other_client = &a;
-    b.remote_parameters = client_init(&a);
-    a.remote_parameters = client_init(&b);
+    client_init(&a);
+    client_init(&b);
+
+    // Exchange parameters, candidates, etc.
+    client_exchange(&a, &b);
+    client_exchange(&b, &a);
+
+    // Start clients
     client_start(&a);
     client_start(&b);
 
@@ -254,8 +273,6 @@ int main(int argc, char* argv[argc + 1]) {
     client_stop(&b);
 
     // Free
-    mem_deref(a.remote_parameters);
-    mem_deref(b.remote_parameters);
     mem_deref(gather_options);
 
     // Bye

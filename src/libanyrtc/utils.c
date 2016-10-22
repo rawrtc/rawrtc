@@ -1,5 +1,6 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <stdarg.h>
+#include <openssl/evp.h> // EVP_MD, evp_*
 #include <anyrtc.h>
 #include "utils.h"
 
@@ -12,6 +13,7 @@ struct anyrtc_config anyrtc_default_config = {
         .ipv6_enable = false, // TODO: true by default
         .udp_enable = true,
         .tcp_enable = false, // TODO: true by default
+        .sign_algorithm = ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
 };
 
 /*
@@ -31,7 +33,7 @@ struct anyrtc_certificate_options anyrtc_default_certificate_options = {
  * TODO: Add codes from trice_lcand_add
  */
 enum anyrtc_code anyrtc_translate_re_code(
-        int code
+        int const code
 ) {
     switch (code) {
         case 0:
@@ -40,6 +42,8 @@ enum anyrtc_code anyrtc_translate_re_code(
             return ANYRTC_CODE_INVALID_ARGUMENT;
         case ENOMEM:
             return ANYRTC_CODE_NO_MEMORY;
+        case EAUTH:
+            return ANYRTC_CODE_INVALID_CERTIFICATE;
         default:
             return ANYRTC_CODE_UNKNOWN_ERROR;
     }
@@ -80,16 +84,22 @@ enum anyrtc_code anyrtc_translate_ipproto(
     }
 }
 
+/*
+ * Translate an ICE candidate type to the corresponding libre type.
+ */
 enum ice_cand_type anyrtc_translate_ice_candidate_type(
-        enum anyrtc_ice_candidate_type type
+        enum anyrtc_ice_candidate_type const type
 ) {
     // No conversion needed
     return (enum ice_cand_type) type;
 }
 
+/*
+ * Translate a libre ICE candidate type to the corresponding anyrtc type.
+ */
 enum anyrtc_code anyrtc_translate_re_ice_cand_type(
-        enum ice_cand_type re_type,
-        enum anyrtc_ice_candidate_type* const typep // de-referenced
+        enum anyrtc_ice_candidate_type* const typep, // de-referenced
+        enum ice_cand_type const re_type
 ) {
     // Check arguments
     if (!typep) {
@@ -115,16 +125,22 @@ enum anyrtc_code anyrtc_translate_re_ice_cand_type(
     }
 }
 
+/*
+ * Translate an ICE TCP candidate type to the corresponding libre type.
+ */
 enum ice_tcptype anyrtc_translate_ice_tcp_candidate_type(
-        enum anyrtc_ice_tcp_candidate_type type
+        enum anyrtc_ice_tcp_candidate_type const type
 ) {
     // No conversion needed
     return (enum ice_tcptype) type;
 }
 
+/*
+ * Translate a libre ICE TCP candidate type to the corresponding anyrtc type.
+ */
 enum anyrtc_code anyrtc_translate_re_ice_tcptype(
-        enum ice_tcptype re_type,
-        enum anyrtc_ice_tcp_candidate_type* const typep // de-referenced
+        enum anyrtc_ice_tcp_candidate_type* const typep, // de-referenced
+        enum ice_tcptype const re_type
 ) {
     // Check arguments
     if (!typep) {
@@ -147,16 +163,22 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
     }
 }
 
+/*
+ * Translate a certificate key type to the corresponding libre type.
+ */
 enum tls_key_type anyrtc_translate_certificate_key_type(
-        enum anyrtc_certificate_key_type type
+        enum anyrtc_certificate_key_type const type
 ) {
     // No conversion needed
     return (enum tls_key_type) type;
 }
 
+/*
+ * Translate a libre key type to the corresponding anyrtc type.
+ */
 enum anyrtc_code anyrtc_translate_re_tls_key_type(
-        enum tls_key_type re_type,
-        enum anyrtc_certificate_key_type* const typep // de-referenced
+        enum anyrtc_certificate_key_type* const typep, // de-referenced
+        enum tls_key_type const re_type
 ) {
     // Check arguments
     if (!typep) {
@@ -174,6 +196,102 @@ enum anyrtc_code anyrtc_translate_re_tls_key_type(
         default:
             return ANYRTC_CODE_INVALID_ARGUMENT;
     }
+}
+
+/*
+ * Translate a certificate sign algorithm to the corresponding libre fingerprint algorithm.
+ */
+enum anyrtc_code anyrtc_translate_certificate_sign_algorithm(
+        enum tls_fingerprint* const fingerprintp, // de-referenced
+        enum anyrtc_certificate_sign_algorithm const algorithm
+) {
+    switch (algorithm) {
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384:
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512:
+            // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to libre)
+            return ANYRTC_CODE_UNSUPPORTED_ALGORITHM;
+        default:
+            break;
+    }
+
+    // No conversion needed
+    *fingerprintp = (enum tls_fingerprint) algorithm;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Translate a libre fingerprint algorithm to the corresponding anyrtc algorithm.
+ */
+enum anyrtc_code anyrtc_translate_re_tls_fingerprint(
+        enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
+        enum tls_fingerprint re_algorithm
+) {
+    // Check arguments
+    if (!algorithmp) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert ice_cand_type
+    // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to libre)
+    switch (re_algorithm) {
+        case TLS_FINGERPRINT_SHA1:
+            *algorithmp = ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1;
+            return ANYRTC_CODE_SUCCESS;
+        case TLS_FINGERPRINT_SHA256:
+            *algorithmp = ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256;
+            return ANYRTC_CODE_SUCCESS;
+        default:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+}
+
+/*
+ * Get the EVP_MD* structure for a certificate sign algorithm type.
+ */
+EVP_MD const * const anyrtc_get_sign_function(
+        enum anyrtc_certificate_sign_algorithm const type
+) {
+    switch (type) {
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1:
+            return EVP_sha1();
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256:
+            return EVP_sha256();
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384:
+            return EVP_sha384();
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512:
+            return EVP_sha512();
+        default:
+            return NULL;
+    }
+}
+
+/*
+ * Get the length of the fingerprint to a certificate sign algorithm type.
+ */
+enum anyrtc_code anyrtc_get_sign_algorithm_length(
+        size_t* const sizep, // de-referenced
+        enum anyrtc_certificate_sign_algorithm const type
+) {
+    EVP_MD const * sign_function;
+    int size;
+
+    // Get sign algorithm function
+    sign_function = anyrtc_get_sign_function(type);
+    if (!sign_function) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get length
+    size = EVP_MD_size(sign_function);
+    if (size < 1) {
+        return ANYRTC_CODE_UNSUPPORTED_ALGORITHM;
+    }
+
+    // Set size
+    *sizep = (size_t) size;
+    return ANYRTC_CODE_SUCCESS;
 }
 
 enum anyrtc_code anyrtc_strdup(

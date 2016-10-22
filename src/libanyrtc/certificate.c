@@ -182,24 +182,6 @@ out:
 }
 
 /*
- * Get the corresponding EVP_MD* for signing the certificate.
- */
-static EVP_MD const * const get_sign_function(
-        enum anyrtc_certificate_sign_algorithm type
-) {
-    switch (type) {
-        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256:
-            return EVP_sha256();
-        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384:
-            return EVP_sha384();
-        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512:
-            return EVP_sha512();
-        default:
-            return NULL;
-    }
-}
-
-/*
  * Generates a self-signed certificate.
  * Caller must call `X509_free(*certificatep)` when done.
  */
@@ -220,8 +202,13 @@ static enum anyrtc_code generate_self_signed_certificate(
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // SHA-1? Nope!
+    if (sign_algorithm == ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
     // Get sign function
-    sign_function = get_sign_function(sign_algorithm);
+    sign_function = anyrtc_get_sign_function(sign_algorithm);
     if (!sign_function) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
@@ -357,9 +344,18 @@ enum anyrtc_code anyrtc_certificate_options_create(
     if (!valid_until) {
         valid_until = anyrtc_default_certificate_options.valid_until;
     }
-    // Check sign algorithm
-    if (sign_algorithm == ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE) {
-        sign_algorithm = anyrtc_default_certificate_options.sign_algorithm;
+
+    // Check sign algorithm/set default
+    // Note: We say 'no' to SHA1 intentionally
+    // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to libre)
+    switch (sign_algorithm) {
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE:
+            sign_algorithm = anyrtc_default_certificate_options.sign_algorithm;
+            break;
+        case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256:
+            break;
+        default:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Set defaults depending on key type
@@ -725,4 +721,41 @@ out:
         *der_lengthp = length;
     }
     return error;
+}
+
+/*
+ * Get certificate's fingerprint.
+ * Caller must ensure that `buffer` has space for
+ * `ANYRTC_FINGERPRINT_MAX_SIZE_HEX` bytes
+ */
+enum anyrtc_code anyrtc_certificate_get_fingerprint(
+        char** const fingerprint, // de-referenced
+        struct anyrtc_certificate* const certificate,
+        enum anyrtc_certificate_sign_algorithm const algorithm
+) {
+    EVP_MD const * sign_function;
+    uint8_t bytes_buffer[ANYRTC_FINGERPRINT_MAX_SIZE_HEX];
+    uint_least32_t length;
+
+    // Check arguments
+    if (!fingerprint || !certificate) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get sign function for algorithm
+    sign_function = anyrtc_get_sign_function(algorithm);
+    if (!sign_function) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Generate certificate fingerprint
+    if (!X509_digest(certificate->certificate, sign_function, bytes_buffer, &length)) {
+        return ANYRTC_CODE_NO_VALUE;
+    }
+    if (length < 1) {
+        return ANYRTC_CODE_UNKNOWN_ERROR;
+    }
+
+    // Convert bytes to hex
+    return anyrtc_sdprintf(fingerprint, "%w", bytes_buffer, (size_t) length);
 }
