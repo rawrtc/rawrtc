@@ -205,11 +205,12 @@ static void verify_certificate(
     uint8_t actual_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
 
     // Verify the peer's certificate
-    error = anyrtc_translate_re_code(tls_peer_verify(transport->connection));
-    if (error) {
-        goto out;
-    }
-    DEBUG_PRINTF("Peer's certificate verified\n");
+    // TODO: Fix this. Testing the fingerprint alone is okay for now though.
+//    error = anyrtc_translate_re_code(tls_peer_verify(transport->connection));
+//    if (error) {
+//        goto out;
+//    }
+//    DEBUG_PRINTF("Peer's certificate verified\n");
 
     // Check if any of the fingerprints provided matches
     // TODO: Is this correct?
@@ -236,8 +237,13 @@ static void verify_certificate(
         }
 
         // Convert hex-encoded value to binary
+        length = strlen(fingerprint->value) / 2;
+        if (length > sizeof(expected_fingerprint)) {
+            DEBUG_WARNING("Hex-encoded fingerprint exceeds buffer size!\n");
+            continue;
+        }
         err = anyrtc_translate_re_code(str_hex(
-                expected_fingerprint, sizeof(expected_fingerprint), fingerprint->value));
+                expected_fingerprint, length, fingerprint->value));
         if (err) {
             DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %m\n", err);
             continue;
@@ -269,6 +275,9 @@ out:
             DEBUG_WARNING("DTLS connection closed, could not stop transport: %s\n",
                           anyrtc_code_to_str(error));
         }
+    } else {
+        // Connected
+        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED);
     }
 }
 
@@ -710,7 +719,7 @@ enum anyrtc_code anyrtc_dtls_transport_start(
         struct anyrtc_dtls_transport* const transport,
         struct anyrtc_dtls_parameters* const remote_parameters // referenced
 ) {
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum anyrtc_code error;
     enum anyrtc_ice_role ice_role;
 
     // Check arguments
