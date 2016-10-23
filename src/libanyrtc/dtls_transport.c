@@ -2,6 +2,7 @@
 #include <anyrtc.h>
 #include "dtls_transport.h"
 #include "dtls_parameters.h"
+#include "candidate_helper.h"
 #include "certificate.h"
 #include "utils.h"
 
@@ -196,7 +197,7 @@ static void dtls_receive_handler(
 static void verify_certificate(
         struct anyrtc_dtls_transport* const transport // not checked
 ) {
-    enum anyrtc_code error;
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
     bool valid = false;
     struct le* le;
     enum tls_fingerprint algorithm;
@@ -436,6 +437,25 @@ static size_t mtu_handler(
 }
 
 /*
+ * Handle received UDP messages.
+ */
+static bool udp_receive_handler(
+        struct sa * const source,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+
+    // Decrypt & receive
+    // Note: No need to check if the transport is already closed as the messages will re-appear in
+    //       the `dtls_receive_handler`.
+    dtls_receive(transport->socket, source, buffer);
+
+    // Handled
+    return true;
+}
+
+/*
  * Destructor for an existing ICE transport.
  */
 static void anyrtc_dtls_transport_destroy(
@@ -583,6 +603,13 @@ enum anyrtc_code anyrtc_dtls_transport_create(
         goto out;
     }
 
+    // Receive buffered DTLS packets
+    error = anyrtc_candidate_helper_handle_buffered_messages(
+            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
+    if (error) {
+        goto out;
+    }
+
     // Attach to existing candidate pairs
     for (le = list_head(trice_validl(ice_transport->gatherer->ice)); le != NULL; le = le->next) {
         struct ice_candpair* candidate_pair = le->data;
@@ -608,38 +635,6 @@ out:
 }
 
 /*
- * Handle received UDP messages.
- */
-static bool udp_receive_handler(
-        struct sa * const source,
-        struct mbuf* const buffer,
-        void* const arg
-) {
-    struct anyrtc_dtls_transport* const transport = arg;
-
-    // Decrypt & receive
-    // Note: No need to check if the transport is already closed as the messages will re-appear in
-    //       the `dtls_receive_handler`.
-    dtls_receive(transport->socket, source, buffer);
-
-    // Handled
-    return true;
-}
-
-/*
- * Destructor for an existing DTLS candidate helper.
- */
-static void anyrtc_dtls_candidate_helper_destroy(
-        void* const arg
-) {
-    struct anyrtc_dtls_candidate_helper* const candidate_helper = arg;
-
-    // Dereference
-    mem_deref(candidate_helper->helper);
-    mem_deref(candidate_helper->candidate);
-}
-
-/*
  * Let the DTLS transport attach itself to a candidate pair.
  */
 enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
@@ -647,8 +642,9 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
         struct ice_candpair* const candidate_pair
 ) {
     enum anyrtc_code error;
-    struct ice_lcand* candidate;
-    struct anyrtc_dtls_candidate_helper* candidate_helper;
+    struct list* candidate_helpers;
+    struct le* le;
+    struct anyrtc_candidate_helper* candidate_helper;
     
     // Check arguments
     if (!transport || !candidate_pair) {
@@ -660,38 +656,28 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Get local candidate
-    candidate = candidate_pair->lcand;
+    // TODO: Check if already attached
 
-    // TODO: Check if local candidate is already in our list
+    // Find temporary DTLS helper
+    candidate_helpers = &transport->ice_transport->gatherer->candidate_helpers;
+    for (le = list_head(candidate_helpers); le != NULL; le = le->next) {
+        candidate_helper = le->data;
 
-    // Get local candidate's UDP socket
-    // TODO: What about TCP?
-    struct udp_sock* const udp_socket = trice_lcand_sock(
-            transport->ice_transport->gatherer->ice, candidate);
-    if (!udp_socket) {
-        return ANYRTC_CODE_NO_SOCKET;
+        // Remove from list and destroy
+        if (candidate_helper->candidate == candidate_pair->lcand) {
+            list_unlink(&candidate_helper->le);
+            mem_deref(candidate_helper);
+            break;
+        }
     }
 
-    // Create DTLS candidate helper
-    candidate_helper = mem_zalloc(sizeof(struct anyrtc_dtls_candidate_helper),
-                                  anyrtc_dtls_candidate_helper_destroy);
-    if (!candidate_helper) {
-        return ANYRTC_CODE_NO_MEMORY;
-    }
-
-    // Set candidate
-    candidate_helper->candidate = mem_ref(candidate);
-
-    // Create & attach UDP helper
-    error = anyrtc_translate_re_code(udp_register_helper(
-            &candidate_helper->helper, udp_socket, ANYRTC_LAYER_DTLS, NULL,
-            udp_receive_handler, transport));
+    // Attach final DTLS helper
+    error = anyrtc_candidate_helper_attach(
+            &candidate_helper, transport->ice_transport->gatherer->ice,
+            candidate_pair->lcand, udp_receive_handler, transport);
     if (error) {
         goto out;
     }
-
-    // TODO: What about TCP helpers?
 
     // Do connect (if client and no connection)
     if (transport->role == ANYRTC_DTLS_ROLE_CLIENT && !transport->connection) {

@@ -353,6 +353,26 @@ struct anyrtc_config {
 };
 
 /*
+ * Message buffer.
+ * TODO: private
+ */
+struct anyrtc_buffered_message {
+    struct le le;
+    struct sa source; // copied
+    struct mbuf* buffer; // referenced
+};
+
+/*
+ * Local candidate helper.
+ * TODO: private
+ */
+struct anyrtc_candidate_helper {
+    struct le le;
+    struct ice_lcand* candidate;
+    struct udp_helper* helper;
+};
+
+/*
  * Certificate options.
  * TODO: private
  */
@@ -454,6 +474,8 @@ struct anyrtc_ice_gatherer {
     anyrtc_ice_gatherer_error_handler* error_handler; // nullable
     anyrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
     void* arg; // nullable
+    struct list buffered_messages;
+    struct list candidate_helpers; // TODO: Hash list instead?
     char ice_username_fragment[9];
     char ice_password[33];
     struct trice* ice;
@@ -474,16 +496,6 @@ struct anyrtc_ice_transport {
     void* arg; // nullable
     struct anyrtc_ice_parameters* remote_parameters; // referenced
     struct anyrtc_dtls_transport* dtls_transport; // referenced, nullable
-};
-
-/*
- * DTLS local candidate helper.
- * TODO: private
- */
-struct anyrtc_dtls_candidate_helper {
-    struct le le;
-    struct ice_lcand* candidate;
-    struct udp_helper* helper;
 };
 
 /*
@@ -518,7 +530,7 @@ struct anyrtc_dtls_transport {
     struct anyrtc_dtls_parameters* remote_parameters; // referenced
     enum anyrtc_dtls_role role;
     bool connection_established;
-    struct list candidate_helpers;
+    struct list candidate_helpers; // TODO: Hash list instead?
     struct list fingerprints;
     struct tls* context;
     struct dtls_sock* socket;

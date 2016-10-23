@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "ice_gatherer.h"
 #include "ice_candidate.h"
+#include "candidate_helper.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 #define DEBUG_LEVEL 7
@@ -220,6 +221,8 @@ static void anyrtc_ice_gatherer_destroy(
     // Dereference
     mem_deref(gatherer->stun);
     mem_deref(gatherer->ice);
+    list_flush(&gatherer->candidate_helpers);
+    list_flush(&gatherer->buffered_messages);
     mem_deref(gatherer->options);
 }
 
@@ -255,6 +258,8 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     gatherer->error_handler = error_handler;
     gatherer->local_candidate_handler = local_candidate_handler;
     gatherer->arg = arg;
+    list_init(&gatherer->buffered_messages);
+    list_init(&gatherer->candidate_helpers);
 
     // Generate random username fragment and password for ICE
     rand_str(gatherer->ice_username_fragment, sizeof(gatherer->ice_username_fragment));
@@ -343,6 +348,29 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
 }
 
 /*
+ * Handle received UDP messages.
+ */
+static bool udp_receive_handler(
+        struct sa * const source,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_ice_gatherer* const gatherer = arg;
+
+    // Buffer message
+    enum anyrtc_code error = anyrtc_candidate_helper_buffer_message(
+            &gatherer->buffered_messages, source, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not buffer DTLS packet, reason: %s\n", anyrtc_code_to_str(error));
+    } else {
+        DEBUG_PRINTF("Buffered DTLS packet of size %zu\n", mbuf_get_left(buffer));
+    }
+
+    // Handled
+    return true;
+}
+
+/*
  * Local interfaces callback.
  * TODO: Consider ICE gather policy
  * TODO: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-01
@@ -357,6 +385,7 @@ static bool interface_handler(
     struct ice_lcand* re_candidate;
     uint32_t priority;
     int err;
+    struct anyrtc_candidate_helper* candidate_helper;
     enum anyrtc_code error;
     struct anyrtc_ice_candidate* candidate;
 
@@ -390,14 +419,25 @@ static bool interface_handler(
                 &re_candidate, gatherer->ice, 1, IPPROTO_UDP, priority, address,
                 NULL, ICE_CAND_TYPE_HOST, NULL, ICE_TCP_ACTIVE, NULL, ANYRTC_LAYER_ICE);
         if (err) {
-            DEBUG_WARNING("Could not add UDP candidate: %m", err);
+            DEBUG_WARNING("Could not add UDP candidate, reason: %m\n", err);
             return false; // Continue gathering
+        }
+
+        // Attach temporary DTLS helper
+        error = anyrtc_candidate_helper_attach(
+                &candidate_helper, gatherer->ice, re_candidate, udp_receive_handler, gatherer);
+        if (error) {
+            DEBUG_WARNING("Could not attach candidate helper, reason: %s\n",
+                          anyrtc_code_to_str(error));
+        } else {
+            // Add to list
+            list_append(&gatherer->candidate_helpers, &candidate_helper->le, candidate_helper);
         }
 
         // Create ICE candidate, call local candidate handler, unreference ICE candidate
         error = anyrtc_ice_candidate_create_from_local_candidate(&candidate, re_candidate);
         if (error) {
-            DEBUG_WARNING("Could not create local candidate instance: %s",
+            DEBUG_WARNING("Could not create local candidate instance: %s\n",
                           anyrtc_code_to_str(error));
         } else {
             gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);

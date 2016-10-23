@@ -8,6 +8,7 @@ set(anyrtc_SOURCES
         ice_parameters.c
         ice_transport.c
         main.c
+        candidate_helper.c
         utils.c)
 
 # Setup library (link & install)
