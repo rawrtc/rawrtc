@@ -449,6 +449,8 @@ static bool udp_receive_handler(
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
 
+    // TODO: Check if DTLS or SRTP packet
+
     // Decrypt & receive
     // Note: No need to check if the transport is already closed as the messages will re-appear in
     //       the `dtls_receive_handler`.

@@ -1,5 +1,6 @@
 # Library sources
 set(anyrtc_SOURCES
+        candidate_helper.c
         certificate.c
         dtls_parameters.c
         dtls_transport.c
@@ -8,7 +9,7 @@ set(anyrtc_SOURCES
         ice_parameters.c
         ice_transport.c
         main.c
-        candidate_helper.c
+        sctp_transport.c
         utils.c)
 
 # Setup library (link & install)

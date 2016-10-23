@@ -119,6 +119,7 @@ enum anyrtc_code anyrtc_candidate_helper_buffer_message(
 
 /*
  * Apply a receive handler to buffered messages.
+ * TODO: Add timestamp to be able to ignore old messages
  */
 enum anyrtc_code anyrtc_candidate_helper_handle_buffered_messages(
         struct list* const buffered_messages,
