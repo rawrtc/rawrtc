@@ -37,13 +37,16 @@ pkg_check_modules(LIB_REW REQUIRED librew>=0.4.0)
 include_directories(${LIB_REW_INCLUDE_DIRS})
 link_directories(${LIB_REW_LIBRARY_DIRS})
 
+# Dependency: usrsctp
+# TODO: Use find_package as usrsctp has cmake support
+find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp libusrsctp)
+
 # Dependencies library list
 set(anyrtc_DEP_LIBRARIES
         ${LIB_RE_LIBRARIES}
         ${LIB_REW_LIBRARIES}
-        ${LIB_OPENSSL_LIBRARIES})
-
-# TODO: Dependency: usrsctp
+        ${LIB_OPENSSL_LIBRARIES}
+        ${LIB_USRSCTP_LIBRARIES})
 
 # Walk through subdirectories
 add_subdirectory(src)

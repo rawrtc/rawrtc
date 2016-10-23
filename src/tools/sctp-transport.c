@@ -20,6 +20,7 @@ struct client {
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
+    struct anyrtc_sctp_transport* sctp_transport;
     struct client* other_client;
 };
 
@@ -141,6 +142,14 @@ static void dtls_transport_error_handler(
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
+void data_channel_handler(
+        struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
+}
+
 static void signal_handler(
         int sig
 ) {
@@ -172,6 +181,10 @@ void client_init(
             &local->dtls_transport, local->ice_transport, certificates,
             sizeof(certificates) / sizeof(struct anyrtc_certificate*),
             dtls_transport_state_change_handler, dtls_transport_error_handler, local));
+
+    // Create SCTP transport
+    EOE(anyrtc_sctp_transport_create(
+            &local->sctp_transport, local->dtls_transport, 0, data_channel_handler, local));
 }
 
 void client_start(
@@ -201,6 +214,7 @@ void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
+//    EOE(anyrtc_sctp_transport_stop(client->sctp_transport));
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
@@ -208,6 +222,7 @@ void client_stop(
     // Dereference & close
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
+    client->sctp_transport = mem_deref(client->sctp_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -251,6 +266,7 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
+            .sctp_transport = NULL,
             .other_client = NULL,
     };
     struct client b = {
@@ -263,6 +279,7 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
+            .sctp_transport = NULL,
             .other_client = NULL,
     };
     a.other_client = &b;

@@ -325,7 +325,7 @@ typedef void (anyrtc_data_channel_message_handler)(
  * SCTP transport data channel handler.
  */
 typedef void (anyrtc_sctp_transport_data_channel_handler)(
-    struct anyrtc_data_channel* const, // read-only, MUST be referenced when used
+    struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
     void* const arg
 );
 
@@ -536,6 +536,19 @@ struct anyrtc_dtls_transport {
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
+    struct anyrtc_sctp_transport* sctp_transport;
+};
+
+/*
+ * SCTP transport.
+ * TODO: private
+ */
+struct anyrtc_sctp_transport {
+    enum anyrtc_sctp_transport_state state;
+    struct anyrtc_dtls_transport* dtls_transport; // referenced
+    anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
+    void* arg; // nullable
+    struct socket* socket;
 };
 
 /*
@@ -1033,9 +1046,9 @@ enum anyrtc_code anyrtc_data_channel_send(
  * Create an SCTP transport.
  */
 enum anyrtc_code anyrtc_sctp_transport_create(
-    struct anyrtc_sctp_transport** const transport, // de-referenced
+    struct anyrtc_sctp_transport** const transportp, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
-    uint16_t const port, // zeroable
+    uint16_t port, // zeroable
     anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
     void* const arg // nullable
 );

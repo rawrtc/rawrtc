@@ -255,7 +255,7 @@ cd ${MAIN_DIR}
 # Build usrsctp
 cd ${USRSCTP_PATH}
 ./bootstrap
-./configure --prefix=${PREFIX} --disable-shared --enable-static
+CFLAGS=-fPIC ./configure --prefix=${PREFIX} --disable-shared --enable-static
 make install -j${THREADS}
 # we have a name conflict for 'mbuf_init'
 objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a
