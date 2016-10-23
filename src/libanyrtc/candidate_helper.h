@@ -10,7 +10,7 @@ enum anyrtc_code anyrtc_candidate_helper_attach(
 
 enum anyrtc_code anyrtc_candidate_helper_buffer_message(
     struct list* const buffered_messages,
-    struct sa * const source, // copied
+    struct sa * const source, // copied, nullable
     struct mbuf* const buffer // referenced
 );
 

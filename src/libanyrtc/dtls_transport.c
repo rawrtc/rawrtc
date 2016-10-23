@@ -170,12 +170,10 @@ static void close_handler(
  * Handle incoming DTLS messages.
  */
 static void dtls_receive_handler(
-        struct mbuf *const buffer,
-        void *const arg
+        struct mbuf* const buffer,
+        void* const arg
 ) {
-    (void) buffer;
     struct anyrtc_dtls_transport* const transport = arg;
-    DEBUG_PRINTF("Received %zu bytes on DTLS connection\n", mbuf_get_left(buffer));
 
     // Check state
     if (is_closed(transport)) {
@@ -183,9 +181,14 @@ static void dtls_receive_handler(
         return;
     }
 
-    // TODO: Implement
-    // TODO: Buffer if no handler, also buffer if state is not CONNECTED
-    DEBUG_WARNING("TODO: Buffer DTLS message: %b\n", buffer->buf, mbuf_get_left(buffer));
+    // Buffer message
+    enum anyrtc_code error = anyrtc_candidate_helper_buffer_message(
+            &transport->buffered_messages, NULL, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not buffer DTLS packet, reason: %s\n", anyrtc_code_to_str(error));
+    } else {
+        DEBUG_PRINTF("Buffered DTLS packet of size %zu\n", mbuf_get_left(buffer));
+    }
 }
 
 /*
@@ -474,6 +477,7 @@ static void anyrtc_dtls_transport_destroy(
     mem_deref(transport->context);
     list_flush(&transport->fingerprints);
     list_flush(&transport->candidate_helpers);
+    list_flush(&transport->buffered_messages);
     mem_deref(transport->remote_parameters);
     list_flush(&transport->certificates);
     mem_deref(transport->ice_transport);
@@ -532,6 +536,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     transport->arg = arg;
     transport->role = ANYRTC_DTLS_ROLE_AUTO;
     transport->connection_established = false;
+    list_init(&transport->buffered_messages);
     list_init(&transport->candidate_helpers);
     list_init(&transport->fingerprints);
 
@@ -603,13 +608,6 @@ enum anyrtc_code anyrtc_dtls_transport_create(
         goto out;
     }
 
-    // Receive buffered DTLS packets
-    error = anyrtc_candidate_helper_handle_buffered_messages(
-            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
-    if (error) {
-        goto out;
-    }
-
     // Attach to existing candidate pairs
     for (le = list_head(trice_validl(ice_transport->gatherer->ice)); le != NULL; le = le->next) {
         struct ice_candpair* candidate_pair = le->data;
@@ -658,7 +656,7 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
 
     // TODO: Check if already attached
 
-    // Find temporary DTLS helper
+    // Find temporary UDP helper
     candidate_helpers = &transport->ice_transport->gatherer->candidate_helpers;
     for (le = list_head(candidate_helpers); le != NULL; le = le->next) {
         candidate_helper = le->data;
@@ -669,6 +667,13 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
             mem_deref(candidate_helper);
             break;
         }
+    }
+
+    // Receive buffered DTLS packets
+    error = anyrtc_candidate_helper_handle_buffered_messages(
+            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
+    if (error) {
+        goto out;
     }
 
     // Attach final DTLS helper

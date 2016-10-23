@@ -89,13 +89,13 @@ static void anyrtc_buffered_message_destroy(
  */
 enum anyrtc_code anyrtc_candidate_helper_buffer_message(
         struct list* const buffered_messages,
-        struct sa * const source, // copied
+        struct sa * const source, // copied, nullable
         struct mbuf* const buffer // referenced
 ) {
     struct anyrtc_buffered_message* buffered_message;
 
     // Check arguments
-    if (!buffered_messages || !source || !buffer) {
+    if (!buffered_messages || !buffer) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -107,7 +107,9 @@ enum anyrtc_code anyrtc_candidate_helper_buffer_message(
     }
 
     // Set fields
-    buffered_message->source = *source;
+    if (source) {
+        buffered_message->source = *source;
+    }
     buffered_message->buffer = mem_ref(buffer);
 
     // Add to list

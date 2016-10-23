@@ -361,9 +361,9 @@ static bool udp_receive_handler(
     enum anyrtc_code error = anyrtc_candidate_helper_buffer_message(
             &gatherer->buffered_messages, source, buffer);
     if (error) {
-        DEBUG_WARNING("Could not buffer DTLS packet, reason: %s\n", anyrtc_code_to_str(error));
+        DEBUG_WARNING("Could not buffer UDP packet, reason: %s\n", anyrtc_code_to_str(error));
     } else {
-        DEBUG_PRINTF("Buffered DTLS packet of size %zu\n", mbuf_get_left(buffer));
+        DEBUG_PRINTF("Buffered UDP packet of size %zu\n", mbuf_get_left(buffer));
     }
 
     // Handled
@@ -423,7 +423,7 @@ static bool interface_handler(
             return false; // Continue gathering
         }
 
-        // Attach temporary DTLS helper
+        // Attach temporary UDP helper
         error = anyrtc_candidate_helper_attach(
                 &candidate_helper, gatherer->ice, re_candidate, udp_receive_handler, gatherer);
         if (error) {

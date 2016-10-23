@@ -530,6 +530,7 @@ struct anyrtc_dtls_transport {
     struct anyrtc_dtls_parameters* remote_parameters; // referenced
     enum anyrtc_dtls_role role;
     bool connection_established;
+    struct list buffered_messages;
     struct list candidate_helpers; // TODO: Hash list instead?
     struct list fingerprints;
     struct tls* context;
