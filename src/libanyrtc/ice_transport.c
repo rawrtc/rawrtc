@@ -81,7 +81,6 @@ enum anyrtc_code anyrtc_ice_transport_create(
     transport->state_change_handler = state_change_handler;
     transport->candidate_pair_change_handler = candidate_pair_change_handler;
     transport->arg = arg;
-    transport->role = ANYRTC_ICE_ROLE_UNKNOWN;
 
     // Set pointer
     *transportp = transport;
@@ -237,16 +236,7 @@ enum anyrtc_code anyrtc_ice_transport_start(
     }
 
     // Set role (abort if unknown or something entirely weird)
-    switch (role) {
-        case ANYRTC_ICE_ROLE_CONTROLLING:
-            translated_role = ROLE_CONTROLLING;
-            break;
-        case ANYRTC_ICE_ROLE_CONTROLLED:
-            translated_role = ROLE_CONTROLLED;
-            break;
-        default:
-            return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
+    translated_role = anyrtc_translate_ice_role(role);
     error = anyrtc_translate_re_code(trice_set_role(transport->gatherer->ice, translated_role));
     if (error) {
         return error;
@@ -321,6 +311,46 @@ enum anyrtc_code anyrtc_ice_transport_stop(
     // TODO: Remove from RTCICETransportController (once we have it)
 
     return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the current ICE role of the ICE transport.
+ * Return `ANYRTC_CODE_NO_VALUE` code in case the ICE role has not been
+ * determined yet.
+ */
+enum anyrtc_code anyrtc_ice_transport_get_role(
+        enum anyrtc_ice_role* const rolep, // de-referenced
+        struct anyrtc_ice_transport* const transport
+) {
+    enum trice_role re_role;
+    enum anyrtc_code error;
+    enum anyrtc_ice_role role;
+
+    // Check arguments
+    if (!rolep || !transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get libre role from ICE instance
+    error = anyrtc_translate_re_code(trice_get_role(transport->gatherer->ice, &re_role));
+    if (error) {
+        return error;
+    }
+
+    // Translate role
+    error = anyrtc_translate_re_trice_role(&role, re_role);
+    if (error) {
+        return error;
+    }
+
+    // Unknown?
+    if (re_role == ANYRTC_ICE_ROLE_UNKNOWN) {
+        return ANYRTC_CODE_NO_VALUE;
+    } else {
+        // Set pointer
+        *rolep = role;
+        return ANYRTC_CODE_SUCCESS;
+    }
 }
 
 /*

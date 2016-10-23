@@ -164,6 +164,44 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
 }
 
 /*
+ * Translate an ICE role to the corresponding libre type.
+ */
+enum trice_role anyrtc_translate_ice_role(
+        enum anyrtc_ice_role const role
+) {
+    // No conversion needed
+    return (enum trice_role) role;
+}
+
+/*
+ * Translate a libre ICE role to the corresponding anyrtc role.
+ */
+enum anyrtc_code anyrtc_translate_re_trice_role(
+        enum anyrtc_ice_role* const rolep, // de-referenced
+        enum trice_role const re_role
+) {
+    // Check arguments
+    if (!rolep) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Translate role
+    switch (re_role) {
+        case ROLE_CONTROLLING:
+            *rolep = ANYRTC_ICE_ROLE_CONTROLLING;
+            return ANYRTC_CODE_SUCCESS;
+        case ROLE_CONTROLLED:
+            *rolep = ANYRTC_ICE_ROLE_CONTROLLED;
+            return ANYRTC_CODE_SUCCESS;
+        case ROLE_UNKNOWN:
+            *rolep = ANYRTC_ICE_ROLE_UNKNOWN;
+            return ANYRTC_CODE_SUCCESS;
+        default:
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+}
+
+/*
  * Translate a certificate key type to the corresponding libre type.
  */
 enum tls_key_type anyrtc_translate_certificate_key_type(

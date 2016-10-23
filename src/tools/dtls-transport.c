@@ -134,59 +134,59 @@ static void signal_handler(
 }
 
 void client_init(
-        struct client* const client
+        struct client* const local
 ) {
     // Generate certificates
-    EOE(anyrtc_certificate_generate(&client->certificate, NULL));
-    struct anyrtc_certificate* certificates[] = {client->certificate};
+    EOE(anyrtc_certificate_generate(&local->certificate, NULL));
+    struct anyrtc_certificate* certificates[] = {local->certificate};
 
     // Create ICE gatherer
     EOE(anyrtc_ice_gatherer_create(
-            &client->gatherer, client->gather_options,
+            &local->gatherer, local->gather_options,
             ice_gatherer_state_change_handler, ice_gatherer_error_handler,
-            ice_gatherer_local_candidate_handler, client));
+            ice_gatherer_local_candidate_handler, local));
 
     // Create ICE transport
     EOE(anyrtc_ice_transport_create(
-            &client->ice_transport, client->gatherer,
+            &local->ice_transport, local->gatherer,
             ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
-            client));
+            local));
 
     // Create DTLS transport
     EOE(anyrtc_dtls_transport_create(
-            &client->dtls_transport, client->ice_transport, certificates,
+            &local->dtls_transport, local->ice_transport, certificates,
             sizeof(certificates) / sizeof(struct anyrtc_certificate*),
-            dtls_transport_state_change_handler, dtls_transport_error_handler, client));
+            dtls_transport_state_change_handler, dtls_transport_error_handler, local));
 }
 
-void client_exchange(
+void client_start(
         struct client* const local,
         struct client* const remote
 ) {
     // Get & set ICE parameters
     EOE(anyrtc_ice_gatherer_get_local_parameters(&local->ice_parameters, remote->gatherer));
 
+    // Start gathering
+    EOE(anyrtc_ice_gatherer_gather(local->gatherer, NULL));
+
+    // Start ICE transport
+    EOE(anyrtc_ice_transport_start(
+            local->ice_transport, local->gatherer, local->ice_parameters, local->role));
+
     // Get & set DTLS parameters
     EOE(anyrtc_dtls_transport_get_local_parameters(
             &local->dtls_parameters, remote->dtls_transport));
-}
 
-void client_start(
-        struct client* const client
-) {
-    // Start gathering & transports
-    EOE(anyrtc_ice_gatherer_gather(client->gatherer, NULL));
-    EOE(anyrtc_ice_transport_start(
-            client->ice_transport, client->gatherer, client->ice_parameters, client->role));
+    // Start DTLS transport
     EOE(anyrtc_dtls_transport_start(
-            client->dtls_transport, client->dtls_parameters));
+            local->dtls_transport, local->dtls_parameters));
 }
 
 void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
-//    EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
+    EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
@@ -255,13 +255,9 @@ int main(int argc, char* argv[argc + 1]) {
     client_init(&a);
     client_init(&b);
 
-    // Exchange parameters, candidates, etc.
-    client_exchange(&a, &b);
-    client_exchange(&b, &a);
-
     // Start clients
-    client_start(&a);
-    client_start(&b);
+    client_start(&a, &b);
+    client_start(&b, &a);
 
     // Start main loop
     // TODO: Wrap re_main?

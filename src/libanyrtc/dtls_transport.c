@@ -370,8 +370,8 @@ static int send_handler(
     // Send
     // TODO: Is destination correct?
     DEBUG_PRINTF("Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n",
-                 mbuf_get_left(buffer), candidate_pair->rcand->attr.addr, original_destination,
-                 candidate_pair->lcand->attr.addr);
+                 mbuf_get_left(buffer), &candidate_pair->rcand->attr.addr, original_destination,
+                 &candidate_pair->lcand->attr.addr);
     int err = udp_send(udp_socket, &candidate_pair->rcand->attr.addr, buffer);
     if (err) {
         DEBUG_WARNING("Could not send, error: %m\n", err);
@@ -673,14 +673,13 @@ out:
 
 /*
  * Start the DTLS transport.
- * The caller MUST ensure that the corresponding ICE transport has
- * been started already.
  */
 enum anyrtc_code anyrtc_dtls_transport_start(
         struct anyrtc_dtls_transport* const transport,
         struct anyrtc_dtls_parameters* const remote_parameters // referenced
 ) {
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum anyrtc_ice_role ice_role;
 
     // Check arguments
     if (!transport || !remote_parameters) {
@@ -706,9 +705,15 @@ enum anyrtc_code anyrtc_dtls_transport_start(
         }
     }
 
+    // Get ICE role
+    error = anyrtc_ice_transport_get_role(&ice_role, transport->ice_transport);
+    if (error) {
+        return error;
+    }
+
     // Determine role
     if (remote_parameters->role == ANYRTC_DTLS_ROLE_AUTO) {
-        switch (transport->ice_transport->role) {
+        switch (ice_role) {
             case ANYRTC_ICE_ROLE_CONTROLLED:
                 transport->role = ANYRTC_DTLS_ROLE_CLIENT;
                 break;
@@ -737,10 +742,16 @@ enum anyrtc_code anyrtc_dtls_transport_start(
             transport->connection_established = false;
         }
 
-        // Do connect
-        error = do_connect(transport, NULL);
-        if (error) {
-            goto out;
+        // Get selected candidate pair
+        struct ice_candpair* const candidate_pair = list_ledata(list_head(trice_validl(
+                transport->ice_transport->gatherer->ice)));
+
+        // Do connect (if we have a valid candidate pair)
+        if (candidate_pair) {
+            error = do_connect(transport, &candidate_pair->lcand->attr.addr);
+            if (error) {
+                goto out;
+            }
         }
     } else {
         // Verify certificate & fingerprint (if connection is established)
@@ -787,7 +798,6 @@ enum anyrtc_code anyrtc_dtls_transport_stop(
 
 /*
  * Get local DTLS parameters of a transport.
- * Return `NULL` in case the transport has not been started, yet.
  */
 enum anyrtc_code anyrtc_dtls_transport_get_local_parameters(
         struct anyrtc_dtls_parameters** const parametersp, // de-referenced
@@ -832,5 +842,6 @@ enum anyrtc_code anyrtc_dtls_transport_get_local_parameters(
     }
 
     // Create and return DTLS parameters instance
-    return anyrtc_dtls_parameters_create_local(parametersp, transport);
+    return anyrtc_dtls_parameters_create_internal(
+            parametersp, transport->role, &transport->fingerprints);
 }

@@ -145,16 +145,23 @@ out:
 }
 
 /*
- * Create local parameters from a DTLS transport instance.
+ * Create parameters from the internal vars of a DTLS transport
+ * instance.
  */
-enum anyrtc_code anyrtc_dtls_parameters_create_local(
-        struct anyrtc_dtls_parameters** const parametersp, // de-referenced, not checked
-        struct anyrtc_dtls_transport* const transport // not checked
+enum anyrtc_code anyrtc_dtls_parameters_create_internal(
+        struct anyrtc_dtls_parameters** const parametersp, // de-referenced
+        enum anyrtc_dtls_role const role,
+        struct list* const fingerprints
 ) {
     struct le* le;
     struct anyrtc_dtls_parameters* parameters;
     struct anyrtc_dtls_fingerprint* copied_fingerprint;
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!parametersp || !fingerprints) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
 
     // Allocate
     parameters = mem_zalloc(sizeof(struct anyrtc_dtls_parameters), anyrtc_dtls_parameters_destroy);
@@ -163,10 +170,10 @@ enum anyrtc_code anyrtc_dtls_parameters_create_local(
     }
 
     // Set role
-    parameters->role = transport->role;
+    parameters->role = role;
 
     // Copy and append each fingerprint
-    for (le = list_head(&transport->remote_parameters->fingerprints); le != NULL; le = le->next) {
+    for (le = list_head(fingerprints); le != NULL; le = le->next) {
         struct anyrtc_dtls_fingerprint* const fingerprint = le->data;
 
         // Check algorithm

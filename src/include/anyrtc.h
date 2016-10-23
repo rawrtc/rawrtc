@@ -473,7 +473,6 @@ struct anyrtc_ice_transport {
     anyrtc_ice_transport_candidate_pair_change_handler* candidate_pair_change_handler; // nullable
     void* arg; // nullable
     struct anyrtc_ice_parameters* remote_parameters; // referenced
-    enum anyrtc_ice_role role;
     struct anyrtc_dtls_transport* dtls_transport; // referenced, nullable
 };
 
@@ -838,6 +837,17 @@ enum anyrtc_code anyrtc_ice_transport_stop(
 /*
  * TODO (from RTCIceTransport interface)
  * anyrtc_ice_transport_get_ice_gatherer
+ */
+
+/*
+ * Get the current ICE role of the ICE transport.
+ */
+enum anyrtc_code anyrtc_ice_transport_get_role(
+    enum anyrtc_ice_role* const rolep, // de-referenced
+    struct anyrtc_ice_transport* const transport
+);
+
+/*
  * anyrtc_ice_transport_get_role
  * anyrtc_ice_transport_get_component
  * anyrtc_ice_transport_get_state

@@ -24,6 +24,15 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
     enum ice_tcptype re_type
 );
 
+enum trice_role anyrtc_translate_ice_role(
+    enum anyrtc_ice_role const role
+);
+
+enum anyrtc_code anyrtc_translate_re_trice_role(
+    enum anyrtc_ice_role* const rolep, // de-referenced
+    enum trice_role const re_role
+);
+
 enum tls_key_type anyrtc_translate_certificate_key_type(
     enum anyrtc_certificate_key_type type
 );
