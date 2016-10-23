@@ -93,11 +93,22 @@ char const * const anyrtc_dtls_transport_state_to_name(
 /*
  * Change the state of the ICE transport.
  * Will call the corresponding handler.
+ * Caller MUST ensure that the same state is not set twice.
  */
 static enum anyrtc_code set_state(
         struct anyrtc_dtls_transport* const transport,
         enum anyrtc_dtls_transport_state const state
 ) {
+    // Closed or failed: Remove connection
+    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED
+            || state == ANYRTC_DTLS_TRANSPORT_STATE_FAILED) {
+        // Remove connection
+        transport->connection = mem_deref(transport->connection);
+
+        // Remove self from ICE transport (if attached)
+        transport->ice_transport->dtls_transport = NULL;
+    }
+
     // Set state
     transport->state = state;
 
@@ -132,14 +143,26 @@ static void close_handler(
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
-    DEBUG_INFO("DTLS connection closed, reason: %m\n", err);
+    enum anyrtc_code error;
 
-    // Set state
-    // TODO: Call .stop to clean up
-    set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+    // Closed?
+    if (!is_closed(transport)) {
+        DEBUG_INFO("DTLS connection closed, reason: %m\n", err);
 
-    // Remove connection
-    transport->connection = mem_deref(transport->connection);
+        // Set state
+        // TODO: What about normal close?
+        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+
+        // Stop
+        error = anyrtc_dtls_transport_stop(transport);
+        if (error) {
+            DEBUG_WARNING("DTLS connection closed, could not stop transport: %s\n",
+                          anyrtc_code_to_str(error));
+        }
+    } else {
+        DEBUG_PRINTF("DTLS connection closed (but state is already closed anyway), reason: %m\n",
+                     err);
+    }
 }
 
 /*
@@ -155,7 +178,7 @@ static void dtls_receive_handler(
 
     // Check state
     if (is_closed(transport)) {
-        DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
+        DEBUG_PRINTF("Ignoring incoming DTLS message, transport is closed\n");
         return;
     }
 
@@ -167,7 +190,8 @@ static void dtls_receive_handler(
 /*
  * Either called by a DTLS connection established event or by the
  * `start` method of the DTLS transport.
- * The caller MUST make sure that remote parameters are available!
+ * The caller MUST make sure that remote parameters are available and
+ * that the state is NOT 'closed' or 'failed'!
  */
 static void verify_certificate(
         struct anyrtc_dtls_transport* const transport // not checked
@@ -237,9 +261,14 @@ static void verify_certificate(
 out:
     if (error || !valid) {
         DEBUG_WARNING("Verifying certificate failed, reason: %s\n", anyrtc_code_to_str(error));
-        // TODO: Call .stop to clean up
-        DEBUG_PRINTF("TODO: Stop DTLS transport\n");
         set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+
+        // Stop
+        error = anyrtc_dtls_transport_stop(transport);
+        if (error) {
+            DEBUG_WARNING("DTLS connection closed, could not stop transport: %s\n",
+                          anyrtc_code_to_str(error));
+        }
     }
 }
 
@@ -283,7 +312,7 @@ static void connect_handler(
 
     // Check state
     if (is_closed(transport)) {
-        DEBUG_WARNING("Ignoring incoming DTLS connection, transport is closed\n");
+        DEBUG_PRINTF("Ignoring incoming DTLS connection, transport is closed\n");
         return;
     }
 
@@ -348,25 +377,29 @@ static int send_handler(
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
     struct trice* const ice = transport->ice_transport->gatherer->ice;
+    bool closed = is_closed(transport);
     (void) tc;
 
-    // Check state
-    if (is_closed(transport)) {
-        DEBUG_WARNING("Ignoring sending message request, DTLS transport is closed\n");
-        return ECONNABORTED;
-    }
+    // Note: No need to check if closed as only non-application data may be sent if the
+    //       transport is already closed.
 
     // Get selected candidate pair
     struct ice_candpair* const candidate_pair = list_ledata(list_head(trice_validl(ice)));
     if (!candidate_pair) {
-        DEBUG_WARNING("Cannot send message, no selected candidate pair\n");
+        if (!closed) {
+            DEBUG_WARNING("Cannot send message, no selected candidate pair\n");
+        }
+        return ECONNRESET;
     }
 
     // Get local candidate's UDP socket
     // TODO: What about TCP?
     struct udp_sock* const udp_socket = trice_lcand_sock(ice, candidate_pair->lcand);
     if (!udp_socket) {
-        DEBUG_WARNING("Cannot send message, selected candidate pair has no socket\n");
+        if (!closed) {
+            DEBUG_WARNING("Cannot send message, selected candidate pair has no socket\n");
+        }
+        return ECONNRESET;
     }
 
     // Send
@@ -575,13 +608,10 @@ static bool udp_receive_handler(
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
 
-    // Check state
-    if (is_closed(transport)) {
-        DEBUG_WARNING("Ignoring incoming UDP message, DTLS transport is closed\n");
-    } else {
-        // Receive & decrypt
-        dtls_receive(transport->socket, source, buffer);
-    }
+    // Decrypt & receive
+    // Note: No need to check if the transport is already closed as the messages will re-appear in
+    //       the `dtls_receive_handler`.
+    dtls_receive(transport->socket, source, buffer);
 
     // Handled
     return true;
@@ -792,14 +822,10 @@ enum anyrtc_code anyrtc_dtls_transport_stop(
         return ANYRTC_CODE_SUCCESS;
     }
 
-    // Remove connection
-    transport->connection = mem_deref(transport->connection);
+    // Update state
+    return set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CLOSED);
 
-    // Remove self from ICE transport
-    transport->ice_transport->dtls_transport = NULL;
-
-    // TODO: Implement
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    // TODO: Anything missing?
 }
 
 /*
