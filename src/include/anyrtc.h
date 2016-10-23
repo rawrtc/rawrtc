@@ -1054,6 +1054,13 @@ enum anyrtc_code anyrtc_sctp_transport_stop(
 
 
 /*
+ * Translate an anyrtc return code to a string.
+ */
+char const* anyrtc_code_to_str(
+    enum anyrtc_code const code
+);
+
+/*
  * Translate an re error to an anyrtc code.
  */
 enum anyrtc_code anyrtc_translate_re_code(

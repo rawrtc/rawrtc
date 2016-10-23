@@ -397,8 +397,8 @@ static bool interface_handler(
         // Create ICE candidate, call local candidate handler, unreference ICE candidate
         error = anyrtc_ice_candidate_create_from_local_candidate(&candidate, re_candidate);
         if (error) {
-            // TODO: Convert error code to string
-            DEBUG_WARNING("Could not create local candidate instance: %d", error);
+            DEBUG_WARNING("Could not create local candidate instance: %s",
+                          anyrtc_code_to_str(error));
         } else {
             gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
             mem_deref(candidate);

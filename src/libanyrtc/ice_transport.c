@@ -143,8 +143,8 @@ static void ice_established_handler(
         error = anyrtc_dtls_transport_add_candidate_pair(
                 transport->dtls_transport, candidate_pair);
         if (error) {
-            // TODO: Convert error code to string
-            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %d\n", error);
+            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
+                          anyrtc_code_to_str(error));
         }
     }
 

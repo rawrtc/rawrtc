@@ -132,7 +132,7 @@ static void close_handler(
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
-    DEBUG_INFO("DTLS connection closed, reason %m\n", err);
+    DEBUG_INFO("DTLS connection closed, reason: %m\n", err);
 
     // Set state
     // TODO: Call .stop to clean up
@@ -236,6 +236,7 @@ static void verify_certificate(
 
 out:
     if (error || !valid) {
+        DEBUG_WARNING("Verifying certificate failed, reason: %s\n", anyrtc_code_to_str(error));
         // TODO: Call .stop to clean up
         DEBUG_PRINTF("TODO: Stop DTLS transport\n");
         set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
@@ -288,19 +289,20 @@ static void connect_handler(
 
     // Update role if "auto"
     if (transport->role == ANYRTC_DTLS_ROLE_AUTO) {
+        DEBUG_PRINTF("Switching role 'auto' -> 'server'\n");
         transport->role = ANYRTC_DTLS_ROLE_SERVER;
     }
     
     // Accept?
     role_is_server = transport->role == ANYRTC_DTLS_ROLE_SERVER;
     have_connection = transport->connection != NULL;
-    if (role_is_server && have_connection) {
+    if (role_is_server && !have_connection) {
         // Set state to connecting (if not already set)
         if (transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
             error = set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
             if (error) {
-                // TODO: Print error
-                DEBUG_WARNING("Could not set DTLS transport state to connecting, reason: TODO\n");
+                DEBUG_WARNING("Could not set DTLS transport state to connecting, reason: %s\n",
+                              anyrtc_code_to_str(error));
             }
         }
 
@@ -312,11 +314,11 @@ static void connect_handler(
             DEBUG_WARNING("Could not accept incoming DTLS connection, reason: %m\n", err);
         }
     } else {
-        if (role_is_server) {
-            DEBUG_WARNING("Incoming DTLS connect but role is client\n");
-        }
         if (have_connection) {
             DEBUG_WARNING("Incoming DTLS connect but we already have a connection\n");
+        }
+        if (!role_is_server) {
+            DEBUG_WARNING("Incoming DTLS connect but role is 'client'\n");
         }
     }
 }
@@ -544,8 +546,8 @@ enum anyrtc_code anyrtc_dtls_transport_create(
         struct ice_candpair* candidate_pair = le->data;
         error = anyrtc_dtls_transport_add_candidate_pair(transport, candidate_pair);
         if (error) {
-            // TODO: Convert error code to string
-            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %d\n", error);
+            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
+                          anyrtc_code_to_str(error));
         }
     }
 
@@ -652,9 +654,9 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
 
     // TODO: What about TCP helpers?
 
-    // Do connect (if no connection)
-    if (!transport->connection) {
-        error = do_connect(transport, &candidate_pair->lcand->attr.addr);
+    // Do connect (if client and no connection)
+    if (transport->role == ANYRTC_DTLS_ROLE_CLIENT && !transport->connection) {
+        error = do_connect(transport, &candidate_pair->rcand->attr.addr);
         if (error) {
             goto out;
         }
@@ -716,9 +718,11 @@ enum anyrtc_code anyrtc_dtls_transport_start(
         switch (ice_role) {
             case ANYRTC_ICE_ROLE_CONTROLLED:
                 transport->role = ANYRTC_DTLS_ROLE_CLIENT;
+                DEBUG_PRINTF("Switching role 'auto' -> 'client'\n");
                 break;
             case ANYRTC_ICE_ROLE_CONTROLLING:
                 transport->role = ANYRTC_DTLS_ROLE_SERVER;
+                DEBUG_PRINTF("Switching role 'auto' -> 'server'\n");
                 break;
             default:
                 // Cannot continue if ICE transport role is unknown
@@ -727,8 +731,10 @@ enum anyrtc_code anyrtc_dtls_transport_start(
         }
     } else if (remote_parameters->role == ANYRTC_DTLS_ROLE_SERVER) {
         transport->role = ANYRTC_DTLS_ROLE_CLIENT;
+        DEBUG_PRINTF("Switching role 'server' -> 'client'\n");
     } else {
         transport->role = ANYRTC_DTLS_ROLE_SERVER;
+        DEBUG_PRINTF("Switching role 'client' -> 'server'\n");
     }
 
     // Connect (if client)
@@ -748,7 +754,7 @@ enum anyrtc_code anyrtc_dtls_transport_start(
 
         // Do connect (if we have a valid candidate pair)
         if (candidate_pair) {
-            error = do_connect(transport, &candidate_pair->lcand->attr.addr);
+            error = do_connect(transport, &candidate_pair->rcand->attr.addr);
             if (error) {
                 goto out;
             }

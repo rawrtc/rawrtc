@@ -41,8 +41,8 @@ static void exit_on_error(enum anyrtc_code code, char const* const file, uint32_
                     file, line);
             return;
         default:
-            fprintf(stderr, "Error in %s %"PRIu32" (%d): NO TRANSLATION\n",
-                    file, line, code);
+            fprintf(stderr, "Error in %s %"PRIu32" (%d): %s\n",
+                    file, line, code, anyrtc_code_to_str(code));
             before_exit();
             exit((int) code);
     }

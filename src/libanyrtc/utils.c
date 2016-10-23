@@ -29,6 +29,44 @@ struct anyrtc_certificate_options anyrtc_default_certificate_options = {
 };
 
 /*
+ * Translate an anyrtc return code to a string.
+ */
+char const* anyrtc_code_to_str(
+        enum anyrtc_code const code
+) {
+    switch (code) {
+        case ANYRTC_CODE_UNKNOWN_ERROR:
+            return "unknown error";
+        case ANYRTC_CODE_NOT_IMPLEMENTED:
+            return "not implemented";
+        case ANYRTC_CODE_SUCCESS:
+            return "success";
+        case ANYRTC_CODE_INITIALISE_FAIL:
+            return "failed to initialise";
+        case ANYRTC_CODE_INVALID_ARGUMENT:
+            return "invalid argument";
+        case ANYRTC_CODE_NO_MEMORY:
+            return "no memory";
+        case ANYRTC_CODE_INVALID_STATE:
+            return "invalid state";
+        case ANYRTC_CODE_UNSUPPORTED_PROTOCOL:
+            return "unsupported protocol";
+        case ANYRTC_CODE_UNSUPPORTED_ALGORITHM:
+            return "unsupported algorithm";
+        case ANYRTC_CODE_NO_VALUE:
+            return "no value";
+        case ANYRTC_CODE_NO_SOCKET:
+            return "no socket";
+        case ANYRTC_CODE_INVALID_CERTIFICATE:
+            return "invalid certificate";
+        case ANYRTC_CODE_INVALID_FINGERPRINT:
+            return "invalid fingerprint";
+        default:
+            return "(no error translation)";
+    }
+}
+
+/*
  * Translate an re error to an anyrtc code.
  * TODO: Add codes from trice_lcand_add
  */
