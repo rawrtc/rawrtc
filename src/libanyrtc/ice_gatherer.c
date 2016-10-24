@@ -440,7 +440,9 @@ static bool interface_handler(
             DEBUG_WARNING("Could not create local candidate instance: %s\n",
                           anyrtc_code_to_str(error));
         } else {
-            gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
+            if (gatherer->local_candidate_handler) {
+                gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
+            }
             mem_deref(candidate);
         }
     }
@@ -537,3 +539,7 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
     return anyrtc_ice_parameters_create(
             parametersp, gatherer->ice_username_fragment, gatherer->ice_password, false);
 }
+
+/*
+ *
+ */
