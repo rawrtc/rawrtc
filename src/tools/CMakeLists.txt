@@ -20,6 +20,13 @@ target_link_libraries(dtls-transport
 install(TARGETS dtls-transport
         DESTINATION bin)
 
+# Tool: redirect-transport
+add_executable(redirect-transport redirect-transport.c)
+target_link_libraries(redirect-transport
+        anyrtc)
+install(TARGETS redirect-transport
+        DESTINATION bin)
+
 # Tool: sctp-transport
 add_executable(sctp-transport sctp-transport.c)
 target_link_libraries(sctp-transport

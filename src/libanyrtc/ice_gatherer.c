@@ -541,5 +541,44 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
 }
 
 /*
- *
+ * Get local ICE candidates.
  */
+enum anyrtc_code anyrtc_ice_gatherer_get_local_candidates(
+        struct anyrtc_ice_candidate*** const candidatesp, // de-referenced
+        size_t* const n_candidatesp, // de-referenced
+        struct anyrtc_ice_gatherer* const gatherer
+) {
+    size_t n_candidates;
+    struct anyrtc_ice_candidate** candidates;
+    struct le* le;
+
+    // Check arguments
+    if (!candidatesp || !gatherer) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get length
+    n_candidates = list_count(trice_lcandl(gatherer->ice));
+
+    // Allocate array
+    candidates = mem_zalloc(sizeof(struct anyrtc_ice_candidate*) * n_candidates,
+                            anyrtc_array_destroy);
+    if (!candidates) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Copy internal candidates list
+    for (le = list_head(trice_lcandl(gatherer->ice)); le != NULL; le = le->next) {
+        // TODO
+    }
+
+out:
+    if (error) {
+        mem_deref(candidates);
+    } else {
+        // Set pointers
+        *candidatesp = candidates;
+        *n_candidatesp = n_candidates;
+    }
+    return error;
+}
