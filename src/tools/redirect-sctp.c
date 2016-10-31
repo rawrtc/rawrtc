@@ -399,6 +399,7 @@ static void remove_dtls_socket(struct agent_t* const agent) {
 
 static void udp_receive_handler(struct sa const * const source, struct mbuf* const buffer, void* const arg) {
     struct agent_t* const agent = arg;
+    dtls_set_peer(agent->dtls_connection, source);
     dtls_receive(agent->dtls_socket, (struct sa* const) source, buffer);
 }
 
@@ -818,7 +819,7 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Create DTLS socket
     DEBUG_PRINTF("Creating DTLS socket\n");
-    EXIT_ON_ERROR(dtls_socketless(&agent.dtls_socket, 0, dtls_connect_handler,
+    EXIT_ON_ERROR(dtls_socketless(&agent.dtls_socket, 1, dtls_connect_handler,
             dtls_send_handler, dtls_mtu_handler, &agent));
     
     // Create redirect raw socket

@@ -451,6 +451,13 @@ static bool udp_receive_handler(
 
     // TODO: Check if DTLS or SRTP packet
 
+    // TODO: Check if source is in our list of remote candidates
+    // Note: It's okay to call this with a DTLS connection socket set to `NULL` as it will simply
+    //       return false if the socket is `NULL`.
+    if (dtls_set_peer(transport->connection, source)) {
+        DEBUG_PRINTF("Remote changed it's peer address to %J\n", source);
+    }
+
     // Decrypt & receive
     // Note: No need to check if the transport is already closed as the messages will re-appear in
     //       the `dtls_receive_handler`.
@@ -605,7 +612,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     // Create DTLS socket
     DEBUG_PRINTF("Creating DTLS socket\n");
     error = anyrtc_translate_re_code(dtls_socketless(
-            &transport->socket, 0, connect_handler, send_handler, mtu_handler, transport));
+            &transport->socket, 1, connect_handler, send_handler, mtu_handler, transport));
     if (error) {
         goto out;
     }
