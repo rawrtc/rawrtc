@@ -448,14 +448,20 @@ static bool udp_receive_handler(
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
+    struct sa const* peer;
 
     // TODO: Check if DTLS or SRTP packet
 
-    // TODO: Check if source is in our list of remote candidates
-    // Note: It's okay to call this with a DTLS connection socket set to `NULL` as it will simply
-    //       return false if the socket is `NULL`.
-    if (dtls_set_peer(transport->connection, source)) {
-        DEBUG_PRINTF("Remote changed it's peer address to %J\n", source);
+    // Update remote peer address (if changed and connection exists)
+    if (transport->connection) {
+        // TODO: It would be cleaner to check if source is in our list of remote candidates
+
+        // Update if changed
+        peer = dtls_peer(transport->connection);
+        if (!sa_cmp(peer, source, SA_ALL)) {
+            DEBUG_PRINTF("Remote changed its peer address from %J to %J\n", peer, source);
+            dtls_set_peer(transport->connection, source);
+        }
     }
 
     // Decrypt & receive
