@@ -53,7 +53,7 @@ enum anyrtc_code anyrtc_candidate_helper_attach(
     candidate_helper->candidate = mem_ref(candidate);
 
     // Create & attach UDP helper
-    error = anyrtc_translate_re_code(udp_register_helper(
+    error = anyrtc_error_to_code(udp_register_helper(
             &candidate_helper->helper, udp_socket, ANYRTC_LAYER_DTLS, NULL,
             receive_handler, arg));
     if (error) {

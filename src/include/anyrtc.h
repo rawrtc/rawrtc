@@ -42,8 +42,8 @@ enum anyrtc_code {
  * Certificate private key types.
  */
 enum anyrtc_certificate_key_type {
-    ANYRTC_CERTIFICATE_KEY_TYPE_RSA = TLS_KEY_TYPE_RSA,
-    ANYRTC_CERTIFICATE_KEY_TYPE_EC = TLS_KEY_TYPE_EC
+    ANYRTC_CERTIFICATE_KEY_TYPE_RSA = TLS_KEYTYPE_RSA,
+    ANYRTC_CERTIFICATE_KEY_TYPE_EC = TLS_KEYTYPE_EC
 };
 
 /*
@@ -428,6 +428,7 @@ struct anyrtc_ice_server_url {
 
 /*
  * Raw ICE candidate (pending candidate).
+ * TODO: private
  */
 struct anyrtc_ice_candidate_raw {
     char* foundation; // copied
@@ -456,6 +457,7 @@ struct anyrtc_ice_candidate {
 
 /*
  * ICE parameters.
+ * TODO: private
  */
 struct anyrtc_ice_parameters {
     char* username_fragment; // copied
@@ -500,6 +502,7 @@ struct anyrtc_ice_transport {
 
 /*
  * DTLS fingerprint.
+ * TODO: private
  */
 struct anyrtc_dtls_fingerprint {
     struct le le;
@@ -562,6 +565,24 @@ enum {
     ANYRTC_LAYER_ICE = 0,
     ANYRTC_LAYER_STUN = -10,
     ANYRTC_LAYER_TURN = -10
+};
+
+
+
+/*
+ * ICE candidates.
+ */
+struct anyrtc_ice_candidates {
+    size_t n_candidates;
+    struct anyrtc_ice_candidate* candidates[];
+};
+
+/*
+ * DTLS fingerprints
+ */
+struct anyrtc_dtls_fingerprints {
+    size_t n_fingerprints;
+    struct anyrtc_dtls_fingerprint* fingerprints[];
 };
 
 
@@ -809,7 +830,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
  */
 
 /*
- * Get local ICE parameters of a gatherer.
+ * Get local ICE parameters of an ICE gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
     struct anyrtc_ice_parameters** const parametersp, // de-referenced
@@ -817,8 +838,15 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
 );
 
 /*
+ * Get local ICE candidates of an ICE gatherer.
+ */
+enum anyrtc_code anyrtc_ice_gatherer_get_local_candidates(
+    struct anyrtc_ice_candidates** const candidatesp, // de-referenced
+    struct anyrtc_ice_gatherer* const gatherer
+);
+
+/*
  * TODO (from RTCIceGatherer interface)
- * anyrtc_ice_gatherer_get_local_candidates
  * anyrtc_ice_gatherer_create_associated_gatherer (unsupported)
  * anyrtc_ice_gatherer_set_state_change_handler
  * anyrtc_ice_gatherer_set_error_handler
@@ -1089,21 +1117,111 @@ char const* anyrtc_code_to_str(
 /*
  * Translate an re error to an anyrtc code.
  */
-enum anyrtc_code anyrtc_translate_re_code(
-    int code
+enum anyrtc_code anyrtc_error_to_code(
+    const int code
 );
 
 /*
  * Translate a protocol to the corresponding IPPROTO_*.
  */
-int anyrtc_translate_ice_protocol(
+int anyrtc_ice_protocol_to_ipproto(
     enum anyrtc_ice_protocol const protocol
 );
 
 /*
  * Translate a IPPROTO_* to the corresponding protocol.
  */
-enum anyrtc_code anyrtc_translate_ipproto(
+enum anyrtc_code anyrtc_ipproto_to_ice_protocol(
     int const ipproto,
     enum anyrtc_ice_protocol* const protocolp // de-referenced
+);
+
+/*
+ * Translate an ICE protocol to str.
+ */
+char const * anyrtc_ice_protocol_to_str(
+    enum anyrtc_ice_protocol const protocol
+);
+
+/*
+ * Translate a str to an ICE protocol (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_protocol(
+    enum anyrtc_ice_protocol* const protocolp, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate an ICE candidate type to str.
+ */
+char const * anyrtc_ice_candidate_type_to_str(
+    enum anyrtc_ice_candidate_type const type
+);
+
+/*
+ * Translate a str to an ICE candidate type (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_candidate_type(
+    enum anyrtc_ice_candidate_type* const typep, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate an ICE TCP candidate type to str.
+ */
+char const * anyrtc_ice_tcp_candidate_type_to_str(
+    enum anyrtc_ice_tcp_candidate_type const type
+);
+
+/*
+ * Translate a str to an ICE TCP candidate type (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_tcp_candidate_type(
+    enum anyrtc_ice_tcp_candidate_type* const typep, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate an ICE role to str.
+ */
+char const * anyrtc_ice_role_to_str(
+    enum anyrtc_ice_role const role
+);
+
+/*
+ * Translate a str to an ICE role (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_role(
+    enum anyrtc_ice_role* const rolep, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate a DTLS role to str.
+ */
+char const * anyrtc_dtls_role_to_str(
+    enum anyrtc_dtls_role const role
+);
+
+/*
+ * Translate a str to a DTLS role (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_dtls_role(
+    enum anyrtc_dtls_role* const rolep, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate a certificate sign algorithm to str.
+ */
+char const * anyrtc_certificate_sign_algorithm_to_str(
+    enum anyrtc_certificate_sign_algorithm const algorithm
+);
+
+/*
+ * Translate a str to a certificate sign algorithm (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_certificate_sign_algorithm(
+    enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
+    char const* const str
 );

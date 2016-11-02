@@ -70,7 +70,7 @@ char const* anyrtc_code_to_str(
  * Translate an re error to an anyrtc code.
  * TODO: Add codes from trice_lcand_add
  */
-enum anyrtc_code anyrtc_translate_re_code(
+enum anyrtc_code anyrtc_error_to_code(
         int const code
 ) {
     switch (code) {
@@ -90,7 +90,7 @@ enum anyrtc_code anyrtc_translate_re_code(
 /*
  * Translate a protocol to the corresponding IPPROTO_*.
  */
-int anyrtc_translate_ice_protocol(
+int anyrtc_ice_protocol_to_ipproto(
         enum anyrtc_ice_protocol const protocol
 ) {
     // No conversion needed
@@ -100,7 +100,7 @@ int anyrtc_translate_ice_protocol(
 /*
  * Translate a IPPROTO_* to the corresponding protocol.
  */
-enum anyrtc_code anyrtc_translate_ipproto(
+enum anyrtc_code anyrtc_ipproto_to_ice_protocol(
         int const ipproto,
         enum anyrtc_ice_protocol* const protocolp // de-referenced
 ) {
@@ -122,10 +122,59 @@ enum anyrtc_code anyrtc_translate_ipproto(
     }
 }
 
+enum anyrtc_ice_protocol const map_enum_ice_protocol[] = {
+    ANYRTC_ICE_PROTOCOL_UDP,
+    ANYRTC_ICE_PROTOCOL_TCP,
+};
+
+char const * const map_str_ice_protocol[] = {
+    "udp",
+    "tcp",
+};
+
+size_t const map_ice_protocol_length =
+        sizeof(map_enum_ice_protocol) / sizeof(map_enum_ice_protocol[0]);
+
 /*
- * Translate an ICE candidate type to the corresponding libre type.
+ * Translate an ICE protocol to str.
  */
-enum ice_cand_type anyrtc_translate_ice_candidate_type(
+char const * anyrtc_ice_protocol_to_str(
+        enum anyrtc_ice_protocol const protocol
+) {
+    for (size_t i = 0; i < map_ice_protocol_length; ++i) {
+        if (map_enum_ice_protocol[i] == protocol) {
+            return map_str_ice_protocol[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an ICE protocol (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_protocol(
+        enum anyrtc_ice_protocol* const protocolp, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!protocolp || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_ice_protocol_length; ++i) {
+        if (str_casecmp(map_str_ice_protocol[i], str) == 0) {
+            *protocolp = map_enum_ice_protocol[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate an ICE candidate type to the corresponding re type.
+ */
+enum ice_cand_type anyrtc_ice_candidate_type_to_ice_cand_type(
         enum anyrtc_ice_candidate_type const type
 ) {
     // No conversion needed
@@ -133,9 +182,9 @@ enum ice_cand_type anyrtc_translate_ice_candidate_type(
 }
 
 /*
- * Translate a libre ICE candidate type to the corresponding anyrtc type.
+ * Translate a re ICE candidate type to the corresponding anyrtc type.
  */
-enum anyrtc_code anyrtc_translate_re_ice_cand_type(
+enum anyrtc_code anyrtc_ice_cand_type_to_ice_candidate_type(
         enum anyrtc_ice_candidate_type* const typep, // de-referenced
         enum ice_cand_type const re_type
 ) {
@@ -163,10 +212,63 @@ enum anyrtc_code anyrtc_translate_re_ice_cand_type(
     }
 }
 
+enum anyrtc_ice_candidate_type const map_enum_ice_candidate_type[] = {
+    ANYRTC_ICE_CANDIDATE_TYPE_HOST,
+    ANYRTC_ICE_CANDIDATE_TYPE_SRFLX,
+    ANYRTC_ICE_CANDIDATE_TYPE_PRFLX,
+    ANYRTC_ICE_CANDIDATE_TYPE_RELAY,
+};
+
+char const * const map_str_ice_candidate_type[] = {
+    "host",
+    "srflx",
+    "prflx",
+    "relay",
+};
+
+size_t const map_ice_candidate_type_length =
+        sizeof(map_enum_ice_candidate_type) / sizeof(map_enum_ice_candidate_type[0]);
+
 /*
- * Translate an ICE TCP candidate type to the corresponding libre type.
+ * Translate an ICE candidate type to str.
  */
-enum ice_tcptype anyrtc_translate_ice_tcp_candidate_type(
+char const * anyrtc_ice_candidate_type_to_str(
+        enum anyrtc_ice_candidate_type const type
+) {
+    for (size_t i = 0; i < map_ice_candidate_type_length; ++i) {
+        if (map_enum_ice_candidate_type[i] == type) {
+            return map_str_ice_candidate_type[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an ICE candidate type (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_candidate_type(
+        enum anyrtc_ice_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!typep || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_ice_candidate_type_length; ++i) {
+        if (str_casecmp(map_str_ice_candidate_type[i], str) == 0) {
+            *typep = map_enum_ice_candidate_type[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate an ICE TCP candidate type to the corresponding re type.
+ */
+enum ice_tcptype anyrtc_ice_tcp_candidate_type_to_ice_tcptype(
         enum anyrtc_ice_tcp_candidate_type const type
 ) {
     // No conversion needed
@@ -174,9 +276,9 @@ enum ice_tcptype anyrtc_translate_ice_tcp_candidate_type(
 }
 
 /*
- * Translate a libre ICE TCP candidate type to the corresponding anyrtc type.
+ * Translate a re ICE TCP candidate type to the corresponding anyrtc type.
  */
-enum anyrtc_code anyrtc_translate_re_ice_tcptype(
+enum anyrtc_code anyrtc_ice_tcptype_to_ice_tcp_candidate_type(
         enum anyrtc_ice_tcp_candidate_type* const typep, // de-referenced
         enum ice_tcptype const re_type
 ) {
@@ -201,10 +303,61 @@ enum anyrtc_code anyrtc_translate_re_ice_tcptype(
     }
 }
 
+enum anyrtc_ice_tcp_candidate_type const map_enum_ice_tcp_candidate_type[] = {
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE,
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_PASSIVE,
+    ANYRTC_ICE_TCP_CANDIDATE_TYPE_SO,
+};
+
+char const * const map_str_ice_tcp_candidate_type[] = {
+    "active",
+    "passive",
+    "so",
+};
+
+size_t const map_ice_tcp_candidate_type_length =
+        sizeof(map_enum_ice_tcp_candidate_type) / sizeof(map_enum_ice_tcp_candidate_type[0]);
+
 /*
- * Translate an ICE role to the corresponding libre type.
+ * Translate an ICE TCP candidate type to str.
  */
-enum trice_role anyrtc_translate_ice_role(
+char const * anyrtc_ice_tcp_candidate_type_to_str(
+        enum anyrtc_ice_tcp_candidate_type const type
+) {
+    for (size_t i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
+        if (map_enum_ice_tcp_candidate_type[i] == type) {
+            return map_str_ice_tcp_candidate_type[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an ICE TCP candidate type (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_ice_tcp_candidate_type(
+        enum anyrtc_ice_tcp_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!typep || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
+        if (str_casecmp(map_str_ice_tcp_candidate_type[i], str) == 0) {
+            *typep = map_enum_ice_tcp_candidate_type[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate an ICE role to the corresponding re type.
+ */
+enum trice_role anyrtc_ice_role_to_trice_role(
         enum anyrtc_ice_role const role
 ) {
     // No conversion needed
@@ -212,9 +365,9 @@ enum trice_role anyrtc_translate_ice_role(
 }
 
 /*
- * Translate a libre ICE role to the corresponding anyrtc role.
+ * Translate a re ICE role to the corresponding anyrtc role.
  */
-enum anyrtc_code anyrtc_translate_re_trice_role(
+enum anyrtc_code anyrtc_trice_role_to_ice_role(
         enum anyrtc_ice_role* const rolep, // de-referenced
         enum trice_role const re_role
 ) {
@@ -239,22 +392,122 @@ enum anyrtc_code anyrtc_translate_re_trice_role(
     }
 }
 
+enum anyrtc_ice_role const map_enum_ice_role[] = {
+    ANYRTC_ICE_ROLE_CONTROLLING,
+    ANYRTC_ICE_ROLE_CONTROLLED,
+};
+
+char const * const map_str_ice_role[] = {
+    "controlling",
+    "controlled",
+};
+
+size_t const map_ice_role_length =
+        sizeof(map_enum_ice_role) / sizeof(map_enum_ice_role[0]);
+
 /*
- * Translate a certificate key type to the corresponding libre type.
+ * Translate an ICE role to str.
  */
-enum tls_key_type anyrtc_translate_certificate_key_type(
-        enum anyrtc_certificate_key_type const type
+char const * anyrtc_ice_role_to_str(
+        enum anyrtc_ice_role const role
 ) {
-    // No conversion needed
-    return (enum tls_key_type) type;
+    for (size_t i = 0; i < map_ice_role_length; ++i) {
+        if (map_enum_ice_role[i] == role) {
+            return map_str_ice_role[i];
+        }
+    }
+
+    return "???";
 }
 
 /*
- * Translate a libre key type to the corresponding anyrtc type.
+ * Translate a str to an ICE role (case-insensitive).
  */
-enum anyrtc_code anyrtc_translate_re_tls_key_type(
+enum anyrtc_code anyrtc_str_to_ice_role(
+        enum anyrtc_ice_role* const rolep, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!rolep || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_ice_role_length; ++i) {
+        if (str_casecmp(map_str_ice_role[i], str) == 0) {
+            *rolep = map_enum_ice_role[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a certificate key type to the corresponding re type.
+ */
+enum tls_keytype anyrtc_certificate_key_type_to_tls_keytype(
+        enum anyrtc_certificate_key_type const type
+) {
+    // No conversion needed
+    return (enum tls_keytype) type;
+}
+
+enum anyrtc_dtls_role const map_enum_dtls_role[] = {
+    ANYRTC_DTLS_ROLE_AUTO,
+    ANYRTC_DTLS_ROLE_CLIENT,
+    ANYRTC_DTLS_ROLE_SERVER,
+};
+
+char const * const map_str_dtls_role[] = {
+    "auto",
+    "client",
+    "server",
+};
+
+size_t const map_dtls_role_length =
+        sizeof(map_enum_dtls_role) / sizeof(map_enum_dtls_role[0]);
+
+/*
+ * Translate a DTLS role to str.
+ */
+char const * anyrtc_dtls_role_to_str(
+        enum anyrtc_dtls_role const role
+) {
+    for (size_t i = 0; i < map_dtls_role_length; ++i) {
+        if (map_enum_dtls_role[i] == role) {
+            return map_str_dtls_role[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to a DTLS role (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_dtls_role(
+        enum anyrtc_dtls_role* const rolep, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!rolep || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_dtls_role_length; ++i) {
+        if (str_casecmp(map_str_dtls_role[i], str) == 0) {
+            *rolep = map_enum_dtls_role[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a re key type to the corresponding anyrtc type.
+ */
+enum anyrtc_code anyrtc_tls_keytype_to_certificate_key_type(
         enum anyrtc_certificate_key_type* const typep, // de-referenced
-        enum tls_key_type const re_type
+        enum tls_keytype const re_type
 ) {
     // Check arguments
     if (!typep) {
@@ -263,10 +516,10 @@ enum anyrtc_code anyrtc_translate_re_tls_key_type(
 
     // Convert ice_cand_type
     switch (re_type) {
-        case TLS_KEY_TYPE_RSA:
+        case TLS_KEYTYPE_RSA:
             *typep = ANYRTC_CERTIFICATE_KEY_TYPE_RSA;
             return ANYRTC_CODE_SUCCESS;
-        case TLS_KEY_TYPE_EC:
+        case TLS_KEYTYPE_EC:
             *typep = ANYRTC_CERTIFICATE_KEY_TYPE_EC;
             return ANYRTC_CODE_SUCCESS;
         default:
@@ -275,9 +528,9 @@ enum anyrtc_code anyrtc_translate_re_tls_key_type(
 }
 
 /*
- * Translate a certificate sign algorithm to the corresponding libre fingerprint algorithm.
+ * Translate a certificate sign algorithm to the corresponding re fingerprint algorithm.
  */
-enum anyrtc_code anyrtc_translate_certificate_sign_algorithm(
+enum anyrtc_code anyrtc_certificate_sign_algorithm_to_tls_fingerprint(
         enum tls_fingerprint* const fingerprintp, // de-referenced
         enum anyrtc_certificate_sign_algorithm const algorithm
 ) {
@@ -286,7 +539,7 @@ enum anyrtc_code anyrtc_translate_certificate_sign_algorithm(
             return ANYRTC_CODE_INVALID_ARGUMENT;
         case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384:
         case ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512:
-            // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to libre)
+            // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to re)
             return ANYRTC_CODE_UNSUPPORTED_ALGORITHM;
         default:
             break;
@@ -298,9 +551,9 @@ enum anyrtc_code anyrtc_translate_certificate_sign_algorithm(
 }
 
 /*
- * Translate a libre fingerprint algorithm to the corresponding anyrtc algorithm.
+ * Translate a re fingerprint algorithm to the corresponding anyrtc algorithm.
  */
-enum anyrtc_code anyrtc_translate_re_tls_fingerprint(
+enum anyrtc_code anyrtc_tls_fingerprint_to_certificate_sign_algorithm(
         enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
         enum tls_fingerprint re_algorithm
 ) {
@@ -321,6 +574,60 @@ enum anyrtc_code anyrtc_translate_re_tls_fingerprint(
         default:
             return ANYRTC_CODE_INVALID_ARGUMENT;
     }
+}
+
+enum anyrtc_certificate_sign_algorithm const map_enum_certificate_sign_algorithm[] = {
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
+    ANYRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512,
+};
+
+char const * const map_str_certificate_sign_algorithm[] = {
+    "none",
+    "sha-1",
+    "sha-256",
+    "sha-384",
+    "sha-512",
+};
+
+size_t const map_certificate_sign_algorithm_length =
+        sizeof(map_enum_certificate_sign_algorithm) / sizeof(map_enum_certificate_sign_algorithm[0]);
+
+/*
+ * Translate a certificate sign algorithm to str.
+ */
+char const * anyrtc_certificate_sign_algorithm_to_str(
+        enum anyrtc_certificate_sign_algorithm const algorithm
+) {
+    for (size_t i = 0; i < map_certificate_sign_algorithm_length; ++i) {
+        if (map_enum_certificate_sign_algorithm[i] == algorithm) {
+            return map_str_certificate_sign_algorithm[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to a certificate sign algorithm (case-insensitive).
+ */
+enum anyrtc_code anyrtc_str_to_certificate_sign_algorithm(
+        enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
+        char const* const str
+) {
+    // Check arguments
+    if (!algorithmp || !str) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (size_t i = 0; i < map_certificate_sign_algorithm_length; ++i) {
+        if (str_casecmp(map_str_certificate_sign_algorithm[i], str) == 0) {
+            *algorithmp = map_enum_certificate_sign_algorithm[i];
+        }
+    }
+
+    return ANYRTC_CODE_NO_VALUE;
 }
 
 /*
@@ -375,7 +682,7 @@ enum anyrtc_code anyrtc_strdup(
         char const * const source
 ) {
     int err = str_dup(destination, source);
-    return anyrtc_translate_re_code(err);
+    return anyrtc_error_to_code(err);
 }
 
 enum anyrtc_code anyrtc_snprintf(
@@ -394,7 +701,7 @@ enum anyrtc_code anyrtc_snprintf(
         case -1:
             return ANYRTC_CODE_INVALID_ARGUMENT;
         default:
-            return anyrtc_translate_re_code(err);
+            return anyrtc_error_to_code(err);
     }
 }
 
@@ -407,6 +714,6 @@ enum anyrtc_code anyrtc_sdprintf(
     va_start(args, formatter);
     int err = re_vsdprintf(destinationp, formatter, args);
     va_end(args);
-    return anyrtc_translate_re_code(err);
+    return anyrtc_error_to_code(err);
 }
 

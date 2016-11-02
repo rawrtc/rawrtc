@@ -338,7 +338,7 @@ enum anyrtc_code anyrtc_ice_candidate_get_protocol(
         default:
             return ANYRTC_CODE_INVALID_STATE;
     }
-    return anyrtc_translate_ipproto(ipproto, protocolp);
+    return anyrtc_ipproto_to_ice_protocol(ipproto, protocolp);
 }
 
 /*
@@ -387,10 +387,10 @@ enum anyrtc_code anyrtc_ice_candidate_get_type(
             *typep = candidate->candidate.raw_candidate->type;
             return ANYRTC_CODE_SUCCESS;
         case ANYRTC_ICE_CANDIDATE_STORAGE_LCAND:
-            return anyrtc_translate_re_ice_cand_type(
+            return anyrtc_ice_cand_type_to_ice_candidate_type(
                     typep, candidate->candidate.local_candidate->attr.type);
         case ANYRTC_ICE_CANDIDATE_STORAGE_RCAND:
-            return anyrtc_translate_re_ice_cand_type(
+            return anyrtc_ice_cand_type_to_ice_candidate_type(
                     typep, candidate->candidate.remote_candidate->attr.type);
         default:
             return ANYRTC_CODE_INVALID_STATE;
@@ -429,7 +429,7 @@ enum anyrtc_code anyrtc_ice_candidate_get_tcp_type(
 
     // Set type from re candidate if TCP
     if (re_candidate->proto == IPPROTO_TCP) {
-        return anyrtc_translate_re_ice_tcptype(typep, re_candidate->tcptype);
+        return anyrtc_ice_tcptype_to_ice_tcp_candidate_type(typep, re_candidate->tcptype);
     } else {
         return ANYRTC_CODE_NO_VALUE;
     }

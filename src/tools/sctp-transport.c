@@ -294,7 +294,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
-    EOE(anyrtc_translate_re_code(re_main(signal_handler)));
+    EOE(anyrtc_error_to_code(re_main(signal_handler)));
 
     // Stop clients
     client_stop(&a);

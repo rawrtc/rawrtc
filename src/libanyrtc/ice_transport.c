@@ -236,8 +236,8 @@ enum anyrtc_code anyrtc_ice_transport_start(
     }
 
     // Set role (abort if unknown or something entirely weird)
-    translated_role = anyrtc_translate_ice_role(role);
-    error = anyrtc_translate_re_code(trice_set_role(transport->gatherer->ice, translated_role));
+    translated_role = anyrtc_ice_role_to_trice_role(role);
+    error = anyrtc_error_to_code(trice_set_role(transport->gatherer->ice, translated_role));
     if (error) {
         return error;
     }
@@ -245,12 +245,12 @@ enum anyrtc_code anyrtc_ice_transport_start(
     // New/first remote parameters?
     if (transport->remote_parameters != remote_parameters) {
         // Apply username fragment and password on trice
-        error = anyrtc_translate_re_code(trice_set_remote_ufrag(
+        error = anyrtc_error_to_code(trice_set_remote_ufrag(
                 transport->gatherer->ice, remote_parameters->username_fragment));
         if (error) {
             return error;
         }
-        error = anyrtc_translate_re_code(trice_set_remote_pwd(
+        error = anyrtc_error_to_code(trice_set_remote_pwd(
                 transport->gatherer->ice, remote_parameters->password));
         if (error) {
             return error;
@@ -273,7 +273,7 @@ enum anyrtc_code anyrtc_ice_transport_start(
     // TODO: Get config from struct
     // TODO: Why are there no keep-alive messages?
     // TODO: Set 'use_cand' properly
-    error = anyrtc_translate_re_code(trice_checklist_start(
+    error = anyrtc_error_to_code(trice_checklist_start(
             transport->gatherer->ice, NULL, anyrtc_default_config.pacing_interval, true,
             ice_established_handler, ice_failed_handler, transport));
     if (error) {
@@ -332,13 +332,13 @@ enum anyrtc_code anyrtc_ice_transport_get_role(
     }
 
     // Get libre role from ICE instance
-    error = anyrtc_translate_re_code(trice_get_role(transport->gatherer->ice, &re_role));
+    error = anyrtc_error_to_code(trice_get_role(transport->gatherer->ice, &re_role));
     if (error) {
         return error;
     }
 
     // Translate role
-    error = anyrtc_translate_re_trice_role(&role, re_role);
+    error = anyrtc_trice_role_to_ice_role(&role, re_role);
     if (error) {
         return error;
     }
@@ -400,7 +400,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     if (error) {
         goto out;
     }
-    error = anyrtc_translate_re_code(sa_set_str(&address, ip, port));
+    error = anyrtc_error_to_code(sa_set_str(&address, ip, port));
     if (error) {
         goto out;
     }
@@ -459,11 +459,11 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
 
     // Add remote candidate
     // TODO: Set correct component ID
-    error = anyrtc_translate_re_code(trice_rcand_add(
+    error = anyrtc_error_to_code(trice_rcand_add(
             &re_candidate, transport->gatherer->ice, 1, foundation,
-            anyrtc_translate_ice_protocol(protocol), priority, &address,
-            anyrtc_translate_ice_candidate_type(type),
-            anyrtc_translate_ice_tcp_candidate_type(tcp_type)));
+            anyrtc_ice_protocol_to_ipproto(protocol), priority, &address,
+            anyrtc_ice_candidate_type_to_ice_cand_type(type),
+            anyrtc_ice_tcp_candidate_type_to_ice_tcptype(tcp_type)));
     if (error) {
         goto out;
     }
@@ -473,7 +473,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     if (!error) {
         error = anyrtc_ice_candidate_get_related_port(candidate, &port);
         if (!error) {
-            error = anyrtc_translate_re_code(sa_set_str(
+            error = anyrtc_error_to_code(sa_set_str(
                     &re_candidate->attr.rel_addr, related_address, port));
             if (error) {
                 goto out;
@@ -510,6 +510,26 @@ enum anyrtc_code anyrtc_ice_transport_set_remote_candidates(
         struct anyrtc_ice_candidate* const candidates[], // referenced (each item)
         size_t const n_candidates
 ) {
-    // TODO: Implement
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    size_t i;
+    enum anyrtc_code error;
+
+    // Check arguments
+    if (!transport || !candidates) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // TODO: Our implementation is incorrect here, it should remove
+    //       previously added remote candidates and replace them. Fix this
+    //       once we can handle an ICE restart.
+
+    // Add each remote candidate
+    for (i = 0; i < n_candidates; ++i) {
+        error = anyrtc_ice_transport_add_remote_candidate(transport, candidates[i]);
+        if (error) {
+            return error;
+        }
+    }
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
 }

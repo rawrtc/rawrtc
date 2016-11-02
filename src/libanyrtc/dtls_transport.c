@@ -13,7 +13,7 @@
 /*
  * Embedded DH parameters in DER encoding (bits: 2048)
  */
-uint8_t anyrtc_default_dh_parameters[] = {
+uint8_t const anyrtc_default_dh_parameters[] = {
     0x30, 0x82, 0x01, 0x08, 0x02, 0x82, 0x01, 0x01, 0x00, 0xaa, 0x4c, 0x1f,
     0x1e, 0xc9, 0xed, 0xfe, 0x5c, 0x50, 0x2d, 0xff, 0xf4, 0x95, 0xf4, 0x80,
     0x69, 0xcf, 0xc3, 0x84, 0x29, 0x87, 0xd5, 0x2c, 0x4f, 0xf6, 0x9e, 0x88,
@@ -210,7 +210,7 @@ static void verify_certificate(
 
     // Verify the peer's certificate
     // TODO: Fix this. Testing the fingerprint alone is okay for now though.
-//    error = anyrtc_translate_re_code(tls_peer_verify(transport->connection));
+//    error = anyrtc_error_to_code(tls_peer_verify(transport->connection));
 //    if (error) {
 //        goto out;
 //    }
@@ -223,7 +223,8 @@ static void verify_certificate(
         size_t length;
 
         // Get algorithm
-        error = anyrtc_translate_certificate_sign_algorithm(&algorithm, fingerprint->algorithm);
+        error = anyrtc_certificate_sign_algorithm_to_tls_fingerprint(
+                &algorithm, fingerprint->algorithm);
         if (error) {
             if (error == ANYRTC_CODE_UNSUPPORTED_ALGORITHM) {
                 continue;
@@ -246,7 +247,7 @@ static void verify_certificate(
             DEBUG_WARNING("Hex-encoded fingerprint exceeds buffer size!\n");
             continue;
         }
-        err = anyrtc_translate_re_code(str_hex(
+        err = anyrtc_error_to_code(str_hex(
                 expected_fingerprint, length, fingerprint->value));
         if (err) {
             DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %m\n", err);
@@ -254,7 +255,7 @@ static void verify_certificate(
         }
 
         // Get remote fingerprint
-        error = anyrtc_translate_re_code(tls_peer_fingerprint(
+        error = anyrtc_error_to_code(tls_peer_fingerprint(
                 transport->connection, algorithm, actual_fingerprint, sizeof(actual_fingerprint)));
         if (error) {
             goto out;
@@ -374,7 +375,7 @@ static enum anyrtc_code do_connect(
 ) {
     // Connect
     DEBUG_PRINTF("Starting DTLS connection to %J\n", peer);
-    return anyrtc_translate_re_code(dtls_connect(
+    return anyrtc_error_to_code(dtls_connect(
             &transport->connection, transport->context, transport->socket, peer,
             establish_handler, dtls_receive_handler, close_handler, transport));
 }
@@ -570,7 +571,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
     // Create (D)TLS context
     DEBUG_PRINTF("Creating DTLS context\n");
-    error = anyrtc_translate_re_code(tls_alloc(&transport->context, TLS_METHOD_DTLS, NULL, NULL));
+    error = anyrtc_error_to_code(tls_alloc(&transport->context, TLS_METHOD_DTLS, NULL, NULL));
     if (error) {
         goto out;
     }
@@ -586,8 +587,8 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
     // Set certificate
     DEBUG_PRINTF("Setting certificate on DTLS context\n");
-    error = anyrtc_translate_re_code(tls_set_certificate_der(
-            transport->context, anyrtc_translate_certificate_key_type(certificate->key_type),
+    error = anyrtc_error_to_code(tls_set_certificate_der(
+            transport->context, anyrtc_certificate_key_type_to_tls_keytype(certificate->key_type),
             certificate_der, certificate_der_length, NULL, 0));
     mem_deref(certificate_der);
     if (error) {
@@ -597,7 +598,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     // Set Diffie-Hellman parameters
     // TODO: Get DH params from config
     DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
-    error = anyrtc_translate_re_code(tls_set_dh_params_der(transport->context,
+    error = anyrtc_error_to_code(tls_set_dh_params_der(transport->context,
             anyrtc_default_dh_parameters, anyrtc_default_dh_parameters_length));
     if (error) {
         goto out;
@@ -606,7 +607,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     // Set cipher suites
     // TODO: Get cipher suites from config
     DEBUG_PRINTF("Setting cipher suites on DTLS context\n");
-    error = anyrtc_translate_re_code(tls_set_ciphers(transport->context,
+    error = anyrtc_error_to_code(tls_set_ciphers(transport->context,
             anyrtc_default_dtls_cipher_suites, anyrtc_default_dtls_cipher_suites_length));
     if (error) {
         goto out;
@@ -617,7 +618,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
     // Create DTLS socket
     DEBUG_PRINTF("Creating DTLS socket\n");
-    error = anyrtc_translate_re_code(dtls_socketless(
+    error = anyrtc_error_to_code(dtls_socketless(
             &transport->socket, 1, connect_handler, send_handler, mtu_handler, transport));
     if (error) {
         goto out;

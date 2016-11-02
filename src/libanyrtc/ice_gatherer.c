@@ -271,7 +271,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     gatherer->ice_config.trace = true;
     gatherer->ice_config.ansi = true;
     gatherer->ice_config.enable_prflx = true;
-    error = anyrtc_translate_re_code(trice_alloc(
+    error = anyrtc_error_to_code(trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password));
     if (error) {
@@ -285,7 +285,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     gatherer->stun_config.rm = STUN_DEFAULT_RM;
     gatherer->stun_config.ti = STUN_DEFAULT_TI;
     gatherer->stun_config.tos = 0x00;
-    error = anyrtc_translate_re_code(stun_alloc(
+    error = anyrtc_error_to_code(stun_alloc(
             &gatherer->stun, &gatherer->stun_config, NULL, NULL));
     if (error) {
         goto out;
@@ -519,7 +519,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
 }
 
 /*
- * Get local ICE parameters of a gatherer.
+ * Get local ICE parameters of an ICE gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
         struct anyrtc_ice_parameters** const parametersp, // de-referenced
@@ -541,16 +541,32 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
 }
 
 /*
- * Get local ICE candidates.
+ * Destructor for an existing ICE transport.
+ */
+static void anyrtc_ice_gatherer_local_candidates_destroy(
+        void* const arg
+) {
+    struct anyrtc_ice_candidates* const candidates = arg;
+    size_t i;
+
+    // Dereference each item
+    for (i = 0; i < candidates->n_candidates; ++i) {
+        mem_deref(candidates->candidates[i]);
+    }
+}
+
+/*
+ * Get local ICE candidates of an ICE gatherer.
  */
 enum anyrtc_code anyrtc_ice_gatherer_get_local_candidates(
-        struct anyrtc_ice_candidate*** const candidatesp, // de-referenced
-        size_t* const n_candidatesp, // de-referenced
+        struct anyrtc_ice_candidates** const candidatesp, // de-referenced
         struct anyrtc_ice_gatherer* const gatherer
 ) {
-    size_t n_candidates;
-    struct anyrtc_ice_candidate** candidates;
+    size_t n;
+    struct anyrtc_ice_candidates* candidates;
     struct le* le;
+    size_t i;
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
 
     // Check arguments
     if (!candidatesp || !gatherer) {
@@ -558,18 +574,27 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_candidates(
     }
 
     // Get length
-    n_candidates = list_count(trice_lcandl(gatherer->ice));
+    n = list_count(trice_lcandl(gatherer->ice));
 
-    // Allocate array
-    candidates = mem_zalloc(sizeof(struct anyrtc_ice_candidate*) * n_candidates,
-                            anyrtc_array_destroy);
+    // Allocate & set length immediately
+    candidates = mem_zalloc(
+            sizeof(struct anyrtc_ice_candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
+            anyrtc_ice_gatherer_local_candidates_destroy);
     if (!candidates) {
         return ANYRTC_CODE_NO_MEMORY;
     }
+    candidates->n_candidates = n;
 
-    // Copy internal candidates list
-    for (le = list_head(trice_lcandl(gatherer->ice)); le != NULL; le = le->next) {
-        // TODO
+    // Copy each ICE candidate
+    for (le = list_head(trice_lcandl(gatherer->ice)), i = 0; le != NULL; le = le->next, ++i) {
+        struct ice_lcand* re_candidate = le->data;
+
+        // Create ICE candidate
+        error = anyrtc_ice_candidate_create_from_local_candidate(
+                &candidates->candidates[i], re_candidate);
+        if (error) {
+            goto out;
+        }
     }
 
 out:
@@ -578,7 +603,6 @@ out:
     } else {
         // Set pointers
         *candidatesp = candidates;
-        *n_candidatesp = n_candidates;
     }
     return error;
 }
