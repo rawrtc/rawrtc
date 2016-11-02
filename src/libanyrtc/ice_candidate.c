@@ -232,8 +232,8 @@ enum anyrtc_code anyrtc_ice_candidate_create_from_remote_candidate(
  * unreferenced.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_foundation(
-        struct anyrtc_ice_candidate* const candidate,
-        char** const foundationp // de-referenced
+        char** const foundationp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     // Check arguments
     if (!candidate || !foundationp) {
@@ -259,8 +259,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_foundation(
  * Get the ICE candidate's priority.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_priority(
-        struct anyrtc_ice_candidate* const candidate,
-        uint32_t* const priorityp // de-referenced
+        uint32_t* const priorityp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     // Check arguments
     if (!candidate || !priorityp) {
@@ -289,8 +289,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_priority(
  * unreferenced.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_ip(
-        struct anyrtc_ice_candidate* const candidate,
-        char** const ipp // de-referenced
+        char** const ipp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     // Check arguments
     if (!candidate || !ipp) {
@@ -314,8 +314,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_ip(
  * Get the ICE candidate's protocol.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_protocol(
-        struct anyrtc_ice_candidate* const candidate,
-        enum anyrtc_ice_protocol* const protocolp // de-referenced
+        enum anyrtc_ice_protocol* const protocolp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     int ipproto;
 
@@ -345,8 +345,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_protocol(
  * Get the ICE candidate's port.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_port(
-        struct anyrtc_ice_candidate* const candidate,
-        uint16_t* const portp // de-referenced
+        uint16_t* const portp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     // Check arguments
     if (!candidate || !portp) {
@@ -373,8 +373,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_port(
  * Get the ICE candidate's type.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_type(
-        struct anyrtc_ice_candidate* const candidate,
-        enum anyrtc_ice_candidate_type* typep // de-referenced
+        enum anyrtc_ice_candidate_type* typep, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     // Check arguments
     if (!candidate || !typep) {
@@ -402,8 +402,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_type(
  * Return `ANYRTC_CODE_NO_VALUE` in case the protocol is not TCP.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_tcp_type(
-        struct anyrtc_ice_candidate* const candidate,
-        enum anyrtc_ice_tcp_candidate_type* typep // de-referenced
+        enum anyrtc_ice_tcp_candidate_type* typep, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     struct ice_cand_attr* re_candidate;
 
@@ -443,8 +443,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_tcp_type(
  * Return `ANYRTC_CODE_NO_VALUE` in case no related address exists.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_related_address(
-        struct anyrtc_ice_candidate* const candidate,
-        char** const related_addressp // de-referenced
+        char** const related_addressp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     struct ice_cand_attr* re_candidate = NULL;
 
@@ -488,8 +488,8 @@ enum anyrtc_code anyrtc_ice_candidate_get_related_address(
  * Return `ANYRTC_CODE_NO_VALUE` in case no related port exists.
  */
 enum anyrtc_code anyrtc_ice_candidate_get_related_port(
-        struct anyrtc_ice_candidate* const candidate,
-        uint16_t* const related_portp // de-referenced
+        uint16_t* const related_portp, // de-referenced
+        struct anyrtc_ice_candidate* const candidate
 ) {
     struct ice_cand_attr* re_candidate = NULL;
 

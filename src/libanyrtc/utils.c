@@ -101,8 +101,8 @@ int anyrtc_ice_protocol_to_ipproto(
  * Translate a IPPROTO_* to the corresponding protocol.
  */
 enum anyrtc_code anyrtc_ipproto_to_ice_protocol(
-        int const ipproto,
-        enum anyrtc_ice_protocol* const protocolp // de-referenced
+        enum anyrtc_ice_protocol* const protocolp, // de-referenced
+        int const ipproto
 ) {
     // Check arguments
     if (!protocolp) {
