@@ -86,8 +86,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Check if another SCTP transport is associated to the DTLS transport
-    if (dtls_transport->sctp_transport) {
+    // Check if a redirect or SCTP transport is associated to the DTLS transport
+    if (dtls_transport->redirect_transport || dtls_transport->sctp_transport) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 

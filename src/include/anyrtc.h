@@ -539,7 +539,17 @@ struct anyrtc_dtls_transport {
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
+    struct anyrtc_redirect_transport* redirect_transport;
     struct anyrtc_sctp_transport* sctp_transport;
+};
+
+/*
+ * Redirect transport.
+ */
+struct anyrtc_redirect_transport {
+    struct anyrtc_dtls_transport* dtls_transport; // referenced
+    struct sa address;
+    int socket;
 };
 
 /*
@@ -1119,6 +1129,16 @@ enum anyrtc_code anyrtc_data_channel_send(
  * anyrtc_data_channel_set_close_handler
  * anyrtc_data_channel_set_message_handler
  */
+
+/*
+ * Create a redirect transport.
+ */
+enum anyrtc_code anyrtc_redirect_transport_create(
+    struct anyrtc_redirect_transport** const transportp, // de-referenced
+    struct anyrtc_dtls_transport* const dtls_transport, // referenced
+    char* const ip, // copied
+    uint16_t const port
+);
 
 /*
  * Create an SCTP transport.
