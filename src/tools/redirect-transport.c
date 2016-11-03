@@ -578,9 +578,13 @@ static void client_set_dtls_parameters(
         EOR(odict_entry_add(array, key, ODICT_OBJECT, node));
 
         // Dereference values
+        mem_deref(key);
         mem_deref(value);
         mem_deref(node);
     }
+
+    // Dereference fingerprints
+    mem_deref(fingerprints);
 
     // Add array to object
     EOR(odict_entry_add(dict, "fingerprints", ODICT_ARRAY, array));

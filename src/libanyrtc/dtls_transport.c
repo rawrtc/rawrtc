@@ -150,9 +150,10 @@ static void close_handler(
     if (!is_closed(transport)) {
         DEBUG_INFO("DTLS connection closed, reason: %m\n", err);
 
-        // Set state
-        // TODO: What about normal close?
-        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+        // Set to failed if not closed normally
+        if (err != ECONNRESET) {
+            set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+        }
 
         // Stop
         error = anyrtc_dtls_transport_stop(transport);
