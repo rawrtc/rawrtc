@@ -1,6 +1,5 @@
 #include <anyrtc.h>
 #include "dtls_parameters.h"
-#include "utils.h"
 
 /*
  * Destructor for an existing DTLS fingerprint instance.
@@ -202,4 +201,21 @@ out:
         *parametersp = parameters;
     }
     return error;
+}
+
+/*
+ * Get the DTLS parameter's role value.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_get_role(
+        enum anyrtc_dtls_role* rolep, // de-referenced
+        struct anyrtc_dtls_parameters* const parameters
+) {
+    // Check arguments
+    if (!rolep || !parameters) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set value
+    *rolep = parameters->role;
+    return ANYRTC_CODE_SUCCESS;
 }

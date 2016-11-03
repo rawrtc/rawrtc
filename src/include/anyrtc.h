@@ -981,8 +981,15 @@ enum anyrtc_code anyrtc_dtls_parameters_create(
 );
 
 /*
+ * Get the DTLS parameter's role value.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_get_role(
+    enum anyrtc_dtls_role* rolep, // de-referenced
+    struct anyrtc_dtls_parameters* const parameters
+);
+
+/*
  * TODO
- * anyrtc_dtls_parameters_get_role
  * anyrtc_dtls_parameters_get_fingerprints
  */
 
