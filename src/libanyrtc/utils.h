@@ -60,21 +60,3 @@ enum anyrtc_code anyrtc_get_sign_algorithm_length(
     size_t* const sizep, // de-referenced
     enum anyrtc_certificate_sign_algorithm const type
 );
-
-enum anyrtc_code anyrtc_strdup(
-    char** const destination,
-    char const * const source
-);
-
-enum anyrtc_code anyrtc_snprintf(
-    char* const destination,
-    size_t const size,
-    char* const formatter,
-    ...
-);
-
-enum anyrtc_code anyrtc_sdprintf(
-    char** const destinationp,
-    char* const formatter,
-    ...
-);

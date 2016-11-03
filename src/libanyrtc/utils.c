@@ -677,6 +677,9 @@ enum anyrtc_code anyrtc_get_sign_algorithm_length(
     return ANYRTC_CODE_SUCCESS;
 }
 
+/*
+ * Duplicate a string.
+ */
 enum anyrtc_code anyrtc_strdup(
         char** const destination,
         char const * const source
@@ -685,6 +688,9 @@ enum anyrtc_code anyrtc_strdup(
     return anyrtc_error_to_code(err);
 }
 
+/*
+ * Print a formatted string to a buffer.
+ */
 enum anyrtc_code anyrtc_snprintf(
         char* const destination,
         size_t const size,
@@ -705,6 +711,9 @@ enum anyrtc_code anyrtc_snprintf(
     }
 }
 
+/*
+ * Print a formatted string to a dynamically allocated buffer.
+ */
 enum anyrtc_code anyrtc_sdprintf(
         char** const destinationp,
         char* const formatter,

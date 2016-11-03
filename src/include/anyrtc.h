@@ -750,11 +750,30 @@ enum anyrtc_code anyrtc_ice_parameters_create(
 );
 
 /*
- * TODO
- * anyrtc_ice_parameters_get_username_fragment
- * anyrtc_ice_parameters_get_password
- * anyrtc_ice_parameters_get_ice_lite
+ * Get the ICE parameter's username fragment value.
+ * `*username_fragmentp` must be unreferenced.
  */
+enum anyrtc_code anyrtc_ice_parameters_get_username_fragment(
+    char** const username_fragmentp, // de-referenced
+    struct anyrtc_ice_parameters* const parameters
+);
+
+/*
+ * Get the ICE parameter's password value.
+ * `*passwordp` must be unreferenced.
+ */
+enum anyrtc_code anyrtc_ice_parameters_get_password(
+    char** const passwordp, // de-referenced
+    struct anyrtc_ice_parameters* const parameters
+);
+
+/*
+ * Get the ICE parameter's ICE lite value.
+ */
+enum anyrtc_code anyrtc_ice_parameters_get_ice_lite(
+    bool* const ice_litep, // de-referenced
+    struct anyrtc_ice_parameters* const parameters
+);
 
 /*
  * Create a new ICE gather options.
@@ -1224,4 +1243,33 @@ char const * anyrtc_certificate_sign_algorithm_to_str(
 enum anyrtc_code anyrtc_str_to_certificate_sign_algorithm(
     enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
     char const* const str
+);
+
+
+
+/*
+ * Duplicate a string.
+ */
+enum anyrtc_code anyrtc_strdup(
+    char** const destination,
+    char const * const source
+);
+
+/*
+ * Print a formatted string to a buffer.
+ */
+enum anyrtc_code anyrtc_snprintf(
+    char* const destination,
+    size_t const size,
+    char* const formatter,
+    ...
+);
+
+/*
+ * Print a formatted string to a dynamically allocated buffer.
+ */
+enum anyrtc_code anyrtc_sdprintf(
+    char** const destinationp,
+    char* const formatter,
+    ...
 );
