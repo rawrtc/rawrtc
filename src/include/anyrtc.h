@@ -516,7 +516,7 @@ struct anyrtc_dtls_fingerprint {
  */
 struct anyrtc_dtls_parameters {
     enum anyrtc_dtls_role role;
-    struct list fingerprints;
+    struct anyrtc_dtls_fingerprints* fingerprints;
 };
 
 /*
@@ -921,7 +921,7 @@ enum anyrtc_code anyrtc_ice_transport_get_role(
 );
 
 /*
- * anyrtc_ice_transport_get_role
+ * TODO
  * anyrtc_ice_transport_get_component
  * anyrtc_ice_transport_get_state
  * anyrtc_ice_transport_get_remote_candidates
@@ -989,10 +989,34 @@ enum anyrtc_code anyrtc_dtls_parameters_get_role(
 );
 
 /*
- * TODO
- * anyrtc_dtls_parameters_get_fingerprints
+ * Get the DTLS parameter's fingerprint array.
+ * `*fingerprintsp` must be unreferenced.
  */
+enum anyrtc_code anyrtc_dtls_parameters_get_fingerprints(
+    struct anyrtc_dtls_fingerprints** const fingerprintsp, // de-referenced
+    struct anyrtc_dtls_parameters* const parameters
+);
 
+/*
+ * Get the DTLS certificate fingerprint's sign algorithm.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_fingerprint_get_sign_algorithm(
+    enum anyrtc_certificate_sign_algorithm* const sign_algorithmp, // de-referenced
+    struct anyrtc_dtls_fingerprint* const fingerprint
+);
+
+/*
+ * Get the DTLS certificate's fingerprint value.
+ * `*valuep` must be unreferenced.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_fingerprint_get_value(
+    char** const valuep, // de-referenced
+    struct anyrtc_dtls_fingerprint* const fingerprint
+);
+
+/*
+* Get the corresponding name for an ICE transport state.
+*/
 char const * const anyrtc_dtls_transport_state_to_name(
     enum anyrtc_dtls_transport_state const state
 );

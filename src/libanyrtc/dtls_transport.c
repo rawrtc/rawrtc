@@ -200,9 +200,9 @@ static void dtls_receive_handler(
 static void verify_certificate(
         struct anyrtc_dtls_transport* const transport // not checked
 ) {
+    size_t i;
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
     bool valid = false;
-    struct le* le;
     enum tls_fingerprint algorithm;
     int err;
     uint8_t expected_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
@@ -218,8 +218,9 @@ static void verify_certificate(
 
     // Check if any of the fingerprints provided matches
     // TODO: Is this correct?
-    for (le = list_head(&transport->remote_parameters->fingerprints); le != NULL; le = le->next) {
-        struct anyrtc_dtls_fingerprint* const fingerprint = le->data;
+    for (i = 0; i < transport->remote_parameters->fingerprints->n_fingerprints; ++i) {
+        struct anyrtc_dtls_fingerprint* const fingerprint =
+                transport->remote_parameters->fingerprints->fingerprints[i];
         size_t length;
 
         // Get algorithm
@@ -558,6 +559,12 @@ enum anyrtc_code anyrtc_dtls_transport_create(
 
     // Append and reference certificates
     for (i = 0; i < n_certificates; ++i) {
+        // Null?
+        if (certificates[i] == NULL) {
+            error = ANYRTC_CODE_INVALID_ARGUMENT;
+            goto out;
+        }
+
         // Copy certificate
         // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
         error = anyrtc_certificate_copy(&certificate, certificates[i]);
@@ -735,7 +742,7 @@ enum anyrtc_code anyrtc_dtls_transport_start(
     }
 
     // Validate parameters
-    if (!list_head(&remote_parameters->fingerprints)) {
+    if (remote_parameters->fingerprints->n_fingerprints < 1) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 

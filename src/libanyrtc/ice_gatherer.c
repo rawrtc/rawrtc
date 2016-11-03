@@ -541,7 +541,7 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_parameters(
 }
 
 /*
- * Destructor for an existing ICE transport.
+ * Destructor for an existing local candidates array.
  */
 static void anyrtc_ice_gatherer_local_candidates_destroy(
         void* const arg

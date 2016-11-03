@@ -133,7 +133,7 @@ enum anyrtc_code anyrtc_ice_candidate_create(
     enum anyrtc_code error;
 
     // Check arguments
-    if (!candidatep || !foundation || !ip || !related_address) {
+    if (!candidatep || !foundation || !ip) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -338,7 +338,7 @@ enum anyrtc_code anyrtc_ice_candidate_get_protocol(
         default:
             return ANYRTC_CODE_INVALID_STATE;
     }
-    return anyrtc_ipproto_to_ice_protocol(ipproto, protocolp);
+    return anyrtc_ipproto_to_ice_protocol(protocolp, ipproto);
 }
 
 /*

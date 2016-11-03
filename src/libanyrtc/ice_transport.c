@@ -392,11 +392,11 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     }
 
     // Get IP and port
-    error = anyrtc_ice_candidate_get_ip(candidate, &ip);
+    error = anyrtc_ice_candidate_get_ip(&ip, candidate);
     if (error) {
         goto out;
     }
-    error = anyrtc_ice_candidate_get_port(candidate, &port);
+    error = anyrtc_ice_candidate_get_port(&port, candidate);
     if (error) {
         goto out;
     }
@@ -415,7 +415,7 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     }
 
     // Get protocol
-    error = anyrtc_ice_candidate_get_protocol(candidate, &protocol);
+    error = anyrtc_ice_candidate_get_protocol(&protocol, candidate);
     if (error) {
         goto out;
     }
@@ -429,23 +429,23 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     }
 
     // Get necessary vars
-    error = anyrtc_ice_candidate_get_foundation(candidate, &foundation);
+    error = anyrtc_ice_candidate_get_foundation(&foundation, candidate);
     if (error) {
         goto out;
     }
-    error = anyrtc_ice_candidate_get_protocol(candidate, &protocol);
+    error = anyrtc_ice_candidate_get_protocol(&protocol, candidate);
     if (error) {
         goto out;
     }
-    error = anyrtc_ice_candidate_get_priority(candidate, &priority);
+    error = anyrtc_ice_candidate_get_priority(&priority, candidate);
     if (error) {
         goto out;
     }
-    error = anyrtc_ice_candidate_get_type(candidate, &type);
+    error = anyrtc_ice_candidate_get_type(&type, candidate);
     if (error) {
         goto out;
     }
-    error = anyrtc_ice_candidate_get_tcp_type(candidate, &tcp_type);
+    error = anyrtc_ice_candidate_get_tcp_type(&tcp_type, candidate);
     switch (error) {
         case ANYRTC_CODE_SUCCESS:
             break;
@@ -469,9 +469,9 @@ enum anyrtc_code anyrtc_ice_transport_add_remote_candidate(
     }
 
     // Set related address (if any)
-    error = anyrtc_ice_candidate_get_related_address(candidate, &related_address);
+    error = anyrtc_ice_candidate_get_related_address(&related_address, candidate);
     if (!error) {
-        error = anyrtc_ice_candidate_get_related_port(candidate, &port);
+        error = anyrtc_ice_candidate_get_related_port(&port, candidate);
         if (!error) {
             error = anyrtc_error_to_code(sa_set_str(
                     &re_candidate->attr.rel_addr, related_address, port));

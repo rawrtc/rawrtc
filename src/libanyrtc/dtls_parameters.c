@@ -74,6 +74,21 @@ enum anyrtc_code anyrtc_dtls_fingerprint_create_empty(
 }
 
 /*
+ * Destructor for an existing DTLS parameter's fingerprints instance.
+ */
+static void anyrtc_dtls_parameters_fingerprints_destroy(
+        void* const arg
+) {
+    struct anyrtc_dtls_fingerprints* const fingerprints = arg;
+    size_t i;
+
+    // Dereference each item
+    for (i = 0; i < fingerprints->n_fingerprints; ++i) {
+        mem_deref(fingerprints->fingerprints[i]);
+    }
+}
+
+/*
  * Destructor for an existing DTLS parameters instance.
  */
 static void anyrtc_dtls_parameters_destroy(
@@ -82,29 +97,22 @@ static void anyrtc_dtls_parameters_destroy(
     struct anyrtc_dtls_parameters* const parameters = arg;
 
     // Dereference
-    list_flush(&parameters->fingerprints);
+    mem_deref(parameters->fingerprints);
 }
 
 /*
- * Create a new DTLS parameters instance.
+ * Common code to allocate a DTLS parameters instance.
  */
-enum anyrtc_code anyrtc_dtls_parameters_create(
+static enum anyrtc_code anyrtc_dtls_parameters_allocate(
         struct anyrtc_dtls_parameters** const parametersp, // de-referenced
         enum anyrtc_dtls_role const role,
-        struct anyrtc_dtls_fingerprint* const fingerprints[], // copied (each item)
         size_t const n_fingerprints
 ) {
-    struct anyrtc_dtls_parameters* parameters;
-    size_t i;
-    struct anyrtc_dtls_fingerprint* fingerprint;
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    struct anyrtc_dtls_parameters* parameters;
+    size_t fingerprints_size;
 
-    // Check arguments
-    if (!parametersp || !role || !fingerprints || n_fingerprints < 1) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Allocate
+    // Allocate parameters
     parameters = mem_zalloc(sizeof(struct anyrtc_dtls_parameters), anyrtc_dtls_parameters_destroy);
     if (!parameters) {
         return ANYRTC_CODE_NO_MEMORY;
@@ -113,24 +121,67 @@ enum anyrtc_code anyrtc_dtls_parameters_create(
     // Set role
     parameters->role = role;
 
-    // Copy and append each fingerprint
+    // Allocate fingerprints array & set length immediately
+    fingerprints_size = sizeof(struct anyrtc_dtls_fingerprint*) * n_fingerprints;
+    parameters->fingerprints = mem_zalloc(
+            sizeof(struct anyrtc_dtls_fingerprints) + fingerprints_size,
+            anyrtc_dtls_parameters_fingerprints_destroy);
+    if (!parameters->fingerprints) {
+        error = ANYRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+    parameters->fingerprints->n_fingerprints = n_fingerprints;
+
+out:
+    if (error) {
+        mem_deref(parameters);
+    } else {
+        // Set pointer
+        *parametersp = parameters;
+    }
+    return error;
+}
+
+/*
+ * Create a new DTLS parameters instance.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_create(
+        struct anyrtc_dtls_parameters** const parametersp, // de-referenced
+        enum anyrtc_dtls_role const role,
+        struct anyrtc_dtls_fingerprint* const fingerprints[], // referenced (each item)
+        size_t const n_fingerprints
+) {
+    struct anyrtc_dtls_parameters* parameters;
+    size_t i;
+    enum anyrtc_code error;
+
+    // Check arguments
+    if (!parametersp || !fingerprints || n_fingerprints < 1) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Create parameters
+    error = anyrtc_dtls_parameters_allocate(&parameters, role, n_fingerprints);
+    if (error) {
+        goto out;
+    }
+
+    // Reference and set each fingerprint
     for (i = 0; i < n_fingerprints; ++i) {
+        // Null?
+        if (fingerprints[i] == NULL) {
+            error = ANYRTC_CODE_INVALID_ARGUMENT;
+            goto out;
+        }
+
         // Check algorithm
         if (fingerprints[i]->algorithm == ANYRTC_CERTIFICATE_SIGN_ALGORITHM_NONE) {
             error = ANYRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }
 
-        // Copy fingerprint
-        // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
-        error = anyrtc_dtls_fingerprint_create(
-                &fingerprint, fingerprints[i]->algorithm, fingerprints[i]->value);
-        if (error) {
-            goto out;
-        }
-
-        // Append to list
-        list_append(&parameters->fingerprints, &fingerprint->le, fingerprint);
+        // Reference and set fingerprint
+        parameters->fingerprints->fingerprints[i] = mem_ref(fingerprints[i]);
     }
 
 out:
@@ -152,27 +203,28 @@ enum anyrtc_code anyrtc_dtls_parameters_create_internal(
         enum anyrtc_dtls_role const role,
         struct list* const fingerprints
 ) {
-    struct le* le;
+    size_t n_fingerprints;
     struct anyrtc_dtls_parameters* parameters;
-    struct anyrtc_dtls_fingerprint* copied_fingerprint;
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum anyrtc_code error;
+    struct le* le;
+    size_t i;
 
     // Check arguments
     if (!parametersp || !fingerprints) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Allocate
-    parameters = mem_zalloc(sizeof(struct anyrtc_dtls_parameters), anyrtc_dtls_parameters_destroy);
-    if (!parameters) {
-        return ANYRTC_CODE_NO_MEMORY;
+    // Get fingerprints length
+    n_fingerprints = list_count(fingerprints);
+
+    // Create parameters
+    error = anyrtc_dtls_parameters_allocate(&parameters, role, n_fingerprints);
+    if (error) {
+        goto out;
     }
 
-    // Set role
-    parameters->role = role;
-
-    // Copy and append each fingerprint
-    for (le = list_head(fingerprints); le != NULL; le = le->next) {
+    // Reference and set each fingerprint
+    for (le = list_head(fingerprints), i = 0; le != NULL; le = le->next, ++i) {
         struct anyrtc_dtls_fingerprint* const fingerprint = le->data;
 
         // Check algorithm
@@ -181,16 +233,8 @@ enum anyrtc_code anyrtc_dtls_parameters_create_internal(
             goto out;
         }
 
-        // Copy fingerprint
-        // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
-        error = anyrtc_dtls_fingerprint_create(
-                &copied_fingerprint, fingerprint->algorithm, fingerprint->value);
-        if (error) {
-            goto out;
-        }
-
-        // Append to list
-        list_append(&parameters->fingerprints, &copied_fingerprint->le, copied_fingerprint);
+        // Reference and set fingerprint
+        parameters->fingerprints->fingerprints[i] = mem_ref(fingerprint);
     }
 
 out:
@@ -217,5 +261,58 @@ enum anyrtc_code anyrtc_dtls_parameters_get_role(
 
     // Set value
     *rolep = parameters->role;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the DTLS parameter's fingerprint array.
+ * `*fingerprintsp` must be unreferenced.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_get_fingerprints(
+        struct anyrtc_dtls_fingerprints** const fingerprintsp, // de-referenced
+        struct anyrtc_dtls_parameters* const parameters
+) {
+    // Check arguments
+    if (!fingerprintsp || !parameters) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set pointer (and reference)
+    *fingerprintsp = mem_ref(parameters->fingerprints);
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the DTLS certificate fingerprint's sign algorithm.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_fingerprint_get_sign_algorithm(
+        enum anyrtc_certificate_sign_algorithm* const sign_algorithmp, // de-referenced
+        struct anyrtc_dtls_fingerprint* const fingerprint
+) {
+    // Check arguments
+    if (!sign_algorithmp || !fingerprint) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set sign algorithm
+    *sign_algorithmp = fingerprint->algorithm;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the DTLS certificate's fingerprint value.
+ * `*valuep` must be unreferenced.
+ */
+enum anyrtc_code anyrtc_dtls_parameters_fingerprint_get_value(
+        char** const valuep, // de-referenced
+        struct anyrtc_dtls_fingerprint* const fingerprint
+) {
+    // Check arguments
+    if (!valuep || !fingerprint) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set value
+    *valuep = mem_ref(fingerprint->value);
     return ANYRTC_CODE_SUCCESS;
 }

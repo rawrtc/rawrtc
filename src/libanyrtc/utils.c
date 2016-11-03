@@ -141,7 +141,9 @@ size_t const map_ice_protocol_length =
 char const * anyrtc_ice_protocol_to_str(
         enum anyrtc_ice_protocol const protocol
 ) {
-    for (size_t i = 0; i < map_ice_protocol_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_ice_protocol_length; ++i) {
         if (map_enum_ice_protocol[i] == protocol) {
             return map_str_ice_protocol[i];
         }
@@ -157,14 +159,17 @@ enum anyrtc_code anyrtc_str_to_ice_protocol(
         enum anyrtc_ice_protocol* const protocolp, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!protocolp || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_ice_protocol_length; ++i) {
+    for (i = 0; i < map_ice_protocol_length; ++i) {
         if (str_casecmp(map_str_ice_protocol[i], str) == 0) {
             *protocolp = map_enum_ice_protocol[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
@@ -235,7 +240,9 @@ size_t const map_ice_candidate_type_length =
 char const * anyrtc_ice_candidate_type_to_str(
         enum anyrtc_ice_candidate_type const type
 ) {
-    for (size_t i = 0; i < map_ice_candidate_type_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_ice_candidate_type_length; ++i) {
         if (map_enum_ice_candidate_type[i] == type) {
             return map_str_ice_candidate_type[i];
         }
@@ -251,14 +258,17 @@ enum anyrtc_code anyrtc_str_to_ice_candidate_type(
         enum anyrtc_ice_candidate_type* const typep, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!typep || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_ice_candidate_type_length; ++i) {
+    for (i = 0; i < map_ice_candidate_type_length; ++i) {
         if (str_casecmp(map_str_ice_candidate_type[i], str) == 0) {
             *typep = map_enum_ice_candidate_type[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
@@ -324,7 +334,9 @@ size_t const map_ice_tcp_candidate_type_length =
 char const * anyrtc_ice_tcp_candidate_type_to_str(
         enum anyrtc_ice_tcp_candidate_type const type
 ) {
-    for (size_t i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
         if (map_enum_ice_tcp_candidate_type[i] == type) {
             return map_str_ice_tcp_candidate_type[i];
         }
@@ -340,14 +352,17 @@ enum anyrtc_code anyrtc_str_to_ice_tcp_candidate_type(
         enum anyrtc_ice_tcp_candidate_type* const typep, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!typep || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
+    for (i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
         if (str_casecmp(map_str_ice_tcp_candidate_type[i], str) == 0) {
             *typep = map_enum_ice_tcp_candidate_type[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
@@ -411,7 +426,9 @@ size_t const map_ice_role_length =
 char const * anyrtc_ice_role_to_str(
         enum anyrtc_ice_role const role
 ) {
-    for (size_t i = 0; i < map_ice_role_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_ice_role_length; ++i) {
         if (map_enum_ice_role[i] == role) {
             return map_str_ice_role[i];
         }
@@ -427,14 +444,17 @@ enum anyrtc_code anyrtc_str_to_ice_role(
         enum anyrtc_ice_role* const rolep, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!rolep || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_ice_role_length; ++i) {
+    for (i = 0; i < map_ice_role_length; ++i) {
         if (str_casecmp(map_str_ice_role[i], str) == 0) {
             *rolep = map_enum_ice_role[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
@@ -472,7 +492,9 @@ size_t const map_dtls_role_length =
 char const * anyrtc_dtls_role_to_str(
         enum anyrtc_dtls_role const role
 ) {
-    for (size_t i = 0; i < map_dtls_role_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_dtls_role_length; ++i) {
         if (map_enum_dtls_role[i] == role) {
             return map_str_dtls_role[i];
         }
@@ -488,14 +510,17 @@ enum anyrtc_code anyrtc_str_to_dtls_role(
         enum anyrtc_dtls_role* const rolep, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!rolep || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_dtls_role_length; ++i) {
+    for (i = 0; i < map_dtls_role_length; ++i) {
         if (str_casecmp(map_str_dtls_role[i], str) == 0) {
             *rolep = map_enum_dtls_role[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
@@ -584,7 +609,6 @@ enum anyrtc_certificate_sign_algorithm const map_enum_certificate_sign_algorithm
 };
 
 char const * const map_str_certificate_sign_algorithm[] = {
-    "none",
     "sha-1",
     "sha-256",
     "sha-384",
@@ -600,7 +624,9 @@ size_t const map_certificate_sign_algorithm_length =
 char const * anyrtc_certificate_sign_algorithm_to_str(
         enum anyrtc_certificate_sign_algorithm const algorithm
 ) {
-    for (size_t i = 0; i < map_certificate_sign_algorithm_length; ++i) {
+    size_t i;
+
+    for (i = 0; i < map_certificate_sign_algorithm_length; ++i) {
         if (map_enum_certificate_sign_algorithm[i] == algorithm) {
             return map_str_certificate_sign_algorithm[i];
         }
@@ -616,14 +642,17 @@ enum anyrtc_code anyrtc_str_to_certificate_sign_algorithm(
         enum anyrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
         char const* const str
 ) {
+    size_t i;
+
     // Check arguments
     if (!algorithmp || !str) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    for (size_t i = 0; i < map_certificate_sign_algorithm_length; ++i) {
+    for (i = 0; i < map_certificate_sign_algorithm_length; ++i) {
         if (str_casecmp(map_str_certificate_sign_algorithm[i], str) == 0) {
             *algorithmp = map_enum_certificate_sign_algorithm[i];
+            return ANYRTC_CODE_SUCCESS;
         }
     }
 
