@@ -9,6 +9,7 @@ set(anyrtc_SOURCES
         ice_parameters.c
         ice_transport.c
         main.c
+        message_buffer.c
         redirect_transport.c
         sctp_transport.c
         utils.c)

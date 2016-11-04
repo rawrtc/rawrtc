@@ -2,6 +2,7 @@
 #include <sys/socket.h> // AF_INET, SOCK_RAW
 #include <netinet/in.h> // IPPROTO_UDP
 #include <anyrtc.h>
+#include "dtls_transport.h"
 #include "redirect_transport.h"
 
 #define DEBUG_MODULE "redirect-transport"
@@ -9,13 +10,25 @@
 #include <re_dbg.h>
 
 /*
- * Handle incoming redirect messages.
+ * Handle incoming messages (that are sent out via the raw socket).
  */
-static void redirect_receive_handler(
-        int flags,
+static void receive_handler(
+        struct mbuf* const buffer,
         void* const arg
 ) {
-    struct anyrtc_dtls_transport* const transport = arg;
+    struct anyrtc_redirect_transport* const transport = arg;
+
+    // TODO: Send over raw socket
+}
+
+/*
+ * Handle outgoing messages (that came in from the raw socket).
+ */
+static void send_handler(
+        int flags,
+        void *const arg
+) {
+    struct anyrtc_redirect_transport* const transport = arg;
 
     // TODO: Read from fd
 
@@ -32,9 +45,8 @@ static void anyrtc_redirect_transport_destroy(
     struct anyrtc_redirect_transport* const transport = arg;
 
     // Remove from DTLS transport
-    if (transport->dtls_transport) {
-        transport->dtls_transport->redirect_transport = NULL;
-    }
+    // Note: No NULL checking needed as the function will do that for us
+    anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
 
     // Dereference
     mem_deref(transport->dtls_transport);
@@ -49,6 +61,7 @@ enum anyrtc_code anyrtc_redirect_transport_create(
         char* const ip, // copied
         uint16_t const port
 ) {
+    bool have_data_transport;
     struct anyrtc_redirect_transport* transport;
     enum anyrtc_code error;
 
@@ -63,8 +76,12 @@ enum anyrtc_code anyrtc_redirect_transport_create(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Check if a redirect or SCTP transport is associated to the DTLS transport
-    if (dtls_transport->redirect_transport || dtls_transport->sctp_transport) {
+    // Check if a data transport is already registered
+    error = anyrtc_dtls_transport_have_data_transport(&have_data_transport, dtls_transport);
+    if (error) {
+        return error;
+    }
+    if (have_data_transport) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -90,15 +107,16 @@ enum anyrtc_code anyrtc_redirect_transport_create(
 
     // Listen on raw socket
     error = anyrtc_error_to_code(fd_listen(
-            transport->socket, FD_READ, redirect_receive_handler, transport));
+            transport->socket, FD_READ, send_handler, transport));
     if (error) {
         goto out;
     }
 
     // Attach to ICE transport
-    // Note: We cannot reference ourselves here as that would introduce a cyclic reference
-    dtls_transport->redirect_transport = transport;
-    error = ANYRTC_CODE_SUCCESS;
+    error = anyrtc_dtls_transport_set_data_transport(dtls_transport, receive_handler, transport);
+    if (error) {
+        goto out;
+    }
 
 out:
     if (error) {

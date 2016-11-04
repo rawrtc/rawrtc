@@ -4,13 +4,17 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
+#include "dtls_transport.h"
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-static int receive_handler(
+/*
+ * Handle incoming data messages.
+ */
+static int sctp_receive_handler(
         struct socket* const socket,
         union sctp_sockstore address,
         void* const data,
@@ -27,7 +31,10 @@ static int receive_handler(
     return 1;
 }
 
-static int send_handler(
+/*
+ * Handle outgoing SCTP messages.
+ */
+static int dtls_send_handler(
         void* const arg,
         void* const buffer,
         size_t length,
@@ -43,6 +50,18 @@ static int send_handler(
 }
 
 /*
+ * Handle incoming SCTP messages.
+ */
+static void dtls_receive_handler(
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_redirect_transport* const transport = arg;
+
+    // TODO: Handle
+}
+
+/*
  * Destructor for an existing ICE transport.
  */
 static void anyrtc_sctp_transport_destroy(
@@ -51,9 +70,8 @@ static void anyrtc_sctp_transport_destroy(
     struct anyrtc_sctp_transport* const transport = arg;
 
     // Remove from DTLS transport
-    if (transport->dtls_transport) {
-        transport->dtls_transport->sctp_transport = NULL;
-    }
+    // Note: No NULL checking needed as the function will do that for us
+    anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
 
     // TODO: Close usrsctp socket
 
@@ -71,6 +89,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
         void* const arg // nullable
 ) {
+    bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
     struct sockaddr_conn peer;
     enum anyrtc_code error = ANYRTC_CODE_UNKNOWN_ERROR;
@@ -86,8 +105,12 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Check if a redirect or SCTP transport is associated to the DTLS transport
-    if (dtls_transport->redirect_transport || dtls_transport->sctp_transport) {
+    // Check if a data transport is already registered
+    error = anyrtc_dtls_transport_have_data_transport(&have_data_transport, dtls_transport);
+    if (error) {
+        return error;
+    }
+    if (have_data_transport) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -110,7 +133,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Initialise usrsctp
-    usrsctp_init(0, send_handler, dbg_info);
+    usrsctp_init(0, dtls_send_handler, dbg_info);
 
     // TODO: What does this do?
     usrsctp_sysctl_set_sctp_blackhole(2);
@@ -118,7 +141,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
     transport->socket = usrsctp_socket(
-            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, receive_handler, NULL, 0, transport);
+            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, sctp_receive_handler, NULL, 0, transport);
     if (!socket) {
         DEBUG_WARNING("SCTP transport could not create socket, reason: %m\n", errno);
         goto out;
@@ -144,9 +167,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Attach to ICE transport
-    // Note: We cannot reference ourselves here as that would introduce a cyclic reference
-    dtls_transport->sctp_transport = transport;
-    error = ANYRTC_CODE_SUCCESS;
+    error = anyrtc_dtls_transport_set_data_transport(dtls_transport, dtls_receive_handler, transport);
+    if (error) {
+        goto out;
+    }
 
 out:
     if (error) {

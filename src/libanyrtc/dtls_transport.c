@@ -2,6 +2,7 @@
 #include <anyrtc.h>
 #include "dtls_transport.h"
 #include "dtls_parameters.h"
+#include "message_buffer.h"
 #include "candidate_helper.h"
 #include "certificate.h"
 #include "utils.h"
@@ -183,7 +184,7 @@ static void dtls_receive_handler(
     }
 
     // Buffer message
-    enum anyrtc_code error = anyrtc_candidate_helper_buffer_message(
+    enum anyrtc_code error = anyrtc_message_buffer_append(
             &transport->buffered_messages, NULL, buffer);
     if (error) {
         DEBUG_WARNING("Could not buffer DTLS packet, reason: %s\n", anyrtc_code_to_str(error));
@@ -666,7 +667,7 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
     enum anyrtc_code error;
     struct list* candidate_helpers;
     struct le* le;
-    struct anyrtc_candidate_helper* candidate_helper;
+    struct anyrtc_candidate_helper* candidate_helper = NULL;
     
     // Check arguments
     if (!transport || !candidate_pair) {
@@ -694,7 +695,7 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
     }
 
     // Receive buffered DTLS packets
-    error = anyrtc_candidate_helper_handle_buffered_messages(
+    error = anyrtc_message_buffer_clear(
             &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
     if (error) {
         goto out;
@@ -828,6 +829,115 @@ out:
         transport->remote_parameters = mem_ref(remote_parameters);
     }
     return error;
+}
+
+/*
+ * Check for an existing data transport (on top of DTLS).
+ */
+enum anyrtc_code anyrtc_dtls_transport_have_data_transport(
+        bool* const have_data_transportp, // de-referenced
+        struct anyrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!have_data_transportp || !transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check if a receive handler has been set.
+    if (transport->receive_handler) {
+        *have_data_transportp = true;
+    } else {
+        *have_data_transportp = false;
+    }
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Pipe buffered messages into the data receive handler that has a
+ * different signature.
+ */
+static bool intermediate_receive_handler(
+        struct sa * const source,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+    (void) source;
+
+    // Pipe into the actual receive handler
+    transport->receive_handler(buffer, transport->receive_handler_arg);
+
+    // Handled
+    return true;
+}
+
+/*
+ * Set a data transport on the DTLS transport.
+ */
+enum anyrtc_code anyrtc_dtls_transport_set_data_transport(
+        struct anyrtc_dtls_transport* const transport,
+        anyrtc_dtls_transport_receive_handler* const receive_handler,
+        void* const arg
+) {
+    enum anyrtc_code error;
+    bool have_data_transport;
+
+    // Check arguments
+    if (!transport || !receive_handler) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check for existing data transport
+    error = anyrtc_dtls_transport_have_data_transport(&have_data_transport, transport);
+    if (error) {
+        return error;
+    }
+    if (have_data_transport) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Receive buffered messages
+    error = anyrtc_message_buffer_clear(
+            &transport->buffered_messages, intermediate_receive_handler, transport);
+    if (error) {
+        return error;
+    }
+
+    // Set handler
+    transport->receive_handler = receive_handler;
+    transport->arg = arg;
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Remove an existing data transport from the DTLS transport.
+ */
+enum anyrtc_code anyrtc_dtls_transport_clear_data_transport(
+        struct anyrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Clear handler and argument
+    transport->receive_handler = NULL;
+    transport->receive_handler_arg = NULL;
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Send a data message over the DTLS transport.
+ */
+enum anyrtc_code anyrtc_dtls_transport_send(
+        struct anyrtc_dtls_transport* const transport,
+        struct mbuf* const buffer
+) {
+    return anyrtc_error_to_code(dtls_send(transport->connection, buffer));
 }
 
 /*

@@ -618,7 +618,7 @@ static void client_print_local_parameters(
     mem_deref(node);
 
     // Print JSON
-    DEBUG_INFO("Local Parameters: %H\n", json_encode_odict, dict);
+    DEBUG_INFO("Local Parameters:\n%H\n", json_encode_odict, dict);
 
     // Dereference
     mem_deref(dict);

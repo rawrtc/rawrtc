@@ -337,6 +337,15 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
     void* const arg
 );
 
+/*
+ * Handle incoming data messages.
+ * TODO: Private
+ */
+typedef void (anyrtc_dtls_transport_receive_handler)(
+    struct mbuf* const buffer,
+    void* const arg
+);
+
 
 
 /*
@@ -539,8 +548,8 @@ struct anyrtc_dtls_transport {
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
-    struct anyrtc_redirect_transport* redirect_transport;
-    struct anyrtc_sctp_transport* sctp_transport;
+    anyrtc_dtls_transport_receive_handler* receive_handler;
+    void* receive_handler_arg;
 };
 
 /*

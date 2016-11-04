@@ -1,10 +1,6 @@
 #include <anyrtc.h>
 #include "candidate_helper.h"
 
-#define DEBUG_MODULE "helper"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
-
 /*
  * Destructor for an existing candidate helper.
  */
@@ -70,80 +66,4 @@ out:
         *candidate_helperp = candidate_helper;
     }
     return error;
-}
-
-/*
- * Destructor for an existing buffered message.
- */
-static void anyrtc_buffered_message_destroy(
-        void* const arg
-) {
-    struct anyrtc_buffered_message* const buffered_message = arg;
-
-    // Dereference
-    mem_deref(buffered_message->buffer);
-}
-
-/*
- * Create a candidate helper message buffer.
- */
-enum anyrtc_code anyrtc_candidate_helper_buffer_message(
-        struct list* const buffered_messages,
-        struct sa * const source, // copied, nullable
-        struct mbuf* const buffer // referenced
-) {
-    struct anyrtc_buffered_message* buffered_message;
-
-    // Check arguments
-    if (!buffered_messages || !buffer) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Create buffered message
-    buffered_message = mem_zalloc(sizeof(struct anyrtc_buffered_message),
-                                  anyrtc_buffered_message_destroy);
-    if (!buffered_message) {
-        return ANYRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields
-    if (source) {
-        buffered_message->source = *source;
-    }
-    buffered_message->buffer = mem_ref(buffer);
-
-    // Add to list
-    list_append(buffered_messages, &buffered_message->le, buffered_message);
-    return ANYRTC_CODE_SUCCESS;
-}
-
-/*
- * Apply a receive handler to buffered messages.
- * TODO: Add timestamp to be able to ignore old messages
- */
-enum anyrtc_code anyrtc_candidate_helper_handle_buffered_messages(
-        struct list* const buffered_messages,
-        udp_helper_recv_h* const receive_handler,
-        void* arg
-) {
-    struct le* le;
-
-    // Check arguments
-    if (!buffered_messages || !receive_handler) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Receive each message
-    for (le = list_head(buffered_messages); le != NULL; le = le->next) {
-        struct anyrtc_buffered_message* const buffered_message = le->data;
-
-        // Receive buffered message
-        receive_handler(&buffered_message->source, buffered_message->buffer, arg);
-    }
-
-    // Dereference all messages
-    list_flush(buffered_messages);
-
-    // Done
-    return ANYRTC_CODE_SUCCESS;
 }

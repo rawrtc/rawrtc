@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "ice_gatherer.h"
 #include "ice_candidate.h"
+#include "message_buffer.h"
 #include "candidate_helper.h"
 
 #define DEBUG_MODULE "ice-gatherer"
@@ -358,7 +359,7 @@ static bool udp_receive_handler(
     struct anyrtc_ice_gatherer* const gatherer = arg;
 
     // Buffer message
-    enum anyrtc_code error = anyrtc_candidate_helper_buffer_message(
+    enum anyrtc_code error = anyrtc_message_buffer_append(
             &gatherer->buffered_messages, source, buffer);
     if (error) {
         DEBUG_WARNING("Could not buffer UDP packet, reason: %s\n", anyrtc_code_to_str(error));
