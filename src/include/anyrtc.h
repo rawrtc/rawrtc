@@ -558,6 +558,7 @@ struct anyrtc_dtls_transport {
 struct anyrtc_redirect_transport {
     struct anyrtc_dtls_transport* dtls_transport; // referenced
     struct sa address;
+    struct mbuf* buffer;
     int socket;
 };
 

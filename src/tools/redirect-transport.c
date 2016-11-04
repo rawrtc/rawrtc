@@ -30,13 +30,14 @@ struct parameters {
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
-    struct sa redirect_address;
+    char* redirect_ip;
+    uint16_t redirect_port;
     enum anyrtc_ice_role ice_role;
     struct anyrtc_certificate* certificate;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
-    struct anyrtc_sctp_transport* redirect_transport;
+    struct anyrtc_redirect_transport* redirect_transport;
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
@@ -358,8 +359,9 @@ static void client_init(
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
     // Create redirect transport
-//    EOE(anyrtc_redirect_transport_create(
-//            &client->redirect_transport, client->dtls_transport, 0, data_channel_handler, client));
+    EOE(anyrtc_redirect_transport_create(
+            &client->redirect_transport, client->dtls_transport,
+            client->redirect_ip, client->redirect_port));
 }
 
 static void client_start_gathering(
@@ -425,8 +427,7 @@ static void parameters_destroy(
 static void client_stop(
         struct client* const client
 ) {
-    // Stop transports & close gatherer
-//    EOE(anyrtc_redirect_transport_stop(client->redirect_transport));
+    client->redirect_transport = mem_deref(client->redirect_transport);
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
@@ -434,7 +435,6 @@ static void client_stop(
     // Dereference & close
     parameters_destroy(&client->remote_parameters);
     parameters_destroy(&client->local_parameters);
-    client->redirect_transport = mem_deref(client->redirect_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -931,11 +931,6 @@ int main(int argc, char* argv[argc + 1]) {
         exit_with_usage(argv[0]);
     }
 
-    // Get redirect IP
-    if (sa_set_str(&client.redirect_address, argv[2], redirect_port)) {
-        exit_with_usage(argv[0]);
-    }
-
     // Create ICE gather options
     EOE(anyrtc_ice_gather_options_create(&gather_options, ANYRTC_ICE_GATHER_ALL));
 
@@ -953,6 +948,8 @@ int main(int argc, char* argv[argc + 1]) {
     client.name = "A";
     client.gather_options = gather_options;
     client.ice_role = ice_role;
+    client.redirect_ip = argv[2];
+    client.redirect_port = redirect_port;
 
     // Setup client
     client_init(&client);

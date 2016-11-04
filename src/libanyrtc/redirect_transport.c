@@ -1,6 +1,8 @@
 #include <sys/types.h>
-#include <sys/socket.h> // AF_INET, SOCK_RAW
-#include <netinet/in.h> // IPPROTO_UDP
+#include <sys/socket.h> // AF_INET, SOCK_RAW, sendto, recvfrom
+#include <netinet/in.h> // IPPROTO_RAW
+#include <unistd.h> // close
+#include <errno.h>
 #include <anyrtc.h>
 #include "dtls_transport.h"
 #include "redirect_transport.h"
@@ -10,30 +12,102 @@
 #include <re_dbg.h>
 
 /*
- * Handle incoming messages (that are sent out via the raw socket).
- */
-static void receive_handler(
-        struct mbuf* const buffer,
-        void* const arg
-) {
-    struct anyrtc_redirect_transport* const transport = arg;
-
-    // TODO: Send over raw socket
-}
-
-/*
  * Handle outgoing messages (that came in from the raw socket).
  */
-static void send_handler(
+static void redirect_from_raw(
         int flags,
         void *const arg
 ) {
     struct anyrtc_redirect_transport* const transport = arg;
+    struct mbuf* buffer;
+    enum anyrtc_code error;
+    struct sockaddr_in from_address;
+    socklen_t address_length;
+    ssize_t length;
+    struct sa from;
+    size_t header_length;
+    uint16_t source;
+    uint16_t destination;
 
-    // TODO: Read from fd
+    if ((flags & FD_READ) == FD_READ) {
+        buffer = transport->buffer;
 
-    // Buffer message
-    // TODO
+        // Rewind buffer
+        mbuf_rewind(buffer);
+
+        // Receive
+        address_length = sizeof(struct sockaddr_in);
+        length = recvfrom(transport->socket, mbuf_buf(buffer), mbuf_get_space(buffer),
+                0, (struct sockaddr*) &from_address, &address_length);
+        if (length == -1) {
+            DEBUG_WARNING("Unable to receive raw message: %m\n", errno);
+            return;
+        }
+        mbuf_set_end(buffer, (size_t) length);
+
+        // TODO: Receive remaining bytes (if any)
+
+        // Check address
+        error = anyrtc_error_to_code(sa_set_sa(&from, (struct sockaddr*) &from_address));
+        if (error) {
+            DEBUG_WARNING("Invalid sender address: %m\n", error);
+            return;
+        }
+        DEBUG_PRINTF("Received %zu bytes via RAW from %j\n", mbuf_get_left(buffer), &from);
+        if (!sa_isset(&from, SA_ADDR) && !sa_cmp(&transport->address, &from, SA_ADDR)) {
+            DEBUG_WARNING("Ignoring data from unknown address");
+            return;
+        }
+
+        // Skip IPv4 header
+        header_length = (mbuf_read_u8(buffer) & 0xf);
+        mbuf_advance(buffer, -1);
+        DEBUG_PRINTF("RAW IPv4 header length: %zu\n", header_length);
+        mbuf_advance(buffer, header_length * 4);
+
+        // Read source and destination port
+        source = ntohs(mbuf_read_u16(buffer));
+        destination = ntohs(mbuf_read_u16(buffer));
+        sa_set_port(&from, source);
+        DEBUG_PRINTF("RAW from %J to %"PRIu16"\n", &from, destination);
+        mbuf_advance(buffer, -4);
+
+        // Is this from the correct source?
+        if (source != sa_port(&transport->address)) {
+            DEBUG_WARNING("Ignored data from different source\n");
+            return;
+        }
+
+        // Send data
+        DEBUG_INFO("Sending %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
+        error = anyrtc_dtls_transport_send(transport->dtls_transport, buffer);
+        if (error) {
+            DEBUG_WARNING("Could not send, error: %m\n", error);
+            return;
+        }
+    }
+}
+
+/*
+ * Handle incoming messages (that are sent out via the raw socket).
+ */
+static void redirect_to_raw(
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_redirect_transport* const transport = arg;
+    ssize_t length;
+
+    // Send over raw socket
+    DEBUG_PRINTF("Redirecting message (%zu bytes) to %J\n",
+            mbuf_get_left(buffer), transport->address);
+    length = sendto(transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), 0,
+            &transport->address.u.sa, transport->address.len);
+    if (length == -1) {
+        DEBUG_WARNING("Unable to redirect message: %m\n", errno);
+        return;
+    }
+    mbuf_advance(buffer, length);
 }
 
 /*
@@ -44,12 +118,19 @@ static void anyrtc_redirect_transport_destroy(
 ) {
     struct anyrtc_redirect_transport* const transport = arg;
 
+    // Stop listening and close raw socket
+    fd_close(transport->socket);
+    if (close(transport->socket)) {
+        DEBUG_WARNING("Closing raw socket failed: %m\n", errno);
+    }
+
     // Remove from DTLS transport
     // Note: No NULL checking needed as the function will do that for us
     anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
 
     // Dereference
     mem_deref(transport->dtls_transport);
+    mem_deref(transport->buffer);
 }
 
 /*
@@ -99,21 +180,32 @@ enum anyrtc_code anyrtc_redirect_transport_create(
         goto out;
     }
 
+    // Create buffer
+    transport->buffer = mbuf_alloc(2048);
+    if (!transport->buffer) {
+        error = ANYRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+
     // Create raw socket
-    if (socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) {
+    transport->socket = socket(AF_INET, SOCK_RAW, IPPROTO_SCTP);
+    if (transport->socket == -1) {
         error = anyrtc_error_to_code(errno);
         goto out;
     }
 
+    // TODO: Set non-blocking
+
     // Listen on raw socket
     error = anyrtc_error_to_code(fd_listen(
-            transport->socket, FD_READ, send_handler, transport));
+            transport->socket, FD_READ, redirect_from_raw, transport));
     if (error) {
         goto out;
     }
 
     // Attach to ICE transport
-    error = anyrtc_dtls_transport_set_data_transport(dtls_transport, receive_handler, transport);
+    error = anyrtc_dtls_transport_set_data_transport(
+            dtls_transport, redirect_to_raw, transport);
     if (error) {
         goto out;
     }

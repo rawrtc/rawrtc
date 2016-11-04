@@ -183,6 +183,12 @@ static void dtls_receive_handler(
         return;
     }
 
+    // Have receive handler?
+    if (transport->receive_handler) {
+        transport->receive_handler(buffer, transport->receive_handler_arg);
+        return;
+    }
+
     // Buffer message
     enum anyrtc_code error = anyrtc_message_buffer_append(
             &transport->buffered_messages, NULL, buffer);
@@ -905,7 +911,7 @@ enum anyrtc_code anyrtc_dtls_transport_set_data_transport(
 
     // Set handler
     transport->receive_handler = receive_handler;
-    transport->arg = arg;
+    transport->receive_handler_arg = arg;
 
     // Done
     return ANYRTC_CODE_SUCCESS;
