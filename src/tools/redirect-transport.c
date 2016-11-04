@@ -440,6 +440,9 @@ static void client_stop(
     client->gatherer = mem_deref(client->gatherer);
     client->certificate = mem_deref(client->certificate);
     client->gather_options = mem_deref(client->gather_options);
+
+    // Stop listening on STDIN
+    fd_close(STDIN_FILENO);
 }
 
 static void client_set_ice_parameters(
@@ -873,7 +876,6 @@ static void client_stdin_handler(
     client_start_transports(client);
     
 out:
-    fd_close(STDIN_FILENO);
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
