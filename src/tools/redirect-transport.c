@@ -873,6 +873,7 @@ static void client_stdin_handler(
     client_start_transports(client);
     
 out:
+    fd_close(STDIN_FILENO);
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
