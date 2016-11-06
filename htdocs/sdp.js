@@ -1,6 +1,17 @@
-// SDP helpers - to be moved into separate module.
+ /* eslint-env node */
+'use strict';
+
+// SDP helpers.
 var SDPUtils = {};
-window.SDPUtils = SDPUtils;
+
+// Generate an alphanumeric identifier for cname or mids.
+// TODO: use UUIDs instead? https://gist.github.com/jed/982883
+SDPUtils.generateIdentifier = function() {
+  return Math.random().toString(36).substr(2, 10);
+};
+
+// The RTCP CNAME used by all peerconnections from the same JS.
+SDPUtils.localCName = SDPUtils.generateIdentifier();
 
 // Splits SDP into lines, dealing with both CRLF and LF.
 SDPUtils.splitLines = function(blob) {
@@ -8,10 +19,9 @@ SDPUtils.splitLines = function(blob) {
     return line.trim();
   });
 };
-
 // Splits SDP into sessionpart and mediasections. Ensures CRLF.
 SDPUtils.splitSections = function(blob) {
-  var parts = blob.split('\r\nm=');
+  var parts = blob.split('\nm=');
   return parts.map(function(part, index) {
     return (index > 0 ? 'm=' + part : part).trim() + '\r\n';
   });
@@ -25,7 +35,8 @@ SDPUtils.matchPrefix = function(blob, prefix) {
 };
 
 // Parses an ICE candidate line. Sample input:
-// candidate:702786350 2 udp 41819902 8.8.8.8 60769 typ relay raddr 8.8.8.8 rport 55996"
+// candidate:702786350 2 udp 41819902 8.8.8.8 60769 typ relay raddr 8.8.8.8
+// rport 55996"
 SDPUtils.parseCandidate = function(line) {
   var parts;
   // Parse both variants.
@@ -103,11 +114,13 @@ SDPUtils.parseRtpMap = function(line) {
 
   parsed.name = parts[0];
   parsed.clockRate = parseInt(parts[1], 10); // was: clockrate
-  parsed.numChannels = parts.length === 3 ? parseInt(parts[2], 10) : 1; // was: channels
+  // was: channels
+  parsed.numChannels = parts.length === 3 ? parseInt(parts[2], 10) : 1;
   return parsed;
 };
 
-// Generate an a=rtpmap line from RTCRtpCodecCapability or RTCRtpCodecParameters.
+// Generate an a=rtpmap line from RTCRtpCodecCapability or
+// RTCRtpCodecParameters.
 SDPUtils.writeRtpMap = function(codec) {
   var pt = codec.payloadType;
   if (codec.preferredPayloadType !== undefined) {
@@ -115,6 +128,23 @@ SDPUtils.writeRtpMap = function(codec) {
   }
   return 'a=rtpmap:' + pt + ' ' + codec.name + '/' + codec.clockRate +
       (codec.numChannels !== 1 ? '/' + codec.numChannels : '') + '\r\n';
+};
+
+// Parses an a=extmap line (headerextension from RFC 5285). Sample input:
+// a=extmap:2 urn:ietf:params:rtp-hdrext:toffset
+SDPUtils.parseExtmap = function(line) {
+  var parts = line.substr(9).split(' ');
+  return {
+    id: parseInt(parts[0], 10),
+    uri: parts[1]
+  };
+};
+
+// Generates a=extmap line from RTCRtpHeaderExtensionParameters or
+// RTCRtpHeaderExtension.
+SDPUtils.writeExtmap = function(headerExtension) {
+  return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
+       ' ' + headerExtension.uri + '\r\n';
 };
 
 // Parses an ftmp line, returns dictionary. Sample input:
@@ -132,13 +162,13 @@ SDPUtils.parseFmtp = function(line) {
 };
 
 // Generates an a=ftmp line from RTCRtpCodecCapability or RTCRtpCodecParameters.
-SDPUtils.writeFtmp = function(codec) {
+SDPUtils.writeFmtp = function(codec) {
   var line = '';
   var pt = codec.payloadType;
   if (codec.preferredPayloadType !== undefined) {
     pt = codec.preferredPayloadType;
   }
-  if (codec.parameters && codec.parameters.length) {
+  if (codec.parameters && Object.keys(codec.parameters).length) {
     var params = [];
     Object.keys(codec.parameters).forEach(function(param) {
       params.push(param + '=' + codec.parameters[param]);
@@ -167,7 +197,8 @@ SDPUtils.writeRtcpFb = function(codec) {
   if (codec.rtcpFeedback && codec.rtcpFeedback.length) {
     // FIXME: special handling for trr-int?
     codec.rtcpFeedback.forEach(function(fb) {
-      lines += 'a=rtcp-fb:' + pt + ' ' + fb.type + ' ' + fb.parameter +
+      lines += 'a=rtcp-fb:' + pt + ' ' + fb.type +
+      (fb.parameter && fb.parameter.length ? ' ' + fb.parameter : '') +
           '\r\n';
     });
   }
@@ -179,7 +210,7 @@ SDPUtils.writeRtcpFb = function(codec) {
 SDPUtils.parseSsrcMedia = function(line) {
   var sp = line.indexOf(' ');
   var parts = {
-    ssrc: line.substr(7, sp - 7),
+    ssrc: parseInt(line.substr(7, sp - 7), 10)
   };
   var colon = line.indexOf(':', sp);
   if (colon > -1) {
@@ -196,7 +227,8 @@ SDPUtils.parseSsrcMedia = function(line) {
 //   get the fingerprint line as input. See also getIceParameters.
 SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
   var lines = SDPUtils.splitLines(mediaSection);
-  lines = lines.concat(SDPUtils.splitLines(sessionpart)); // Search in session part, too.
+  // Search in session part, too.
+  lines = lines.concat(SDPUtils.splitLines(sessionpart));
   var fpLine = lines.filter(function(line) {
     return line.indexOf('a=fingerprint:') === 0;
   })[0].substr(14);
@@ -224,7 +256,8 @@ SDPUtils.writeDtlsParameters = function(params, setupType) {
 //   get the ice-ufrag and ice-pwd lines as input.
 SDPUtils.getIceParameters = function(mediaSection, sessionpart) {
   var lines = SDPUtils.splitLines(mediaSection);
-  lines = lines.concat(SDPUtils.splitLines(sessionpart)); // Search in session part, too.
+  // Search in session part, too.
+  lines = lines.concat(SDPUtils.splitLines(sessionpart));
   var iceParameters = {
     usernameFragment: lines.filter(function(line) {
       return line.indexOf('a=ice-ufrag:') === 0;
@@ -266,13 +299,26 @@ SDPUtils.parseRtpParameters = function(mediaSection) {
           mediaSection, 'a=rtcp-fb:' + pt + ' ')
         .map(SDPUtils.parseRtcpFb);
       description.codecs.push(codec);
+      // parse FEC mechanisms from rtpmap lines.
+      switch (codec.name.toUpperCase()) {
+        case 'RED':
+        case 'ULPFEC':
+          description.fecMechanisms.push(codec.name.toUpperCase());
+          break;
+        default: // only RED and ULPFEC are recognized as FEC mechanisms.
+          break;
+      }
     }
   }
-  // FIXME: parse headerExtensions, fecMechanisms and rtcp.
+  SDPUtils.matchPrefix(mediaSection, 'a=extmap:').forEach(function(line) {
+    description.headerExtensions.push(SDPUtils.parseExtmap(line));
+  });
+  // FIXME: parse rtcp.
   return description;
 };
 
-// Generates parts of the SDP media section describing the capabilities / parameters.
+// Generates parts of the SDP media section describing the capabilities /
+// parameters.
 SDPUtils.writeRtpDescription = function(kind, caps) {
   var sdp = '';
 
@@ -293,12 +339,85 @@ SDPUtils.writeRtpDescription = function(kind, caps) {
   // Add a=rtpmap lines for each codec. Also fmtp and rtcp-fb.
   caps.codecs.forEach(function(codec) {
     sdp += SDPUtils.writeRtpMap(codec);
-    sdp += SDPUtils.writeFtmp(codec);
+    sdp += SDPUtils.writeFmtp(codec);
     sdp += SDPUtils.writeRtcpFb(codec);
   });
   // FIXME: add headerExtensions, fecMechanismş and rtcp.
   sdp += 'a=rtcp-mux\r\n';
   return sdp;
+};
+
+// Parses the SDP media section and returns an array of
+// RTCRtpEncodingParameters.
+SDPUtils.parseRtpEncodingParameters = function(mediaSection) {
+  var encodingParameters = [];
+  var description = SDPUtils.parseRtpParameters(mediaSection);
+  var hasRed = description.fecMechanisms.indexOf('RED') !== -1;
+  var hasUlpfec = description.fecMechanisms.indexOf('ULPFEC') !== -1;
+
+  // filter a=ssrc:... cname:, ignore PlanB-msid
+  var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
+  .map(function(line) {
+    return SDPUtils.parseSsrcMedia(line);
+  })
+  .filter(function(parts) {
+    return parts.attribute === 'cname';
+  });
+  var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
+  var secondarySsrc;
+
+  var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
+  .map(function(line) {
+    var parts = line.split(' ');
+    parts.shift();
+    return parts.map(function(part) {
+      return parseInt(part, 10);
+    });
+  });
+  if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
+    secondarySsrc = flows[0][1];
+  }
+
+  description.codecs.forEach(function(codec) {
+    if (codec.name.toUpperCase() === 'RTX' && codec.parameters.apt) {
+      var encParam = {
+        ssrc: primarySsrc,
+        codecPayloadType: parseInt(codec.parameters.apt, 10),
+        rtx: {
+          payloadType: codec.payloadType,
+          ssrc: secondarySsrc
+        }
+      };
+      encodingParameters.push(encParam);
+      if (hasRed) {
+        encParam = JSON.parse(JSON.stringify(encParam));
+        encParam.fec = {
+          ssrc: secondarySsrc,
+          mechanism: hasUlpfec ? 'red+ulpfec' : 'red'
+        };
+        encodingParameters.push(encParam);
+      }
+    }
+  });
+  if (encodingParameters.length === 0 && primarySsrc) {
+    encodingParameters.push({
+      ssrc: primarySsrc
+    });
+  }
+
+  // we support both b=AS and b=TIAS but interpret AS as TIAS.
+  var bandwidth = SDPUtils.matchPrefix(mediaSection, 'b=');
+  if (bandwidth.length) {
+    if (bandwidth[0].indexOf('b=TIAS:') === 0) {
+      bandwidth = parseInt(bandwidth[0].substr(7), 10);
+    } else if (bandwidth[0].indexOf('b=AS:') === 0) {
+      bandwidth = parseInt(bandwidth[0].substr(5), 10);
+    }
+    encodingParameters.forEach(function(params) {
+      params.maxBitrate = bandwidth;
+    });
+  }
+  return encodingParameters;
 };
 
 SDPUtils.writeSessionBoilerplate = function() {
@@ -338,11 +457,12 @@ SDPUtils.writeMediaSection = function(transceiver, caps, type, stream) {
     var msid = 'msid:' + stream.id + ' ' +
         transceiver.rtpSender.track.id + '\r\n';
     sdp += 'a=' + msid;
-    sdp += 'a=ssrc:' + transceiver.sendSsrc + ' ' + msid;
+    sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
+        ' ' + msid;
   }
   // FIXME: this should be written by writeRtpDescription.
-  sdp += 'a=ssrc:' + transceiver.sendSsrc + ' cname:' +
-      localCName + '\r\n';
+  sdp += 'a=ssrc:' + transceiver.sendEncodingParameters[0].ssrc +
+      ' cname:' + SDPUtils.localCName + '\r\n';
   return sdp;
 };
 
@@ -357,6 +477,8 @@ SDPUtils.getDirection = function(mediaSection, sessionpart) {
       case 'a=recvonly':
       case 'a=inactive':
         return lines[i].substr(2);
+      default:
+        // FIXME: What should happen here?
     }
   }
   if (sessionpart) {
