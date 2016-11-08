@@ -3,7 +3,6 @@
 class Peer {
     constructor() {
         this.pc = null;
-        this.dc = null;
         this.localMid = null;
         this.localCandidates = [];
         this.localParameters = null;
@@ -21,7 +20,7 @@ class Peer {
     createPeerConnection() {
         if (this.pc) {
             console.warn('RTCPeerConnection already created');
-            return;
+            return this.pc;
         }
 
         var self = this;
@@ -64,14 +63,10 @@ class Peer {
         };
 
         this.pc = pc;
+        return pc;
     }
 
     createDataChannel() {
-        if (this.dc) {
-            console.warn('Data channel already created');
-            return;
-        }
-
         // Create data channel
         var dc = this.pc.createDataChannel('example-channel', {
             ordered: true
@@ -96,7 +91,7 @@ class Peer {
             console.info('Data channel', dc.id, 'message:', event.data);
         };
 
-        this.dc = dc;
+        return dc;
     }
 
     getLocalParameters() {
@@ -213,9 +208,17 @@ class Peer {
                     setupType = 'passive';
                     break;
                 default:
-                    // If in doubt, let WebRTC do the client side as ORTC is able to
-                    // switch over to server mode
-                    setupType = 'passive';
+                    // We map 'offer' to 'controlling' and 'answer' to 'controlled',
+                    // so anyrtc will take 'server' if offering and 'client' if answering
+                    // as specified by the ORTC spec
+                    switch (type) {
+                        case 'offer':
+                            setupType = 'passive';
+                            break;
+                        case 'answer':
+                            setupType = 'active';
+                            break;
+                    }
                     break;
             }
 

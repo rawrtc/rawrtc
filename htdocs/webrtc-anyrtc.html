@@ -19,7 +19,7 @@ textarea {
     <script type="text/javascript">
         var peer = new ControllingPeer();
         peer.createPeerConnection();
-        peer.createDataChannel();
+        var dc = peer.createDataChannel();
         peer.getLocalParameters()
         .then((parameters) => {
             console.log('Local parameters:', parameters);
