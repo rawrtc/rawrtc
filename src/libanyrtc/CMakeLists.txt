@@ -2,6 +2,7 @@
 set(anyrtc_SOURCES
         candidate_helper.c
         certificate.c
+        crc32c.c
         dtls_parameters.c
         dtls_transport.c
         ice_candidate.c

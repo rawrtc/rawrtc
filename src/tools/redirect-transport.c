@@ -361,7 +361,7 @@ static void client_init(
     // Create redirect transport
     EOE(anyrtc_redirect_transport_create(
             &client->redirect_transport, client->dtls_transport,
-            client->redirect_ip, client->redirect_port));
+            client->redirect_ip, client->redirect_port, 0, 0));
 }
 
 static void client_start_gathering(

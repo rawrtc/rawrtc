@@ -558,7 +558,9 @@ struct anyrtc_dtls_transport {
  */
 struct anyrtc_redirect_transport {
     struct anyrtc_dtls_transport* dtls_transport; // referenced
-    struct sa address;
+    uint16_t local_port;
+    uint16_t remote_port;
+    struct sa redirect_address;
     struct mbuf* buffer;
     int socket;
 };
@@ -1143,12 +1145,15 @@ enum anyrtc_code anyrtc_data_channel_send(
 
 /*
  * Create a redirect transport.
+ * `local_port` and `remote_port` may be `0`.
  */
 enum anyrtc_code anyrtc_redirect_transport_create(
     struct anyrtc_redirect_transport** const transportp, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
-    char* const ip, // copied
-    uint16_t const port
+    char* const redirect_ip, // copied
+    uint16_t const redirect_port,
+    uint16_t const local_port, // zeroable
+    uint16_t const remote_port // zeroable
 );
 
 /*

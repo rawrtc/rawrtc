@@ -1,15 +1,58 @@
+#include <string.h> // memset
 #include <sys/types.h>
 #include <sys/socket.h> // AF_INET, SOCK_RAW, sendto, recvfrom
-#include <netinet/in.h> // IPPROTO_RAW
+#include <netinet/in.h> // IPPROTO_RAW, ntohs, htons
 #include <unistd.h> // close
 #include <errno.h>
 #include <anyrtc.h>
+#include "crc32c.h"
 #include "dtls_transport.h"
 #include "redirect_transport.h"
 
 #define DEBUG_MODULE "redirect-transport"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
+
+static void patch_sctp_header(
+        struct mbuf* const buffer,
+        uint16_t const source,
+        uint16_t const destination
+) {
+    size_t const start = buffer->pos;
+    int err;
+    uint32_t checksum;
+
+    // Patch source port
+    err = mbuf_write_u16(buffer, htons(source));
+    if (err) {
+        DEBUG_WARNING("Could not patch source port, reason: %m\n", err);
+        return;
+    }
+
+    // Patch destination port
+    err = mbuf_write_u16(buffer, htons(destination));
+    if (err) {
+        DEBUG_WARNING("Could not patch destination port, reason: %m\n", err);
+        return;
+    }
+
+    // Skip verification tag
+    mbuf_advance(buffer, 4);
+
+    // Reset checksum field to '0' and rewind back
+    memset(mbuf_buf(buffer), 0, 4);
+    mbuf_set_pos(buffer, start);
+    // Recalculate checksum
+    checksum = crc32c(0, mbuf_buf(buffer), mbuf_get_left(buffer));
+    // Advance to checksum field, set it and rewind back
+    mbuf_advance(buffer, 8);
+    err = mbuf_write_u32(buffer, checksum);
+    if (err) {
+        DEBUG_WARNING("Could not patch checksum, reason: %m\n", err);
+        return;
+    }
+    mbuf_set_pos(buffer, start);
+}
 
 /*
  * Handle outgoing messages (that came in from the raw socket).
@@ -54,7 +97,7 @@ static void redirect_from_raw(
             return;
         }
         DEBUG_PRINTF("Received %zu bytes via RAW from %j\n", mbuf_get_left(buffer), &from);
-        if (!sa_isset(&from, SA_ADDR) && !sa_cmp(&transport->address, &from, SA_ADDR)) {
+        if (!sa_isset(&from, SA_ADDR) && !sa_cmp(&transport->redirect_address, &from, SA_ADDR)) {
             DEBUG_WARNING("Ignoring data from unknown address");
             return;
         }
@@ -73,10 +116,13 @@ static void redirect_from_raw(
         mbuf_advance(buffer, -4);
 
         // Is this from the correct source?
-        if (source != sa_port(&transport->address)) {
+        if (source != sa_port(&transport->redirect_address)) {
             DEBUG_WARNING("Ignored data from different source\n");
             return;
         }
+
+        // Update SCTP header with changed ports
+        patch_sctp_header(buffer, transport->local_port, transport->remote_port);
 
         // Send data
         DEBUG_INFO("Sending %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
@@ -98,11 +144,14 @@ static void redirect_to_raw(
     struct anyrtc_redirect_transport* const transport = arg;
     ssize_t length;
 
+    // Update SCTP header with changed ports
+    patch_sctp_header(buffer, transport->local_port, sa_port(&transport->redirect_address));
+
     // Send over raw socket
     DEBUG_PRINTF("Redirecting message (%zu bytes) to %J\n",
-            mbuf_get_left(buffer), transport->address);
+            mbuf_get_left(buffer), &transport->redirect_address);
     length = sendto(transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), 0,
-            &transport->address.u.sa, transport->address.len);
+            &transport->redirect_address.u.sa, transport->redirect_address.len);
     if (length == -1) {
         DEBUG_WARNING("Unable to redirect message: %m\n", errno);
         return;
@@ -135,19 +184,23 @@ static void anyrtc_redirect_transport_destroy(
 
 /*
  * Create a redirect transport.
+ * `local_port` and `remote_port` may be `0`.
+ * TODO: local and remote port should probably be in SCTPCapabilities? Open issue for ORTC spec.
  */
 enum anyrtc_code anyrtc_redirect_transport_create(
         struct anyrtc_redirect_transport** const transportp, // de-referenced
         struct anyrtc_dtls_transport* const dtls_transport, // referenced
-        char* const ip, // copied
-        uint16_t const port
+        char* const redirect_ip, // copied
+        uint16_t const redirect_port,
+        uint16_t const local_port, // zeroable
+        uint16_t const remote_port // zeroable
 ) {
     bool have_data_transport;
     struct anyrtc_redirect_transport* transport;
     enum anyrtc_code error;
 
     // Check arguments
-    if (!transportp || !dtls_transport || !ip || port == 0) {
+    if (!transportp || !dtls_transport || !redirect_ip || redirect_port == 0) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -175,7 +228,10 @@ enum anyrtc_code anyrtc_redirect_transport_create(
 
     // Set fields
     transport->dtls_transport = mem_ref(dtls_transport);
-    error = anyrtc_error_to_code(sa_set_str(&transport->address, ip, port));
+    transport->local_port = local_port ? local_port : ANYRTC_REDIRECT_TRANSPORT_DEFAULT_PORT;
+    transport->remote_port = remote_port ? remote_port : ANYRTC_REDIRECT_TRANSPORT_DEFAULT_PORT;
+    error = anyrtc_error_to_code(sa_set_str(
+            &transport->redirect_address, redirect_ip, redirect_port));
     if (error) {
         goto out;
     }
