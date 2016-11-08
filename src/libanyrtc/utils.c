@@ -741,7 +741,7 @@ enum anyrtc_code anyrtc_bin_to_colon_hex(
             *hex_ptr = ':';
             ++hex_ptr;
         }
-        ret = sprintf(hex_ptr, "%02x", source[i]);
+        ret = sprintf(hex_ptr, "%02X", source[i]);
         if (ret != 2) {
             error = ANYRTC_CODE_UNKNOWN_ERROR;
             goto out;
