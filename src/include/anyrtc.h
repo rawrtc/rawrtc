@@ -36,6 +36,7 @@ enum anyrtc_code {
     ANYRTC_CODE_NO_SOCKET,
     ANYRTC_CODE_INVALID_CERTIFICATE,
     ANYRTC_CODE_INVALID_FINGERPRINT,
+    ANYRTC_CODE_INSUFFICIENT_SPACE,
 };
 
 /*
@@ -1312,7 +1313,7 @@ enum anyrtc_code anyrtc_str_to_certificate_sign_algorithm(
  * Duplicate a string.
  */
 enum anyrtc_code anyrtc_strdup(
-    char** const destination,
+    char** const destinationp,
     char const * const source
 );
 
@@ -1320,7 +1321,7 @@ enum anyrtc_code anyrtc_strdup(
  * Print a formatted string to a buffer.
  */
 enum anyrtc_code anyrtc_snprintf(
-    char* const destination,
+    char* const destinationp,
     size_t const size,
     char* const formatter,
     ...

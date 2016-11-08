@@ -1,3 +1,5 @@
+#include <stdio.h> // sprintf
+#include <string.h> // strlen
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <stdarg.h>
 #include <openssl/evp.h> // EVP_MD, evp_*
@@ -707,13 +709,112 @@ enum anyrtc_code anyrtc_get_sign_algorithm_length(
 }
 
 /*
+ * Convert binary to hex string where each value is separated by a
+ * colon.
+ */
+enum anyrtc_code anyrtc_bin_to_colon_hex(
+        char** const destinationp, // de-referenced
+        uint8_t* const source,
+        size_t const length
+) {
+    char* hex_str;
+    char* hex_ptr;
+    size_t i;
+    int ret;
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!destinationp || !source) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate hex string
+    hex_str = mem_zalloc(length > 0 ? (length * 3) : 1, NULL);
+    if (!hex_str) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Bin to hex
+    hex_ptr = hex_str;
+    for (i = 0; i < length; ++i) {
+        if (i > 0) {
+            *hex_ptr = ':';
+            ++hex_ptr;
+        }
+        ret = sprintf(hex_ptr, "%02x", source[i]);
+        if (ret != 2) {
+            error = ANYRTC_CODE_UNKNOWN_ERROR;
+            goto out;
+        } else {
+            hex_ptr += ret;
+        }
+    }
+
+out:
+    if (error) {
+        mem_deref(hex_str);
+    } else {
+        // Set pointer
+        *destinationp = hex_str;
+    }
+    return error;
+}
+
+/*
+ * Convert hex string with colon-separated hex values to binary.
+ */
+enum anyrtc_code anyrtc_colon_hex_to_bin(
+        size_t* const bytes_written, // de-referenced
+        uint8_t* const buffer, // written into
+        size_t const buffer_size,
+        char* source
+) {
+    size_t hex_length;
+    size_t bin_length;
+    size_t i;
+
+    // Check arguments
+    if (!bytes_written, !buffer || !source) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Validate length
+    hex_length = strlen(source);
+    if (hex_length > 0 && hex_length % 3 != 2) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Determine size
+    bin_length = hex_length > 0 ? (size_t) ((hex_length + 1) / 3) : 0;
+    if (bin_length > buffer_size) {
+        return ANYRTC_CODE_INSUFFICIENT_SPACE;
+    }
+
+    // Hex to bin
+    for (i = 0; i < bin_length; ++i) {
+        if (i > 0) {
+            // Skip colon
+            ++source;
+        }
+        buffer[i] = ch_hex(*source) << 4;
+        ++source;
+        buffer[i] += ch_hex(*source);
+        ++source;
+    }
+
+    // Done
+    *bytes_written = bin_length;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Duplicate a string.
  */
 enum anyrtc_code anyrtc_strdup(
-        char** const destination,
+        char** const destinationp,
         char const * const source
 ) {
-    int err = str_dup(destination, source);
+    int err = str_dup(destinationp, source);
     return anyrtc_error_to_code(err);
 }
 
@@ -721,14 +822,14 @@ enum anyrtc_code anyrtc_strdup(
  * Print a formatted string to a buffer.
  */
 enum anyrtc_code anyrtc_snprintf(
-        char* const destination,
+        char* const destinationp,
         size_t const size,
         char* const formatter,
         ...
 ) {
     va_list args;
     va_start(args, formatter);
-    int err = re_vsnprintf(destination, size, formatter, args);
+    int err = re_vsnprintf(destinationp, size, formatter, args);
     va_end(args);
 
     // For some reason, re_vsnprintf does return -1 on argument error

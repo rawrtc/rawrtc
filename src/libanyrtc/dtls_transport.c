@@ -212,7 +212,6 @@ static void verify_certificate(
     enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
     bool valid = false;
     enum tls_fingerprint algorithm;
-    int err;
     uint8_t expected_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
     uint8_t actual_fingerprint[ANYRTC_FINGERPRINT_MAX_SIZE];
 
@@ -230,6 +229,7 @@ static void verify_certificate(
         struct anyrtc_dtls_fingerprint* const fingerprint =
                 transport->remote_parameters->fingerprints->fingerprints[i];
         size_t length;
+        size_t bytes_written;
 
         // Get algorithm
         error = anyrtc_certificate_sign_algorithm_to_tls_fingerprint(
@@ -251,15 +251,22 @@ static void verify_certificate(
         }
 
         // Convert hex-encoded value to binary
-        length = strlen(fingerprint->value) / 2;
-        if (length > sizeof(expected_fingerprint)) {
-            DEBUG_WARNING("Hex-encoded fingerprint exceeds buffer size!\n");
+        error = anyrtc_colon_hex_to_bin(
+                &bytes_written, expected_fingerprint, length, fingerprint->value);
+        if (error) {
+            if (error == ANYRTC_CODE_INSUFFICIENT_SPACE) {
+                DEBUG_WARNING("Hex-encoded fingerprint exceeds buffer size!\n");
+            } else {
+                DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %s\n",
+                        anyrtc_code_to_str(error));
+            }
             continue;
         }
-        err = anyrtc_error_to_code(str_hex(
-                expected_fingerprint, length, fingerprint->value));
-        if (err) {
-            DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %m\n", err);
+
+        // Validate length
+        if (bytes_written != length) {
+            DEBUG_WARNING("Hex-encoded fingerprint should have been %zu bytes but was %zu bytes\n",
+                    length, bytes_written);
             continue;
         }
 

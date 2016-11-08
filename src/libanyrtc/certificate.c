@@ -757,5 +757,5 @@ enum anyrtc_code anyrtc_certificate_get_fingerprint(
     }
 
     // Convert bytes to hex
-    return anyrtc_sdprintf(fingerprint, "%w", bytes_buffer, (size_t) length);
+    return anyrtc_bin_to_colon_hex(fingerprint, bytes_buffer, (size_t) length);
 }

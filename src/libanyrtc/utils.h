@@ -60,3 +60,16 @@ enum anyrtc_code anyrtc_get_sign_algorithm_length(
     size_t* const sizep, // de-referenced
     enum anyrtc_certificate_sign_algorithm const type
 );
+
+enum anyrtc_code anyrtc_bin_to_colon_hex(
+    char** const destinationp, // de-referenced
+    uint8_t* const source,
+    size_t const length
+);
+
+enum anyrtc_code anyrtc_colon_hex_to_bin(
+    size_t* const bytes_written, // de-referenced
+    uint8_t* const buffer, // written into
+    size_t const buffer_size,
+    char* source
+);
