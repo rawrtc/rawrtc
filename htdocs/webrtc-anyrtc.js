@@ -4,8 +4,11 @@ class Peer {
     constructor() {
         this.pc = null;
         this.dc = null;
+        this.localMid = null;
         this.localCandidates = [];
+        this.localParameters = null;
         this.localDescription = null;
+        this.remoteParameters = null;
         this.remoteDescription = null;
         var _waitGatheringComplete = {};
         _waitGatheringComplete.promise = new Promise((resolve, reject) => {
@@ -25,9 +28,10 @@ class Peer {
 
         // Create peer connection
         var pc = new RTCPeerConnection({
-            iceServers: [{
-                urls: 'stun:stun.l.google.com:19302'
-            }]
+            iceServers: []
+            // iceServers: [{
+            //     urls: 'stun:stun.l.google.com:19302'
+            // }]
         });
 
         // Bind peer connection events
@@ -122,6 +126,15 @@ class Peer {
             sections.forEach(function(mediaSection, sdpMLineIndex) {
                 // TODO: Ignore anything else but data transports
 
+                // Get mid
+                // TODO: This breaks with multiple transceivers
+                if (!self.localMid) {
+                    var mid = SDPUtils.matchPrefix(mediaSection, 'a=mid:');
+                    if (mid.length > 0) {
+                        self.localMid = mid[0].substr(6);
+                    }
+                }
+
                 // Get ICE parameters
                 if (!parameters.iceParameters) {
                     parameters.iceParameters = SDPUtils.getIceParameters(mediaSection, session);
@@ -160,7 +173,7 @@ class Peer {
         });
     }
 
-    setRemoteParameters(parameters, type, sctpPort = 5000, localMid = 0) {
+    setRemoteParameters(parameters, type, sctpPort = 5000, localMid = null) {
         return new Promise((resolve, reject) => {
             if (this.remoteDescription) {
                 resolve(this.remoteDescription);
@@ -172,15 +185,41 @@ class Peer {
                 return;
             }
 
+            if (!localMid) {
+                localMid = this.localMid;
+            }
+            this.remoteParameters = parameters;
+
             // Write SDP
             var sdp = SDPUtils.writeSessionBoilerplate();
 
             // Write media section
             sdp += 'a=msid-semantic: WMS\r\n'; // magic pixie dust
+            if (parameters.iceParameters.iceLite) {
+                sdp += 'a=ice-lite\r\n';
+            }
             sdp += 'm=application 9 DTLS/SCTP ' + sctpPort + '\r\n';
             sdp += 'c=IN IP4 0.0.0.0\r\n';
             sdp += SDPUtils.writeIceParameters(parameters.iceParameters);
-            sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters);
+
+            // Translate DTLS role
+            // Note: This somehow didn't make it into SDPUtils
+            var setupType;
+            switch (parameters.dtlsParameters.role) {
+                case 'client':
+                    setupType = 'active';
+                    break;
+                case 'server':
+                    setupType = 'passive';
+                    break;
+                default:
+                    // If in doubt, let WebRTC do the client side as ORTC is able to
+                    // switch over to server mode
+                    setupType = 'passive';
+                    break;
+            }
+
+            sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters, setupType);
             sdp += 'a=mid:' + localMid + '\r\n';
             sdp += 'a=sctpmap:' + sctpPort + ' webrtc-datachannel 1024\r\n';
 
@@ -189,6 +228,29 @@ class Peer {
             .then(() => {
                 console.log('Remote description:\n' + this.pc.remoteDescription.sdp);
                 this.remoteDescription = this.pc.remoteDescription;
+
+                // Add ICE candidates
+                for (var iceCandidate of parameters.iceCandidates) {
+                    // Add component which ORTC doesn't have
+                    // Note: We choose RTP as it doesn't actually matter for us
+                    iceCandidate.component = 1; // RTP
+
+                    // Create
+                    var candidate = new RTCIceCandidate({
+                        candidate: SDPUtils.writeCandidate(iceCandidate),
+                        sdpMLineIndex: 0, // TODO: Fix
+                        sdpMid: localMid // TODO: Fix
+                    });
+
+                    // Add
+                    console.log(candidate.candidate);
+                    this.pc.addIceCandidate(candidate)
+                    .then(() => {
+                        console.log('Added remote candidate', candidate);
+                    });
+                }
+
+                // It's trickle ICE, no need to wait for candidates to be added
                 resolve();
             })
             .catch((error) => {
@@ -214,6 +276,7 @@ class ControllingPeer extends Peer {
                 // Return parameters
                 super.getLocalParameters()
                 .then((parameters) => {
+                    this.localParameters = parameters;
                     resolve(parameters);
                 })
                 .catch((error) => {
@@ -241,8 +304,8 @@ class ControllingPeer extends Peer {
         });
     }
 
-    setRemoteParameters(parameters, sctpPort = 5000, localMid = 0) {
-        super.setRemoteParameters(parameters, 'answer', sctpPort, localMid);
+    setRemoteParameters(parameters, sctpPort = 5000, localMid = null) {
+        return super.setRemoteParameters(parameters, 'answer', sctpPort, localMid);
     }
 }
 
@@ -292,7 +355,7 @@ class ControlledPeer extends Peer {
         });
     }
 
-    setRemoteParameters(parameters, sctpPort = 5000, localMid = 0) {
+    setRemoteParameters(parameters, sctpPort = 5000, localMid = null) {
         super.setRemoteParameters(parameters, 'offer', sctpPort, localMid);
     }
 }

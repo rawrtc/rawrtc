@@ -29,7 +29,11 @@ textarea {
         var setRemoteParameters = () => {
             var parameters = JSON.parse(document.getElementById('remote-parameters').value);
             console.log('Remote parameters:', parameters);
-            peer.setRemoteParameters(parameters);
+            peer.setRemoteParameters(parameters)
+            .catch((error) => {
+                console.error(error);
+            });
+            start();
         };
 
         var start = () => {
