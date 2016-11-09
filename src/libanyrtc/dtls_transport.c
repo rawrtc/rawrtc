@@ -183,7 +183,7 @@ static void dtls_receive_handler(
         return;
     }
 
-    // Have receive handler?
+    // Handle (if receive handler exists)
     if (transport->receive_handler) {
         transport->receive_handler(buffer, transport->receive_handler_arg);
         return;

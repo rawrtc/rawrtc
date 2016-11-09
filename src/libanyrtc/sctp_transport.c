@@ -4,6 +4,7 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
+#include "message_buffer.h"
 #include "dtls_transport.h"
 #include "sctp_transport.h"
 
@@ -11,42 +12,134 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-/*
- * Handle incoming data messages.
- */
-static int sctp_receive_handler(
-        struct socket* const socket,
-        union sctp_sockstore address,
-        void* const data,
-        size_t length,
-        struct sctp_rcvinfo receive_info,
-        int flags,
-        void* arg
-) {
-    struct anyrtc_sctp_transport* const transport = arg;
+// TODO: This should probably be in usrsctp.h
+#define SCTP_EVENT_READ    0x0001
+#define SCTP_EVENT_WRITE   0x0002
+#define SCTP_EVENT_ERROR   0x0004
 
-    DEBUG_WARNING("TODO: HANDLE INCOMING SCTP PACKET\n");
+volatile int wat = 0; // TODO: Look, I know this is stupid, but it's going to be removed anyway
 
-    // TODO: What does the return code do?
-    return 1;
-}
-
+//
 /*
  * Handle outgoing SCTP messages.
  */
-static int dtls_send_handler(
-        void* const arg,
-        void* const buffer,
+static int sctp_packet_handler(
+        void* arg,
+        void* buffer,
         size_t length,
         uint8_t tos,
         uint8_t set_df
 ) {
     struct anyrtc_sctp_transport* const transport = arg;
 
+    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
+    if (wat) {
+        printf("mutex locked twice, PANIC?!\n");
+    }
+
+    // Lock event loop mutex
+    re_thread_enter();
+    ++wat; // TODO: Remove
+    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
+
+    // TODO: Send on DTLS transport
     DEBUG_WARNING("TODO: HANDLE OUTGOING SCTP PACKET\n");
+
+out:
+    // Unlock event loop mutex
+    re_thread_leave();
+    wat = 0; // TODO: Remove
 
     // TODO: What does the return code do?
     return 0;
+}
+
+/*
+ * Handle usrsctp events.
+ */
+static void upcall_handler(
+        struct socket* sock,
+        void* arg,
+        int flags
+) {
+    struct anyrtc_sctp_transport* const transport = arg;
+    int events = usrsctp_get_events(sock);
+
+    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
+    if (wat) {
+        printf("mutex locked twice, PANIC?!\n");
+    }
+
+    // Lock event loop mutex
+    re_thread_enter();
+    ++wat; // TODO: Remove
+    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
+
+    // Closed?
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_PRINTF("Ignoring SCTP event, transport is closed\n");
+    }
+
+    // Error?
+    if (events & SCTP_EVENT_ERROR) {
+        // TODO: What am I supposed to do with this information?
+        DEBUG_WARNING("SCTP error event\n");
+    }
+
+    // Can read?
+    if (events & SCTP_EVENT_READ) {
+        DEBUG_WARNING("TODO: CAN READ\n");
+//        struct mbuf* buffer;
+//        ssize_t length;
+//        struct sockaddr_in source;
+//        socklen_t source_length = sizeof(struct sockaddr_in);
+//        struct sctp_nxtinfo info = {0};
+//        socklen_t info_length = sizeof(struct sctp_recvv_rn);
+//        unsigned int info_type = SCTP_RECVV_NOINFO;
+//        int recv_flags = 0;
+//
+//        // TODO: Get datagram size
+//        length = ???;
+//
+//        // Create buffer (when buffering)
+//        // OR increase size of buffer if needed
+//
+//        // TODO: Do we need to do anything with info? Or can we NULL it if we don't use it?
+//        length = usrsctp_recvv(
+//                sock, buffer->buf, buffer->size, (struct sockaddr*) &source, &source_length,
+//                &info, &info_length, &info_type, &recv_flags);
+//        if (length == -1) {
+//            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
+//            // TODO: What now?
+//            goto out;
+//        }
+//
+//        // Handle (if receive handler exists)
+//        if (transport->receive_handler) {
+//            transport->receive_handler(buffer, transport->receive_handler_arg);
+//            goto out;
+//        }
+//
+//        // Buffer message
+//        enum anyrtc_code error = anyrtc_message_buffer_append(
+//                &transport->buffered_messages, NULL, buffer);
+//        if (error) {
+//            DEBUG_WARNING("Could not buffer SCTP packet, reason: %s\n", anyrtc_code_to_str(error));
+//        } else {
+//            DEBUG_PRINTF("Buffered SCTP packet of size %zu\n", mbuf_get_left(buffer));
+//        }
+    }
+
+    // Can write?
+    // TODO: How often is this called? What does 'write' tell me?
+    if (events & SCTP_EVENT_WRITE) {
+        DEBUG_WARNING("TODO: CAN WRITE\n");
+    }
+
+out:
+    // Unlock event loop mutex
+    re_thread_leave();
+    wat = 0; // TODO: Remove
 }
 
 /*
@@ -59,6 +152,7 @@ static void dtls_receive_handler(
     struct anyrtc_redirect_transport* const transport = arg;
 
     // TODO: Handle
+    DEBUG_WARNING("TODO: HANDLE INCOMING SCTP PACKET\n");
 }
 
 /*
@@ -91,8 +185,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 ) {
     bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
-    struct sockaddr_conn peer;
-    enum anyrtc_code error = ANYRTC_CODE_UNKNOWN_ERROR;
+    struct sockaddr_conn peer = {0};
+    enum anyrtc_code error;
 
     // Check arguments
     if (!transportp || !dtls_transport) {
@@ -133,7 +227,12 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Initialise usrsctp
-    usrsctp_init(0, dtls_send_handler, dbg_info);
+    usrsctp_init(0, sctp_packet_handler, dbg_info);
+
+    // TODO: Debugging depending on options
+#ifdef SCTP_DEBUG
+    usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
+#endif
 
     // TODO: What does this do?
     usrsctp_sysctl_set_sctp_blackhole(2);
@@ -141,23 +240,30 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
     transport->socket = usrsctp_socket(
-            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, sctp_receive_handler, NULL, 0, transport);
+            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, NULL, NULL, 0, transport);
     if (!socket) {
-        DEBUG_WARNING("SCTP transport could not create socket, reason: %m\n", errno);
+        DEBUG_WARNING("Could not create socket, reason: %m\n", errno);
         goto out;
     }
 
     // Make socket non-blocking
     if (usrsctp_set_non_blocking(transport->socket, 1)) {
-        DEBUG_WARNING("SCTP transport could not set to non-blocking, reason: %m\n", errno);
+        DEBUG_WARNING("Could not set to non-blocking, reason: %m\n", errno);
+        goto out;
+    }
+
+    // Set event callback
+    if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
+        DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
         goto out;
     }
 
     // Set peer address
-    memset(&peer, 0, sizeof(peer));
     peer.sconn_family = AF_CONN;
+    // TODO: Check for existance of sconn_len
+    // sconn.sconn_len = sizeof(struct sockaddr_conn);
     peer.sconn_port = port;
-    // Note: This is a very nasty hack to get our transport instance in the send handler
+    // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
 
     // Connect
