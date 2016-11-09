@@ -48,7 +48,7 @@ static int sctp_packet_handler(
 out:
     // Unlock event loop mutex
     re_thread_leave();
-    wat = 0; // TODO: Remove
+    --wat; // TODO: Remove
 
     // TODO: What does the return code do?
     return 0;
@@ -139,7 +139,7 @@ static void upcall_handler(
 out:
     // Unlock event loop mutex
     re_thread_leave();
-    wat = 0; // TODO: Remove
+    --wat; // TODO: Remove
 }
 
 /*
@@ -236,6 +236,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
     // TODO: What does this do?
     usrsctp_sysctl_set_sctp_blackhole(2);
+
+    // TODO: Do we need this?
+    //usrsctp_register_address(...);
 
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
