@@ -26,8 +26,8 @@ LIBRE_PATH="re"
 LIBREW_GIT="vcs@vcs.zwuenf.org:anyrtc/rew.git"
 LIBREW_BRANCH="gather_without_role"
 LIBREW_PATH="rew"
-USRSCTP_GIT="https://github.com/sctplab/usrsctp.git"
-USRSCTP_BRANCH="master"
+USRSCTP_GIT="https://github.com/lgrahl/usrsctp-neat.git"
+USRSCTP_BRANCH="usrsctpForNeat"
 USRSCTP_PATH="usrsctp"
 
 # Prefix
@@ -57,7 +57,7 @@ fi
 
 # Get zf_log
 if [ ! -d "${ZF_LOG_PATH}" ]; then
-    git clone --depth=1 -b ${ZF_LOG_BRANCH} ${ZF_LOG_GIT}
+    git clone --depth=1 -b ${ZF_LOG_BRANCH} ${ZF_LOG_GIT} ${ZF_LOG_PATH}
 else
     cd ${ZF_LOG_PATH}
     git pull
@@ -66,7 +66,7 @@ fi
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
-    git clone --depth=1 -b ${USRSCTP_BRANCH} ${USRSCTP_GIT}
+    git clone --depth=1 -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
 else
     cd ${USRSCTP_PATH}
     git pull
@@ -75,7 +75,7 @@ fi
 
 # Get libre
 if [ ! -d "${LIBRE_PATH}" ]; then
-    git clone --depth=1 -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
+    git clone --depth=1 -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH} ${LIBRE_PATH}
     cd ${LIBRE_PATH}
     patch << "EOF"
 --- Makefile
@@ -151,7 +151,7 @@ fi
 
 # Get librew
 if [ ! -d "${LIBREW_PATH}" ]; then
-    git clone --depth=1 -b ${LIBREW_BRANCH} ${LIBREW_GIT}
+    git clone --depth=1 -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
     cd ${LIBREW_PATH}
     patch << "EOF"
 --- Makefile
