@@ -78,6 +78,7 @@ static void upcall_handler(
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         DEBUG_PRINTF("Ignoring SCTP event, transport is closed\n");
+        goto out;
     }
 
     // Error?
