@@ -150,10 +150,19 @@ static void dtls_receive_handler(
         struct mbuf* const buffer,
         void* const arg
 ) {
-    struct anyrtc_redirect_transport* const transport = arg;
+    struct anyrtc_sctp_transport* const transport = arg;
+    size_t const length = mbuf_get_left(buffer);
 
-    // TODO: Handle
-    DEBUG_WARNING("TODO: HANDLE INCOMING SCTP PACKET\n");
+    // Closed?
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
+        return;
+    }
+
+    // Feed into SCTP socket
+    // TODO: What about ECN bits?
+    DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
+    usrsctp_conninput(transport->socket, mbuf_buf(buffer), length, 0);
 }
 
 /*
@@ -228,6 +237,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Initialise usrsctp
+    // TODO: Call this once (?)
     usrsctp_init(0, sctp_packet_handler, dbg_info);
 
     // TODO: Debugging depending on options
