@@ -294,6 +294,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
 out:
     if (error) {
+        if (transport->socket) {
+            usrsctp_close(transport->socket);
+        }
         mem_deref(transport);
     } else {
         // Set pointer
