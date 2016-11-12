@@ -339,6 +339,16 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
 );
 
 /*
+ * Handle buffered messages.
+ * TODO: private
+ */
+typedef void (anyrtc_message_buffer_handler)(
+    struct sa* const address,
+    struct mbuf* const buffer,
+    void* const arg
+);
+
+/*
  * Handle incoming data messages.
  * TODO: Private
  */
@@ -368,7 +378,7 @@ struct anyrtc_config {
  */
 struct anyrtc_buffered_message {
     struct le le;
-    struct sa source; // copied
+    struct sa address; // copied
     struct mbuf* buffer; // referenced
 };
 
@@ -543,7 +553,8 @@ struct anyrtc_dtls_transport {
     struct anyrtc_dtls_parameters* remote_parameters; // referenced
     enum anyrtc_dtls_role role;
     bool connection_established;
-    struct list buffered_messages;
+    struct list buffered_messages_in;
+    struct list buffered_messages_out;
     struct list candidate_helpers; // TODO: Hash list instead?
     struct list fingerprints;
     struct tls* context;
@@ -575,6 +586,7 @@ struct anyrtc_sctp_transport {
     anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
     void* arg; // nullable
     struct socket* socket;
+    volatile int wat; // TODO: Look, I know this is stupid, but it's going to be removed anyway
 };
 
 /*

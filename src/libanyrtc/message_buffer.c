@@ -18,7 +18,7 @@ static void anyrtc_message_buffer_destroy(
  */
 enum anyrtc_code anyrtc_message_buffer_append(
         struct list* const message_buffer,
-        struct sa * const source, // copied, nullable
+        struct sa * const address, // copied, nullable
         struct mbuf* const buffer // referenced
 ) {
     struct anyrtc_buffered_message* buffered_message;
@@ -36,8 +36,8 @@ enum anyrtc_code anyrtc_message_buffer_append(
     }
 
     // Set fields
-    if (source) {
-        buffered_message->source = *source;
+    if (address) {
+        buffered_message->address = *address;
     }
     buffered_message->buffer = mem_ref(buffer);
 
@@ -52,22 +52,22 @@ enum anyrtc_code anyrtc_message_buffer_append(
  */
 enum anyrtc_code anyrtc_message_buffer_clear(
         struct list* const message_buffer,
-        udp_helper_recv_h* const receive_handler,
+        anyrtc_message_buffer_handler* const message_handler,
         void* arg
 ) {
     struct le* le;
 
     // Check arguments
-    if (!message_buffer || !receive_handler) {
+    if (!message_buffer || !message_handler) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Receive each message
+    // Handle each message
     for (le = list_head(message_buffer); le != NULL; le = le->next) {
         struct anyrtc_buffered_message* const buffered_message = le->data;
 
-        // Receive buffered message
-        receive_handler(&buffered_message->source, buffered_message->buffer, arg);
+        // Handle buffered message
+        message_handler(&buffered_message->address, buffered_message->buffer, arg);
     }
 
     // Dereference all messages

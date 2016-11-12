@@ -169,6 +169,26 @@ static void close_handler(
 }
 
 /*
+ * Handle outgoing buffered DTLS messages.
+ */
+static void dtls_outgoing_buffer_handler(
+        struct sa* const destination,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+    enum anyrtc_code error;
+    (void) destination;
+
+    // Send
+    error = anyrtc_dtls_transport_send(transport, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not send buffered packet, reason: %s\n",
+                      anyrtc_code_to_str(error));
+    }
+}
+
+/*
  * Handle incoming DTLS messages.
  */
 static void dtls_receive_handler(
@@ -191,11 +211,12 @@ static void dtls_receive_handler(
 
     // Buffer message
     enum anyrtc_code error = anyrtc_message_buffer_append(
-            &transport->buffered_messages, NULL, buffer);
+            &transport->buffered_messages_in, NULL, buffer);
     if (error) {
-        DEBUG_WARNING("Could not buffer DTLS packet, reason: %s\n", anyrtc_code_to_str(error));
+        DEBUG_WARNING("Could not buffer incoming packet, reason: %s\n",
+                      anyrtc_code_to_str(error));
     } else {
-        DEBUG_PRINTF("Buffered DTLS packet of size %zu\n", mbuf_get_left(buffer));
+        DEBUG_PRINTF("Buffered incoming packet of size %zu\n", mbuf_get_left(buffer));
     }
 }
 
@@ -299,6 +320,15 @@ out:
     } else {
         // Connected
         set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED);
+
+        // TODO: This doesn't seem like the right place for that call
+        // Send buffered outgoing messages
+        error = anyrtc_message_buffer_clear(
+                &transport->ice_transport->gatherer->buffered_messages,
+                dtls_outgoing_buffer_handler, transport);
+        if (error) {
+            goto out;
+        }
     }
 }
 
@@ -459,8 +489,8 @@ static size_t mtu_handler(
 /*
  * Handle received UDP messages.
  */
-static bool udp_receive_handler(
-        struct sa * const source,
+static void udp_receive_handler(
+        struct sa* const source,
         struct mbuf* const buffer,
         void* const arg
 ) {
@@ -485,6 +515,18 @@ static bool udp_receive_handler(
     // Note: No need to check if the transport is already closed as the messages will re-appear in
     //       the `dtls_receive_handler`.
     dtls_receive(transport->socket, source, buffer);
+}
+
+/*
+ * Handle received UDP messages (UDP receive helper).
+ */
+static bool udp_receive_helper(
+        struct sa* const source,
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    // Receive
+    udp_receive_handler(source, buffer, arg);
 
     // Handled
     return true;
@@ -509,7 +551,8 @@ static void anyrtc_dtls_transport_destroy(
     mem_deref(transport->context);
     list_flush(&transport->fingerprints);
     list_flush(&transport->candidate_helpers);
-    list_flush(&transport->buffered_messages);
+    list_flush(&transport->buffered_messages_out);
+    list_flush(&transport->buffered_messages_in);
     mem_deref(transport->remote_parameters);
     list_flush(&transport->certificates);
     mem_deref(transport->ice_transport);
@@ -568,7 +611,8 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     transport->arg = arg;
     transport->role = ANYRTC_DTLS_ROLE_AUTO;
     transport->connection_established = false;
-    list_init(&transport->buffered_messages);
+    list_init(&transport->buffered_messages_in);
+    list_init(&transport->buffered_messages_out);
     list_init(&transport->candidate_helpers);
     list_init(&transport->fingerprints);
 
@@ -717,7 +761,7 @@ enum anyrtc_code anyrtc_dtls_transport_add_candidate_pair(
     // Attach final DTLS helper
     error = anyrtc_candidate_helper_attach(
             &candidate_helper, transport->ice_transport->gatherer->ice,
-            candidate_pair->lcand, udp_receive_handler, transport);
+            candidate_pair->lcand, udp_receive_helper, transport);
     if (error) {
         goto out;
     }
@@ -869,7 +913,7 @@ enum anyrtc_code anyrtc_dtls_transport_have_data_transport(
  * Pipe buffered messages into the data receive handler that has a
  * different signature.
  */
-static bool intermediate_receive_handler(
+static void intermediate_receive_handler(
         struct sa * const source,
         struct mbuf* const buffer,
         void* const arg
@@ -879,9 +923,6 @@ static bool intermediate_receive_handler(
 
     // Pipe into the actual receive handler
     transport->receive_handler(buffer, transport->receive_handler_arg);
-
-    // Handled
-    return true;
 }
 
 /*
@@ -911,7 +952,7 @@ enum anyrtc_code anyrtc_dtls_transport_set_data_transport(
 
     // Receive buffered messages
     error = anyrtc_message_buffer_clear(
-            &transport->buffered_messages, intermediate_receive_handler, transport);
+            &transport->buffered_messages_in, intermediate_receive_handler, transport);
     if (error) {
         return error;
     }
@@ -950,7 +991,26 @@ enum anyrtc_code anyrtc_dtls_transport_send(
         struct anyrtc_dtls_transport* const transport,
         struct mbuf* const buffer
 ) {
-    return anyrtc_error_to_code(dtls_send(transport->connection, buffer));
+    enum anyrtc_code error;
+
+    // Check arguments
+    if (!transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Connected?
+    if (transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        return anyrtc_error_to_code(dtls_send(transport->connection, buffer));
+    }
+
+    // Buffer message
+    error = anyrtc_message_buffer_append(&transport->buffered_messages_out, NULL, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
+                      anyrtc_code_to_str(error));
+    } else {
+        DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
+    }
 }
 
 /*
