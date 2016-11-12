@@ -116,21 +116,6 @@ static void dtls_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
-
-    // Open? Send message
-    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
-        // Send message
-        struct mbuf* buffer = mbuf_alloc(1024);
-        mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
-        mbuf_set_pos(buffer, 0);
-        DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
-                     mbuf_get_left(buffer));
-        int error = dtls_send(client->dtls_transport->connection, buffer);
-        if (error) {
-            DEBUG_WARNING("Could not send, error: %m\n", error);
-        }
-        mem_deref(buffer);
-    }
 }
 
 static void dtls_transport_error_handler(

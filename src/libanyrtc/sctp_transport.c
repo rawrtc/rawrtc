@@ -1,4 +1,4 @@
-#include <string.h> // memset
+#include <string.h> // memset, memcpy
 #include <errno.h> // errno
 #include <sys/socket.h> // AF_INET, SOCK_STREAM
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
@@ -17,9 +17,17 @@
 #define SCTP_EVENT_WRITE   0x0002
 #define SCTP_EVENT_ERROR   0x0004
 
-volatile int wat = 0; // TODO: Look, I know this is stupid, but it's going to be removed anyway
+/*
+ * Handle incoming message.
+ * TODO: Move into own directory
+ */
+static void dcep_receive_handler(
+        struct mbuf* const buffer,
+        void* const arg
+) {
 
-//
+}
+
 /*
  * Handle outgoing SCTP messages.
  */
@@ -31,24 +39,64 @@ static int sctp_packet_handler(
         uint8_t set_df
 ) {
     struct anyrtc_sctp_transport* const transport = arg;
+    enum anyrtc_code error;
+    (void) tos; // TODO: Handle?
+    (void) set_df; // TODO: Handle?
+
+    DEBUG_PRINTF("SCTP_PACKET_HANDLER\n");
 
     // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
-    if (wat) {
+    if (transport->wat) {
         printf("mutex locked twice, PANIC?!\n");
     }
 
     // Lock event loop mutex
     re_thread_enter();
-    ++wat; // TODO: Remove
+    ++transport->wat; // TODO: Remove
     DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
 
-    // TODO: Send on DTLS transport
-    DEBUG_WARNING("TODO: HANDLE OUTGOING SCTP PACKET\n");
+    // Note: We only need to copy the buffer if we add it to the outgoing queue
+    if (transport->dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        struct mbuf mbuffer;
+
+        // Note: dtls_send does not reference the buffer, so we can safely fake an mbuf structure
+        // to avoid copying. This may change in the future, so be aware!
+        mbuffer.buf = buffer;
+        mbuffer.pos = 0;
+        mbuffer.size = length;
+        mbuffer.end = length;
+
+        // Send
+        error = anyrtc_dtls_transport_send(transport->dtls_transport, &mbuffer);
+        if (error) {
+            DEBUG_WARNING("Could not send packet, reason: %s\n", anyrtc_code_to_str(error));
+            goto out;
+        }
+    } else {
+        // Allocate
+        struct mbuf* const mbuffer = mbuf_alloc(length);
+        if (!mbuffer) {
+            DEBUG_WARNING("Could not create buffer for outgoing packet, no memory\n");
+            goto out;
+        }
+
+        // Copy and set size/end
+        memcpy(mbuffer->buf, buffer, length);
+        mbuffer->end = length;
+
+        // Send (well, actually buffer...)
+        error = anyrtc_dtls_transport_send(transport->dtls_transport, mbuffer);
+        mem_deref(mbuffer);
+        if (error) {
+            DEBUG_WARNING("Could not send packet, reason: %s\n", anyrtc_code_to_str(error));
+            goto out;
+        }
+    }
 
 out:
     // Unlock event loop mutex
     re_thread_leave();
-    --wat; // TODO: Remove
+    --transport->wat; // TODO: Remove
 
     // TODO: What does the return code do?
     return 0;
@@ -65,14 +113,17 @@ static void upcall_handler(
     struct anyrtc_sctp_transport* const transport = arg;
     int events = usrsctp_get_events(sock);
 
+    // TODO: Remove
+    DEBUG_PRINTF("UPCALL_HANDLER\n");
+
     // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
-    if (wat) {
+    if (transport->wat) {
         printf("mutex locked twice, PANIC?!\n");
     }
 
     // Lock event loop mutex
     re_thread_enter();
-    ++wat; // TODO: Remove
+    ++transport->wat; // TODO: Remove
     DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
 
     // Closed?
@@ -89,38 +140,62 @@ static void upcall_handler(
 
     // Can read?
     if (events & SCTP_EVENT_READ) {
-        DEBUG_WARNING("TODO: CAN READ\n");
-//        struct mbuf* buffer;
-//        ssize_t length;
-//        struct sockaddr_in source;
-//        socklen_t source_length = sizeof(struct sockaddr_in);
-//        struct sctp_nxtinfo info = {0};
-//        socklen_t info_length = sizeof(struct sctp_recvv_rn);
-//        unsigned int info_type = SCTP_RECVV_NOINFO;
-//        int recv_flags = 0;
-//
-//        // TODO: Get datagram size
-//        length = ???;
-//
-//        // Create buffer (when buffering)
-//        // OR increase size of buffer if needed
-//
-//        // TODO: Do we need to do anything with info? Or can we NULL it if we don't use it?
+        struct mbuf* buffer;
+        ssize_t length;
+        struct sockaddr_in source;
+        socklen_t source_length = sizeof(struct sockaddr_in);
+        struct sctp_recvv_rn info;
+        socklen_t info_length = 0;
+        unsigned int info_type = SCTP_RECVV_NOINFO;
+        int recv_flags = MSG_PEEK;
+
+        // Get datagram size
+        length = usrsctp_recvv(
+                sock, NULL, 0, NULL, 0,
+                &info, &info_length, &info_type, &recv_flags);
+        if (length == -1) {
+            if (recv_flags & MSG_NOTIFICATION) {
+                DEBUG_WARNING("Ignoring message notification\n");
+                goto out;
+            }
+            if (info_type == SCTP_RECVV_RN) {
+                uint32_t packet_size = info.recvv_nxtinfo.nxt_length;
+                DEBUG_INFO("PACKET SIZE: %"PRIu32"\n", packet_size);
+            } else {
+                DEBUG_WARNING("Unexpected info type\n");
+                goto out;
+            }
+            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
+            // TODO: What now?
+            goto out;
+        }
+
+        DEBUG_WARNING("TODO: NOW WHAT?\n");
+
+        // Create buffer (when buffering)
+        // OR increase size of buffer if needed
+
+//        // Receive datagram
+//        info_length = 0;
+//        info_type = SCTP_RECVV_NOINFO;
+//        recv_flags = 0;
 //        length = usrsctp_recvv(
 //                sock, buffer->buf, buffer->size, (struct sockaddr*) &source, &source_length,
-//                &info, &info_length, &info_type, &recv_flags);
+//                NULL, &info_length, &info_type, &recv_flags);
 //        if (length == -1) {
 //            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
 //            // TODO: What now?
 //            goto out;
 //        }
-//
+
+//        dcep_receive_handler(buffer, NULL);
+
 //        // Handle (if receive handler exists)
 //        if (transport->receive_handler) {
 //            transport->receive_handler(buffer, transport->receive_handler_arg);
 //            goto out;
 //        }
-//
+
 //        // Buffer message
 //        enum anyrtc_code error = anyrtc_message_buffer_append(
 //                &transport->buffered_messages, NULL, buffer);
@@ -140,7 +215,7 @@ static void upcall_handler(
 out:
     // Unlock event loop mutex
     re_thread_leave();
-    --wat; // TODO: Remove
+    --transport->wat; // TODO: Remove
 }
 
 /*
@@ -195,8 +270,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 ) {
     bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
-    struct sockaddr_conn peer = {0};
+    struct sockaddr_in6 local = {0};
+    struct sockaddr_conn remote = {0};
     enum anyrtc_code error;
+    int option_value;
 
     // Check arguments
     if (!transportp || !dtls_transport) {
@@ -248,14 +325,17 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // TODO: What does this do?
     usrsctp_sysctl_set_sctp_blackhole(2);
 
-    // TODO: Do we need this?
-    //usrsctp_register_address(...);
+
+
+    // Disable ECN
+    usrsctp_sysctl_set_sctp_ecn_enable(0);
 
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
+    DEBUG_PRINTF("Creating SCTP socket\n");
     transport->socket = usrsctp_socket(
-            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, NULL, NULL, 0, transport);
-    if (!socket) {
+            AF_CONN, SOCK_STREAM, IPPROTO_SCTP, NULL, NULL, 0, NULL);
+    if (!transport->socket) {
         DEBUG_WARNING("Could not create socket, reason: %m\n", errno);
         goto out;
     }
@@ -266,29 +346,53 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // We want info
+    option_value = 1;
+    if (usrsctp_setsockopt(
+            transport->socket, IPPROTO_SCTP, SCTP_RECVNXTINFO,
+            &option_value, sizeof(option_value))) {
+        DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
+    }
+
     // Set event callback
     if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
         DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
         goto out;
     }
 
-    // Set peer address
-    peer.sconn_family = AF_CONN;
-    // TODO: Check for existance of sconn_len
-    // sconn.sconn_len = sizeof(struct sockaddr_conn);
-    peer.sconn_port = port;
-    // Note: This is a hack to get our transport instance in the send handler
-    peer.sconn_addr = transport;
-
-    // Connect
-    if (usrsctp_connect(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
-        DEBUG_WARNING("SCTP transport could not connect, reason: %m\n", errno);
+    // Bind local address
+    // TODO: Check for existance of sin6_len
+    //local.sin6_len = sizeof(struct sockaddr_in6);
+    local.sin6_family = AF_INET6;
+    local.sin6_addr = in6addr_any;
+    local.sin6_port = htons(port);
+    if (usrsctp_bind(transport->socket, (struct sockaddr*) &local, sizeof(struct sockaddr_in6))) {
+        DEBUG_WARNING("Could not bind local address, reason: %m\n", errno);
         goto out;
     }
 
+    // Set remote address
+    remote.sconn_family = AF_CONN;
+    // TODO: Check for existance of sconn_len
+    //sconn.sconn_len = sizeof(struct sockaddr_conn);
+    // TODO: This is incorrect. Furthermore, we don't actually know which port we have to choose.
+    // TODO: Open an issue about that on ORTC spec.
+    remote.sconn_port = htons(port);
+    // Note: This is a hack to get our transport instance in the send handler
+    remote.sconn_addr = transport;
+
     // Attach to ICE transport
+    DEBUG_PRINTF("Attaching as data transport\n");
     error = anyrtc_dtls_transport_set_data_transport(dtls_transport, dtls_receive_handler, transport);
     if (error) {
+        goto out;
+    }
+
+    // Connect
+    DEBUG_PRINTF("Connecting to remote\n");
+    if (usrsctp_connect(transport->socket, (struct sockaddr*) &remote, sizeof(remote))
+            && errno != EINPROGRESS) {
+        DEBUG_WARNING("Could not connect, reason: %m\n", errno);
         goto out;
     }
 
