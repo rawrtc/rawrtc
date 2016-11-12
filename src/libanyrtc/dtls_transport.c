@@ -324,8 +324,7 @@ out:
         // TODO: This doesn't seem like the right place for that call
         // Send buffered outgoing messages
         error = anyrtc_message_buffer_clear(
-                &transport->ice_transport->gatherer->buffered_messages,
-                dtls_outgoing_buffer_handler, transport);
+                &transport->buffered_messages_out, dtls_outgoing_buffer_handler, transport);
         if (error) {
             goto out;
         }

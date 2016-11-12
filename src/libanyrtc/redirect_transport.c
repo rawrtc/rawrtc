@@ -125,7 +125,6 @@ static void redirect_from_raw(
         patch_sctp_header(buffer, transport->local_port, transport->remote_port);
 
         // Send data
-        DEBUG_INFO("Sending %zu bytes via DTLS connection\n", mbuf_get_left(buffer));
         error = anyrtc_dtls_transport_send(transport->dtls_transport, buffer);
         if (error) {
             DEBUG_WARNING("Could not send, error: %m\n", error);

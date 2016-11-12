@@ -146,7 +146,7 @@ static void upcall_handler(
         socklen_t source_length = sizeof(struct sockaddr_in);
         struct sctp_recvv_rn info;
         socklen_t info_length = 0;
-        unsigned int info_type = SCTP_RECVV_NOINFO;
+        unsigned int info_type = SCTP_RECVV_RN;
         int recv_flags = MSG_PEEK;
 
         // Get datagram size
@@ -254,6 +254,9 @@ static void anyrtc_sctp_transport_destroy(
 
     // TODO: Close usrsctp socket
 
+    // TODO: Deregister address
+    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#338
+
     // Dereference
     mem_deref(transport->dtls_transport);
 }
@@ -270,8 +273,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 ) {
     bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
-    struct sockaddr_in6 local = {0};
-    struct sockaddr_conn remote = {0};
+    struct sctp_assoc_value av;
+    struct sockaddr_conn peer = {0};
     enum anyrtc_code error;
     int option_value;
 
@@ -322,13 +325,37 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
 #endif
 
-    // TODO: What does this do?
+    // Do not send ABORTs in response to INITs (1).
+    // Do not send ABORTs for received Out of the Blue packets (2).
     usrsctp_sysctl_set_sctp_blackhole(2);
 
-
-
-    // Disable ECN
+    // Disable the Explicit Congestion Notification extension
     usrsctp_sysctl_set_sctp_ecn_enable(0);
+
+    // Disable the Address Reconfiguration extension
+    usrsctp_sysctl_set_sctp_auto_asconf(0);
+
+    // Disable the Authentication extension
+    usrsctp_sysctl_set_sctp_auth_enable(0);
+
+    // Disable the NR-SACK extension
+    // TODO: Why?
+    usrsctp_sysctl_set_sctp_nrsack_enable(0);
+
+    // Disable the Packet Drop Report extension
+    // TODO: Why?
+    usrsctp_sysctl_set_sctp_pktdrop_enable(0);
+
+    // Enable the Partial Reliability extension
+    usrsctp_sysctl_set_sctp_pr_enable(1);
+
+    // TODO: Set amount of outgoing and incoming streams
+//    usrsctp_sysctl_set_sctp_nr_incoming_streams_default(...);
+//    usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(...);
+
+
+
+
 
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
@@ -340,9 +367,27 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // TODO: Why?
+    usrsctp_register_address(transport);
+
     // Make socket non-blocking
     if (usrsctp_set_non_blocking(transport->socket, 1)) {
         DEBUG_WARNING("Could not set to non-blocking, reason: %m\n", errno);
+        goto out;
+    }
+
+    // Set event callback
+    if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
+        DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
+        goto out;
+    }
+
+    // Enable the Stream Reconfiguration extension
+    av.assoc_id = SCTP_ALL_ASSOC;
+    av.assoc_value = SCTP_ENABLE_RESET_STREAM_REQ | SCTP_ENABLE_CHANGE_ASSOC_REQ;
+    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_ENABLE_STREAM_RESET,
+                           &av, sizeof(struct sctp_assoc_value))) {
+        DEBUG_WARNING("Could not enable stream reconfiguration extension, reason: %m\n", errno);
         goto out;
     }
 
@@ -354,43 +399,48 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
     }
 
-    // Set event callback
-    if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
-        DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
-        goto out;
-    }
+    // TODO: Disable lingering
+    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#291
+
+    // TODO: Set no delay option
+    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#303
+
+    // TODO: Subscribe to SCTP event notifications
+    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#310
 
     // Bind local address
-    // TODO: Check for existance of sin6_len
-    //local.sin6_len = sizeof(struct sockaddr_in6);
-    local.sin6_family = AF_INET6;
-    local.sin6_addr = in6addr_any;
-    local.sin6_port = htons(port);
-    if (usrsctp_bind(transport->socket, (struct sockaddr*) &local, sizeof(struct sockaddr_in6))) {
+    peer.sconn_family = AF_CONN;
+    // TODO: Check for existance of sconn_len
+    //sconn.sconn_len = sizeof(struct sockaddr_conn);
+    peer.sconn_port = htons(port);
+    // Note: This is a hack to get our transport instance in the send handler
+    peer.sconn_addr = transport;
+    if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
         DEBUG_WARNING("Could not bind local address, reason: %m\n", errno);
         goto out;
     }
 
     // Set remote address
-    remote.sconn_family = AF_CONN;
+    peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
     //sconn.sconn_len = sizeof(struct sockaddr_conn);
     // TODO: This is incorrect. Furthermore, we don't actually know which port we have to choose.
     // TODO: Open an issue about that on ORTC spec.
-    remote.sconn_port = htons(port);
+    peer.sconn_port = htons(port);
     // Note: This is a hack to get our transport instance in the send handler
-    remote.sconn_addr = transport;
+    peer.sconn_addr = transport;
 
     // Attach to ICE transport
     DEBUG_PRINTF("Attaching as data transport\n");
-    error = anyrtc_dtls_transport_set_data_transport(dtls_transport, dtls_receive_handler, transport);
+    error = anyrtc_dtls_transport_set_data_transport(
+            dtls_transport, dtls_receive_handler, transport);
     if (error) {
         goto out;
     }
 
     // Connect
-    DEBUG_PRINTF("Connecting to remote\n");
-    if (usrsctp_connect(transport->socket, (struct sockaddr*) &remote, sizeof(remote))
+    DEBUG_PRINTF("Connecting to peer\n");
+    if (usrsctp_connect(transport->socket, (struct sockaddr*) &peer, sizeof(peer))
             && errno != EINPROGRESS) {
         DEBUG_WARNING("Could not connect, reason: %m\n", errno);
         goto out;
@@ -399,6 +449,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 out:
     if (error) {
         if (transport->socket) {
+            usrsctp_deregister_address(transport);
             usrsctp_close(transport->socket);
         }
         mem_deref(transport);
