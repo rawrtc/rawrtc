@@ -21,7 +21,7 @@ endif()
 find_package(PkgConfig REQUIRED)
 
 # TODO: Dependency: zf_log
-include_directories(/home/lenny/Projects/anyrtc/anyrtc/build.cmake/prefix/include)
+#include_directories(.../build.cmake/prefix/include)
 
 # Dependency: OpenSSL (TODO: Move to libre)
 pkg_check_modules(LIB_OPENSSL REQUIRED openssl>=1.0.2)

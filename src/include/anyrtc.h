@@ -8,13 +8,13 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, ...
 #include <openssl/evp.h> // EVP_PKEY
 
-#define ZF_LOG_LIBRARY_PREFIX anyrtc_
-#ifdef ANYRTC_DEBUG
-    #define ANYRTC_ZF_LOG_LEVEL ZF_LOG_DEBUG
-#else
-    #define ANYRTC_ZF_LOG_LEVEL ZF_LOG_WARN
-#endif
-#include <zf_log.h>
+//#define ZF_LOG_LIBRARY_PREFIX anyrtc_
+//#ifdef ANYRTC_DEBUG
+//    #define ANYRTC_ZF_LOG_LEVEL ZF_LOG_DEBUG
+//#else
+//    #define ANYRTC_ZF_LOG_LEVEL ZF_LOG_WARN
+//#endif
+//#include <zf_log.h>
 
 #include <re.h>
 #include <rew.h>

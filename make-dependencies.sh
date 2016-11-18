@@ -16,10 +16,10 @@ fi
 OPENSSL_URL="https://www.openssl.org/source/openssl-1.0.2h.tar.gz"
 OPENSSL_TAR="openssl-1.0.2h.tar.gz"
 OPENSSL_PATH="openssl-1.0.2h"
-ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
-ZF_LOG_BRANCH="master"
-ZF_LOG_PATH="zf_log"
-ZF_LOG_BUILD_PATH="zf_log.build"
+#ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
+#ZF_LOG_BRANCH="master"
+#ZF_LOG_PATH="zf_log"
+#ZF_LOG_BUILD_PATH="zf_log.build"
 LIBRE_GIT="vcs@vcs.zwuenf.org:anyrtc/re.git"
 LIBRE_BRANCH="anyrtc-patched"
 LIBRE_PATH="re"
@@ -55,14 +55,14 @@ if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
     tar -xzf ${OPENSSL_TAR}
 fi
 
-# Get zf_log
-if [ ! -d "${ZF_LOG_PATH}" ]; then
-    git clone --depth=1 -b ${ZF_LOG_BRANCH} ${ZF_LOG_GIT} ${ZF_LOG_PATH}
-else
-    cd ${ZF_LOG_PATH}
-    git pull
-    cd ${MAIN_DIR}
-fi
+## Get zf_log
+#if [ ! -d "${ZF_LOG_PATH}" ]; then
+#    git clone --depth=1 -b ${ZF_LOG_BRANCH} ${ZF_LOG_GIT} ${ZF_LOG_PATH}
+#else
+#    cd ${ZF_LOG_PATH}
+#    git pull
+#    cd ${MAIN_DIR}
+#fi
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
@@ -243,14 +243,14 @@ if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
     cd ${MAIN_DIR}
 fi
 
-# Build zf_log
-if [ ! -d "${ZF_LOG_BUILD_PATH}" ]; then
-    mkdir zf_log.build
-fi
-cd ${ZF_LOG_BUILD_PATH}
-CFLAGS=-fPIC cmake ../${ZF_LOG_PATH} -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_LIBRARY_PREFIX=${LIB_PREFIX}
-make install -j${THREADS}
-cd ${MAIN_DIR}
+## Build zf_log
+#if [ ! -d "${ZF_LOG_BUILD_PATH}" ]; then
+#    mkdir zf_log.build
+#fi
+#cd ${ZF_LOG_BUILD_PATH}
+#CFLAGS=-fPIC cmake ../${ZF_LOG_PATH} -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_LIBRARY_PREFIX=${LIB_PREFIX}
+#make install -j${THREADS}
+#cd ${MAIN_DIR}
 
 # Build usrsctp
 cd ${USRSCTP_PATH}
