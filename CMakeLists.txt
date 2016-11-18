@@ -23,7 +23,7 @@ find_package(PkgConfig REQUIRED)
 # TODO: Dependency: zf_log
 #include_directories(.../build.cmake/prefix/include)
 
-# Dependency: OpenSSL (TODO: Move to libre)
+# Dependency: OpenSSL
 pkg_check_modules(LIB_OPENSSL REQUIRED openssl>=1.0.2)
 include_directories(${LIB_OPENSSL_INCLUDE_DIRS})
 link_directories(${LIB_OPENSSL_LIBRARY_DIRS})
@@ -40,7 +40,12 @@ link_directories(${LIB_REW_LIBRARY_DIRS})
 
 # Dependency: usrsctp
 # TODO: Use find_package as usrsctp has cmake support
+# TODO: Or even better add a pkg-config file to usrsctp
 find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp libusrsctp)
+find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
+get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
+include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
+link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
 
 # Dependencies library list
 set(anyrtc_DEP_LIBRARIES
