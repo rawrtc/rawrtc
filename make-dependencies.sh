@@ -75,7 +75,7 @@ fi
 
 # Get libre
 if [ ! -d "${LIBRE_PATH}" ]; then
-    git clone --depth=1 -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH} ${LIBRE_PATH}
+    git clone --depth=1 -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
     cd ${LIBRE_PATH}
     patch << "EOF"
 --- Makefile
