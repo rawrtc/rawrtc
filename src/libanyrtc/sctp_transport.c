@@ -292,8 +292,8 @@ static void anyrtc_sctp_transport_destroy(
 
     // Close socket and deregister transport
     if (transport->socket) {
-        usrsctp_deregister_address(transport);
         usrsctp_close(transport->socket);
+        usrsctp_deregister_address(transport);
         transport->socket = NULL;
     }
 
@@ -383,7 +383,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
         // Do not send ABORTs in response to INITs (1).
         // Do not send ABORTs for received Out of the Blue packets (2).
-//        usrsctp_sysctl_set_sctp_blackhole(2);
+        usrsctp_sysctl_set_sctp_blackhole(2);
 
         // Disable the Explicit Congestion Notification extension
         usrsctp_sysctl_set_sctp_ecn_enable(0);
