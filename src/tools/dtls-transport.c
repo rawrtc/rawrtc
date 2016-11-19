@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <anyrtc.h>
+#include "../libanyrtc/dtls_transport.h"
 
 /* TODO: Replace with zf_log */
 #define DEBUG_MODULE "dtls-transport-app"
@@ -118,15 +119,17 @@ static void dtls_transport_state_change_handler(
 
     // Open? Send message
     if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        enum anyrtc_code error;
+
         // Send message
         struct mbuf* buffer = mbuf_alloc(1024);
         mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
         mbuf_set_pos(buffer, 0);
         DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
                      mbuf_get_left(buffer));
-        int error = dtls_send(client->dtls_transport->connection, buffer);
+        error = anyrtc_dtls_transport_send(client->dtls_transport, buffer);
         if (error) {
-            DEBUG_WARNING("Could not send, error: %m\n", error);
+            DEBUG_WARNING("Could not send, reason: %s\n", anyrtc_code_to_str(error));
         }
         mem_deref(buffer);
     }

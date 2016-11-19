@@ -466,6 +466,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // TODO: Set MTU
+    // https://github.com/ortclib/ortclib-cpp/blob/master/ortc/cpp/ortc_SCTPTransport.cpp#L2143
+
     // We want info
     option_value = 1;
     if (usrsctp_setsockopt(
@@ -565,5 +568,71 @@ out:
         *transportp = transport;
     }
     return error;
+}
+
+/*
+ * Send a data message over the SCTP transport.
+ * TODO: Add partial reliability options.
+ */
+enum anyrtc_code anyrtc_sctp_transport_send(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer
+) {
+    struct sctp_sendv_spa spa = {0};
+    ssize_t length;
+
+    // Check arguments
+    if (!transport || !buffer) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Partial reliability setting
+    // TODO
+    spa.sendv_sndinfo.snd_sid = 1;
+    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+    spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//    spa.sendv_sndinfo.snd_sid = channel->sid;
+//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+//    if ((channel->state == DATA_CHANNEL_OPEN) && (channel->unordered)) {
+//        spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
+//    }
+//    spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//    if (channel->pr_policy == SCTP_PR_SCTP_TTL || channel->pr_policy == SCTP_PR_SCTP_RTX) {
+//        spa.sendv_prinfo.pr_policy = channel->pr_policy;
+//        spa.sendv_prinfo.pr_value = channel->pr_value;
+//        spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
+//    }
+
+    // Connected?
+    // TODO
+//    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+    length = usrsctp_sendv(
+            transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
+            &spa, (socklen_t) sizeof(spa), SCTP_SENDV_SPA, 0);
+    if (length < 0) {
+        DEBUG_WARNING("Could not send message, reason: %m\n", errno);
+        return anyrtc_error_to_code(errno);
+    }
+    return ANYRTC_CODE_SUCCESS;
+//    }
+
+    // Buffer message
+    // TODO
+    DEBUG_WARNING("SHOULD BUFFER MESSAGE\n");
+//    error = anyrtc_message_buffer_append(&transport->buffered_messages_out, NULL, buffer);
+//    if (error) {
+//        DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
+//                      anyrtc_code_to_str(error));
+//    } else {
+//        DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
+//    }
+//    return ANYRTC_CODE_SUCCESS;
 }
 

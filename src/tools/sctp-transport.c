@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <anyrtc.h>
+#include "../libanyrtc/sctp_transport.h"
 
 /* TODO: Replace with zf_log */
 #define DEBUG_MODULE "sctp-transport-app"
@@ -20,7 +21,7 @@ struct client {
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
-    struct anyrtc_sctp_transport* redirect_transport;
+    struct anyrtc_sctp_transport* sctp_transport;
     struct client* other_client;
 };
 
@@ -116,6 +117,24 @@ static void dtls_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
+
+    // Open? Send message
+    // TODO: This shouldn't be here!
+    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        enum anyrtc_code error;
+
+        // Send message
+        struct mbuf* buffer = mbuf_alloc(1024);
+        mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
+        mbuf_set_pos(buffer, 0);
+        DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
+                     mbuf_get_left(buffer));
+        error = anyrtc_sctp_transport_send(client->sctp_transport, buffer);
+        if (error) {
+            DEBUG_WARNING("Could not send, reason: %s\n", anyrtc_code_to_str(error));
+        }
+        mem_deref(buffer);
+    }
 }
 
 static void dtls_transport_error_handler(
@@ -169,7 +188,7 @@ void client_init(
 
     // Create SCTP transport
     EOE(anyrtc_sctp_transport_create(
-            &local->redirect_transport, local->dtls_transport, 0, data_channel_handler, local));
+            &local->sctp_transport, local->dtls_transport, 0, data_channel_handler, local));
 }
 
 void client_start(
@@ -207,7 +226,7 @@ void client_stop(
     // Dereference & close
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
-    client->redirect_transport = mem_deref(client->redirect_transport);
+    client->sctp_transport = mem_deref(client->sctp_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -251,7 +270,7 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
-            .redirect_transport = NULL,
+            .sctp_transport = NULL,
             .other_client = NULL,
     };
     struct client b = {
@@ -264,7 +283,7 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
-            .redirect_transport = NULL,
+            .sctp_transport = NULL,
             .other_client = NULL,
     };
     a.other_client = &b;

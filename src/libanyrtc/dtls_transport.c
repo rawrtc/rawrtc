@@ -993,8 +993,13 @@ enum anyrtc_code anyrtc_dtls_transport_send(
     enum anyrtc_code error;
 
     // Check arguments
-    if (!transport) {
+    if (!transport || !buffer) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (is_closed(transport)) {
+        return ANYRTC_CODE_INVALID_STATE;
     }
 
     // Connected?
@@ -1010,6 +1015,7 @@ enum anyrtc_code anyrtc_dtls_transport_send(
     } else {
         DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
     }
+    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
