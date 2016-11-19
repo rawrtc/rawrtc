@@ -38,6 +38,31 @@ uint16_t const sctp_events[] = {
 size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
 /*
+ * Dump an SCTP packet into a trace file.
+ */
+static void trace_packet(
+        struct anyrtc_sctp_transport* const transport,
+        void* const buffer,
+        size_t const length,
+        int const direction
+) {
+    char* dump_buffer;
+
+    // Have trace handle?
+    if (!transport->trace_handle) {
+        return;
+    }
+
+    // Trace (if trace handle)
+    dump_buffer = usrsctp_dumppacket(buffer, length, direction);
+    if (dump_buffer) {
+        fprintf(transport->trace_handle, "%s", dump_buffer);
+        usrsctp_freedumpbuffer(dump_buffer);
+        fflush(transport->trace_handle);
+    }
+}
+
+/*
  * Handle incoming message.
  * TODO: Move into own directory
  */
@@ -81,6 +106,10 @@ static int sctp_packet_handler(
         goto out;
     }
 
+    // Trace (if trace handle)
+    // Note: No need to check if NULL as the function does it for us
+    trace_packet(transport, buffer, length, SCTP_DUMP_OUTBOUND);
+
     // Note: We only need to copy the buffer if we add it to the outgoing queue
     if (transport->dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         struct mbuf mbuffer;
@@ -91,10 +120,6 @@ static int sctp_packet_handler(
         mbuffer.pos = 0;
         mbuffer.size = length;
         mbuffer.end = length;
-
-        // Trace (if trace handle)
-        // Note: No need to check if NULL as the function does it for us
-        anyrtc_trace_packet(transport->trace_handle, &mbuffer);
 
         // Send
         error = anyrtc_dtls_transport_send(transport->dtls_transport, &mbuffer);
@@ -109,10 +134,6 @@ static int sctp_packet_handler(
         // Copy and set size/end
         memcpy(mbuffer->buf, buffer, length);
         mbuffer->end = length;
-
-        // Trace (if trace handle)
-        // Note: No need to check if NULL as the function does it for us
-        anyrtc_trace_packet(transport->trace_handle, mbuffer);
 
         // Send (well, actually buffer...)
         error = anyrtc_dtls_transport_send(transport->dtls_transport, mbuffer);
@@ -270,7 +291,7 @@ static void dtls_receive_handler(
 
     // Trace (if trace handle)
     // Note: No need to check if NULL as the function does it for us
-    anyrtc_trace_packet(transport->trace_handle, buffer);
+    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
 
     // Feed into SCTP socket
     // TODO: What about ECN bits?
@@ -317,7 +338,8 @@ static void anyrtc_sctp_transport_destroy(
 enum anyrtc_code anyrtc_sctp_transport_create(
         struct anyrtc_sctp_transport** const transportp, // de-referenced
         struct anyrtc_dtls_transport* const dtls_transport, // referenced
-        uint16_t port, // zeroable
+        uint16_t local_port, // zeroable
+        uint16_t remote_port, // zeroable
         anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
         void* const arg // nullable
 ) {
@@ -368,8 +390,11 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     transport->arg = arg;
 
     // Set default port (if 0)
-    if (port == 0) {
-        port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
+    if (local_port == 0) {
+        local_port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
+    }
+    if (remote_port == 0) {
+        remote_port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
     }
 
     // Initialise usrsctp (if not already initialised)
@@ -484,7 +509,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Discard pending packets when closing
-    // TODO: OK?
+    // (so we don't get a callback when the transport is already free'd)
     linger_option.l_onoff = 1;
     linger_option.l_linger = 0;
     if (usrsctp_setsockopt(transport->socket, SOL_SOCKET, SO_LINGER,
@@ -497,7 +522,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // TODO: Why?
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
                            &av.assoc_value, sizeof(av.assoc_value))) {
-        DEBUG_WARNING("Could not enable stream reconfiguration extension, reason: %m\n", errno);
+        DEBUG_WARNING("Could not set no-delay, reason: %m\n", errno);
         goto out;
     }
 
@@ -527,7 +552,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
     //sconn.sconn_len = sizeof(struct sockaddr_conn);
-    peer.sconn_port = htons(port);
+    peer.sconn_port = htons(local_port);
     // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
     if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
@@ -547,9 +572,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
     //sconn.sconn_len = sizeof(struct sockaddr_conn);
-    // TODO: This is incorrect. Furthermore, we don't actually know which port we have to choose.
-    // TODO: Open an issue about that on ORTC spec.
-    peer.sconn_port = htons(port);
+    // TODO: Open an issue about missing remote port on ORTC spec.
+    peer.sconn_port = htons(remote_port);
     // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
 

@@ -73,8 +73,3 @@ enum anyrtc_code anyrtc_colon_hex_to_bin(
     size_t const buffer_size,
     char* source
 );
-
-void anyrtc_trace_packet(
-    FILE* const handle,
-    struct mbuf* const buffer
-);

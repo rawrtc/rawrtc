@@ -1175,7 +1175,8 @@ enum anyrtc_code anyrtc_redirect_transport_create(
 enum anyrtc_code anyrtc_sctp_transport_create(
     struct anyrtc_sctp_transport** const transportp, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
-    uint16_t port, // zeroable
+    uint16_t local_port, // zeroable
+    uint16_t remote_port, // zeroable
     anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
     void* const arg // nullable
 );

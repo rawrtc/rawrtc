@@ -21,6 +21,8 @@ struct client {
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
+    uint16_t local_sctp_port; // TODO: This should be in parameters
+    uint16_t remote_sctp_port; // TODO: This should be in parameters
     struct anyrtc_sctp_transport* sctp_transport;
     struct client* other_client;
 };
@@ -188,7 +190,8 @@ void client_init(
 
     // Create SCTP transport
     EOE(anyrtc_sctp_transport_create(
-            &local->sctp_transport, local->dtls_transport, 0, data_channel_handler, local));
+            &local->sctp_transport, local->dtls_transport,
+            local->local_sctp_port, local->remote_sctp_port, data_channel_handler, local));
 }
 
 void client_start(
@@ -270,6 +273,8 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
+            .local_sctp_port = 6000,
+            .remote_sctp_port = 5000,
             .sctp_transport = NULL,
             .other_client = NULL,
     };
@@ -283,6 +288,8 @@ int main(int argc, char* argv[argc + 1]) {
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
+            .local_sctp_port = 5000,
+            .remote_sctp_port = 6000,
             .sctp_transport = NULL,
             .other_client = NULL,
     };
