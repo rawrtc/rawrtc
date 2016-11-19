@@ -3,6 +3,7 @@
 #include <errno.h> // errno
 #include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
+#define SCTP_DEBUG
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
 #include "utils.h"
@@ -62,7 +63,7 @@ static int sctp_packet_handler(
     (void) tos; // TODO: Handle?
     (void) set_df; // TODO: Handle?
 
-    DEBUG_PRINTF("SCTP_PACKET_HANDLER\n");
+    DEBUG_PRINTF(">>> %u SCTP_PACKET_HANDLER\n", transport->wat);
 
     // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
     if (transport->wat) {
@@ -126,8 +127,9 @@ static int sctp_packet_handler(
 
 out:
     // Unlock event loop mutex
-    re_thread_leave();
     --transport->wat; // TODO: Remove
+    DEBUG_PRINTF("<<< %u SCTP_PACKET_HANDLER\n", transport->wat);
+    re_thread_leave();
 
     // TODO: What does the return code do?
     return 0;
@@ -145,7 +147,7 @@ static void upcall_handler(
     int events = usrsctp_get_events(sock);
 
     // TODO: Remove
-    DEBUG_PRINTF("UPCALL_HANDLER\n");
+    DEBUG_PRINTF(">>> %u UPCALL_HANDLER\n", transport->wat);
 
     // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
     if (transport->wat) {
@@ -245,8 +247,9 @@ static void upcall_handler(
 
 out:
     // Unlock event loop mutex
-    re_thread_leave();
     --transport->wat; // TODO: Remove
+    DEBUG_PRINTF("<<< %u UPCALL_HANDLER\n", transport->wat);
+    re_thread_leave();
 }
 
 /*
@@ -287,13 +290,15 @@ static void anyrtc_sctp_transport_destroy(
     // Note: No NULL checking needed as the function will do that for us
     anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
 
-    // Close socket and close transport
-    usrsctp_close(transport->socket);
-    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_CLOSED;
-    transport->socket = NULL;
+    // Close socket and deregister transport
+    if (transport->socket) {
+        usrsctp_deregister_address(transport);
+        usrsctp_close(transport->socket);
+        transport->socket = NULL;
+    }
 
-    // Deregister instance
-    usrsctp_deregister_address(transport);
+    // Close transport
+    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_CLOSED;
 
     // Close trace file (if any)
     if (transport->trace_handle) {
@@ -378,7 +383,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
         // Do not send ABORTs in response to INITs (1).
         // Do not send ABORTs for received Out of the Blue packets (2).
-        usrsctp_sysctl_set_sctp_blackhole(2);
+//        usrsctp_sysctl_set_sctp_blackhole(2);
 
         // Disable the Explicit Congestion Notification extension
         usrsctp_sysctl_set_sctp_ecn_enable(0);
@@ -530,6 +535,14 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // Attach to ICE transport
+    DEBUG_PRINTF("Attaching as data transport\n");
+    error = anyrtc_dtls_transport_set_data_transport(
+            dtls_transport, dtls_receive_handler, transport);
+    if (error) {
+        goto out;
+    }
+
     // Set remote address
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
@@ -539,14 +552,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     peer.sconn_port = htons(port);
     // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
-
-    // Attach to ICE transport
-    DEBUG_PRINTF("Attaching as data transport\n");
-    error = anyrtc_dtls_transport_set_data_transport(
-            dtls_transport, dtls_receive_handler, transport);
-    if (error) {
-        goto out;
-    }
 
     // Connect
     DEBUG_PRINTF("Connecting to peer\n");
@@ -558,10 +563,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
 out:
     if (error) {
-        if (transport->socket) {
-            usrsctp_deregister_address(transport);
-            usrsctp_close(transport->socket);
-        }
         mem_deref(transport);
     } else {
         // Set pointer
@@ -613,14 +614,14 @@ enum anyrtc_code anyrtc_sctp_transport_send(
     // Connected?
     // TODO
 //    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-    length = usrsctp_sendv(
-            transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
-            &spa, (socklen_t) sizeof(spa), SCTP_SENDV_SPA, 0);
-    if (length < 0) {
-        DEBUG_WARNING("Could not send message, reason: %m\n", errno);
-        return anyrtc_error_to_code(errno);
-    }
-    return ANYRTC_CODE_SUCCESS;
+        length = usrsctp_sendv(
+                transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
+                &spa, (socklen_t) sizeof(spa), SCTP_SENDV_SPA, 0);
+        if (length < 0) {
+            DEBUG_WARNING("Could not send message, reason: %m\n", errno);
+            return anyrtc_error_to_code(errno);
+        }
+        return ANYRTC_CODE_SUCCESS;
 //    }
 
     // Buffer message

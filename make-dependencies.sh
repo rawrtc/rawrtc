@@ -19,7 +19,6 @@ OPENSSL_PATH="openssl-1.0.2h"
 #ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
 #ZF_LOG_BRANCH="master"
 #ZF_LOG_PATH="zf_log"
-#ZF_LOG_BUILD_PATH="zf_log.build"
 LIBRE_GIT="https://vcs.zwuenf.org/anyrtc/re.git"
 LIBRE_BRANCH="anyrtc-patched"
 LIBRE_PATH="re"
@@ -244,18 +243,22 @@ if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
 fi
 
 ## Build zf_log
-#if [ ! -d "${ZF_LOG_BUILD_PATH}" ]; then
-#    mkdir zf_log.build
+#cd ${ZF_LOG_PATH}
+#if [ ! -d "build" ]; then
+#    mkdir build
 #fi
-#cd ${ZF_LOG_BUILD_PATH}
-#CFLAGS=-fPIC cmake ../${ZF_LOG_PATH} -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_LIBRARY_PREFIX=${LIB_PREFIX}
+#cd build
+#CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_LIBRARY_PREFIX=${LIB_PREFIX} ..
 #make install -j${THREADS}
 #cd ${MAIN_DIR}
 
 # Build usrsctp
 cd ${USRSCTP_PATH}
-./bootstrap
-CFLAGS=-fPIC ./configure --prefix=${PREFIX} --disable-shared --enable-static
+if [ ! -d "build" ]; then
+    mkdir build
+fi
+cd build
+CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 make install -j${THREADS}
 # we have a name conflict for 'mbuf_init'
 objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a

@@ -39,8 +39,7 @@ include_directories(${LIB_REW_INCLUDE_DIRS})
 link_directories(${LIB_REW_LIBRARY_DIRS})
 
 # Dependency: usrsctp
-# TODO: Use find_package as usrsctp has cmake support
-# TODO: Or even better add a pkg-config file to usrsctp
+# TODO: Add a pkg-config file to usrsctp
 find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp libusrsctp)
 find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
