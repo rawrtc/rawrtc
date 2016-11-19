@@ -1,9 +1,11 @@
+#include <stdio.h> // fopen
 #include <string.h> // memset, memcpy
 #include <errno.h> // errno
-#include <sys/socket.h> // AF_INET, SOCK_STREAM
+#include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
+#include "utils.h"
 #include "message_buffer.h"
 #include "dtls_transport.h"
 #include "sctp_transport.h"
@@ -16,6 +18,23 @@
 #define SCTP_EVENT_READ    0x0001
 #define SCTP_EVENT_WRITE   0x0002
 #define SCTP_EVENT_ERROR   0x0004
+
+// Initialised flag
+static bool usrsctp_initialized = false;
+
+// Events to subscribe to
+uint16_t const sctp_events[] = {
+    SCTP_ASSOC_CHANGE,
+    SCTP_PEER_ADDR_CHANGE,
+    SCTP_REMOTE_ERROR,
+    SCTP_SHUTDOWN_EVENT,
+    SCTP_ADAPTATION_INDICATION,
+    SCTP_SEND_FAILED_EVENT,
+    SCTP_STREAM_RESET_EVENT,
+    SCTP_STREAM_CHANGE_EVENT,
+    SCTP_SENDER_DRY_EVENT
+};
+size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
 /*
  * Handle incoming message.
@@ -55,6 +74,12 @@ static int sctp_packet_handler(
     ++transport->wat; // TODO: Remove
     DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
 
+    // Closed?
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_PRINTF("Ignoring SCTP packet ready event, transport is closed\n");
+        goto out;
+    }
+
     // Note: We only need to copy the buffer if we add it to the outgoing queue
     if (transport->dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         struct mbuf mbuffer;
@@ -66,12 +91,12 @@ static int sctp_packet_handler(
         mbuffer.size = length;
         mbuffer.end = length;
 
+        // Trace (if trace handle)
+        // Note: No need to check if NULL as the function does it for us
+        anyrtc_trace_packet(transport->trace_handle, &mbuffer);
+
         // Send
         error = anyrtc_dtls_transport_send(transport->dtls_transport, &mbuffer);
-        if (error) {
-            DEBUG_WARNING("Could not send packet, reason: %s\n", anyrtc_code_to_str(error));
-            goto out;
-        }
     } else {
         // Allocate
         struct mbuf* const mbuffer = mbuf_alloc(length);
@@ -84,13 +109,19 @@ static int sctp_packet_handler(
         memcpy(mbuffer->buf, buffer, length);
         mbuffer->end = length;
 
+        // Trace (if trace handle)
+        // Note: No need to check if NULL as the function does it for us
+        anyrtc_trace_packet(transport->trace_handle, mbuffer);
+
         // Send (well, actually buffer...)
         error = anyrtc_dtls_transport_send(transport->dtls_transport, mbuffer);
         mem_deref(mbuffer);
-        if (error) {
-            DEBUG_WARNING("Could not send packet, reason: %s\n", anyrtc_code_to_str(error));
-            goto out;
-        }
+    }
+
+    // Handle error
+    if (error) {
+        DEBUG_WARNING("Could not send packet, reason: %s\n", anyrtc_code_to_str(error));
+        goto out;
     }
 
 out:
@@ -128,7 +159,7 @@ static void upcall_handler(
 
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        DEBUG_PRINTF("Ignoring SCTP event, transport is closed\n");
+        DEBUG_PRINTF("Ignoring SCTP upcall event, transport is closed\n");
         goto out;
     }
 
@@ -234,6 +265,10 @@ static void dtls_receive_handler(
         return;
     }
 
+    // Trace (if trace handle)
+    // Note: No need to check if NULL as the function does it for us
+    anyrtc_trace_packet(transport->trace_handle, buffer);
+
     // Feed into SCTP socket
     // TODO: What about ECN bits?
     DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
@@ -252,10 +287,20 @@ static void anyrtc_sctp_transport_destroy(
     // Note: No NULL checking needed as the function will do that for us
     anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
 
-    // TODO: Close usrsctp socket
+    // Close socket and close transport
+    usrsctp_close(transport->socket);
+    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_CLOSED;
+    transport->socket = NULL;
 
-    // TODO: Deregister address
-    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#338
+    // Deregister instance
+    usrsctp_deregister_address(transport);
+
+    // Close trace file (if any)
+    if (transport->trace_handle) {
+        if (fclose(transport->trace_handle)) {
+            DEBUG_WARNING("Could not close trace file, reason: %m\n", errno);
+        }
+    }
 
     // Dereference
     mem_deref(transport->dtls_transport);
@@ -273,7 +318,13 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 ) {
     bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
+    char trace_handle_id[8];
+    char* trace_handle_name;
     struct sctp_assoc_value av;
+    struct linger linger_option;
+    struct sctp_event sctp_event = {0};
+    size_t i;
+    struct sctp_initmsg sctp_init_options = {0};
     struct sockaddr_conn peer = {0};
     enum anyrtc_code error;
     int option_value;
@@ -316,46 +367,69 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
     }
 
-    // Initialise usrsctp
-    // TODO: Call this once (?)
-    usrsctp_init(0, sctp_packet_handler, dbg_info);
+    // Initialise usrsctp (if not already initialised)
+    if (!usrsctp_initialized) {
+        usrsctp_init(0, sctp_packet_handler, dbg_info);
 
-    // TODO: Debugging depending on options
+        // TODO: Debugging depending on options
 #ifdef SCTP_DEBUG
-    usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
+        usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
 #endif
 
-    // Do not send ABORTs in response to INITs (1).
-    // Do not send ABORTs for received Out of the Blue packets (2).
-    usrsctp_sysctl_set_sctp_blackhole(2);
+        // Do not send ABORTs in response to INITs (1).
+        // Do not send ABORTs for received Out of the Blue packets (2).
+        usrsctp_sysctl_set_sctp_blackhole(2);
 
-    // Disable the Explicit Congestion Notification extension
-    usrsctp_sysctl_set_sctp_ecn_enable(0);
+        // Disable the Explicit Congestion Notification extension
+        usrsctp_sysctl_set_sctp_ecn_enable(0);
 
-    // Disable the Address Reconfiguration extension
-    usrsctp_sysctl_set_sctp_auto_asconf(0);
+        // Disable the Address Reconfiguration extension
+        // TODO: This is still enabled in SCTP INIT for some reason
+        usrsctp_sysctl_set_sctp_auto_asconf(0);
 
-    // Disable the Authentication extension
-    usrsctp_sysctl_set_sctp_auth_enable(0);
+        // Disable the Authentication extension
+        usrsctp_sysctl_set_sctp_auth_enable(0);
 
-    // Disable the NR-SACK extension
-    // TODO: Why?
-    usrsctp_sysctl_set_sctp_nrsack_enable(0);
+        // Disable the NR-SACK extension
+        // TODO: Why?
+        usrsctp_sysctl_set_sctp_nrsack_enable(0);
 
-    // Disable the Packet Drop Report extension
-    // TODO: Why?
-    usrsctp_sysctl_set_sctp_pktdrop_enable(0);
+        // Disable the Packet Drop Report extension
+        // TODO: Why?
+        usrsctp_sysctl_set_sctp_pktdrop_enable(0);
 
-    // Enable the Partial Reliability extension
-    usrsctp_sysctl_set_sctp_pr_enable(1);
+        // Enable the Partial Reliability extension
+        // TODO: This is not set in SCTP INIT for some reason
+        usrsctp_sysctl_set_sctp_pr_enable(1);
 
-    // TODO: Set amount of outgoing and incoming streams
-//    usrsctp_sysctl_set_sctp_nr_incoming_streams_default(...);
-//    usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(...);
+        // Set amount of incoming streams
+        // TODO: usrsctp_sysctl_set_sctp_nr_incoming_streams_default is not defined
+        //    usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
+        //            ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
+        // Set amount of outgoing streams
+        usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(
+                ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
+        // Initialised
+        usrsctp_initialized = true;
+    }
 
-
+    // Create packet tracer
+    // TODO: Debug mode only, filename set by debug options
+    rand_str(trace_handle_id, sizeof(trace_handle_id));
+    error = anyrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
+    if (error) {
+        DEBUG_WARNING("Could create trace file name, reason: %s\n", anyrtc_code_to_str(error));
+    } else {
+        transport->trace_handle = fopen(trace_handle_name, "w");
+        mem_deref(trace_handle_name);
+        if (!transport->trace_handle) {
+            DEBUG_WARNING("Could not open trace file, reason: %m\n", errno);
+        } else {
+            DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
+        }
+    }
 
     // Create SCTP socket
     // TODO: Do we need a send handler? What does 'threshold' do?
@@ -367,6 +441,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // Register instance
     // TODO: Why?
     usrsctp_register_address(transport);
 
@@ -397,16 +472,48 @@ enum anyrtc_code anyrtc_sctp_transport_create(
             transport->socket, IPPROTO_SCTP, SCTP_RECVNXTINFO,
             &option_value, sizeof(option_value))) {
         DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
+        goto out;
     }
 
-    // TODO: Disable lingering
-    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#291
+    // Discard pending packets when closing
+    // TODO: OK?
+    linger_option.l_onoff = 1;
+    linger_option.l_linger = 0;
+    if (usrsctp_setsockopt(transport->socket, SOL_SOCKET, SO_LINGER,
+                           &linger_option, sizeof(linger_option))) {
+        DEBUG_WARNING("Could not set linger options, reason: %m\n", errno);
+        goto out;
+    }
 
-    // TODO: Set no delay option
-    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#303
+    // Set no delay option
+    // TODO: Why?
+    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
+                           &av.assoc_value, sizeof(av.assoc_value))) {
+        DEBUG_WARNING("Could not enable stream reconfiguration extension, reason: %m\n", errno);
+        goto out;
+    }
 
-    // TODO: Subscribe to SCTP event notifications
-    // Reference: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/media/sctp/sctpdataengine.cc#310
+    // Subscribe to SCTP event notifications
+    sctp_event.se_assoc_id = SCTP_ALL_ASSOC;
+    sctp_event.se_on = 1;
+    for (i = 0; i < sctp_events_length; ++i) {
+        sctp_event.se_type = sctp_events[i];
+        if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_EVENT,
+                               &sctp_event, sizeof(sctp_event))) {
+            DEBUG_WARNING("Could not subscribe to event notification, reason: %m", errno);
+            goto out;
+        }
+    }
+
+    // Set number of streams (outgoing and incoming)
+    // TODO: Use options?
+    sctp_init_options.sinit_num_ostreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
+    sctp_init_options.sinit_max_instreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
+    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_INITMSG,
+                           &sctp_init_options, sizeof(sctp_init_options))) {
+        DEBUG_WARNING("Could not set number of streams, reason: %m", errno);
+        goto out;
+    }
 
     // Bind local address
     peer.sconn_family = AF_CONN;

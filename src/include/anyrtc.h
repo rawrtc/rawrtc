@@ -585,6 +585,7 @@ struct anyrtc_sctp_transport {
     struct anyrtc_dtls_transport* dtls_transport; // referenced
     anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
     void* arg; // nullable
+    FILE* trace_handle;
     struct socket* socket;
     volatile int wat; // TODO: Look, I know this is stupid, but it's going to be removed anyway
 };

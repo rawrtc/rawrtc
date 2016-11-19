@@ -808,6 +808,40 @@ enum anyrtc_code anyrtc_colon_hex_to_bin(
 }
 
 /*
+ * Trace a network packet to file.
+ */
+void anyrtc_trace_packet(
+        FILE* const handle,
+        struct mbuf* const buffer
+) {
+    size_t length;
+    uint8_t* bufferp;
+    size_t i;
+
+    // Check arguments
+    if (!handle || !buffer) {
+        return;
+    }
+
+    // Get length
+    length = mbuf_get_left(buffer);
+    if (length == 0) {
+        return;
+    }
+
+    // Write packet data as hex
+    fprintf(handle, "0000");
+    bufferp = mbuf_buf(buffer);
+    for (i = 0; i < length; ++i) {
+        fprintf(handle, " %02X", bufferp[i]);
+    }
+
+    // New line & flush
+    fprintf(handle, "\n\n");
+    fflush(handle);
+}
+
+/*
  * Duplicate a string.
  */
 enum anyrtc_code anyrtc_strdup(
