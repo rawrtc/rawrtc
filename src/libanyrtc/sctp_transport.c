@@ -296,7 +296,7 @@ static void dtls_receive_handler(
     // Feed into SCTP socket
     // TODO: What about ECN bits?
     DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
-    usrsctp_conninput(transport->socket, mbuf_buf(buffer), length, 0);
+    usrsctp_conninput(transport, mbuf_buf(buffer), length, 0);
 }
 
 /*
