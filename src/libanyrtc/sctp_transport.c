@@ -414,8 +414,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_ecn_enable(0);
 
         // Disable the Address Reconfiguration extension
-        // TODO: This is still enabled in SCTP INIT for some reason
-        usrsctp_sysctl_set_sctp_auto_asconf(0);
+        usrsctp_sysctl_set_sctp_asconf_enable(0);
 
         // Disable the Authentication extension
         usrsctp_sysctl_set_sctp_auth_enable(0);
@@ -434,7 +433,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
         // Set amount of incoming streams
         // TODO: usrsctp_sysctl_set_sctp_nr_incoming_streams_default is not defined
-        //    usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
+        //usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
         //            ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
         // Set amount of outgoing streams
