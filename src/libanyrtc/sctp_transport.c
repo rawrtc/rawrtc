@@ -25,15 +25,15 @@ static bool usrsctp_initialized = false;
 
 // Events to subscribe to
 uint16_t const sctp_events[] = {
-    SCTP_ASSOC_CHANGE,
-    SCTP_PEER_ADDR_CHANGE,
-    SCTP_REMOTE_ERROR,
-    SCTP_SHUTDOWN_EVENT,
-    SCTP_ADAPTATION_INDICATION,
-    SCTP_SEND_FAILED_EVENT,
+//    SCTP_ASSOC_CHANGE,
+//    SCTP_PEER_ADDR_CHANGE,
+//    SCTP_REMOTE_ERROR,
+//    SCTP_SHUTDOWN_EVENT,
+//    SCTP_ADAPTATION_INDICATION,
+//    SCTP_SEND_FAILED_EVENT,
     SCTP_STREAM_RESET_EVENT,
     SCTP_STREAM_CHANGE_EVENT,
-    SCTP_SENDER_DRY_EVENT
+//    SCTP_SENDER_DRY_EVENT
 };
 size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
@@ -419,16 +419,13 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         // Disable the Authentication extension
         usrsctp_sysctl_set_sctp_auth_enable(0);
 
-        // Disable the NR-SACK extension
-        // TODO: Why?
+        // Disable the NR-SACK extension (not standardised)
         usrsctp_sysctl_set_sctp_nrsack_enable(0);
 
-        // Disable the Packet Drop Report extension
-        // TODO: Why?
+        // Disable the Packet Drop Report extension (not standardised)
         usrsctp_sysctl_set_sctp_pktdrop_enable(0);
 
         // Enable the Partial Reliability extension
-        // TODO: This is not set in SCTP INIT for some reason
         usrsctp_sysctl_set_sctp_pr_enable(1);
 
         // Set amount of incoming streams
@@ -461,7 +458,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Create SCTP socket
-    // TODO: Do we need a send handler? What does 'threshold' do?
     DEBUG_PRINTF("Creating SCTP socket\n");
     transport->socket = usrsctp_socket(
             AF_CONN, SOCK_STREAM, IPPROTO_SCTP, NULL, NULL, 0, NULL);
@@ -471,7 +467,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Register instance
-    // TODO: Why?
     usrsctp_register_address(transport);
 
     // Make socket non-blocking
@@ -495,10 +490,11 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
-    // TODO: Set MTU
+    // TODO: Set MTU (1200 - IPv4 | IPv6 - UDP - DTLS (cipher suite dependent) - SCTP (12)
     // https://github.com/ortclib/ortclib-cpp/blob/master/ortc/cpp/ortc_SCTPTransport.cpp#L2143
 
     // We want info
+    // TODO: recv info only
     option_value = 1;
     if (usrsctp_setsockopt(
             transport->socket, IPPROTO_SCTP, SCTP_RECVNXTINFO,
@@ -517,8 +513,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
-    // Set no delay option
-    // TODO: Why?
+    // Set no delay option (disable nagle)
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
                            &av.assoc_value, sizeof(av.assoc_value))) {
         DEBUG_WARNING("Could not set no-delay, reason: %m\n", errno);
@@ -538,7 +533,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Set number of streams (outgoing and incoming)
-    // TODO: Use options?
+    // TODO: Remove after branch update
     sctp_init_options.sinit_num_ostreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
     sctp_init_options.sinit_max_instreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_INITMSG,
@@ -552,7 +547,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // TODO: Check for existance of sconn_len
     //sconn.sconn_len = sizeof(struct sockaddr_conn);
     peer.sconn_port = htons(local_port);
-    // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
     if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
         DEBUG_WARNING("Could not bind local address, reason: %m\n", errno);
@@ -573,7 +567,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     //sconn.sconn_len = sizeof(struct sockaddr_conn);
     // TODO: Open an issue about missing remote port on ORTC spec.
     peer.sconn_port = htons(remote_port);
-    // Note: This is a hack to get our transport instance in the send handler
     peer.sconn_addr = transport;
 
     // Connect
