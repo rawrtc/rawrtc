@@ -25,8 +25,7 @@ enum anyrtc_code anyrtc_dtls_fingerprint_create(
     enum anyrtc_code error;
 
     // Allocate
-    fingerprint = mem_zalloc(sizeof(struct anyrtc_dtls_fingerprint),
-                             anyrtc_dtls_fingerprint_destroy);
+    fingerprint = mem_zalloc(sizeof(*fingerprint), anyrtc_dtls_fingerprint_destroy);
     if (!fingerprint) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -59,8 +58,7 @@ enum anyrtc_code anyrtc_dtls_fingerprint_create_empty(
     struct anyrtc_dtls_fingerprint* fingerprint;
 
     // Allocate
-    fingerprint = mem_zalloc(sizeof(struct anyrtc_dtls_fingerprint),
-                             anyrtc_dtls_fingerprint_destroy);
+    fingerprint = mem_zalloc(sizeof(*fingerprint), anyrtc_dtls_fingerprint_destroy);
     if (!fingerprint) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -113,7 +111,7 @@ static enum anyrtc_code anyrtc_dtls_parameters_allocate(
     size_t fingerprints_size;
 
     // Allocate parameters
-    parameters = mem_zalloc(sizeof(struct anyrtc_dtls_parameters), anyrtc_dtls_parameters_destroy);
+    parameters = mem_zalloc(sizeof(*parameters), anyrtc_dtls_parameters_destroy);
     if (!parameters) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -122,10 +120,9 @@ static enum anyrtc_code anyrtc_dtls_parameters_allocate(
     parameters->role = role;
 
     // Allocate fingerprints array & set length immediately
-    fingerprints_size = sizeof(struct anyrtc_dtls_fingerprint*) * n_fingerprints;
-    parameters->fingerprints = mem_zalloc(
-            sizeof(struct anyrtc_dtls_fingerprints) + fingerprints_size,
-            anyrtc_dtls_parameters_fingerprints_destroy);
+    fingerprints_size = sizeof(*parameters) * n_fingerprints;
+    parameters->fingerprints = mem_zalloc(sizeof(*parameters) + fingerprints_size,
+                                          anyrtc_dtls_parameters_fingerprints_destroy);
     if (!parameters->fingerprints) {
         error = ANYRTC_CODE_NO_MEMORY;
         goto out;

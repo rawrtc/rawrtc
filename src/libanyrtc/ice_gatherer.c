@@ -35,8 +35,7 @@ enum anyrtc_code anyrtc_ice_gather_options_create(
     }
 
     // Allocate
-    options = mem_zalloc(sizeof(struct anyrtc_ice_gather_options),
-                        anyrtc_ice_gather_options_destroy);
+    options = mem_zalloc(sizeof(*options), anyrtc_ice_gather_options_destroy);
     if (!options) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -79,7 +78,7 @@ static enum anyrtc_code anyrtc_ice_server_url_create(
     }
 
     // Allocate
-    url = mem_zalloc(sizeof(struct anyrtc_ice_server_url), anyrtc_ice_server_url_destroy);
+    url = mem_zalloc(sizeof(*url), anyrtc_ice_server_url_destroy);
     if (!url) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -138,7 +137,7 @@ enum anyrtc_code anyrtc_ice_gather_options_add_server(
     }
 
     // Allocate
-    server = mem_zalloc(sizeof(struct anyrtc_ice_server), anyrtc_ice_server_destroy);
+    server = mem_zalloc(sizeof(*server), anyrtc_ice_server_destroy);
     if (!server) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -247,7 +246,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     }
 
     // Allocate
-    gatherer = mem_zalloc(sizeof(struct anyrtc_ice_gatherer), anyrtc_ice_gatherer_destroy);
+    gatherer = mem_zalloc(sizeof(*gatherer), anyrtc_ice_gatherer_destroy);
     if (!gatherer) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -578,9 +577,8 @@ enum anyrtc_code anyrtc_ice_gatherer_get_local_candidates(
     n = list_count(trice_lcandl(gatherer->ice));
 
     // Allocate & set length immediately
-    candidates = mem_zalloc(
-            sizeof(struct anyrtc_ice_candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
-            anyrtc_ice_gatherer_local_candidates_destroy);
+    candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
+                            anyrtc_ice_gatherer_local_candidates_destroy);
     if (!candidates) {
         return ANYRTC_CODE_NO_MEMORY;
     }

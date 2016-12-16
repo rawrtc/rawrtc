@@ -355,7 +355,7 @@ static void client_init(
     // Create DTLS transport
     EOE(anyrtc_dtls_transport_create(
             &client->dtls_transport, client->ice_transport, certificates,
-            sizeof(certificates) / sizeof(struct anyrtc_certificate*),
+            sizeof(certificates) / sizeof(certificates[0]),
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
     // Create redirect transport
@@ -674,9 +674,8 @@ static enum anyrtc_code client_get_ice_candidates(
     n = list_count(&dict->lst);
 
     // Allocate & set length immediately
-    candidates = mem_zalloc(
-            sizeof(struct anyrtc_ice_candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
-            client_ice_candidates_destroy);
+    candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
+                            client_ice_candidates_destroy);
     if (!candidates) {
         EWE("No memory to allocate ICE candidates array");
     }
@@ -771,7 +770,7 @@ static enum anyrtc_code client_get_dtls_parameters(
 
     // Allocate & set length immediately
     fingerprints = mem_zalloc(
-            sizeof(struct anyrtc_ice_candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
+            sizeof(*fingerprints) + (sizeof(struct anyrtc_dtls_fingerprints*) * n),
             client_dtls_fingerprints_destroy);
     if (!fingerprints) {
         EWE("No memory to allocate DTLS fingerprint array");
@@ -940,11 +939,11 @@ int main(int argc, char* argv[argc + 1]) {
     // Add ICE servers to ICE gather options
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(char*),
+            sizeof(stun_google_com_urls) / sizeof(stun_google_com_urls[0]),
             NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org_urls) / sizeof(char*),
+            sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Set client fields

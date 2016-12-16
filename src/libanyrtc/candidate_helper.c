@@ -39,8 +39,7 @@ enum anyrtc_code anyrtc_candidate_helper_attach(
     }
 
     // Create DTLS candidate helper
-    candidate_helper = mem_zalloc(sizeof(struct anyrtc_candidate_helper),
-                                  anyrtc_candidate_helper_destroy);
+    candidate_helper = mem_zalloc(sizeof(*candidate_helper), anyrtc_candidate_helper_destroy);
     if (!candidate_helper) {
         return ANYRTC_CODE_NO_MEMORY;
     }

@@ -427,8 +427,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(struct anyrtc_dtls_transport),
-                           anyrtc_sctp_transport_destroy);
+    transport = mem_zalloc(sizeof(*transport), anyrtc_sctp_transport_destroy);
     if (!transport) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -583,7 +582,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // Bind local address
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
-    //sconn.sconn_len = sizeof(struct sockaddr_conn);
+    //sconn.sconn_len = sizeof(peer);
     peer.sconn_port = htons(local_port);
     peer.sconn_addr = transport;
     if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
@@ -602,7 +601,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // Set remote address
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
-    //sconn.sconn_len = sizeof(struct sockaddr_conn);
+    //sconn.sconn_len = sizeof(peer);
     // TODO: Open an issue about missing remote port on ORTC spec.
     peer.sconn_port = htons(remote_port);
     peer.sconn_addr = transport;

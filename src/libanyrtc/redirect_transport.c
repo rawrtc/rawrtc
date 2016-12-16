@@ -79,7 +79,7 @@ static void redirect_from_raw(
         mbuf_rewind(buffer);
 
         // Receive
-        address_length = sizeof(struct sockaddr_in);
+        address_length = sizeof(from_address);
         length = recvfrom(transport->socket, mbuf_buf(buffer), mbuf_get_space(buffer),
                 0, (struct sockaddr*) &from_address, &address_length);
         if (length == -1) {
@@ -219,8 +219,7 @@ enum anyrtc_code anyrtc_redirect_transport_create(
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(struct anyrtc_redirect_transport),
-                           anyrtc_redirect_transport_destroy);
+    transport = mem_zalloc(sizeof(*transport), anyrtc_redirect_transport_destroy);
     if (!transport) {
         return ANYRTC_CODE_NO_MEMORY;
     }

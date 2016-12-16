@@ -173,7 +173,7 @@ void client_init(
     // Create DTLS transport
     EOE(anyrtc_dtls_transport_create(
             &local->dtls_transport, local->ice_transport, certificates,
-            sizeof(certificates) / sizeof(struct anyrtc_certificate*),
+            sizeof(certificates) / sizeof(certificates[0]),
             dtls_transport_state_change_handler, dtls_transport_error_handler, local));
 }
 
@@ -236,11 +236,11 @@ int main(int argc, char* argv[argc + 1]) {
     // Add ICE servers to ICE gather options
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(char*),
+            sizeof(stun_google_com_urls) / sizeof(stun_google_com_urls[0]),
             NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
     EOE(anyrtc_ice_gather_options_add_server(
             gather_options, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org_urls) / sizeof(char*),
+            sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Initialise clients

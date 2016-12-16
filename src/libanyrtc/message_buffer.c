@@ -29,8 +29,7 @@ enum anyrtc_code anyrtc_message_buffer_append(
     }
 
     // Create buffered message
-    buffered_message = mem_zalloc(sizeof(struct anyrtc_buffered_message),
-                                  anyrtc_message_buffer_destroy);
+    buffered_message = mem_zalloc(sizeof(*buffered_message), anyrtc_message_buffer_destroy);
     if (!buffered_message) {
         return ANYRTC_CODE_NO_MEMORY;
     }

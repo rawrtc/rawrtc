@@ -387,8 +387,7 @@ enum anyrtc_code anyrtc_certificate_options_create(
     }
 
     // Allocate
-    options = mem_zalloc(sizeof(struct anyrtc_certificate_options),
-                         anyrtc_certificate_options_destroy);
+    options = mem_zalloc(sizeof(*options), anyrtc_certificate_options_destroy);
     if (!options) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -462,7 +461,7 @@ enum anyrtc_code anyrtc_certificate_generate(
     }
 
     // Allocate
-    certificate = mem_zalloc(sizeof(struct anyrtc_certificate), anyrtc_certificate_destroy);
+    certificate = mem_zalloc(sizeof(*certificate), anyrtc_certificate_destroy);
     if (!certificate) {
         return ANYRTC_CODE_NO_MEMORY;
     }
@@ -520,7 +519,7 @@ enum anyrtc_code anyrtc_certificate_copy(
     }
 
     // Allocate
-    certificate = mem_zalloc(sizeof(struct anyrtc_certificate), anyrtc_certificate_destroy);
+    certificate = mem_zalloc(sizeof(*certificate), anyrtc_certificate_destroy);
     if (!certificate) {
         return ANYRTC_CODE_NO_MEMORY;
     }
