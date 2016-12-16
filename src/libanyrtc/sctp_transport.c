@@ -20,7 +20,7 @@ static bool usrsctp_initialized = false;
 
 // Events to subscribe to
 uint16_t const sctp_events[] = {
-//    SCTP_ASSOC_CHANGE,
+    SCTP_ASSOC_CHANGE,
 //    SCTP_PEER_ADDR_CHANGE,
 //    SCTP_REMOTE_ERROR,
 //    SCTP_SHUTDOWN_EVENT,
@@ -31,6 +31,26 @@ uint16_t const sctp_events[] = {
 //    SCTP_SENDER_DRY_EVENT
 };
 size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+
+/*
+ * Get the corresponding name for an SCTP transport state.
+ */
+char const * const anyrtc_sctp_transport_state_to_name(
+        enum anyrtc_sctp_transport_state const state
+) {
+    switch (state) {
+        case ANYRTC_SCTP_TRANSPORT_STATE_NEW:
+            return "new";
+        case ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING:
+            return "connecting";
+        case ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED:
+            return "connected";
+        case ANYRTC_SCTP_TRANSPORT_STATE_CLOSED:
+            return "closed";
+        default:
+            return "???";
+    }
+}
 
 /*
  * Lock event loop mutex.
@@ -88,11 +108,169 @@ static void trace_packet(
  * Handle incoming message.
  * TODO: Move into own directory
  */
-static void dcep_receive_handler(
+static enum anyrtc_code sctp_receive_handler(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer
+) {
+    DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
+}
+
+/*
+ * Handle outgoing buffered DTLS messages.
+ */
+static void sctp_receive_handler_helper(
+        struct sa* const destination,
         struct mbuf* const buffer,
         void* const arg
 ) {
+    struct anyrtc_sctp_transport* const transport = arg;
+    enum anyrtc_code error;
+    (void) destination;
 
+    // Receive
+    error = sctp_receive_handler(transport, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not receive buffered packet, reason: %s\n",
+                      anyrtc_code_to_str(error));
+    }
+}
+
+/*
+ * Change the state of the SCTP transport.
+ * Will call the corresponding handler.
+ * Caller MUST ensure that the same state is not set twice.
+ */
+static enum anyrtc_code set_state(
+        struct anyrtc_sctp_transport* const transport,
+        enum anyrtc_sctp_transport_state const state
+) {
+    // Set state
+    transport->state = state;
+
+    // Call handler (if any)
+    if (transport->state_change_handler) {
+        transport->state_change_handler(state, transport->arg);
+    }
+
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Print debug information for an SCTP association change event.
+ */
+int debug_association_change_event(
+        struct re_printf* const pf,
+        struct sctp_assoc_change* const event
+) {
+    int err = 0;
+    uint_fast32_t length;
+    uint_fast32_t i;
+
+    switch (event->sac_state) {
+        case SCTP_COMM_UP:
+            err |= re_hprintf(pf, "SCTP_COMM_UP");
+            break;
+        case SCTP_COMM_LOST:
+            err |= re_hprintf(pf, "SCTP_COMM_LOST");
+            break;
+        case SCTP_RESTART:
+            err |= re_hprintf(pf, "SCTP_RESTART");
+            break;
+        case SCTP_SHUTDOWN_COMP:
+            err |= re_hprintf(pf, "SCTP_SHUTDOWN_COMP");
+            break;
+        case SCTP_CANT_STR_ASSOC:
+            err |= re_hprintf(pf, "SCTP_CANT_STR_ASSOC");
+            break;
+        default:
+            err |= re_hprintf(pf, "???");
+            break;
+    }
+    err |= re_hprintf(pf, ", streams (in/out) = (%u/%u)",
+               event->sac_inbound_streams, event->sac_outbound_streams);
+    length = event->sac_length - sizeof(*event);
+    if (length > 0) {
+        switch (event->sac_state) {
+            case SCTP_COMM_UP:
+            case SCTP_RESTART:
+                err |= re_hprintf(pf, ", supports");
+                for (i = 0; i < length; ++i) {
+                    switch (event->sac_info[i]) {
+                        case SCTP_ASSOC_SUPPORTS_PR:
+                            err |= re_hprintf(pf, " PR");
+                            break;
+                        case SCTP_ASSOC_SUPPORTS_AUTH:
+                            err |= re_hprintf(pf, " AUTH");
+                            break;
+                        case SCTP_ASSOC_SUPPORTS_ASCONF:
+                            err |= re_hprintf(pf, " ASCONF");
+                            break;
+                        case SCTP_ASSOC_SUPPORTS_MULTIBUF:
+                            err |= re_hprintf(pf, " MULTIBUF");
+                            break;
+                        case SCTP_ASSOC_SUPPORTS_RE_CONFIG:
+                            err |= re_hprintf(pf, " RE-CONFIG");
+                            break;
+                        default:
+                            err |= re_hprintf(pf, " ??? (0x%02x)", event->sac_info[i]);
+                            break;
+                    }
+                }
+                break;
+            case SCTP_COMM_LOST:
+            case SCTP_CANT_STR_ASSOC:
+                err |= re_hprintf(pf, ", ABORT =");
+                for (i = 0; i < length; ++i) {
+                    err |= re_hprintf(pf, " 0x%02x", event->sac_info[i]);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    err |= re_hprintf(pf, "\n");
+    return err;
+}
+
+/*
+ * Handle SCTP association change event.
+ */
+static void handle_association_change_event(
+        struct anyrtc_sctp_transport* const transport,
+        struct sctp_assoc_change* const event
+) {
+    enum anyrtc_code error;
+
+    // Print debug output for event
+    DEBUG_PRINTF("Association change: %H", debug_association_change_event, event);
+
+    // Send buffered SCTP packets
+    // TODO: MOVE INTO CORRECT SECTION
+    error = anyrtc_message_buffer_clear(
+            &transport->buffered_messages, sctp_receive_handler_helper, transport);
+    if (error) {
+        DEBUG_WARNING("Could not receive buffered messages, reason: %s\n",
+                      anyrtc_code_to_str(error));
+        // TODO: It would probably make more sense to close the transport here.
+        return;
+    }
+
+    // TODO: Handle
+    switch (event->sac_state) {
+        case SCTP_COMM_UP:
+            // Connected
+            set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED);
+            break;
+        case SCTP_CANT_STR_ASSOC:
+        case SCTP_SHUTDOWN_COMP:
+        case SCTP_COMM_LOST:
+            // Disconnected
+            // TODO: Anything more required?
+            set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+            break;
+        default:
+            break;
+    }
 }
 
 /*
@@ -113,6 +291,8 @@ static void handle_notification(
 
     // Handle notification by type
     switch (notification->sn_header.sn_type) {
+        case SCTP_ASSOC_CHANGE:
+            handle_association_change_event(transport, &notification->sn_assoc_change);
         case SCTP_STREAM_RESET_EVENT:
             // TODO: Handle
             DEBUG_WARNING("TODO: HANDLE STREAM RESET\n");
@@ -369,7 +549,7 @@ static void anyrtc_sctp_transport_destroy(
     }
 
     // Close transport
-    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_CLOSED;
+    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
 
     // Close trace file (if any)
     if (transport->trace_handle) {
@@ -379,6 +559,7 @@ static void anyrtc_sctp_transport_destroy(
     }
 
     // Dereference
+    list_flush(&transport->buffered_messages);
     mem_deref(transport->dtls_transport);
 }
 
@@ -391,6 +572,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         uint16_t local_port, // zeroable
         uint16_t remote_port, // zeroable
         anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
+        anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
         void* const arg // nullable
 ) {
     bool have_data_transport;
@@ -401,7 +583,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     struct linger linger_option;
     struct sctp_event sctp_event = {0};
     size_t i;
-    struct sctp_initmsg sctp_init_options = {0};
     struct sockaddr_conn peer = {0};
     enum anyrtc_code error;
     int option_value;
@@ -436,7 +617,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW;
     transport->dtls_transport = mem_ref(dtls_transport);
     transport->data_channel_handler = data_channel_handler;
+    transport->state_change_handler = state_change_handler;
     transport->arg = arg;
+    list_init(&transport->buffered_messages);
 
     // Set default port (if 0)
     if (local_port == 0) {
@@ -614,6 +797,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
+    // Transition to connecting state
+    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
+
 out:
     if (error) {
         mem_deref(transport);
@@ -630,9 +816,12 @@ out:
  */
 enum anyrtc_code anyrtc_sctp_transport_send(
         struct anyrtc_sctp_transport* const transport,
-        struct mbuf* const buffer
+        struct mbuf* const buffer,
+        void* const info,
+        socklen_t const info_length,
+        unsigned int const info_type,
+        int const flags
 ) {
-    struct sctp_sendv_spa spa = {0};
     ssize_t length;
 
     // Check arguments
@@ -645,12 +834,13 @@ enum anyrtc_code anyrtc_sctp_transport_send(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Partial reliability setting
-    // TODO
-    spa.sendv_sndinfo.snd_sid = 1;
-    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-    spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
-    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+    // TODO: Move to DCEP
+    // Set SCTP stream, protocol identifier, flags, partial reliability, ...
+//    spa.sendv_sndinfo.snd_sid = 1;
+//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+//    spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//
 //    spa.sendv_sndinfo.snd_sid = channel->sid;
 //    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
 //    if ((channel->state == DATA_CHANNEL_OPEN) && (channel->unordered)) {
@@ -665,28 +855,17 @@ enum anyrtc_code anyrtc_sctp_transport_send(
 //    }
 
     // Connected?
-    // TODO
-//    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         length = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
-                &spa, (socklen_t) sizeof(spa), SCTP_SENDV_SPA, 0);
+                info, info_length, info_type, flags);
         if (length < 0) {
-            DEBUG_WARNING("Could not send message, reason: %m\n", errno);
             return anyrtc_error_to_code(errno);
         }
         return ANYRTC_CODE_SUCCESS;
-//    }
+    }
 
     // Buffer message
-    // TODO
-    DEBUG_WARNING("SHOULD BUFFER MESSAGE\n");
-//    error = anyrtc_message_buffer_append(&transport->buffered_messages_out, NULL, buffer);
-//    if (error) {
-//        DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
-//                      anyrtc_code_to_str(error));
-//    } else {
-//        DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
-//    }
-//    return ANYRTC_CODE_SUCCESS;
+    return anyrtc_message_buffer_append(&transport->buffered_messages, NULL, buffer);
 }
 

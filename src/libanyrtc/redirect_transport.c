@@ -13,6 +13,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+/*
+ * TODO: Lacks state transition event callback
+ */
+
 static void patch_sctp_header(
         struct mbuf* const buffer,
         uint16_t const source,

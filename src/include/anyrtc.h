@@ -271,7 +271,7 @@ typedef void (anyrtc_ice_transport_candidate_pair_change_handler)(
  * DTLS transport state change handler.
  */
 typedef void (anyrtc_dtls_transport_state_change_handler)(
-    enum anyrtc_dtls_transport_state const state, // read-only
+    enum anyrtc_dtls_transport_state const state,
     void* const arg
 );
 
@@ -316,7 +316,7 @@ typedef void (anyrtc_data_channel_close_handler)(
  * Data channel message handler.
  */
 typedef void (anyrtc_data_channel_message_handler)(
-    enum anyrtc_data_channel_sctp_ppid const,
+    enum anyrtc_data_channel_sctp_ppid const sctp_ppid,
     uint8_t const * const data, // read-only
     uint32_t const size,
     void* const arg
@@ -334,7 +334,7 @@ typedef void (anyrtc_sctp_transport_data_channel_handler)(
  * SCTP transport state change handler.
  */
 typedef void (anyrtc_sctp_transport_state_change_handler)(
-    enum anyrtc_sctp_transport_state const,
+    enum anyrtc_sctp_transport_state const state,
     void* const arg
 );
 
@@ -584,7 +584,9 @@ struct anyrtc_sctp_transport {
     enum anyrtc_sctp_transport_state state;
     struct anyrtc_dtls_transport* dtls_transport; // referenced
     anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
+    anyrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
+    struct list buffered_messages;
     FILE* trace_handle;
     struct socket* socket;
     volatile int wat; // TODO: Look, I know this is stupid, but it's going to be removed anyway
@@ -1170,6 +1172,13 @@ enum anyrtc_code anyrtc_redirect_transport_create(
 );
 
 /*
+ * Get the corresponding name for an SCTP transport state.
+ */
+char const * const anyrtc_sctp_transport_state_to_name(
+    enum anyrtc_sctp_transport_state const state
+);
+
+/*
  * Create an SCTP transport.
  */
 enum anyrtc_code anyrtc_sctp_transport_create(
@@ -1178,6 +1187,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     uint16_t local_port, // zeroable
     uint16_t remote_port, // zeroable
     anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
+    anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
     void* const arg // nullable
 );
 

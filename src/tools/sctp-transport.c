@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <anyrtc.h>
+#include <usrsctp.h> // sctp_sendv_spa
 #include "../libanyrtc/sctp_transport.h"
 
 /* TODO: Replace with zf_log */
@@ -119,24 +120,6 @@ static void dtls_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
-
-    // Open? Send message
-    // TODO: This shouldn't be here!
-    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
-        enum anyrtc_code error;
-
-        // Send message
-        struct mbuf* buffer = mbuf_alloc(1024);
-        mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
-        mbuf_set_pos(buffer, 0);
-        DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
-                     mbuf_get_left(buffer));
-        error = anyrtc_sctp_transport_send(client->sctp_transport, buffer);
-        if (error) {
-            DEBUG_WARNING("Could not send, reason: %s\n", anyrtc_code_to_str(error));
-        }
-        mem_deref(buffer);
-    }
 }
 
 static void dtls_transport_error_handler(
@@ -148,6 +131,42 @@ static void dtls_transport_error_handler(
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
+void sctp_transport_state_change_handler(
+    enum anyrtc_sctp_transport_state const state,
+    void* const arg
+) {
+    struct client* const client = arg;
+    char const * const state_name = anyrtc_sctp_transport_state_to_name(state);
+    DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
+
+    // Open? Send message
+    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        struct sctp_sendv_spa spa = {0};
+        enum anyrtc_code error;
+
+        // Compose meowing message
+        struct mbuf* buffer = mbuf_alloc(1024);
+        mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
+        mbuf_set_pos(buffer, 0);
+
+        // Set SCTP stream, protocol identifier and flags
+        spa.sendv_sndinfo.snd_sid = 0;
+        spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+        spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+        spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+
+        // Send message
+        DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
+                     mbuf_get_left(buffer));
+        error = anyrtc_sctp_transport_send(
+                client->sctp_transport, buffer, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
+        if (error) {
+            DEBUG_WARNING("Could not send, reason: %s\n", anyrtc_code_to_str(error));
+        }
+        mem_deref(buffer);
+    }
+}
+
 void data_channel_handler(
         struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
@@ -155,6 +174,7 @@ void data_channel_handler(
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
 }
+
 
 static void signal_handler(
         int sig
@@ -191,7 +211,8 @@ void client_init(
     // Create SCTP transport
     EOE(anyrtc_sctp_transport_create(
             &local->sctp_transport, local->dtls_transport,
-            local->local_sctp_port, local->remote_sctp_port, data_channel_handler, local));
+            local->local_sctp_port, local->remote_sctp_port,
+            data_channel_handler, sctp_transport_state_change_handler, local));
 }
 
 void client_start(
