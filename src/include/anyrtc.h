@@ -343,8 +343,8 @@ typedef void (anyrtc_sctp_transport_state_change_handler)(
  * TODO: private
  */
 typedef void (anyrtc_message_buffer_handler)(
-    struct sa* const address,
     struct mbuf* const buffer,
+    void* const context,
     void* const arg
 );
 
@@ -378,8 +378,8 @@ struct anyrtc_config {
  */
 struct anyrtc_buffered_message {
     struct le le;
-    struct sa address; // copied
     struct mbuf* buffer; // referenced
+    void* context; // referenced, nullable
 };
 
 /*

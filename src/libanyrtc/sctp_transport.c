@@ -15,6 +15,18 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+// SCTP send context (needed when buffering)
+struct send_context {
+    unsigned int info_type;
+    union {
+        struct sctp_sndinfo sndinfo;
+        struct sctp_prinfo prinfo;
+        struct sctp_authinfo authinfo;
+        struct sctp_sendv_spa spa;
+    } info;
+    int flags;
+};
+
 // Initialised flag
 static bool usrsctp_initialized = false;
 
@@ -59,6 +71,7 @@ static void thread_enter(
         struct anyrtc_sctp_transport* const transport
 ) {
     // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
+    // Answer: Yes. We can either use an reentrant mutex or register a callback on the event loop
     if (transport->wat) {
         printf("mutex locked twice, PANIC?!\n");
     }
@@ -113,24 +126,60 @@ static enum anyrtc_code sctp_receive_handler(
         struct mbuf* const buffer
 ) {
     DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
 }
 
 /*
- * Handle outgoing buffered DTLS messages.
+ * Send outstanding buffered SCTP messages.
  */
-static void sctp_receive_handler_helper(
-        struct sa* const destination,
+static void sctp_send_outstanding(
         struct mbuf* const buffer,
+        void* const context,
         void* const arg
 ) {
     struct anyrtc_sctp_transport* const transport = arg;
+    struct send_context* const send_context = context;
     enum anyrtc_code error;
-    (void) destination;
+    void* info;
+    socklen_t info_size;
 
-    // Receive
-    error = sctp_receive_handler(transport, buffer);
+    // Determine info pointer and info size
+    switch (send_context->info_type) {
+        case SCTP_SENDV_NOINFO:
+            info = NULL;
+            info_size = 0;
+            break;
+        case SCTP_SENDV_SNDINFO:
+            info = (void*) &send_context->info.sndinfo;
+            info_size = sizeof(send_context->info.sndinfo);
+            break;
+        case SCTP_SENDV_PRINFO:
+            info = (void*) &send_context->info.prinfo;
+            info_size = sizeof(send_context->info.prinfo);
+            break;
+        case SCTP_SENDV_AUTHINFO:
+            info = (void*) &send_context->info.authinfo;
+            info_size = sizeof(send_context->info.authinfo);
+            break;
+        case SCTP_SENDV_SPA:
+            info = (void*) &send_context->info.spa;
+            info_size = sizeof(send_context->info.spa);
+            break;
+        default:
+            error = ANYRTC_CODE_INVALID_STATE;
+            goto out;
+    }
+
+    // Send
+    error = anyrtc_sctp_transport_send(
+            transport, buffer, info, info_size, send_context->info_type, send_context->flags);
     if (error) {
-        DEBUG_WARNING("Could not receive buffered packet, reason: %s\n",
+        goto out;
+    }
+
+out:
+    if (error) {
+        DEBUG_WARNING("Could not send buffered message, reason: %s\n",
                       anyrtc_code_to_str(error));
     }
 }
@@ -146,6 +195,18 @@ static enum anyrtc_code set_state(
 ) {
     // Set state
     transport->state = state;
+
+    // Connected?
+    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        // Send buffered SCTP packets
+        enum anyrtc_code const error = anyrtc_message_buffer_clear(
+                &transport->buffered_messages, sctp_send_outstanding, transport);
+        if (error) {
+            DEBUG_WARNING("Could not clear buffered messages, reason: %s\n",
+                          anyrtc_code_to_str(error));
+            return error;
+        }
+    }
 
     // Call handler (if any)
     if (transport->state_change_handler) {
@@ -239,37 +300,32 @@ static void handle_association_change_event(
         struct anyrtc_sctp_transport* const transport,
         struct sctp_assoc_change* const event
 ) {
-    enum anyrtc_code error;
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
 
     // Print debug output for event
     DEBUG_PRINTF("Association change: %H", debug_association_change_event, event);
-
-    // Send buffered SCTP packets
-    // TODO: MOVE INTO CORRECT SECTION
-    error = anyrtc_message_buffer_clear(
-            &transport->buffered_messages, sctp_receive_handler_helper, transport);
-    if (error) {
-        DEBUG_WARNING("Could not receive buffered messages, reason: %s\n",
-                      anyrtc_code_to_str(error));
-        // TODO: It would probably make more sense to close the transport here.
-        return;
-    }
 
     // TODO: Handle
     switch (event->sac_state) {
         case SCTP_COMM_UP:
             // Connected
-            set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED);
+            error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED);
             break;
         case SCTP_CANT_STR_ASSOC:
         case SCTP_SHUTDOWN_COMP:
         case SCTP_COMM_LOST:
             // Disconnected
-            // TODO: Anything more required?
-            set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+            // TODO: Anything else required?
+            error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
             break;
         default:
             break;
+    }
+
+    // Error?
+    if (error) {
+        DEBUG_WARNING("Could not update state, reason: %s\n", anyrtc_code_to_str(error));
+        // TODO: It would probably make sense to close the transport here if not already closed.
     }
 }
 
@@ -798,7 +854,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Transition to connecting state
-    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
+    error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
+    if (error) {
+        goto out;
+    }
 
 out:
     if (error) {
@@ -818,11 +877,13 @@ enum anyrtc_code anyrtc_sctp_transport_send(
         struct anyrtc_sctp_transport* const transport,
         struct mbuf* const buffer,
         void* const info,
-        socklen_t const info_length,
+        socklen_t const info_size,
         unsigned int const info_type,
         int const flags
 ) {
     ssize_t length;
+    struct send_context* send_context = NULL;
+    enum anyrtc_code error;
 
     // Check arguments
     if (!transport || !buffer) {
@@ -858,14 +919,56 @@ enum anyrtc_code anyrtc_sctp_transport_send(
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         length = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
-                info, info_length, info_type, flags);
+                info, info_size, info_type, flags);
         if (length < 0) {
             return anyrtc_error_to_code(errno);
         }
         return ANYRTC_CODE_SUCCESS;
     }
 
+    // Allocate context
+    send_context = mem_zalloc(sizeof(*send_context), NULL);
+    if (!send_context) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set context fields
+    send_context->info_type = info_type;
+    send_context->flags = flags;
+
+    // Copy info data (if any)
+    if (info_type != SCTP_SENDV_NOINFO && info) {
+        // Copy info data according to type
+        // Note: info_size will be ignored for buffered messages
+        switch (info_type) {
+            case SCTP_SENDV_SNDINFO:
+                memcpy(&send_context->info.sndinfo, info, sizeof(send_context->info.sndinfo));
+                break;
+            case SCTP_SENDV_PRINFO:
+                memcpy(&send_context->info.prinfo, info, sizeof(send_context->info.prinfo));
+                break;
+            case SCTP_SENDV_AUTHINFO:
+                memcpy(&send_context->info.authinfo, info, sizeof(send_context->info.authinfo));
+                break;
+            case SCTP_SENDV_SPA:
+                memcpy(&send_context->info.spa, info, sizeof(send_context->info.spa));
+                break;
+            default:
+                error = ANYRTC_CODE_INVALID_STATE;
+                goto out;
+        }
+    }
+
     // Buffer message
-    return anyrtc_message_buffer_append(&transport->buffered_messages, NULL, buffer);
+    error = anyrtc_message_buffer_append(&transport->buffered_messages, buffer, send_context);
+    if (error) {
+        goto out;
+    }
+
+out:
+    // Dereference
+    mem_deref(send_context);
+
+    return error;
 }
 

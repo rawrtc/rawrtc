@@ -14,7 +14,7 @@ enum anyrtc_code anyrtc_sctp_transport_send(
     struct anyrtc_sctp_transport* const transport,
     struct mbuf* const buffer,
     void* const info,
-    socklen_t const info_length,
+    socklen_t const info_size,
     unsigned int const info_type,
     int const flags
 );

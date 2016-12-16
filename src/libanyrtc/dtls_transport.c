@@ -172,13 +172,13 @@ static void close_handler(
  * Handle outgoing buffered DTLS messages.
  */
 static void dtls_outgoing_buffer_handler(
-        struct sa* const destination,
         struct mbuf* const buffer,
+        void* const context,
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
     enum anyrtc_code error;
-    (void) destination;
+    (void) context;
 
     // Send
     error = anyrtc_dtls_transport_send(transport, buffer);
@@ -211,7 +211,7 @@ static void dtls_receive_handler(
 
     // Buffer message
     enum anyrtc_code error = anyrtc_message_buffer_append(
-            &transport->buffered_messages_in, NULL, buffer);
+            &transport->buffered_messages_in, buffer, NULL);
     if (error) {
         DEBUG_WARNING("Could not buffer incoming packet, reason: %s\n",
                       anyrtc_code_to_str(error));
@@ -489,11 +489,12 @@ static size_t mtu_handler(
  * Handle received UDP messages.
  */
 static void udp_receive_handler(
-        struct sa* const source,
         struct mbuf* const buffer,
+        void* const context,
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
+    struct sa* source = context;
     struct sa const* peer;
 
     // TODO: Check if DTLS or SRTP packet
@@ -525,7 +526,7 @@ static bool udp_receive_helper(
         void* const arg
 ) {
     // Receive
-    udp_receive_handler(source, buffer, arg);
+    udp_receive_handler(buffer, source, arg);
 
     // Handled
     return true;
@@ -912,12 +913,12 @@ enum anyrtc_code anyrtc_dtls_transport_have_data_transport(
  * different signature.
  */
 static void intermediate_receive_handler(
-        struct sa * const source,
         struct mbuf* const buffer,
+        void* const context,
         void* const arg
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
-    (void) source;
+    (void) context;
 
     // Pipe into the actual receive handler
     transport->receive_handler(buffer, transport->receive_handler_arg);
@@ -1007,7 +1008,7 @@ enum anyrtc_code anyrtc_dtls_transport_send(
     }
 
     // Buffer message
-    error = anyrtc_message_buffer_append(&transport->buffered_messages_out, NULL, buffer);
+    error = anyrtc_message_buffer_append(&transport->buffered_messages_out, buffer, NULL);
     if (error) {
         DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
                       anyrtc_code_to_str(error));

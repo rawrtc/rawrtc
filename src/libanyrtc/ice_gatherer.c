@@ -1,5 +1,6 @@
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
+#include <string.h> // memcpy
 #include <anyrtc.h>
 #include "utils.h"
 #include "ice_gatherer.h"
@@ -356,15 +357,32 @@ static bool udp_receive_handler(
         void* const arg
 ) {
     struct anyrtc_ice_gatherer* const gatherer = arg;
+    enum anyrtc_code error;
+
+    // Allocate context and copy source address
+    void* const context = mem_zalloc(sizeof(*source), NULL);
+    if (!context) {
+        error = ANYRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+    memcpy(context, source, sizeof(*source));
 
     // Buffer message
-    enum anyrtc_code error = anyrtc_message_buffer_append(
-            &gatherer->buffered_messages, source, buffer);
+    error = anyrtc_message_buffer_append(&gatherer->buffered_messages, buffer, context);
+    if (error) {
+        goto out;
+    }
+
+    // Done
+    DEBUG_PRINTF("Buffered UDP packet of size %zu\n", mbuf_get_left(buffer));
+
+out:
     if (error) {
         DEBUG_WARNING("Could not buffer UDP packet, reason: %s\n", anyrtc_code_to_str(error));
-    } else {
-        DEBUG_PRINTF("Buffered UDP packet of size %zu\n", mbuf_get_left(buffer));
     }
+
+    // Dereference
+    mem_deref(context);
 
     // Handled
     return true;

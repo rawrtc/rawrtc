@@ -10,6 +10,7 @@ static void anyrtc_message_buffer_destroy(
     struct anyrtc_buffered_message* const buffered_message = arg;
 
     // Dereference
+    mem_deref(buffered_message->context);
     mem_deref(buffered_message->buffer);
 }
 
@@ -18,8 +19,8 @@ static void anyrtc_message_buffer_destroy(
  */
 enum anyrtc_code anyrtc_message_buffer_append(
         struct list* const message_buffer,
-        struct sa * const address, // copied, nullable
-        struct mbuf* const buffer // referenced
+        struct mbuf* const buffer, // referenced
+        void* const context // referenced, nullable
 ) {
     struct anyrtc_buffered_message* buffered_message;
 
@@ -35,10 +36,10 @@ enum anyrtc_code anyrtc_message_buffer_append(
     }
 
     // Set fields
-    if (address) {
-        buffered_message->address = *address;
-    }
     buffered_message->buffer = mem_ref(buffer);
+    if (context) {
+        buffered_message->context = mem_ref(context);
+    }
 
     // Add to list
     list_append(message_buffer, &buffered_message->le, buffered_message);
@@ -66,7 +67,7 @@ enum anyrtc_code anyrtc_message_buffer_clear(
         struct anyrtc_buffered_message* const buffered_message = le->data;
 
         // Handle buffered message
-        message_handler(&buffered_message->address, buffered_message->buffer, arg);
+        message_handler(buffered_message->buffer, buffered_message->context, arg);
     }
 
     // Dereference all messages

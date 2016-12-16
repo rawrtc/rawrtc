@@ -1,9 +1,9 @@
 #pragma once
 
 enum anyrtc_code anyrtc_message_buffer_append(
-    struct list* const buffered_messages,
-    struct sa * const address, // copied, nullable
-    struct mbuf* const buffer // referenced
+    struct list* const message_buffer,
+    struct mbuf* const buffer, // referenced
+    void* const context // referenced, nullable
 );
 
 enum anyrtc_code anyrtc_message_buffer_clear(
