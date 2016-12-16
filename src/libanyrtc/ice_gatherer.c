@@ -253,7 +253,7 @@ enum anyrtc_code anyrtc_ice_gatherer_create(
     }
 
     // Set fields/reference
-    gatherer->state = ANYRTC_ICE_GATHERER_NEW;
+    gatherer->state = ANYRTC_ICE_GATHERER_NEW; // TODO: Raise state (delayed)?
     gatherer->options = mem_ref(options);
     gatherer->state_change_handler = state_change_handler;
     gatherer->error_handler = error_handler;

@@ -68,8 +68,11 @@ static enum anyrtc_code generate_key_rsa(
     }
 
     // Allocate BIGNUM
-    // TODO: Use BN_secure_new when OpenSSL version is >= 1.1.0
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    bn = BN_secure_new();
+#else
     bn = BN_new();
+#endif
     if (!bn) {
         DEBUG_WARNING("Could not allocate BIGNUM\n");
         goto out;
@@ -619,8 +622,11 @@ enum anyrtc_code anyrtc_certificate_get_pem(
     error = ANYRTC_CODE_UNKNOWN_ERROR;
 
     // Create bio structure
-    // TODO: Use BIO_s_secmem when OpenSSL version is >= 1.1.0
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    bio = BIO_new(BIO_s_secmem());
+#else
     bio = BIO_new(BIO_s_mem());
+#endif
 
     // Write certificate
     if (encode_certificate && !PEM_write_bio_X509(bio, certificate->certificate)) {

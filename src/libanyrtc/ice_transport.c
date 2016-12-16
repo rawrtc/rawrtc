@@ -76,7 +76,7 @@ enum anyrtc_code anyrtc_ice_transport_create(
     }
 
     // Set fields/reference
-    transport->state = ANYRTC_ICE_TRANSPORT_NEW;
+    transport->state = ANYRTC_ICE_TRANSPORT_NEW; // TODO: Raise state (delayed)?
     transport->gatherer = mem_ref(gatherer);
     transport->state_change_handler = state_change_handler;
     transport->candidate_pair_change_handler = candidate_pair_change_handler;

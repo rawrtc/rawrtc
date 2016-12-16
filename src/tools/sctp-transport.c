@@ -139,8 +139,9 @@ void sctp_transport_state_change_handler(
     char const * const state_name = anyrtc_sctp_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
 
-    // Open? Send message
-    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+    // Open? Send message (twice to test the buffering)
+    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED ||
+            state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING) {
         struct sctp_sendv_spa spa = {0};
         enum anyrtc_code error;
 

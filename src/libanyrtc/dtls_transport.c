@@ -602,7 +602,7 @@ enum anyrtc_code anyrtc_dtls_transport_create(
     }
 
     // Set fields/reference
-    transport->state = ANYRTC_DTLS_TRANSPORT_STATE_NEW;
+    transport->state = ANYRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);
     list_init(&transport->certificates);
     transport->state_change_handler = state_change_handler;

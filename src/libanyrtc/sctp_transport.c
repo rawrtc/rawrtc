@@ -670,7 +670,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Set fields/reference
-    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW;
+    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->dtls_transport = mem_ref(dtls_transport);
     transport->data_channel_handler = data_channel_handler;
     transport->state_change_handler = state_change_handler;
@@ -854,6 +854,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     }
 
     // Transition to connecting state
+    // TODO: Raise this event delayed to prevent a chicken egg problem
     error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
     if (error) {
         goto out;

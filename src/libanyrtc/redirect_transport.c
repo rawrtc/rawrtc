@@ -188,7 +188,7 @@ static void anyrtc_redirect_transport_destroy(
 /*
  * Create a redirect transport.
  * `local_port` and `remote_port` may be `0`.
- * TODO: local and remote port should probably be in SCTPCapabilities? Open issue for ORTC spec.
+ * TODO: https://github.com/w3c/ortc/issues/625
  */
 enum anyrtc_code anyrtc_redirect_transport_create(
         struct anyrtc_redirect_transport** const transportp, // de-referenced
