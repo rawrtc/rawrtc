@@ -15,11 +15,6 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-// TODO: This should probably be in usrsctp.h
-#define SCTP_EVENT_READ    0x0001
-#define SCTP_EVENT_WRITE   0x0002
-#define SCTP_EVENT_ERROR   0x0004
-
 // Initialised flag
 static bool usrsctp_initialized = false;
 

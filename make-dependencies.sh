@@ -13,9 +13,9 @@ if [ -z "$BUILD_PATH" ]; then
 fi
 
 # Dependencies
-OPENSSL_URL="https://www.openssl.org/source/openssl-1.0.2h.tar.gz"
-OPENSSL_TAR="openssl-1.0.2h.tar.gz"
-OPENSSL_PATH="openssl-1.0.2h"
+OPENSSL_URL="https://www.openssl.org/source/openssl-1.1.0c.tar.gz"
+OPENSSL_TAR="openssl-1.1.0c.tar.gz"
+OPENSSL_PATH="openssl-1.1.0c"
 #ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
 #ZF_LOG_BRANCH="master"
 #ZF_LOG_PATH="zf_log"

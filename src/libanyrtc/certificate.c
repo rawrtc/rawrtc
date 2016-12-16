@@ -526,15 +526,25 @@ enum anyrtc_code anyrtc_certificate_copy(
     }
 
     // Increment reference count of certificate and private key, copy the pointers
-    // TODO: Use X509_up_ref when OpenSSL version is >= 1.1.0
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    if (!X509_up_ref(source_certificate->certificate)) {
+        goto out;
+    }
+#else
     if (!CRYPTO_add(&source_certificate->certificate->references, 1, CRYPTO_LOCK_X509)) {
         goto out;
     }
+#endif
     certificate->certificate = source_certificate->certificate;
-    // TODO: Use EVP_PKEY_up_ref when OpenSSL version is >= 1.1.0
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    if (!EVP_PKEY_up_ref(source_certificate->key)) {
+        goto out;
+    }
+#else
     if (!CRYPTO_add(&source_certificate->key->references, 1, CRYPTO_LOCK_EVP_PKEY)) {
         goto out;
     }
+#endif
     certificate->key = source_certificate->key;
     certificate->key_type = source_certificate->key_type;
 
@@ -544,6 +554,7 @@ enum anyrtc_code anyrtc_certificate_copy(
 out:
     if (error) {
         mem_deref(certificate);
+        ERR_print_errors_cb(print_openssl_error, NULL);
     } else {
         // Set pointer
         *certificatep = certificate;
@@ -594,7 +605,7 @@ enum anyrtc_code anyrtc_certificate_get_pem(
     enum anyrtc_code error;
     BIO* bio = NULL;
     char* pem = NULL;
-    size_t length;
+    uint64_t length;
 
     // Check arguments
     if (!pemp || !certificate) {
@@ -623,13 +634,17 @@ enum anyrtc_code anyrtc_certificate_get_pem(
     }
 
     // Allocate buffer
-    length = bio->num_write;
+    length = BIO_number_written(bio);
+    if (length > INT_MAX) {
+        error = ANYRTC_CODE_UNKNOWN_ERROR;
+    }
     pem = mem_alloc(length, NULL);
+    if (!pem) {
+        error = ANYRTC_CODE_NO_MEMORY;
+        goto out;
+    }
 
     // Copy to buffer
-    if (length > INT_MAX) {
-        return ANYRTC_CODE_UNKNOWN_ERROR;
-    }
     if (BIO_read(bio, pem, (int) length) < length) {
         goto out;
     }
@@ -643,6 +658,7 @@ out:
     }
     if (error) {
         mem_deref(pem);
+        ERR_print_errors_cb(print_openssl_error, NULL);
     } else {
         // Set pointers
         *pemp = pem;
@@ -697,6 +713,10 @@ enum anyrtc_code anyrtc_certificate_get_der(
     }
     length = (size_t) (length_certificate + length_key);
     der = mem_alloc(length, NULL);
+    if (!der) {
+        error = ANYRTC_CODE_NO_MEMORY;
+        goto out;
+    }
     der_i2d = der;
 
     // Write certificate
@@ -715,6 +735,7 @@ enum anyrtc_code anyrtc_certificate_get_der(
 out:
     if (error) {
         mem_deref(der);
+        ERR_print_errors_cb(print_openssl_error, NULL);
     } else {
         // Set pointers
         *derp = der;
