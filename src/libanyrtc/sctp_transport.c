@@ -1,7 +1,7 @@
 #include <stdio.h> // fopen
-#include <string.h> // memset, memcpy
+#include <string.h> // memcpy
 #include <errno.h> // errno
-#include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
+#include <sys/socket.h> // AF_INET, SOCK_STREAM, linger, sockaddr_storage
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #define SCTP_DEBUG
 #include <usrsctp.h> // usrsctp*
@@ -31,6 +31,33 @@ uint16_t const sctp_events[] = {
 //    SCTP_SENDER_DRY_EVENT
 };
 size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+
+/*
+ * Lock event loop mutex.
+ */
+static void thread_enter(
+        struct anyrtc_sctp_transport* const transport
+) {
+    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
+    if (transport->wat) {
+        printf("mutex locked twice, PANIC?!\n");
+    }
+
+    // Lock event loop mutex
+    re_thread_enter();
+    ++transport->wat; // TODO: Remove
+    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
+}
+
+/*
+ * Release event loop mutex.
+ */
+static void thread_leave(
+        struct anyrtc_sctp_transport* const transport
+) {
+    // Unlock event loop mutex
+    --transport->wat; // TODO: Remove
+}
 
 /*
  * Dump an SCTP packet into a trace file.
@@ -69,6 +96,41 @@ static void dcep_receive_handler(
 }
 
 /*
+ * Handle SCTP notification.
+ */
+static void handle_notification(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer
+) {
+    union sctp_notification* const notification = (union sctp_notification*) buffer->buf;
+
+    // TODO: Are all of these checks necessary or can we reduce that?
+    if (buffer->pos > UINT32_MAX ||
+            notification->sn_header.sn_length > SIZE_MAX ||
+            notification->sn_header.sn_length != buffer->pos) {
+        return;
+    }
+
+    // Handle notification by type
+    switch (notification->sn_header.sn_type) {
+        case SCTP_STREAM_RESET_EVENT:
+            // TODO: Handle
+            DEBUG_WARNING("TODO: HANDLE STREAM RESET\n");
+            // handle_stream_reset_event(transport, &(notification->sn_strreset_event));
+            break;
+        case SCTP_STREAM_CHANGE_EVENT:
+            // TODO: Handle
+            DEBUG_WARNING("TODO: HANDLE STREAM CHANGE\n");
+            // handle_stream_change_event(transport, ...);
+            break;
+        default:
+            DEBUG_WARNING("Unexpected notification event: %"PRIu16"\n",
+                          notification->sn_header.sn_type);
+            break;
+    }
+}
+
+/*
  * Handle outgoing SCTP messages.
  */
 static int sctp_packet_handler(
@@ -83,17 +145,9 @@ static int sctp_packet_handler(
     (void) tos; // TODO: Handle?
     (void) set_df; // TODO: Handle?
 
-    DEBUG_PRINTF(">>> %u SCTP_PACKET_HANDLER\n", transport->wat);
-
-    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
-    if (transport->wat) {
-        printf("mutex locked twice, PANIC?!\n");
-    }
-
     // Lock event loop mutex
-    re_thread_enter();
-    ++transport->wat; // TODO: Remove
-    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
+    DEBUG_PRINTF(">>> %u SCTP_PACKET_HANDLER\n", transport->wat);
+    thread_enter(transport);
 
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
@@ -142,10 +196,8 @@ static int sctp_packet_handler(
     }
 
 out:
-    // Unlock event loop mutex
-    --transport->wat; // TODO: Remove
+    thread_leave(transport);
     DEBUG_PRINTF("<<< %u SCTP_PACKET_HANDLER\n", transport->wat);
-    re_thread_leave();
 
     // TODO: What does the return code do?
     return 0;
@@ -162,18 +214,9 @@ static void upcall_handler(
     struct anyrtc_sctp_transport* const transport = arg;
     int events = usrsctp_get_events(sock);
 
-    // TODO: Remove
-    DEBUG_PRINTF(">>> %u UPCALL_HANDLER\n", transport->wat);
-
-    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
-    if (transport->wat) {
-        printf("mutex locked twice, PANIC?!\n");
-    }
-
     // Lock event loop mutex
-    re_thread_enter();
-    ++transport->wat; // TODO: Remove
-    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
+    DEBUG_PRINTF(">>> %u UPCALL_HANDLER\n", transport->wat);
+    thread_enter(transport);
 
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
@@ -184,67 +227,78 @@ static void upcall_handler(
     // Error?
     if (events & SCTP_EVENT_ERROR) {
         // TODO: What am I supposed to do with this information?
-        DEBUG_WARNING("SCTP error event\n");
+        DEBUG_WARNING("TODO: Handle SCTP error event\n");
     }
 
+read:
     // Can read?
     if (events & SCTP_EVENT_READ) {
         struct mbuf* buffer;
-        ssize_t length;
-        struct sockaddr_in source;
-        socklen_t source_length = sizeof(struct sockaddr_in);
-        struct sctp_recvv_rn info;
-        socklen_t info_length = 0;
-        unsigned int info_type = SCTP_RECVV_RN;
-        int recv_flags = MSG_PEEK;
 
-        // Get datagram size
-        length = usrsctp_recvv(
-                sock, NULL, 0, NULL, 0,
-                &info, &info_length, &info_type, &recv_flags);
-        if (length == -1) {
-            if (recv_flags & MSG_NOTIFICATION) {
-                DEBUG_WARNING("Ignoring message notification\n");
-                goto out;
-            }
-            if (info_type == SCTP_RECVV_RN) {
-                uint32_t packet_size = info.recvv_nxtinfo.nxt_length;
-                DEBUG_INFO("PACKET SIZE: %"PRIu32"\n", packet_size);
-            } else {
-                DEBUG_WARNING("Unexpected info type\n");
-                goto out;
-            }
-            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
-            // TODO: What now?
-            goto out;
+        // TODO: Get next message size
+        // TODO: Can we get the COMPLETE message size or just the current message size?
+
+        // Create buffer
+        buffer = mbuf_alloc(ANYRTC_SCTP_TRANSPORT_DEFAULT_BUFFER);
+        if (!buffer) {
+            DEBUG_WARNING("Cannot allocate buffer, no memory");
+            // TODO: This needs to be handled in a better way, otherwise it's probably going
+            // to cause another read call which calls this handler again resulting in an infinite
+            // loop.
+            goto write;
         }
 
-        DEBUG_WARNING("TODO: NOW WHAT?\n");
+        {
+            ssize_t length;
+            struct sockaddr_storage source = {0};
+            socklen_t source_length = sizeof(source);
+            struct sctp_rcvinfo info = {0};
+            socklen_t info_length = sizeof(info);
+            unsigned int info_type = 0;
+            int recv_flags = 0;
 
-        // Create buffer (when buffering)
-        // OR increase size of buffer if needed
+            // Receive notification or data
+            length = usrsctp_recvv(
+                    sock, buffer->buf, buffer->size, (struct sockaddr*) &source, &source_length,
+                    &info, &info_length, &info_type, &recv_flags);
+            if (length < 0) {
+                DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
+                // TODO: What now? Close?
+                goto write;
+            }
 
-//        // Receive datagram
-//        info_length = 0;
-//        info_type = SCTP_RECVV_NOINFO;
-//        recv_flags = 0;
-//        length = usrsctp_recvv(
-//                sock, buffer->buf, buffer->size, (struct sockaddr*) &source, &source_length,
-//                NULL, &info_length, &info_type, &recv_flags);
-//        if (length == -1) {
-//            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
-//            // TODO: What now?
-//            goto out;
-//        }
+            // Update buffer position and end
+            buffer->pos = buffer->end = (size_t) length;
+
+            // Handle notification
+            if (recv_flags & MSG_NOTIFICATION) {
+                handle_notification(transport, buffer);
+                goto write;
+            }
+
+            // Handle info
+            if (info_type == SCTP_RECVV_RCVINFO) {
+                info.rcv_ppid = ntohl(info.rcv_ppid);
+                DEBUG_INFO("STREAM ID: %"PRIu16", PPID: %"PRIu32"\n", info.rcv_sid, info.rcv_ppid);
+            } else {
+                DEBUG_WARNING("Unexpected info type: %u\n", info_type);
+                goto write;
+            }
+
+            // Handle data
+            DEBUG_WARNING("TODO: Handle data\n");
+
+            // Dereference
+            mem_deref(buffer);
 
 //        dcep_receive_handler(buffer, NULL);
 
 //        // Handle (if receive handler exists)
 //        if (transport->receive_handler) {
 //            transport->receive_handler(buffer, transport->receive_handler_arg);
-//            goto out;
+//            goto write;
 //        }
-
+//
 //        // Buffer message
 //        enum anyrtc_code error = anyrtc_message_buffer_append(
 //                &transport->buffered_messages, NULL, buffer);
@@ -253,8 +307,10 @@ static void upcall_handler(
 //        } else {
 //            DEBUG_PRINTF("Buffered SCTP packet of size %zu\n", mbuf_get_left(buffer));
 //        }
+        }
     }
 
+write:
     // Can write?
     // TODO: How often is this called? What does 'write' tell me?
     if (events & SCTP_EVENT_WRITE) {
@@ -263,9 +319,8 @@ static void upcall_handler(
 
 out:
     // Unlock event loop mutex
-    --transport->wat; // TODO: Remove
+    thread_leave(transport);
     DEBUG_PRINTF("<<< %u UPCALL_HANDLER\n", transport->wat);
-    re_thread_leave();
 }
 
 /*
@@ -424,9 +479,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_pr_enable(1);
 
         // Set amount of incoming streams
-        // TODO: usrsctp_sysctl_set_sctp_nr_incoming_streams_default is not defined
-        //usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
-        //            ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
+        usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
+                ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
         // Set amount of outgoing streams
         usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(
@@ -489,10 +543,9 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // https://github.com/ortclib/ortclib-cpp/blob/master/ortc/cpp/ortc_SCTPTransport.cpp#L2143
 
     // We want info
-    // TODO: recv info only
     option_value = 1;
     if (usrsctp_setsockopt(
-            transport->socket, IPPROTO_SCTP, SCTP_RECVNXTINFO,
+            transport->socket, IPPROTO_SCTP, SCTP_RECVRCVINFO,
             &option_value, sizeof(option_value))) {
         DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
         goto out;
@@ -525,16 +578,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
             DEBUG_WARNING("Could not subscribe to event notification, reason: %m", errno);
             goto out;
         }
-    }
-
-    // Set number of streams (outgoing and incoming)
-    // TODO: Remove after branch update
-    sctp_init_options.sinit_num_ostreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
-    sctp_init_options.sinit_max_instreams = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
-    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_INITMSG,
-                           &sctp_init_options, sizeof(sctp_init_options))) {
-        DEBUG_WARNING("Could not set number of streams, reason: %m", errno);
-        goto out;
     }
 
     // Bind local address
