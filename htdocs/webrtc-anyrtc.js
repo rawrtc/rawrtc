@@ -61,14 +61,17 @@ class Peer {
         pc.onconnectionstatechange = function(event) {
             console.log('Connection state changed to:', pc.connectionState);
         };
+        pc.ondatachannel = function(event) {
+            window.dc = self.createDataChannel(event.channel);
+        };
 
         this.pc = pc;
         return pc;
     }
 
-    createDataChannel() {
+    createDataChannel(dc) {
         // Create data channel
-        var dc = this.pc.createDataChannel('example-channel', {
+        var dc = (typeof dc !== 'undefined') ? dc : this.pc.createDataChannel('example-channel', {
             ordered: true
         });
 
@@ -88,7 +91,8 @@ class Peer {
             console.log('Data channel', dc.id, 'closed');
         };
         dc.onmessage = function(event) {
-            console.info('Data channel', dc.id, 'message:', event.data);
+            var length = event.data.size || event.data.byteLength || event.data.length;
+            console.info('Data channel', dc.id, 'message size:', length);
         };
 
         return dc;
@@ -213,7 +217,8 @@ class Peer {
                     // as specified by the ORTC spec
                     switch (type) {
                         case 'offer':
-                            setupType = 'passive';
+                            // WebRTC requires actpass in offer
+                            setupType = 'actpass';
                             break;
                         case 'answer':
                             setupType = 'active';
@@ -359,6 +364,6 @@ class ControlledPeer extends Peer {
     }
 
     setRemoteParameters(parameters, sctpPort = 5000, localMid = null) {
-        super.setRemoteParameters(parameters, 'offer', sctpPort, localMid);
+        return super.setRemoteParameters(parameters, 'offer', sctpPort, localMid);
     }
 }

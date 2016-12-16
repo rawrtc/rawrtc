@@ -35,5 +35,5 @@
 /var
 
 # Build folder
-/build
+/build*
 
