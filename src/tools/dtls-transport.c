@@ -182,7 +182,8 @@ void client_start(
         struct client* const remote
 ) {
     // Get & set ICE parameters
-    EOE(anyrtc_ice_gatherer_get_local_parameters(&local->ice_parameters, remote->gatherer));
+    EOE(anyrtc_ice_gatherer_get_local_parameters(
+            &local->ice_parameters, remote->gatherer));
 
     // Start gathering
     EOE(anyrtc_ice_gatherer_gather(local->gatherer, NULL));

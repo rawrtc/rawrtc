@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <anyrtc.h>
-#include <usrsctp.h> // sctp_sendv_spa
-#include "../libanyrtc/sctp_transport.h"
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "sctp-transport-app"
+#define DEBUG_MODULE "data-channel-sctp-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
@@ -25,6 +23,8 @@ struct client {
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
     struct anyrtc_sctp_transport* sctp_transport;
+    struct anyrtc_data_transport* data_transport;
+    struct anyrtc_data_channel* data_channel;
     struct client* other_client;
 };
 
@@ -138,34 +138,6 @@ void sctp_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = anyrtc_sctp_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
-
-    // Open? Send message (twice to test the buffering)
-    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED ||
-            state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING) {
-        struct sctp_sendv_spa spa = {0};
-        enum anyrtc_code error;
-
-        // Compose meowing message
-        struct mbuf* buffer = mbuf_alloc(1024);
-        mbuf_printf(buffer, "Hello! Meow meow meow meow meow meow meow meow meow!");
-        mbuf_set_pos(buffer, 0);
-
-        // Set SCTP stream, protocol identifier and flags
-        spa.sendv_sndinfo.snd_sid = 0;
-        spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-        spa.sendv_sndinfo.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
-        spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-
-        // Send message
-        DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
-                     mbuf_get_left(buffer));
-        error = anyrtc_sctp_transport_send(
-                client->sctp_transport, buffer, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
-        if (error) {
-            DEBUG_WARNING("Could not send, reason: %s\n", anyrtc_code_to_str(error));
-        }
-        mem_deref(buffer);
-    }
 }
 
 void data_channel_handler(
@@ -213,6 +185,17 @@ void client_init(
     EOE(anyrtc_sctp_transport_create(
             &local->sctp_transport, local->dtls_transport, local->sctp_port,
             data_channel_handler, sctp_transport_state_change_handler, local));
+
+    // Get data transport
+    EOE(anyrtc_sctp_transport_get_data_transport(
+            &local->data_transport, local->sctp_transport));
+
+    // Create data channel
+//    EOE(anyrtc_data_channel_create(
+//            &local->data_channel, &local->data_transport, &local->data_channel_parameters,
+//            data_channel_open_handler, data_channel_buffered_amount_low_handler,
+//            data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
+//            local));
 }
 
 void client_start(
@@ -251,15 +234,18 @@ void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
+//    EOE(anyrtc_data_channel_close(client->data_channel));
     EOE(anyrtc_sctp_transport_stop(client->sctp_transport));
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
+//    client->data_channel = mem_deref(client->data_channel);
     client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
+    client->data_transport = mem_deref(client->data_transport);
     client->sctp_transport = mem_deref(client->sctp_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);

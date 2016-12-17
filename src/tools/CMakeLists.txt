@@ -33,3 +33,10 @@ target_link_libraries(sctp-transport
         anyrtc)
 install(TARGETS sctp-transport
         DESTINATION bin)
+
+# Tool: data-channel-sctp
+add_executable(data-channel-sctp data-channel-sctp.c)
+target_link_libraries(data-channel-sctp
+        anyrtc)
+install(TARGETS data-channel-sctp
+        DESTINATION bin)

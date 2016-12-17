@@ -830,6 +830,40 @@ out:
 }
 
 /*
+ * Get the SCTP data transport instance.
+ */
+enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
+        struct anyrtc_data_transport** const transportp, // de-referenced
+        struct anyrtc_sctp_transport* const sctp_transport
+) {
+    struct anyrtc_data_transport* transport;
+
+    // Check arguments
+    if (!transportp || !sctp_transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check SCTP transport state
+    if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Allocate
+    transport = mem_zalloc(sizeof(*transport), NULL);
+    if (!transport) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields
+    transport->type = ANYRTC_DATA_TRANSPORT_TYPE_SCTP;
+    transport->transport = sctp_transport;
+
+    // Set pointer & done
+    *transportp = transport;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Start the SCTP transport.
  */
 enum anyrtc_code anyrtc_sctp_transport_start(

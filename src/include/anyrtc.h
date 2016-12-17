@@ -194,6 +194,13 @@ enum anyrtc_ice_tcp_candidate_type {
     ANYRTC_ICE_TCP_CANDIDATE_TYPE_SO = ICE_TCP_SO
 };
 
+/*
+ * Data transport type.
+ */
+enum anyrtc_data_transport_type {
+    ANYRTC_DATA_TRANSPORT_TYPE_SCTP
+};
+
 
 
 /*
@@ -580,7 +587,8 @@ struct anyrtc_redirect_transport {
  * TODO: private
  */
 struct anyrtc_data_transport {
-    anyrtc_data_channel_send
+    enum anyrtc_data_transport_type type;
+    void* transport;
 };
 
 /*
@@ -1159,6 +1167,14 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     anyrtc_data_channel_handler* const data_channel_handler, // nullable
     anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
     void* const arg // nullable
+);
+
+/*
+ * Get the SCTP data transport instance.
+ */
+enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
+    struct anyrtc_data_transport** const transportp, // de-referenced
+    struct anyrtc_sctp_transport* const sctp_transport
 );
 
 /*
