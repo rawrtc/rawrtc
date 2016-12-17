@@ -357,9 +357,9 @@ static void handle_notification(
     union sctp_notification* const notification = (union sctp_notification*) buffer->buf;
 
     // TODO: Are all of these checks necessary or can we reduce that?
-    if (buffer->pos > UINT32_MAX ||
+    if (buffer->end > UINT32_MAX ||
             notification->sn_header.sn_length > SIZE_MAX ||
-            notification->sn_header.sn_length != buffer->pos) {
+            notification->sn_header.sn_length != buffer->end) {
         return;
     }
 
@@ -640,6 +640,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     size_t i;
     enum anyrtc_code error;
     int option_value;
+    struct sockaddr_conn peer = {0};
 
     // Check arguments
     if (!transportp || !dtls_transport) {
@@ -822,36 +823,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         }
     }
 
-out:
-    if (error) {
-        mem_deref(transport);
-    } else {
-        // Set pointer
-        *transportp = transport;
-    }
-    return error;
-}
-
-/*
- * Start the SCTP transport.
- */
-enum anyrtc_code anyrtc_sctp_transport_start(
-        struct anyrtc_sctp_transport* const transport,
-        struct anyrtc_sctp_capabilities* const remote_capabilities // copied
-) {
-    struct sockaddr_conn peer = {0};
-    enum anyrtc_code error;
-
-    // Check arguments
-    if (!transport || !remote_capabilities) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Check state
-    if (transport->state != ANYRTC_SCTP_TRANSPORT_STATE_NEW) {
-        return ANYRTC_CODE_INVALID_STATE;
-    }
-
     // Bind local address
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
@@ -870,6 +841,36 @@ enum anyrtc_code anyrtc_sctp_transport_start(
             transport->dtls_transport, dtls_receive_handler, transport);
     if (error) {
         goto out;
+    }
+
+out:
+    if (error) {
+        mem_deref(transport);
+    } else {
+        // Set pointer
+        *transportp = transport;
+    }
+    return error;
+}
+
+/*
+ * Start the SCTP transport.
+ */
+enum anyrtc_code anyrtc_sctp_transport_start(
+        struct anyrtc_sctp_transport* const transport,
+        struct anyrtc_sctp_capabilities* const remote_capabilities // copied
+) {
+    struct sockaddr_conn peer = {0};
+    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!transport || !remote_capabilities) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state != ANYRTC_SCTP_TRANSPORT_STATE_NEW) {
+        return ANYRTC_CODE_INVALID_STATE;
     }
 
     // Set remote address
