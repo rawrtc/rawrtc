@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "message_buffer.h"
 #include "dtls_transport.h"
+#include "sctp_data_channel.h"
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
@@ -115,18 +116,6 @@ static void trace_packet(
         usrsctp_freedumpbuffer(dump_buffer);
         fflush(transport->trace_handle);
     }
-}
-
-/*
- * Handle incoming message.
- * TODO: Move into own directory
- */
-static enum anyrtc_code sctp_receive_handler(
-        struct anyrtc_sctp_transport* const transport,
-        struct mbuf* const buffer
-) {
-    DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
 }
 
 /*
@@ -488,6 +477,12 @@ read:
     // Can read?
     if (events & SCTP_EVENT_READ) {
         struct mbuf* buffer;
+        ssize_t length;
+        struct sctp_rcvinfo info = {0};
+        socklen_t info_length = sizeof(info);
+        unsigned int info_type = 0;
+        int recv_flags = 0;
+        enum anyrtc_code error;
 
         // TODO: Get next message size
         // TODO: Can we get the COMPLETE message size or just the current message size?
@@ -502,63 +497,44 @@ read:
             goto write;
         }
 
-        {
-            ssize_t length;
-            struct sockaddr_storage source = {0};
-            socklen_t source_length = sizeof(source);
-            struct sctp_rcvinfo info = {0};
-            socklen_t info_length = sizeof(info);
-            unsigned int info_type = 0;
-            int recv_flags = 0;
-
-            // Receive notification or data
-            length = usrsctp_recvv(
-                    sock, buffer->buf, buffer->size, (struct sockaddr*) &source, &source_length,
-                    &info, &info_length, &info_type, &recv_flags);
-            if (length < 0) {
-                DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
-                // TODO: What now? Close?
-                goto write;
-            }
-
-            // Update buffer position and end
-            buffer->end = (size_t) length;
-
-            // Handle notification
-            if (recv_flags & MSG_NOTIFICATION) {
-                handle_notification(transport, buffer);
-                goto write;
-            }
-
-            // Handle info
-            if (info_type == SCTP_RECVV_RCVINFO) {
-                info.rcv_ppid = ntohl(info.rcv_ppid);
-                DEBUG_INFO("STREAM ID: %"PRIu16", PPID: %"PRIu32"\n", info.rcv_sid, info.rcv_ppid);
-            } else {
-                DEBUG_WARNING("Unexpected info type: %u\n", info_type);
-                goto write;
-            }
-
-            // Handle data
-            DEBUG_WARNING("TODO: Handle data\n");
-
-//        dcep_receive_handler(buffer, NULL);
-
-//        // Handle (if receive handler exists)
-//        if (transport->receive_handler) {
-//            transport->receive_handler(buffer, transport->receive_handler_arg);
-//            goto write;
-//        }
-//
-//        // Buffer message
-//        enum anyrtc_code error = anyrtc_message_buffer_append(
-//                &transport->buffered_messages, NULL, buffer);
-//        if (error) {
-//            DEBUG_WARNING("Could not buffer SCTP packet, reason: %s\n", anyrtc_code_to_str(error));
-//        } else {
-//            DEBUG_PRINTF("Buffered SCTP packet of size %zu\n", mbuf_get_left(buffer));
-//        }
+        // Receive notification or data
+        length = usrsctp_recvv(
+                sock, buffer->buf, buffer->size, NULL, NULL,
+                &info, &info_length, &info_type, &recv_flags);
+        if (length < 0) {
+            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
+            // TODO: What now? Close?
+            goto write;
         }
+
+        // Update buffer position and end
+        buffer->end = (size_t) length;
+
+        // Handle notification
+        if (recv_flags & MSG_NOTIFICATION) {
+            handle_notification(transport, buffer);
+            goto write;
+        }
+
+        // Check state
+        if (transport->state != ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+            DEBUG_WARNING("Ignored incoming data before state 'connected'\n");
+            goto write;
+        }
+
+        // Have info?
+        if (info_type != SCTP_RECVV_RCVINFO) {
+            DEBUG_WARNING("Cannot handle incoming data without SCTP rcvfinfo\n");
+            goto write;
+        }
+
+        // Pass data to SCTP data channel
+        error = anyrtc_sctp_data_channel_receive_handler(transport, buffer, &info);
+        if (error) {
+            DEBUG_WARNING("Could not handle incoming SCTP data channel message, reason: %s\n",
+                          anyrtc_code_to_str(error));
+        }
+
 // Note: Label must be here to ensure that the buffer is being free'd
 write:
         // Dereference
@@ -626,7 +602,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         struct anyrtc_sctp_transport** const transportp, // de-referenced
         struct anyrtc_dtls_transport* const dtls_transport, // referenced
         uint16_t port, // zeroable
-        anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
+        anyrtc_data_channel_handler* const data_channel_handler, // nullable
         anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
         void* const arg // nullable
 ) {

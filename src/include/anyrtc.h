@@ -158,15 +158,6 @@ enum anyrtc_dtls_transport_state {
 };
 
 /*
- * Data channel SCTP payload protocol identifier.
- */ 
-enum anyrtc_data_channel_sctp_ppid {
-    ANYRTC_DATA_CHANNEL_SCTP_PPID_CONTROL = 50,
-    ANYRTC_DATA_CHANNEL_SCTP_PPID_DOMSTRING = 51,
-    ANYRTC_DATA_CHANNEL_SCTP_PPID_BINARY = 52
-};
-
-/*
  * SCTP transport state.
  */
 enum anyrtc_sctp_transport_state {
@@ -314,18 +305,26 @@ typedef void (anyrtc_data_channel_close_handler)(
 
 /*
  * Data channel message handler.
+ * TODO: Add binary/string flag
+ * TODO: ORTC is really unclear about that handler. Consider improving it with a PR.
  */
 typedef void (anyrtc_data_channel_message_handler)(
-    enum anyrtc_data_channel_sctp_ppid const sctp_ppid,
     uint8_t const * const data, // read-only
     uint32_t const size,
     void* const arg
 );
 
 /*
- * SCTP transport data channel handler.
+ * Data channel streaming message handler.
  */
-typedef void (anyrtc_sctp_transport_data_channel_handler)(
+typedef void (anyrtc_data_channel_streaming_message_handler)(
+    // TODO: Specify streaming API handler
+);
+
+/*
+ * Data channel handler.
+ */
+typedef void (anyrtc_data_channel_handler)(
     struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
     void* const arg
 );
@@ -594,7 +593,7 @@ struct anyrtc_sctp_transport {
     uint16_t port;
     uint64_t remote_maximum_message_size;
     struct anyrtc_dtls_transport* dtls_transport; // referenced
-    anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
+    anyrtc_data_channel_handler* data_channel_handler; // nullable
     anyrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
     struct list buffered_messages;
@@ -1146,10 +1145,10 @@ enum anyrtc_code anyrtc_data_channel_close(
 
 /*
  * Send data via the data channel.
+ * TODO: Add binary/string flag
  */
 enum anyrtc_code anyrtc_data_channel_send(
     struct anyrtc_data_channel* const channel,
-    enum anyrtc_data_channel_sctp_ppid const,
     uint8_t const * const data,
     uint32_t const size
 );
@@ -1196,7 +1195,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     struct anyrtc_sctp_transport** const transportp, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
     uint16_t port, // zeroable
-    anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
+    anyrtc_data_channel_handler* const data_channel_handler, // nullable
     anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
     void* const arg // nullable
 );

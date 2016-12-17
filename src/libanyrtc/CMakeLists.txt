@@ -12,6 +12,7 @@ set(anyrtc_SOURCES
         main.c
         message_buffer.c
         redirect_transport.c
+        sctp_data_channel.c
         sctp_transport.c
         utils.c)
 
