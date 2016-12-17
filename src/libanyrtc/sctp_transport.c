@@ -627,8 +627,7 @@ static void anyrtc_sctp_transport_destroy(
 enum anyrtc_code anyrtc_sctp_transport_create(
         struct anyrtc_sctp_transport** const transportp, // de-referenced
         struct anyrtc_dtls_transport* const dtls_transport, // referenced
-        uint16_t local_port, // zeroable
-        uint16_t remote_port, // zeroable
+        uint16_t port, // zeroable
         anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
         anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
         void* const arg // nullable
@@ -641,7 +640,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     struct linger linger_option;
     struct sctp_event sctp_event = {0};
     size_t i;
-    struct sockaddr_conn peer = {0};
     enum anyrtc_code error;
     int option_value;
 
@@ -654,6 +652,11 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     if (dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_CLOSED
             || dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_FAILED) {
         return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Set default port (if 0)
+    if (port == 0) {
+        port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
     }
 
     // Check if a data transport is already registered
@@ -673,19 +676,12 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
     // Set fields/reference
     transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
+    transport->port = port;
     transport->dtls_transport = mem_ref(dtls_transport);
     transport->data_channel_handler = data_channel_handler;
     transport->state_change_handler = state_change_handler;
     transport->arg = arg;
     list_init(&transport->buffered_messages);
-
-    // Set default port (if 0)
-    if (local_port == 0) {
-        local_port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
-    }
-    if (remote_port == 0) {
-        remote_port = ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT;
-    }
 
     // Initialise usrsctp (if not already initialised)
     if (!usrsctp_initialized) {
@@ -752,6 +748,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
             AF_CONN, SOCK_STREAM, IPPROTO_SCTP, NULL, NULL, 0, NULL);
     if (!transport->socket) {
         DEBUG_WARNING("Could not create socket, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -761,12 +758,14 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     // Make socket non-blocking
     if (usrsctp_set_non_blocking(transport->socket, 1)) {
         DEBUG_WARNING("Could not set to non-blocking, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
     // Set event callback
     if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
         DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -776,6 +775,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_ENABLE_STREAM_RESET,
                            &av, sizeof(struct sctp_assoc_value))) {
         DEBUG_WARNING("Could not enable stream reconfiguration extension, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -788,6 +788,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
             transport->socket, IPPROTO_SCTP, SCTP_RECVRCVINFO,
             &option_value, sizeof(option_value))) {
         DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -798,6 +799,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     if (usrsctp_setsockopt(transport->socket, SOL_SOCKET, SO_LINGER,
                            &linger_option, sizeof(linger_option))) {
         DEBUG_WARNING("Could not set linger options, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -805,6 +807,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
                            &av.assoc_value, sizeof(av.assoc_value))) {
         DEBUG_WARNING("Could not set no-delay, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
         goto out;
     }
 
@@ -816,48 +819,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_EVENT,
                                &sctp_event, sizeof(sctp_event))) {
             DEBUG_WARNING("Could not subscribe to event notification, reason: %m", errno);
+            error = anyrtc_error_to_code(errno);
             goto out;
         }
     }
-
-    // Bind local address
-    peer.sconn_family = AF_CONN;
-    // TODO: Check for existance of sconn_len
-    //sconn.sconn_len = sizeof(peer);
-    peer.sconn_port = htons(local_port);
-    peer.sconn_addr = transport;
-    if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
-        DEBUG_WARNING("Could not bind local address, reason: %m\n", errno);
-        goto out;
-    }
-
-    // Attach to ICE transport
-    DEBUG_PRINTF("Attaching as data transport\n");
-    error = anyrtc_dtls_transport_set_data_transport(
-            dtls_transport, dtls_receive_handler, transport);
-    if (error) {
-        goto out;
-    }
-
-    // Set remote address
-    peer.sconn_family = AF_CONN;
-    // TODO: Check for existance of sconn_len
-    //sconn.sconn_len = sizeof(peer);
-    // TODO: Open an issue about missing remote port on ORTC spec.
-    peer.sconn_port = htons(remote_port);
-    peer.sconn_addr = transport;
-
-    // Connect
-    DEBUG_PRINTF("Connecting to peer\n");
-    if (usrsctp_connect(transport->socket, (struct sockaddr*) &peer, sizeof(peer))
-            && errno != EINPROGRESS) {
-        DEBUG_WARNING("Could not connect, reason: %m\n", errno);
-        goto out;
-    }
-
-    // Transition to connecting state
-    // TODO: Raise this event delayed to prevent a chicken egg problem
-    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
 
 out:
     if (error) {
@@ -868,6 +833,74 @@ out:
     }
     return error;
 }
+
+/*
+ * Start the SCTP transport.
+ */
+enum anyrtc_code anyrtc_sctp_transport_start(
+        struct anyrtc_sctp_transport* const transport,
+        struct anyrtc_sctp_capabilities* const remote_capabilities // copied
+) {
+    struct sockaddr_conn peer = {0};
+    enum anyrtc_code error;
+
+    // Check arguments
+    if (!transport || !remote_capabilities) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state != ANYRTC_SCTP_TRANSPORT_STATE_NEW) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Bind local address
+    peer.sconn_family = AF_CONN;
+    // TODO: Check for existance of sconn_len
+    //sconn.sconn_len = sizeof(peer);
+    peer.sconn_port = htons(transport->port);
+    peer.sconn_addr = transport;
+    if (usrsctp_bind(transport->socket, (struct sockaddr*) &peer, sizeof(peer))) {
+        DEBUG_WARNING("Could not bind local address, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
+        goto out;
+    }
+
+    // Attach to ICE transport
+    DEBUG_PRINTF("Attaching as data transport\n");
+    error = anyrtc_dtls_transport_set_data_transport(
+            transport->dtls_transport, dtls_receive_handler, transport);
+    if (error) {
+        goto out;
+    }
+
+    // Set remote address
+    peer.sconn_family = AF_CONN;
+    // TODO: Check for existance of sconn_len
+    //sconn.sconn_len = sizeof(peer);
+    // TODO: Open an issue about missing remote port on ORTC spec.
+    peer.sconn_port = htons(remote_capabilities->port);
+    peer.sconn_addr = transport;
+
+    // Connect
+    DEBUG_PRINTF("Connecting to peer\n");
+    if (usrsctp_connect(transport->socket, (struct sockaddr*) &peer, sizeof(peer)) &&
+            errno != EINPROGRESS) {
+        DEBUG_WARNING("Could not connect, reason: %m\n", errno);
+        error = anyrtc_error_to_code(errno);
+        goto out;
+    }
+
+    // Transition to connecting state
+    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
+
+out:
+    if (error) {
+        set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+    }
+    return error;
+}
+
 
 /*
  * Stop and close the DTLS transport.
@@ -995,3 +1028,36 @@ out:
     return error;
 }
 
+/*
+ * Get local SCTP capabilities of a transport.
+ */
+enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
+        struct anyrtc_sctp_capabilities** const capabilitiesp, // de-referenced
+        struct anyrtc_sctp_transport* const transport
+) {
+    struct anyrtc_sctp_capabilities* capabilities;
+
+    // Check arguments
+    if (!capabilitiesp || !transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Allocate capabilities
+    capabilities = mem_zalloc(sizeof(*capabilities), NULL);
+    if (!capabilities) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields
+    capabilities->port = transport->port;
+    capabilities->max_message_size = ANYRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE;
+
+    // Set pointer & done
+    *capabilitiesp = capabilities;
+    return ANYRTC_CODE_SUCCESS;
+}

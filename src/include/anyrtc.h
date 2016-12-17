@@ -577,11 +577,22 @@ struct anyrtc_redirect_transport {
 };
 
 /*
+ * SCTP capabilities.
+ * TODO: private
+ */
+struct anyrtc_sctp_capabilities {
+    uint16_t port;
+    uint64_t max_message_size;
+};
+
+/*
  * SCTP transport.
  * TODO: private
  */
 struct anyrtc_sctp_transport {
     enum anyrtc_sctp_transport_state state;
+    uint16_t port;
+    uint64_t remote_maximum_message_size;
     struct anyrtc_dtls_transport* dtls_transport; // referenced
     anyrtc_sctp_transport_data_channel_handler* data_channel_handler; // nullable
     anyrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
@@ -1184,8 +1195,7 @@ char const * const anyrtc_sctp_transport_state_to_name(
 enum anyrtc_code anyrtc_sctp_transport_create(
     struct anyrtc_sctp_transport** const transportp, // de-referenced
     struct anyrtc_dtls_transport* const dtls_transport, // referenced
-    uint16_t local_port, // zeroable
-    uint16_t remote_port, // zeroable
+    uint16_t port, // zeroable
     anyrtc_sctp_transport_data_channel_handler* const data_channel_handler, // nullable
     anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
     void* const arg // nullable
@@ -1196,13 +1206,21 @@ enum anyrtc_code anyrtc_sctp_transport_create(
  */
 enum anyrtc_code anyrtc_sctp_transport_start(
     struct anyrtc_sctp_transport* const transport,
-    struct anyrtc_sctp_capabilities const * const remote_capabilities // copied
+    struct anyrtc_sctp_capabilities* const remote_capabilities // copied
 );
 
 /*
  * Stop and close the SCTP transport.
  */
 enum anyrtc_code anyrtc_sctp_transport_stop(
+    struct anyrtc_sctp_transport* const transport
+);
+
+/*
+ * Get local SCTP capabilities of a transport.
+ */
+enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
+    struct anyrtc_sctp_capabilities** const capabilitiesp, // de-referenced
     struct anyrtc_sctp_transport* const transport
 );
 

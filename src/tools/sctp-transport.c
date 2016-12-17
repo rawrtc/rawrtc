@@ -17,13 +17,13 @@ struct client {
     struct anyrtc_ice_gather_options* gather_options;
     struct anyrtc_ice_parameters* ice_parameters;
     struct anyrtc_dtls_parameters* dtls_parameters;
+    struct anyrtc_sctp_capabilities* sctp_capabilities;
     enum anyrtc_ice_role const role;
     struct anyrtc_certificate* certificate;
+    uint16_t sctp_port;
     struct anyrtc_ice_gatherer* gatherer;
     struct anyrtc_ice_transport* ice_transport;
     struct anyrtc_dtls_transport* dtls_transport;
-    uint16_t local_sctp_port; // TODO: This should be in parameters
-    uint16_t remote_sctp_port; // TODO: This should be in parameters
     struct anyrtc_sctp_transport* sctp_transport;
     struct client* other_client;
 };
@@ -211,8 +211,7 @@ void client_init(
 
     // Create SCTP transport
     EOE(anyrtc_sctp_transport_create(
-            &local->sctp_transport, local->dtls_transport,
-            local->local_sctp_port, local->remote_sctp_port,
+            &local->sctp_transport, local->dtls_transport, local->sctp_port,
             data_channel_handler, sctp_transport_state_change_handler, local));
 }
 
@@ -239,14 +238,12 @@ void client_start(
             local->dtls_transport, remote->dtls_parameters));
 
     // Get & set SCTP capabilities
-    // TODO
-//    EOE(anyrtc_sctp_transport_get_capabilities(
-//            &remote->sctp_capabilities, remote->sctp_transport));
+    EOE(anyrtc_sctp_transport_get_capabilities(
+            &remote->sctp_capabilities, remote->sctp_transport));
 
     // Start SCTP transport
-    // TODO
-//    EOE(anyrtc_sctp_transport_start(
-//            local->sctp_transport, local->sctp_capabilities));
+    EOE(anyrtc_sctp_transport_start(
+            local->sctp_transport, remote->sctp_capabilities));
 }
 
 void client_stop(
@@ -259,6 +256,7 @@ void client_stop(
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
+    client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
     client->sctp_transport = mem_deref(client->sctp_transport);
@@ -302,11 +300,10 @@ int main(int argc, char* argv[argc + 1]) {
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLING,
             .certificate = NULL,
+            .sctp_port = 6000,
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
-            .local_sctp_port = 6000,
-            .remote_sctp_port = 5000,
             .sctp_transport = NULL,
             .other_client = NULL,
     };
@@ -317,11 +314,10 @@ int main(int argc, char* argv[argc + 1]) {
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLED,
             .certificate = NULL,
+            .sctp_port = 5000,
             .gatherer = NULL,
             .ice_transport = NULL,
             .dtls_transport = NULL,
-            .local_sctp_port = 5000,
-            .remote_sctp_port = 6000,
             .sctp_transport = NULL,
             .other_client = NULL,
     };
