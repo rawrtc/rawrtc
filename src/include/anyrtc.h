@@ -576,6 +576,14 @@ struct anyrtc_redirect_transport {
 };
 
 /*
+ * Generic data transport.
+ * TODO: private
+ */
+struct anyrtc_data_transport {
+    anyrtc_data_channel_send
+};
+
+/*
  * SCTP capabilities.
  * TODO: private
  */
@@ -1189,22 +1197,22 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
  * Create a data channel.
  */
 enum anyrtc_code anyrtc_data_channel_create(
-        struct anyrtc_data_channel** const channel, // de-referenced
-        struct anyrtc_data_transport* const transport, // referenced
-        struct anyrtc_data_channel_parameters const * const parameters, // copied
-        anyrtc_data_channel_open_handler* const open_handler, // nullable
-        anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
-        anyrtc_data_channel_error_handler* const error_handler, // nullable
-        anyrtc_data_channel_close_handler* const close_handler, // nullable
-        anyrtc_data_channel_message_handler* const message_handler, // nullable
-        void* const arg // nullable
+    struct anyrtc_data_channel** const channel, // de-referenced
+    struct anyrtc_data_transport* const transport, // referenced
+    struct anyrtc_data_channel_parameters const * const parameters, // copied
+    anyrtc_data_channel_open_handler* const open_handler, // nullable
+    anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
+    anyrtc_data_channel_error_handler* const error_handler, // nullable
+    anyrtc_data_channel_close_handler* const close_handler, // nullable
+    anyrtc_data_channel_message_handler* const message_handler, // nullable
+    void* const arg // nullable
 );
 
 /*
  * Close the data channel.
  */
 enum anyrtc_code anyrtc_data_channel_close(
-        struct anyrtc_data_channel* const channel
+    struct anyrtc_data_channel* const channel
 );
 
 /*
@@ -1212,9 +1220,9 @@ enum anyrtc_code anyrtc_data_channel_close(
  * TODO: Add binary/string flag
  */
 enum anyrtc_code anyrtc_data_channel_send(
-        struct anyrtc_data_channel* const channel,
-        uint8_t const * const data,
-        uint32_t const size
+    struct anyrtc_data_channel* const channel,
+    uint8_t const * const data,
+    uint32_t const size
 );
 
 /*
