@@ -93,11 +93,31 @@ char const * const anyrtc_dtls_transport_state_to_name(
 }
 
 /*
+ * Handle outgoing buffered DTLS messages.
+ */
+static void dtls_outgoing_buffer_handler(
+        struct mbuf* const buffer,
+        void* const context,
+        void* const arg
+) {
+    struct anyrtc_dtls_transport* const transport = arg;
+    enum anyrtc_code error;
+    (void) context;
+
+    // Send
+    error = anyrtc_dtls_transport_send(transport, buffer);
+    if (error) {
+        DEBUG_WARNING("Could not send buffered packet, reason: %s\n",
+                      anyrtc_code_to_str(error));
+    }
+}
+
+/*
  * Change the state of the ICE transport.
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
  */
-static enum anyrtc_code set_state(
+static void set_state(
         struct anyrtc_dtls_transport* const transport,
         enum anyrtc_dtls_transport_state const state
 ) {
@@ -114,12 +134,21 @@ static enum anyrtc_code set_state(
     // Set state
     transport->state = state;
 
+    // Connected?
+    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        // Send buffered outgoing DTLS messages
+        enum anyrtc_code const error = anyrtc_message_buffer_clear(
+                &transport->buffered_messages_out, dtls_outgoing_buffer_handler, transport);
+        if (error) {
+            DEBUG_WARNING("Could not send buffered messages, reason: %s\n",
+                          anyrtc_code_to_str(error));
+        }
+    }
+
     // Call handler (if any)
     if (transport->state_change_handler) {
         transport->state_change_handler(state, transport->arg);
     }
-
-    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
@@ -165,26 +194,6 @@ static void close_handler(
     } else {
         DEBUG_PRINTF("DTLS connection closed (but state is already closed anyway), reason: %m\n",
                      err);
-    }
-}
-
-/*
- * Handle outgoing buffered DTLS messages.
- */
-static void dtls_outgoing_buffer_handler(
-        struct mbuf* const buffer,
-        void* const context,
-        void* const arg
-) {
-    struct anyrtc_dtls_transport* const transport = arg;
-    enum anyrtc_code error;
-    (void) context;
-
-    // Send
-    error = anyrtc_dtls_transport_send(transport, buffer);
-    if (error) {
-        DEBUG_WARNING("Could not send buffered packet, reason: %s\n",
-                      anyrtc_code_to_str(error));
     }
 }
 
@@ -309,7 +318,9 @@ static void verify_certificate(
 out:
     if (error || !valid) {
         DEBUG_WARNING("Verifying certificate failed, reason: %s\n", anyrtc_code_to_str(error));
-        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+        if (!is_closed(transport)) {
+            set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_FAILED);
+        }
 
         // Stop
         error = anyrtc_dtls_transport_stop(transport);
@@ -320,14 +331,6 @@ out:
     } else {
         // Connected
         set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED);
-
-        // TODO: This doesn't seem like the right place for that call
-        // Send buffered outgoing messages
-        error = anyrtc_message_buffer_clear(
-                &transport->buffered_messages_out, dtls_outgoing_buffer_handler, transport);
-        if (error) {
-            goto out;
-        }
     }
 }
 
@@ -387,11 +390,7 @@ static void connect_handler(
     if (role_is_server && !have_connection) {
         // Set state to connecting (if not already set)
         if (transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
-            error = set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
-            if (error) {
-                DEBUG_WARNING("Could not set DTLS transport state to connecting, reason: %s\n",
-                              anyrtc_code_to_str(error));
-            }
+            set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
         }
 
         // Accept and create connection
@@ -540,10 +539,8 @@ static void anyrtc_dtls_transport_destroy(
 ) {
     struct anyrtc_dtls_transport* const transport = arg;
 
-    // Remove from ICE transport
-    if (transport->ice_transport) {
-        transport->ice_transport->dtls_transport = NULL;
-    }
+    // Stop transport
+    anyrtc_dtls_transport_stop(transport);
 
     // Dereference
     mem_deref(transport->connection);
@@ -812,10 +809,7 @@ enum anyrtc_code anyrtc_dtls_transport_start(
 
     // Set state to connecting (if not already set)
     if (transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
-        error = set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
-        if (error) {
-            return error;
-        }
+        set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CONNECTING);
     }
 
     // Get ICE role
@@ -1035,7 +1029,8 @@ enum anyrtc_code anyrtc_dtls_transport_stop(
     }
 
     // Update state
-    return set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CLOSED);
+    set_state(transport, ANYRTC_DTLS_TRANSPORT_STATE_CLOSED);
+    return ANYRTC_CODE_SUCCESS;
 
     // TODO: Anything missing?
 }

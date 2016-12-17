@@ -243,7 +243,7 @@ void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
-//    EOE(anyrtc_sctp_transport_stop(client->redirect_transport));
+    EOE(anyrtc_sctp_transport_stop(client->sctp_transport));
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));

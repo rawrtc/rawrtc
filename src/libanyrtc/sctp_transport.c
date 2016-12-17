@@ -189,22 +189,46 @@ out:
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
  */
-static enum anyrtc_code set_state(
+static void set_state(
         struct anyrtc_sctp_transport* const transport,
         enum anyrtc_sctp_transport_state const state
 ) {
+    // Closed?
+    if (state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        // TODO: Close all data channels (?)
+
+        // Remove from DTLS transport
+        // Note: No NULL checking needed as the function will do that for us
+        anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
+
+        // Close socket and deregister transport
+        if (transport->socket) {
+            usrsctp_close(transport->socket);
+            usrsctp_deregister_address(transport);
+            transport->socket = NULL;
+        }
+
+        // Close trace file (if any)
+        if (transport->trace_handle) {
+            if (fclose(transport->trace_handle)) {
+                DEBUG_WARNING("Could not close trace file, reason: %m\n", errno);
+            }
+        }
+    }
+
     // Set state
     transport->state = state;
 
     // Connected?
+    // Note: This needs to be done after the state has been updated because it uses the
+    //       send function which checks the state.
     if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-        // Send buffered SCTP packets
+        // Send buffered outgoing SCTP packets
         enum anyrtc_code const error = anyrtc_message_buffer_clear(
                 &transport->buffered_messages, sctp_send_outstanding, transport);
         if (error) {
-            DEBUG_WARNING("Could not clear buffered messages, reason: %s\n",
+            DEBUG_WARNING("Could not send buffered messages, reason: %s\n",
                           anyrtc_code_to_str(error));
-            return error;
         }
     }
 
@@ -212,8 +236,6 @@ static enum anyrtc_code set_state(
     if (transport->state_change_handler) {
         transport->state_change_handler(state, transport->arg);
     }
-
-    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
@@ -309,23 +331,21 @@ static void handle_association_change_event(
     switch (event->sac_state) {
         case SCTP_COMM_UP:
             // Connected
-            error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED);
+            if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING) {
+                set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED);
+            }
             break;
         case SCTP_CANT_STR_ASSOC:
         case SCTP_SHUTDOWN_COMP:
         case SCTP_COMM_LOST:
             // Disconnected
-            // TODO: Anything else required?
-            error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+            // TODO: Is this the correct behaviour?
+            if (transport->state != ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+                set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+            }
             break;
         default:
             break;
-    }
-
-    // Error?
-    if (error) {
-        DEBUG_WARNING("Could not update state, reason: %s\n", anyrtc_code_to_str(error));
-        // TODO: It would probably make sense to close the transport here if not already closed.
     }
 }
 
@@ -593,26 +613,8 @@ static void anyrtc_sctp_transport_destroy(
 ) {
     struct anyrtc_sctp_transport* const transport = arg;
 
-    // Remove from DTLS transport
-    // Note: No NULL checking needed as the function will do that for us
-    anyrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
-
-    // Close socket and deregister transport
-    if (transport->socket) {
-        usrsctp_close(transport->socket);
-        usrsctp_deregister_address(transport);
-        transport->socket = NULL;
-    }
-
-    // Close transport
-    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
-
-    // Close trace file (if any)
-    if (transport->trace_handle) {
-        if (fclose(transport->trace_handle)) {
-            DEBUG_WARNING("Could not close trace file, reason: %m\n", errno);
-        }
-    }
+    // Stop transport
+    anyrtc_sctp_transport_stop(transport);
 
     // Dereference
     list_flush(&transport->buffered_messages);
@@ -855,10 +857,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
     // Transition to connecting state
     // TODO: Raise this event delayed to prevent a chicken egg problem
-    error = set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
-    if (error) {
-        goto out;
-    }
+    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);
 
 out:
     if (error) {
@@ -868,6 +867,29 @@ out:
         *transportp = transport;
     }
     return error;
+}
+
+/*
+ * Stop and close the DTLS transport.
+ */
+enum anyrtc_code anyrtc_sctp_transport_stop(
+        struct anyrtc_sctp_transport* const transport
+) {
+    // Check arguments
+    if (!transport) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        return ANYRTC_CODE_SUCCESS;
+    }
+
+    // Update state
+    set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CLOSED);
+    return ANYRTC_CODE_SUCCESS;
+
+    // TODO: Anything missing?
 }
 
 /*

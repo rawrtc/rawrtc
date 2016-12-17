@@ -219,6 +219,9 @@ static void anyrtc_ice_gatherer_destroy(
 ) {
     struct anyrtc_ice_gatherer* const gatherer = arg;
 
+    // Close gatherer
+    anyrtc_ice_gatherer_close(gatherer);
+
     // Dereference
     mem_deref(gatherer->stun);
     mem_deref(gatherer->ice);
@@ -307,7 +310,7 @@ out:
  * Will call the corresponding handler.
  * TODO: https://github.com/w3c/ortc/issues/606
  */
-static enum anyrtc_code set_state(
+static void set_state(
         struct anyrtc_ice_gatherer* const gatherer,
         enum anyrtc_ice_gatherer_state const state
 ) {
@@ -318,8 +321,6 @@ static enum anyrtc_code set_state(
     if (gatherer->state_change_handler) {
         gatherer->state_change_handler(state, gatherer->arg);
     }
-
-    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
@@ -345,7 +346,7 @@ enum anyrtc_code anyrtc_ice_gatherer_close(
     gatherer->ice = mem_deref(gatherer->ice);
 
     // Set state to closed and return
-    return set_state(gatherer, ANYRTC_ICE_GATHERER_CLOSED);
+    set_state(gatherer, ANYRTC_ICE_GATHERER_CLOSED);
 }
 
 /*
@@ -492,8 +493,6 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
         struct anyrtc_ice_gatherer* const gatherer,
         struct anyrtc_ice_gather_options* options // referenced, nullable
 ) {
-    enum anyrtc_code error;
-
     // Check arguments
     if (!gatherer) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
@@ -513,10 +512,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     }
 
     // Update state
-    error = set_state(gatherer, ANYRTC_ICE_GATHERER_GATHERING);
-    if (error) {
-        return error;
-    }
+    set_state(gatherer, ANYRTC_ICE_GATHERER_GATHERING);
 
     // Start gathering host candidates
     if (options->gather_policy != ANYRTC_ICE_GATHER_NOHOST) {
@@ -526,10 +522,7 @@ enum anyrtc_code anyrtc_ice_gatherer_gather(
     // Gathering complete
     // TODO: Complete after gathering srflx and relay candidates
     gatherer->local_candidate_handler(NULL, NULL, gatherer->arg);
-    error = set_state(gatherer, ANYRTC_ICE_GATHERER_COMPLETE);
-    if (error) {
-        return error;
-    }
+    set_state(gatherer, ANYRTC_ICE_GATHERER_COMPLETE);
 
     // TODO: Debug only
     DEBUG_PRINTF("%H", trice_debug, gatherer->ice);

@@ -41,6 +41,9 @@ static void anyrtc_ice_transport_destroy(
 ) {
     struct anyrtc_ice_transport* const transport = arg;
 
+    // Stop transport
+    anyrtc_ice_transport_stop(transport);
+
     // Dereference
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
@@ -91,7 +94,7 @@ enum anyrtc_code anyrtc_ice_transport_create(
  * Change the state of the ICE transport.
  * Will call the corresponding handler.
  */
-static enum anyrtc_code set_state(
+static void set_state(
         struct anyrtc_ice_transport* const transport,
         enum anyrtc_ice_transport_state const state
 ) {
@@ -102,8 +105,6 @@ static enum anyrtc_code set_state(
     if (transport->state_change_handler) {
         transport->state_change_handler(state, transport->arg);
     }
-
-    return ANYRTC_CODE_SUCCESS;
 }
 
 /*
@@ -126,7 +127,7 @@ static void ice_established_handler(
     }
 
     // State: checking -> connected
-    if (transport->state != ANYRTC_ICE_TRANSPORT_CONNECTED) {
+    if (transport->state == ANYRTC_ICE_TRANSPORT_CHECKING) {
         set_state(transport, ANYRTC_ICE_TRANSPORT_CONNECTED);
     }
 
@@ -263,10 +264,7 @@ enum anyrtc_code anyrtc_ice_transport_start(
 
     // Set state to checking
     // TODO: Get more states from trice
-    error = set_state(transport, ANYRTC_ICE_TRANSPORT_CHECKING);
-    if (error) {
-        return error;
-    }
+    set_state(transport, ANYRTC_ICE_TRANSPORT_CHECKING);
 
     // Starting checklist
     // TODO: Is this the correct place?
