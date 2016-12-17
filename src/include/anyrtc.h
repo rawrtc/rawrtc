@@ -275,6 +275,14 @@ typedef void (anyrtc_dtls_transport_error_handler)(
 );
 
 /*
+ * SCTP transport state change handler.
+ */
+typedef void (anyrtc_sctp_transport_state_change_handler)(
+    enum anyrtc_sctp_transport_state const state,
+    void* const arg
+);
+
+/*
  * Data channel open handler.
  */
 typedef void (anyrtc_data_channel_open_handler)(
@@ -326,14 +334,6 @@ typedef void (anyrtc_data_channel_streaming_message_handler)(
  */
 typedef void (anyrtc_data_channel_handler)(
     struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
-    void* const arg
-);
-
-/*
- * SCTP transport state change handler.
- */
-typedef void (anyrtc_sctp_transport_state_change_handler)(
-    enum anyrtc_sctp_transport_state const state,
     void* const arg
 );
 
@@ -1122,53 +1122,6 @@ enum anyrtc_code anyrtc_dtls_transport_get_local_parameters(
  */
 
 /*
- * Create a data channel.
- */
-enum anyrtc_code anyrtc_data_channel_create(
-    struct anyrtc_data_channel** const channel, // de-referenced
-    struct anyrtc_data_transport* const transport, // referenced
-    struct anyrtc_data_channel_parameters const * const parameters, // copied
-    anyrtc_data_channel_open_handler* const open_handler, // nullable
-    anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
-    anyrtc_data_channel_error_handler* const error_handler, // nullable
-    anyrtc_data_channel_close_handler* const close_handler, // nullable
-    anyrtc_data_channel_message_handler* const message_handler, // nullable
-    void* const arg // nullable
-);
-
-/*
- * Close the data channel.
- */
-enum anyrtc_code anyrtc_data_channel_close(
-    struct anyrtc_data_channel* const channel
-);
-
-/*
- * Send data via the data channel.
- * TODO: Add binary/string flag
- */
-enum anyrtc_code anyrtc_data_channel_send(
-    struct anyrtc_data_channel* const channel,
-    uint8_t const * const data,
-    uint32_t const size
-);
-
-/*
- * TODO (from RTCDataChannel interface)
- * anyrtc_data_channel_get_transport
- * anyrtc_data_channel_get_ready_state
- * anyrtc_data_channel_get_buffered_amount
- * anyrtc_data_channel_get_buffered_amount_low_threshold
- * anyrtc_data_channel_set_buffered_amount_low_threshold
- * anyrtc_data_channel_get_parameters
- * anyrtc_data_channel_set_open_handler
- * anyrtc_data_channel_set_buffered_amount_low_handler
- * anyrtc_data_channel_set_error_handler
- * anyrtc_data_channel_set_close_handler
- * anyrtc_data_channel_set_message_handler
- */
-
-/*
  * Create a redirect transport.
  * `local_port` and `remote_port` may be `0`.
  */
@@ -1230,6 +1183,53 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
  * anyrtc_sctp_transport_get_port
  * anyrtc_sctp_transport_get_capabilities
  * anyrtc_sctp_transport_set_data_channel_handler
+ */
+
+/*
+ * Create a data channel.
+ */
+enum anyrtc_code anyrtc_data_channel_create(
+        struct anyrtc_data_channel** const channel, // de-referenced
+        struct anyrtc_data_transport* const transport, // referenced
+        struct anyrtc_data_channel_parameters const * const parameters, // copied
+        anyrtc_data_channel_open_handler* const open_handler, // nullable
+        anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
+        anyrtc_data_channel_error_handler* const error_handler, // nullable
+        anyrtc_data_channel_close_handler* const close_handler, // nullable
+        anyrtc_data_channel_message_handler* const message_handler, // nullable
+        void* const arg // nullable
+);
+
+/*
+ * Close the data channel.
+ */
+enum anyrtc_code anyrtc_data_channel_close(
+        struct anyrtc_data_channel* const channel
+);
+
+/*
+ * Send data via the data channel.
+ * TODO: Add binary/string flag
+ */
+enum anyrtc_code anyrtc_data_channel_send(
+        struct anyrtc_data_channel* const channel,
+        uint8_t const * const data,
+        uint32_t const size
+);
+
+/*
+ * TODO (from RTCDataChannel interface)
+ * anyrtc_data_channel_get_transport
+ * anyrtc_data_channel_get_ready_state
+ * anyrtc_data_channel_get_buffered_amount
+ * anyrtc_data_channel_get_buffered_amount_low_threshold
+ * anyrtc_data_channel_set_buffered_amount_low_threshold
+ * anyrtc_data_channel_get_parameters
+ * anyrtc_data_channel_set_open_handler
+ * anyrtc_data_channel_set_buffered_amount_low_handler
+ * anyrtc_data_channel_set_error_handler
+ * anyrtc_data_channel_set_close_handler
+ * anyrtc_data_channel_set_message_handler
  */
 
 
