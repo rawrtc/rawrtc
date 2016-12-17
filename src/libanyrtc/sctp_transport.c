@@ -322,8 +322,6 @@ static void handle_association_change_event(
         struct anyrtc_sctp_transport* const transport,
         struct sctp_assoc_change* const event
 ) {
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
-
     // Print debug output for event
     DEBUG_PRINTF("Association change: %H", debug_association_change_event, event);
 
@@ -1020,6 +1018,9 @@ enum anyrtc_code anyrtc_sctp_transport_send(
     if (error) {
         goto out;
     }
+
+    // Buffered message
+    DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
 
 out:
     // Dereference

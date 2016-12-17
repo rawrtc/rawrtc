@@ -1008,9 +1008,11 @@ enum anyrtc_code anyrtc_dtls_transport_send(
     if (error) {
         DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
                       anyrtc_code_to_str(error));
-    } else {
-        DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
+        return error;
     }
+
+    // Buffered message
+    DEBUG_PRINTF("Buffered outgoing packet of size %zu\n", mbuf_get_left(buffer));
     return ANYRTC_CODE_SUCCESS;
 }
 
