@@ -232,11 +232,21 @@ void client_start(
 
     // Get & set DTLS parameters
     EOE(anyrtc_dtls_transport_get_local_parameters(
-            &local->dtls_parameters, remote->dtls_transport));
+            &remote->dtls_parameters, remote->dtls_transport));
 
     // Start DTLS transport
     EOE(anyrtc_dtls_transport_start(
-            local->dtls_transport, local->dtls_parameters));
+            local->dtls_transport, remote->dtls_parameters));
+
+    // Get & set SCTP capabilities
+    // TODO
+//    EOE(anyrtc_sctp_transport_get_capabilities(
+//            &remote->sctp_capabilities, remote->sctp_transport));
+
+    // Start SCTP transport
+    // TODO
+//    EOE(anyrtc_sctp_transport_start(
+//            local->sctp_transport, local->sctp_capabilities));
 }
 
 void client_stop(

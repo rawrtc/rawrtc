@@ -37,9 +37,7 @@ enum anyrtc_code anyrtc_message_buffer_append(
 
     // Set fields
     buffered_message->buffer = mem_ref(buffer);
-    if (context) {
-        buffered_message->context = mem_ref(context);
-    }
+    buffered_message->context = mem_ref(context);
 
     // Add to list
     list_append(message_buffer, &buffered_message->le, buffered_message);

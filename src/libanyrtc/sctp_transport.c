@@ -524,7 +524,7 @@ read:
             }
 
             // Update buffer position and end
-            buffer->pos = buffer->end = (size_t) length;
+            buffer->end = (size_t) length;
 
             // Handle notification
             if (recv_flags & MSG_NOTIFICATION) {
@@ -544,9 +544,6 @@ read:
             // Handle data
             DEBUG_WARNING("TODO: Handle data\n");
 
-            // Dereference
-            mem_deref(buffer);
-
 //        dcep_receive_handler(buffer, NULL);
 
 //        // Handle (if receive handler exists)
@@ -564,9 +561,12 @@ read:
 //            DEBUG_PRINTF("Buffered SCTP packet of size %zu\n", mbuf_get_left(buffer));
 //        }
         }
+// Note: Label must be here to ensure that the buffer is being free'd
+write:
+        // Dereference
+        mem_deref(buffer);
     }
 
-write:
     // Can write?
     // TODO: How often is this called? What does 'write' tell me?
     if (events & SCTP_EVENT_WRITE) {

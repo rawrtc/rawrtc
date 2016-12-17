@@ -969,6 +969,8 @@ enum anyrtc_code anyrtc_dtls_transport_clear_data_transport(
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // TODO: Clear buffered messages (?)
+
     // Clear handler and argument
     transport->receive_handler = NULL;
     transport->receive_handler_arg = NULL;
