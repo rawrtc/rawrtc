@@ -331,6 +331,7 @@ static void handle_notification(
             handle_association_change_event(transport, &notification->sn_assoc_change);
         case SCTP_STREAM_RESET_EVENT:
             // TODO: Handle
+            // https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.7
             DEBUG_WARNING("TODO: HANDLE STREAM RESET\n");
             // handle_stream_reset_event(transport, &(notification->sn_strreset_event));
             break;
@@ -420,6 +421,8 @@ out:
 
 /*
  * Handle usrsctp events.
+ * TODO: Handle graceful and non-graceful shutdown (should raise an error event)
+ * https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.2
  */
 static void upcall_handler(
         struct socket* sock,
@@ -652,6 +655,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(
                 ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
+        // TODO: Enable SCTP ndata
+
         // Initialised
         initialized = true;
     }
@@ -724,7 +729,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         goto out;
     }
 
-    // TODO: Set MTU (1200 - IPv4 | IPv6 - UDP - DTLS (cipher suite dependent) - SCTP (12)
+    // TODO: Set MTU (1200|1280 (IPv4|IPv6) - UDP - DTLS (cipher suite dependent) - SCTP (12)
     // https://github.com/ortclib/ortclib-cpp/blob/master/ortc/cpp/ortc_SCTPTransport.cpp#L2143
 
     // We want info
@@ -739,6 +744,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
 
     // Discard pending packets when closing
     // (so we don't get a callback when the transport is already free'd)
+    // TODO: Find a way to use graceful shutdown instead, otherwise the other peer would raise an
+    // error indication (https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.2)
     linger_option.l_onoff = 1;
     linger_option.l_linger = 0;
     if (usrsctp_setsockopt(transport->socket, SOL_SOCKET, SO_LINGER,
@@ -869,6 +876,10 @@ enum anyrtc_code anyrtc_sctp_transport_start(
         error = anyrtc_error_to_code(errno);
         goto out;
     }
+
+    // TODO: Initiate Path MTU discovery (https://tools.ietf.org/html/rfc4821)
+    // by using probing messages (https://tools.ietf.org/html/rfc4820)
+    // see https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-5
 
     // Transition to connecting state
     set_state(transport, ANYRTC_SCTP_TRANSPORT_STATE_CONNECTING);

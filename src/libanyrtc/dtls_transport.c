@@ -497,10 +497,15 @@ static void udp_receive_handler(
     struct sa const* peer;
 
     // TODO: Check if DTLS or SRTP packet
+    // TODO: This handler should also be moved into ICE transport
+    // https://tools.ietf.org/html/rfc5764#section-5.1.2
 
     // Update remote peer address (if changed and connection exists)
     if (transport->connection) {
         // TODO: It would be cleaner to check if source is in our list of remote candidates
+
+        // TODO: SCTP - Retest path MTU and reset congestion state to the initial state
+        // https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-5
 
         // Update if changed
         peer = dtls_peer(transport->connection);

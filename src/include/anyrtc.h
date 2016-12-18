@@ -158,6 +158,18 @@ enum anyrtc_dtls_transport_state {
 };
 
 /*
+ * Data channel types.
+ */
+enum anyrtc_data_channel_type {
+    ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED = 0x00,
+    ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED = 0x80,
+    ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_RETRANSMIT = 0x01,
+    ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT = 0x81,
+    ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_TIMED = 0x02,
+    ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED = 0x82
+};
+
+/*
  * SCTP transport state.
  */
 enum anyrtc_sctp_transport_state {
@@ -592,6 +604,19 @@ struct anyrtc_data_transport {
 };
 
 /*
+ * Data channel parameters.
+ * TODO: private
+ */
+struct anyrtc_data_channel_parameters {
+    char* label; // copied
+    enum anyrtc_data_channel_type channel_type;
+    uint32_t channel_value; // contains either max_packet_lifetime or max_retransmit
+    char* protocol; // copied
+    bool negotiated;
+    uint16_t id;
+};
+
+/*
  * SCTP capabilities.
  * TODO: private
  */
@@ -622,9 +647,8 @@ struct anyrtc_sctp_transport {
  * TODO: private
  */
 enum {
-    ANYRTC_LAYER_DCEP = 30,
-    ANYRTC_LAYER_SRTP = 20,
-    ANYRTC_LAYER_DTLS = 10,
+    ANYRTC_LAYER_SCTP = 20,
+    ANYRTC_LAYER_DTLS_SRTP_STUN = 10,
     ANYRTC_LAYER_ICE = 0,
     ANYRTC_LAYER_STUN = -10,
     ANYRTC_LAYER_TURN = -10

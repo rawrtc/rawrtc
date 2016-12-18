@@ -5,6 +5,7 @@ enum {
     ANYRTC_SCTP_TRANSPORT_DEFAULT_PORT = 5000,
     // TODO: Suggest re-adding reconfiguration of number of streams to spec
     // because this requires too many streams to allocate who eat up memory
+    // Maybe add a configuration entry to enable/disable 'strict' mode
     ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS = 65535,
     ANYRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE = 0,
     ANYRTC_SCTP_TRANSPORT_PPID_DCEP = 0x32,
