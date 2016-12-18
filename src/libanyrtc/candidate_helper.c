@@ -49,7 +49,7 @@ enum anyrtc_code anyrtc_candidate_helper_attach(
 
     // Create & attach UDP helper
     error = anyrtc_error_to_code(udp_register_helper(
-            &candidate_helper->helper, udp_socket, ANYRTC_LAYER_DTLS, NULL,
+            &candidate_helper->helper, udp_socket, ANYRTC_LAYER_DTLS_SRTP_STUN, NULL,
             receive_handler, arg));
     if (error) {
         goto out;
