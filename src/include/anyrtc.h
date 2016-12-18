@@ -643,6 +643,14 @@ struct anyrtc_sctp_transport {
 };
 
 /*
+ * Data channel.
+ * TODO: private
+ */
+struct anyrtc_data_channel {
+    struct anyrtc_data_transport* transport; // referenced
+};
+
+/*
  * Layers.
  * TODO: private
  */
