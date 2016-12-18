@@ -6,6 +6,7 @@
 #define SCTP_DEBUG
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
+#include "main.h"
 #include "utils.h"
 #include "message_buffer.h"
 #include "dtls_transport.h"
@@ -29,10 +30,10 @@ struct send_context {
 };
 
 // Initialised flag
-static bool usrsctp_initialized = false;
+static bool initialized = false;
 
 // Events to subscribe to
-uint16_t const sctp_events[] = {
+static uint16_t const sctp_events[] = {
     SCTP_ASSOC_CHANGE,
 //    SCTP_PEER_ADDR_CHANGE,
 //    SCTP_REMOTE_ERROR,
@@ -43,7 +44,7 @@ uint16_t const sctp_events[] = {
     SCTP_STREAM_CHANGE_EVENT,
 //    SCTP_SENDER_DRY_EVENT
 };
-size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
 /*
  * Get the corresponding name for an SCTP transport state.
@@ -63,34 +64,6 @@ char const * const anyrtc_sctp_transport_state_to_name(
         default:
             return "???";
     }
-}
-
-/*
- * Lock event loop mutex.
- */
-static void thread_enter(
-        struct anyrtc_sctp_transport* const transport
-) {
-    // TODO: Can an upcall/output trigger an upcall/output? This COULD result in a deadlock.
-    // Answer: Yes. We can either use an reentrant mutex or register a callback on the event loop
-    if (transport->wat) {
-        printf("mutex locked twice, PANIC?!\n");
-    }
-
-    // Lock event loop mutex
-    re_thread_enter();
-    ++transport->wat; // TODO: Remove
-    DEBUG_PRINTF("No deadlock\n"); // TODO: Remove
-}
-
-/*
- * Release event loop mutex.
- */
-static void thread_leave(
-        struct anyrtc_sctp_transport* const transport
-) {
-    // Unlock event loop mutex
-    --transport->wat; // TODO: Remove
 }
 
 /*
@@ -389,8 +362,7 @@ static int sctp_packet_handler(
     (void) set_df; // TODO: Handle?
 
     // Lock event loop mutex
-    DEBUG_PRINTF(">>> %u SCTP_PACKET_HANDLER\n", transport->wat);
-    thread_enter(transport);
+    anyrtc_thread_enter();
 
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
@@ -439,8 +411,8 @@ static int sctp_packet_handler(
     }
 
 out:
-    thread_leave(transport);
-    DEBUG_PRINTF("<<< %u SCTP_PACKET_HANDLER\n", transport->wat);
+    // Unlock event loop mutex
+    anyrtc_thread_leave();
 
     // TODO: What does the return code do?
     return 0;
@@ -458,8 +430,7 @@ static void upcall_handler(
     int events = usrsctp_get_events(sock);
 
     // Lock event loop mutex
-    DEBUG_PRINTF(">>> %u UPCALL_HANDLER\n", transport->wat);
-    thread_enter(transport);
+    anyrtc_thread_enter();
 
     // Closed?
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
@@ -549,8 +520,7 @@ write:
 
 out:
     // Unlock event loop mutex
-    thread_leave(transport);
-    DEBUG_PRINTF("<<< %u UPCALL_HANDLER\n", transport->wat);
+    anyrtc_thread_leave();
 }
 
 /*
@@ -643,23 +613,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Allocate
-    transport = mem_zalloc(sizeof(*transport), anyrtc_sctp_transport_destroy);
-    if (!transport) {
-        return ANYRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields/reference
-    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
-    transport->port = port;
-    transport->dtls_transport = mem_ref(dtls_transport);
-    transport->data_channel_handler = data_channel_handler;
-    transport->state_change_handler = state_change_handler;
-    transport->arg = arg;
-    list_init(&transport->buffered_messages);
-
-    // Initialise usrsctp (if not already initialised)
-    if (!usrsctp_initialized) {
+    // Initialise usrsctp
+    if (!initialized) {
         usrsctp_init(0, sctp_packet_handler, dbg_info);
 
         // TODO: Debugging depending on options
@@ -698,8 +653,23 @@ enum anyrtc_code anyrtc_sctp_transport_create(
                 ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
 
         // Initialised
-        usrsctp_initialized = true;
+        initialized = true;
     }
+
+    // Allocate
+    transport = mem_zalloc(sizeof(*transport), anyrtc_sctp_transport_destroy);
+    if (!transport) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields/reference
+    transport->state = ANYRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
+    transport->port = port;
+    transport->dtls_transport = mem_ref(dtls_transport);
+    transport->data_channel_handler = data_channel_handler;
+    transport->state_change_handler = state_change_handler;
+    transport->arg = arg;
+    list_init(&transport->buffered_messages);
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options

@@ -615,7 +615,6 @@ struct anyrtc_sctp_transport {
     struct list buffered_messages;
     FILE* trace_handle;
     struct socket* socket;
-    volatile int wat; // TODO: Look, I know this is stupid, but it's going to be removed anyway
 };
 
 /*

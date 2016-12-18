@@ -19,6 +19,7 @@ endif()
 
 # Use pkg-config
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 
 # TODO: Dependency: zf_log
 #include_directories(.../build.cmake/prefix/include)
@@ -48,6 +49,7 @@ link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
 
 # Dependencies library list
 set(anyrtc_DEP_LIBRARIES
+        Threads::Threads
         ${LIB_RE_LIBRARIES}
         ${LIB_REW_LIBRARIES}
         ${LIB_OPENSSL_LIBRARIES}
