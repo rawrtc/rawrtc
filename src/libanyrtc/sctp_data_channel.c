@@ -37,9 +37,9 @@ struct data_channel_ack {
 } __attribute__((packed));
 
 /*
- * Create a data channel open request.
+ * Create a data channel open message.
  */
-static enum anyrtc_code data_channel_open_request_create(
+static enum anyrtc_code data_channel_open_message_create(
         struct data_channel_open** const messagep, // de-referenced
         struct anyrtc_data_channel_parameters* const parameters
 ) {
@@ -73,6 +73,16 @@ static enum anyrtc_code data_channel_open_request_create(
     // Set pointer & done
     *messagep = message;
     return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Create a data channel ack message.
+ */
+static void data_channel_ack_message(
+        struct data_channel_ack* const message // modified
+) {
+    // Set fields
+    message->message_type = ANYRTC_SCTP_DATA_CHANNEL_MESSAGE_TYPE_ACK;
 }
 
 /*
