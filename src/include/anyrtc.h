@@ -610,7 +610,7 @@ struct anyrtc_data_transport {
 struct anyrtc_data_channel_parameters {
     char* label; // copied
     enum anyrtc_data_channel_type channel_type;
-    uint32_t channel_value; // contains either max_packet_lifetime or max_retransmit
+    uint32_t reliability_parameter; // contains either max_packet_lifetime or max_retransmit
     char* protocol; // copied
     bool negotiated;
     uint16_t id;

@@ -1,3 +1,5 @@
+#include <netinet/in.h> // htons, ...
+#include <string.h> // strlen, memcpy
 #include <usrsctp.h> // SCTP_RECVV_RCVINFO, ...
 #include <anyrtc.h>
 #include "sctp_data_channel.h"
@@ -34,20 +36,44 @@ struct data_channel_ack {
     uint8_t message_type;
 } __attribute__((packed));
 
-
 /*
- * Set a data channel open request.
+ * Create a data channel open request.
  */
-static enum anyrtc_code data_channel_open_request(
-        struct data_channel_open* const message, // copied into
+static enum anyrtc_code data_channel_open_request_create(
+        struct data_channel_open** const messagep, // de-referenced
         struct anyrtc_data_channel_parameters* const parameters
 ) {
+    size_t const label_length = strlen(parameters->label);
+    size_t const protocol_length = strlen(parameters->protocol);
+    struct data_channel_open* message;
+
+    // Check string length
+    if (label_length > UINT16_MAX || protocol_length > UINT16_MAX) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    // TODO: Once we can use vectored send in usrsctp, we can use an iov for the strings
+    // https://github.com/nplab/dctt/blob/bcff62eeb53fa02f5d5da9fe145ce7cafa1a3780/dctt.c#L201
+    message = mem_alloc(sizeof(*message) + label_length + protocol_length, NULL);
+    if (!message) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields
     message->message_type = ANYRTC_SCTP_DATA_CHANNEL_MESSAGE_TYPE_OPEN;
     message->channel_type = parameters->channel_type;
-    message->priority = ANYRTC_SCTP_DATA_CHANNEL_MESSAGE_PRIORITY_NORMAL; // TODO: Correct?
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
-}
+    message->priority = htons(ANYRTC_SCTP_DATA_CHANNEL_MESSAGE_PRIORITY_NORMAL); // TODO: Ok?
+    message->reliability_parameter = htonl(parameters->reliability_parameter);
+    message->label_length = (uint16_t) label_length;
+    message->protocol_length = (uint16_t) protocol_length;
+    memcpy(message->label_and_protocol, parameters->label, label_length);
+    memcpy(message->label_and_protocol + label_length, parameters->protocol, protocol_length);
 
+    // Set pointer & done
+    *messagep = message;
+    return ANYRTC_CODE_SUCCESS;
+}
 
 /*
  * Handle incoming SCTP message.
