@@ -1,5 +1,14 @@
 #pragma once
 
+/*
+ * Handle buffered messages.
+ */
+typedef void (anyrtc_message_buffer_handler)(
+    struct mbuf* const buffer,
+    void* const context,
+    void* const arg
+);
+
 enum anyrtc_code anyrtc_message_buffer_append(
     struct list* const message_buffer,
     struct mbuf* const buffer, // referenced

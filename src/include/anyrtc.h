@@ -357,16 +357,6 @@ typedef void (anyrtc_data_channel_handler)(
 );
 
 /*
- * Handle buffered messages.
- * TODO: private
- */
-typedef void (anyrtc_message_buffer_handler)(
-    struct mbuf* const buffer,
-    void* const context,
-    void* const arg
-);
-
-/*
  * Handle incoming data messages.
  * TODO: Private
  */
