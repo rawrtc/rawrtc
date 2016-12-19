@@ -2,7 +2,7 @@
 #include <string.h> // strlen, memcpy
 #include <usrsctp.h> // SCTP_RECVV_RCVINFO, ...
 #include <anyrtc.h>
-#include "sctp_data_channel.h"
+#include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-data-channel"
 #define DEBUG_LEVEL 7

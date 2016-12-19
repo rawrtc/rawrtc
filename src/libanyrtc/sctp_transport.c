@@ -11,7 +11,6 @@
 #include "message_buffer.h"
 #include "dtls_transport.h"
 #include "data_transport.h"
-#include "sctp_data_channel.h"
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
