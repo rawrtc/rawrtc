@@ -208,9 +208,20 @@ enum anyrtc_ice_tcp_candidate_type {
 
 /*
  * Data transport type.
+ * TODO: private -> data_transport.h
  */
 enum anyrtc_data_transport_type {
     ANYRTC_DATA_TRANSPORT_TYPE_SCTP
+};
+
+/*
+ * Data channel state.
+ * TODO: private -> data_transport.h
+ */
+enum anyrtc_data_channel_state {
+    ANYRTC_DATA_CHANNEL_STATE_NEW,
+    ANYRTC_DATA_CHANNEL_STATE_OPEN,
+    ANYRTC_DATA_CHANNEL_STATE_CLOSED
 };
 
 
@@ -358,11 +369,40 @@ typedef void (anyrtc_data_channel_handler)(
 
 /*
  * Handle incoming data messages.
- * TODO: Private
+ * TODO: private -> dtls_transport.h
  */
 typedef void (anyrtc_dtls_transport_receive_handler)(
     struct mbuf* const buffer,
     void* const arg
+);
+
+/*
+ * Create the data channel (transport handler).
+ * TODO: private -> data_transport.h
+ */
+typedef enum anyrtc_code (anyrtc_data_transport_channel_create_handler)(
+    struct anyrtc_data_transport* const transport,
+    struct anyrtc_data_channel* const channel, // referenced
+    struct anyrtc_data_channel_parameters const * const parameters // copied
+);
+
+/*
+ * Close the data channel (transport handler).
+ * TODO: private -> data_transport.h
+ */
+typedef enum anyrtc_code (anyrtc_data_transport_channel_close_handler)(
+    struct anyrtc_data_channel* const channel
+);
+
+/*
+ * Send data via the data channel (transport handler).
+ * TODO: Add binary/string flag
+ * TODO: private -> data_transport.h
+ */
+typedef enum anyrtc_code (anyrtc_data_transport_channel_send_handler)(
+    struct anyrtc_data_channel* const channel,
+    uint8_t const * const data,
+    uint32_t const size
 );
 
 
@@ -589,8 +629,11 @@ struct anyrtc_redirect_transport {
  * TODO: private
  */
 struct anyrtc_data_transport {
-    enum anyrtc_data_transport_type type;
+    enum anyrtc_data_transport_type type; // TODO: Can this be removed?
     void* transport;
+    anyrtc_data_transport_channel_create_handler* channel_create;
+    anyrtc_data_transport_channel_close_handler* channel_close;
+    anyrtc_data_transport_channel_send_handler* channel_send;
 };
 
 /*
@@ -637,7 +680,14 @@ struct anyrtc_sctp_transport {
  * TODO: private
  */
 struct anyrtc_data_channel {
+    enum anyrtc_data_channel_state state;
     struct anyrtc_data_transport* transport; // referenced
+    anyrtc_data_channel_open_handler* open_handler; // nullable
+    anyrtc_data_channel_buffered_amount_low_handler* buffered_amount_low_handler; // nullable
+    anyrtc_data_channel_error_handler* error_handler; // nullable
+    anyrtc_data_channel_close_handler* close_handler; // nullable
+    anyrtc_data_channel_message_handler* message_handler;
+    void* arg; // nullable
 };
 
 /*
@@ -646,7 +696,7 @@ struct anyrtc_data_channel {
  */
 enum {
     ANYRTC_LAYER_SCTP = 20,
-    ANYRTC_LAYER_DTLS_SRTP_STUN = 10,
+    ANYRTC_LAYER_DTLS_SRTP_STUN = 10, // TODO: Pretty sure we are able to detect STUN earlier
     ANYRTC_LAYER_ICE = 0,
     ANYRTC_LAYER_STUN = -10,
     ANYRTC_LAYER_TURN = -10
@@ -1195,7 +1245,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
  */
 enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
     struct anyrtc_data_transport** const transportp, // de-referenced
-    struct anyrtc_sctp_transport* const sctp_transport
+    struct anyrtc_sctp_transport* const sctp_transport // referenced
 );
 
 /*
@@ -1234,14 +1284,14 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
  * Create a data channel.
  */
 enum anyrtc_code anyrtc_data_channel_create(
-    struct anyrtc_data_channel** const channel, // de-referenced
+    struct anyrtc_data_channel** const channelp, // de-referenced
     struct anyrtc_data_transport* const transport, // referenced
     struct anyrtc_data_channel_parameters const * const parameters, // copied
     anyrtc_data_channel_open_handler* const open_handler, // nullable
     anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
     anyrtc_data_channel_error_handler* const error_handler, // nullable
     anyrtc_data_channel_close_handler* const close_handler, // nullable
-    anyrtc_data_channel_message_handler* const message_handler, // nullable
+    anyrtc_data_channel_message_handler* const message_handler,
     void* const arg // nullable
 );
 

@@ -812,7 +812,7 @@ out:
  */
 enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
         struct anyrtc_data_transport** const transportp, // de-referenced
-        struct anyrtc_sctp_transport* const sctp_transport
+        struct anyrtc_sctp_transport* const sctp_transport // referenced
 ) {
     // Check arguments
     if (!sctp_transport) {
@@ -826,7 +826,8 @@ enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
 
     // Create data transport
     return anyrtc_data_transport_create(
-            transportp, ANYRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport);
+            transportp, ANYRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
+            NULL, NULL, NULL); // TODO: REPLACE NULL
 }
 
 /*

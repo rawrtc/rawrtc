@@ -20,6 +20,16 @@
  * - DC open
  * - reliability settings must be set with each message
  *
+ * anyrtc_data_channel_create
+ * + transport->data_channel_create_handler(channel, parameters, transport)
+ *   + sctp_transport find free sid or fail, channels[sid] = channel
+ *     + data_channel_open_message_send(channel, parameters, transport, sid)
+ *       + anyrtc_sctp_transport_send(transport, ...)
+ *
+ * anyrtc_data_channel_close
+ * + transport->data_channel_close_handler(channel)
+ *   + sctp_transport:
+ *     + channel
  */
 
 struct data_channel_open {
@@ -87,7 +97,20 @@ static void data_channel_ack_message(
 }
 
 /*
+ * SCTP data channel create handler.
+ */
+static enum anyrtc_code anyrtc_sctp_data_channel_open(
+        struct anyrtc_data_channel* const channel,
+        struct anyrtc_data_transport* const transport,
+        struct anyrtc_data_channel_parameters* const parameters
+) {
+    // Create data channel open message
+    return ANYRTC_CODE_NOT_IMPLEMENTED; // TODO: Implement
+}
+
+/*
  * Handle incoming SCTP message.
+ * TODO: Map to SCTP data channel
  */
 enum anyrtc_code anyrtc_sctp_data_channel_receive_handler(
         struct anyrtc_sctp_transport* const transport,
@@ -98,22 +121,5 @@ enum anyrtc_code anyrtc_sctp_data_channel_receive_handler(
     DEBUG_INFO("STREAM ID: %"PRIu16", PPID: %"PRIu32"\n", info->rcv_sid, info->rcv_ppid);
 
     DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
-}
-
-/*
- * Create a data channel.
- */
-enum anyrtc_code anyrtc_data_channel_create(
-        struct anyrtc_data_channel** const channel, // de-referenced
-        struct anyrtc_data_transport* const transport, // referenced
-        struct anyrtc_data_channel_parameters const * const parameters, // copied
-        anyrtc_data_channel_open_handler* const open_handler, // nullable
-        anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
-        anyrtc_data_channel_error_handler* const error_handler, // nullable
-        anyrtc_data_channel_close_handler* const close_handler, // nullable
-        anyrtc_data_channel_message_handler* const message_handler, // nullable
-        void* const arg // nullable
-) {
     return ANYRTC_CODE_NOT_IMPLEMENTED;
 }
