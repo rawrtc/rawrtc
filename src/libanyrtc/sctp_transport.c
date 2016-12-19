@@ -528,32 +528,6 @@ out:
 }
 
 /*
- * Handle incoming SCTP messages.
- */
-static void dtls_receive_handler(
-        struct mbuf* const buffer,
-        void* const arg
-) {
-    struct anyrtc_sctp_transport* const transport = arg;
-    size_t const length = mbuf_get_left(buffer);
-
-    // Closed?
-    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
-        return;
-    }
-
-    // Trace (if trace handle)
-    // Note: No need to check if NULL as the function does it for us
-    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
-
-    // Feed into SCTP socket
-    // TODO: What about ECN bits?
-    DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
-    usrsctp_conninput(transport, mbuf_buf(buffer), length, 0);
-}
-
-/*
  * Destructor for an existing ICE transport.
  */
 static void anyrtc_sctp_transport_destroy(
@@ -1043,4 +1017,30 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
     // Set pointer & done
     *capabilitiesp = capabilities;
     return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Handle incoming SCTP messages.
+ */
+static void dtls_receive_handler(
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_sctp_transport* const transport = arg;
+    size_t const length = mbuf_get_left(buffer);
+
+    // Closed?
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
+        return;
+    }
+
+    // Trace (if trace handle)
+    // Note: No need to check if NULL as the function does it for us
+    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
+
+    // Feed into SCTP socket
+    // TODO: What about ECN bits?
+    DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
+    usrsctp_conninput(transport, mbuf_buf(buffer), length, 0);
 }

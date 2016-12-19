@@ -26,6 +26,7 @@ static void set_state(
             if (channel->open_handler) {
                 channel->open_handler(channel->arg);
             }
+            break;
 
         case ANYRTC_DATA_CHANNEL_STATE_CLOSED:
             // Warning: To close the channel, use `anyrtc_data_channel_close`!
