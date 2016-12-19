@@ -37,6 +37,7 @@ enum anyrtc_code {
     ANYRTC_CODE_INVALID_CERTIFICATE,
     ANYRTC_CODE_INVALID_FINGERPRINT,
     ANYRTC_CODE_INSUFFICIENT_SPACE,
+    ANYRTC_CODE_STILL_IN_USE
 };
 
 /*
@@ -671,6 +672,8 @@ struct anyrtc_sctp_transport {
     anyrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
     struct list buffered_messages;
+    struct anyrtc_data_channel** channels;
+    uint16_t n_channels;
     FILE* trace_handle;
     struct socket* socket;
 };
@@ -682,6 +685,7 @@ struct anyrtc_sctp_transport {
 struct anyrtc_data_channel {
     enum anyrtc_data_channel_state state;
     struct anyrtc_data_transport* transport; // referenced
+    void* transport_arg; // referenced
     anyrtc_data_channel_open_handler* open_handler; // nullable
     anyrtc_data_channel_buffered_amount_low_handler* buffered_amount_low_handler; // nullable
     anyrtc_data_channel_error_handler* error_handler; // nullable

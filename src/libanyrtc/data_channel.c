@@ -6,7 +6,7 @@
 #include <re_dbg.h>
 
 /*
- * Change the state of the SCTP transport.
+ * Change the state of the data channel.
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
  */
@@ -60,6 +60,7 @@ static void anyrtc_data_channel_destroy(
 
     // Dereference
     mem_deref(channel->transport);
+    mem_deref(channel->transport_arg);
 }
 
 /*
@@ -139,6 +140,4 @@ enum anyrtc_code anyrtc_data_channel_close(
     // Update state
     set_state(channel, ANYRTC_DATA_CHANNEL_STATE_CLOSED);
     return ANYRTC_CODE_SUCCESS;
-
-    // TODO: Anything missing?
 }

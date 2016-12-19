@@ -1,8 +1,8 @@
 #include <stdio.h> // fopen
-#include <string.h> // memcpy
+#include <string.h> // memcpy, strlen
 #include <errno.h> // errno
 #include <sys/socket.h> // AF_INET, SOCK_STREAM, linger, sockaddr_storage
-#include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
+#include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, htons
 #define SCTP_DEBUG
 #include <usrsctp.h> // usrsctp*
 #include <anyrtc.h>
@@ -45,6 +45,83 @@ static uint16_t const sctp_events[] = {
 //    SCTP_SENDER_DRY_EVENT
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+
+/*
+ * Create a data channel open message.
+ *
+ * https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.1
+ */
+static enum anyrtc_code data_channel_open_message_create(
+        struct mbuf** const bufferp, // de-referenced, not checked
+        struct anyrtc_data_channel_parameters const * const parameters // not checked
+) {
+    size_t const label_length = strlen(parameters->label);
+    size_t const protocol_length = strlen(parameters->protocol);
+    struct mbuf* buffer;
+    int err;
+
+    // Check string length
+    if (label_length > UINT16_MAX || protocol_length > UINT16_MAX) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    buffer = mbuf_alloc(ANYRTC_DCEP_MESSAGE_OPEN_BASE_SIZE + label_length + protocol_length);
+    if (!buffer) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields
+    err = mbuf_write_u8(buffer, ANYRTC_DCEP_MESSAGE_TYPE_OPEN);
+    err |= mbuf_write_u8(buffer, parameters->channel_type);
+    err |= mbuf_write_u16(buffer, htons(ANYRTC_DCEP_CHANNEL_PRIORITY_NORMAL)); // TODO: Ok?
+    err |= mbuf_write_u32(buffer, htonl(parameters->reliability_parameter));
+    err |= mbuf_write_u16(buffer, htons((uint16_t) label_length));
+    err |= mbuf_write_u16(buffer, htons((uint16_t) protocol_length));
+    err |= mbuf_write_mem(buffer, (uint8_t*) parameters->label, label_length);
+    err |= mbuf_write_mem(buffer, (uint8_t*) parameters->protocol, protocol_length);
+
+out:
+    if (err) {
+        mem_deref(buffer);
+        return anyrtc_error_to_code(err);
+    } else {
+        // Set pointer & done
+        *bufferp = buffer;
+        return ANYRTC_CODE_SUCCESS;
+    }
+}
+
+/*
+ * Create a data channel ack message.
+ *
+ * https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.2
+ */
+static enum anyrtc_code data_channel_ack_message(
+        struct mbuf** const bufferp // de-referenced, not checked
+) {
+    int err;
+
+    // Allocate
+    struct mbuf* const buffer = mbuf_alloc(ANYRTC_DCEP_MESSAGE_ACK_BASE_SIZE);
+    if (!buffer) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields
+    err = mbuf_write_u8(buffer, ANYRTC_DCEP_MESSAGE_TYPE_ACK);
+
+out:
+    if (err) {
+        mem_deref(buffer);
+        return anyrtc_error_to_code(err);
+    } else {
+        // Set pointer & done
+        *bufferp = buffer;
+        return ANYRTC_CODE_SUCCESS;
+    }
+
+}
 
 /*
  * Get the corresponding name for an SCTP transport state.
@@ -420,6 +497,22 @@ out:
 }
 
 /*
+ * Handle incoming SCTP message.
+ * TODO: Back to sctp_transport.c
+ */
+enum anyrtc_code data_receive_handler(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer,
+        struct sctp_rcvinfo* const info
+) {
+    info->rcv_ppid = ntohl(info->rcv_ppid);
+    DEBUG_INFO("STREAM ID: %"PRIu16", PPID: %"PRIu32"\n", info->rcv_sid, info->rcv_ppid);
+
+    DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
  * Handle usrsctp events.
  * TODO: Handle graceful and non-graceful shutdown (should raise an error event)
  * https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.2
@@ -502,8 +595,8 @@ read:
             goto write;
         }
 
-        // Pass data to SCTP data channel
-        error = anyrtc_sctp_data_channel_receive_handler(transport, buffer, &info);
+        // Pass data to handler
+        error = data_receive_handler(transport, buffer, &info);
         if (error) {
             DEBUG_WARNING("Could not handle incoming SCTP data channel message, reason: %s\n",
                           anyrtc_code_to_str(error));
@@ -527,6 +620,86 @@ out:
 }
 
 /*
+ * Handle incoming DTLS messages.
+ */
+static void dtls_receive_handler(
+        struct mbuf* const buffer,
+        void* const arg
+) {
+    struct anyrtc_sctp_transport* const transport = arg;
+    size_t const length = mbuf_get_left(buffer);
+
+    // Closed?
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
+        return;
+    }
+
+    // Trace (if trace handle)
+    // Note: No need to check if NULL as the function does it for us
+    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
+
+    // Feed into SCTP socket
+    // TODO: What about ECN bits?
+    DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
+    usrsctp_conninput(transport, mbuf_buf(buffer), length, 0);
+}
+
+/*
+ * Destructor for an existing SCTP data channel array.
+ */
+static void data_channels_destroy(
+        void* const arg
+) {
+    struct anyrtc_sctp_transport* const transport = arg;
+    size_t i;
+
+    // Dereference all members
+    for (i = 0; i < transport->n_channels; ++i) {
+        mem_deref(transport->channels[i]);
+    }
+}
+
+/*
+ * Create SCTP data channel array.
+ *
+ * Warning: Will not pre-fill stream IDs of the members!
+ */
+enum anyrtc_code data_channels_alloc(
+        struct anyrtc_data_channel*** channelsp, // de-referenced
+        uint16_t const n_channels,
+        uint16_t const n_channels_previously
+) {
+    size_t i;
+    struct anyrtc_data_channel** channels;
+
+    // Check arguments
+    if (!channelsp) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocated before and #channels is decreasing?
+    if (n_channels_previously > 0 && n_channels < n_channels_previously) {
+        // Ensure we're not removing active data channels
+        for (i = 0; i < n_channels_previously; ++i) {
+            if ((*channelsp)[i]) {
+                return ANYRTC_CODE_STILL_IN_USE;
+            }
+        }
+    }
+
+    // Allocate
+    channels = mem_reallocarray(*channelsp, n_channels, sizeof(*channels), data_channels_destroy);
+    if (!channels) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set pointer & done
+    *channelsp = channels;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Destructor for an existing ICE transport.
  */
 static void anyrtc_sctp_transport_destroy(
@@ -538,6 +711,7 @@ static void anyrtc_sctp_transport_destroy(
     anyrtc_sctp_transport_stop(transport);
 
     // Dereference
+    mem_deref(transport->channels);
     list_flush(&transport->buffered_messages);
     mem_deref(transport->dtls_transport);
 }
@@ -553,6 +727,8 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         anyrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
         void* const arg // nullable
 ) {
+    enum anyrtc_code error;
+    uint16_t n_channels;
     bool have_data_transport;
     struct anyrtc_sctp_transport* transport;
     char trace_handle_id[8];
@@ -561,7 +737,6 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     struct linger linger_option;
     struct sctp_event sctp_event = {0};
     size_t i;
-    enum anyrtc_code error;
     int option_value;
     struct sockaddr_conn peer = {0};
 
@@ -575,6 +750,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
             || dtls_transport->state == ANYRTC_DTLS_TRANSPORT_STATE_FAILED) {
         return ANYRTC_CODE_INVALID_STATE;
     }
+
+    // Set number of channels
+    // TODO: Get from config
+    n_channels = ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
 
     // Set default port (if 0)
     if (port == 0) {
@@ -622,12 +801,10 @@ enum anyrtc_code anyrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_pr_enable(1);
 
         // Set amount of incoming streams
-        usrsctp_sysctl_set_sctp_nr_incoming_streams_default(
-                ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
+        usrsctp_sysctl_set_sctp_nr_incoming_streams_default(n_channels);
 
         // Set amount of outgoing streams
-        usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(
-                ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS);
+        usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(n_channels);
 
         // TODO: Enable SCTP ndata
 
@@ -649,6 +826,12 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     transport->state_change_handler = state_change_handler;
     transport->arg = arg;
     list_init(&transport->buffered_messages);
+
+    // Allocate channel array
+    error = data_channels_alloc(&transport->channels, n_channels, 0);
+    if (error) {
+        goto out;
+    }
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
@@ -781,6 +964,140 @@ out:
 }
 
 /*
+ * Create the SCTP data channel.
+ */
+static enum anyrtc_code channel_create_handler(
+        struct anyrtc_data_transport* const transport,
+        struct anyrtc_data_channel* const channel, // referenced
+        struct anyrtc_data_channel_parameters const * const parameters // copied
+) {
+    struct anyrtc_sctp_transport* sctp_transport;
+    size_t i;
+    enum anyrtc_code error;
+    uint16_t* sid = NULL;
+    struct mbuf* buffer = NULL;
+    struct sctp_sndinfo send_info = {0};
+
+    // Check arguments
+    if (!transport || !channel || !parameters) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get SCTP transport
+    sctp_transport = transport->transport;
+
+    // Check DTLS state
+    // Note: We need to have an open DTLS connection to determine whether we use odd or even
+    // SIDs.
+    // TODO: Can we fix this somehow to make it possible to create data channels earlier?
+    if (sctp_transport->dtls_transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Use odd or even SIDs
+    switch (sctp_transport->dtls_transport->role) {
+        case ANYRTC_DTLS_ROLE_CLIENT:
+            i = 0;
+            break;
+        case ANYRTC_DTLS_ROLE_SERVER:
+            i = 1;
+            break;
+        default:
+            return ANYRTC_CODE_INVALID_STATE;
+    }
+
+    // Find free SID
+    for (i; i < sctp_transport->n_channels; i += 2) {
+        if (!sctp_transport->channels[i]) {
+            // Allocate SID to be used as an argument for the data channel handlers
+            sid = mem_alloc(sizeof(*sid), NULL);
+            if (!sid) {
+                return ANYRTC_CODE_NO_MEMORY;
+            }
+
+            // Set SID
+            *sid = (uint16_t) i;
+            break;
+        }
+    }
+    if (!sid) {
+        return ANYRTC_CODE_INSUFFICIENT_SPACE;
+    }
+
+    // Create open message
+    error = data_channel_open_message_create(&buffer, parameters);
+    if (error) {
+        goto out;
+    }
+
+    // Set SCTP stream, protocol identifier and flags
+    send_info.snd_sid = *sid;
+    send_info.snd_flags = SCTP_EOR;
+    send_info.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+
+    // Send message
+    error = anyrtc_sctp_transport_send(
+            sctp_transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
+    if (error) {
+        goto out;
+    }
+
+out:
+    if (!error) {
+        // Update channel with SID and reference
+        channel->transport_arg = mem_ref(sid);
+        sctp_transport->channels[i] = mem_ref(channel);
+    }
+
+    // Dereference & done
+    mem_deref(buffer);
+    mem_deref(sid);
+    return error;
+}
+
+/*
+ * Close the data channel (transport handler).
+ */
+static enum anyrtc_code channel_close_handler(
+        struct anyrtc_data_channel* const channel
+) {
+    struct anyrtc_sctp_transport* sctp_transport;
+    uint16_t sid;
+
+    // Check arguments
+    if (!channel) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get SCTP transport & SID
+    sctp_transport = channel->transport->transport;
+    sid = *((uint16_t*) channel->transport_arg);
+
+    // Dereference channel and clear pointer
+    sctp_transport->channels[sid] = mem_deref(channel);
+
+    // TODO: Anything else required here?
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
+ * Send data via the data channel (transport handler).
+ * TODO: Add binary/string flag
+ */
+static enum anyrtc_code channel_send_handler(
+        struct anyrtc_data_channel* const channel,
+        uint8_t const * const data,
+        uint32_t const size
+) {
+    struct anyrtc_sctp_transport* const sctp_transport = channel->transport->transport;
+
+    // TODO: Implement
+    return ANYRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
  * Get the SCTP data transport instance.
  */
 enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
@@ -800,7 +1117,7 @@ enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
     // Create data transport
     return anyrtc_data_transport_create(
             transportp, ANYRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
-            NULL, NULL, NULL); // TODO: REPLACE NULL
+            channel_create_handler, channel_close_handler, channel_send_handler);
 }
 
 /*
@@ -879,7 +1196,7 @@ enum anyrtc_code anyrtc_sctp_transport_stop(
 }
 
 /*
- * Send a data message over the SCTP transport.
+ * Send a message via the SCTP transport.
  * TODO: Add partial reliability options.
  */
 enum anyrtc_code anyrtc_sctp_transport_send(
@@ -1016,30 +1333,4 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
     // Set pointer & done
     *capabilitiesp = capabilities;
     return ANYRTC_CODE_SUCCESS;
-}
-
-/*
- * Handle incoming SCTP messages.
- */
-static void dtls_receive_handler(
-        struct mbuf* const buffer,
-        void* const arg
-) {
-    struct anyrtc_sctp_transport* const transport = arg;
-    size_t const length = mbuf_get_left(buffer);
-
-    // Closed?
-    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
-        return;
-    }
-
-    // Trace (if trace handle)
-    // Note: No need to check if NULL as the function does it for us
-    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
-
-    // Feed into SCTP socket
-    // TODO: What about ECN bits?
-    DEBUG_PRINTF("Feeding SCTP packet of %zu bytes\n", length);
-    usrsctp_conninput(transport, mbuf_buf(buffer), length, 0);
 }
