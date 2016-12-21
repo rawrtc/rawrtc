@@ -498,7 +498,7 @@ static void udp_receive_handler(
 
     // TODO: Check if DTLS or SRTP packet
     // TODO: This handler should also be moved into ICE transport
-    // https://tools.ietf.org/html/rfc5764#section-5.1.2
+    // https://tools.ietf.org/search/rfc7983#section-7
 
     // Update remote peer address (if changed and connection exists)
     if (transport->connection) {
