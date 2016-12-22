@@ -1027,52 +1027,48 @@ static enum anyrtc_code sid_create(
 }
 
 /*
- * Create the SCTP data channel.
+ * Create a negotiated SCTP data channel.
  */
-static enum anyrtc_code channel_create_handler(
-        struct anyrtc_data_transport* const transport,
-        struct anyrtc_data_channel* const channel, // referenced
-        struct anyrtc_data_channel_parameters const * const parameters // copied
+static enum anyrtc_code channel_create_negotiated(
+        uint16_t** const sidp, // de-referenced, not checked
+        struct anyrtc_sctp_transport* const transport, // not checked
+        struct anyrtc_data_channel_parameters const * const parameters // read-only
 ) {
-    struct anyrtc_sctp_transport* sctp_transport;
-    size_t i;
-    enum anyrtc_code error;
-    uint16_t* sid = NULL;
-    struct mbuf* buffer = NULL;
-    struct sctp_sndinfo send_info = {0};
-
-    // Check arguments
-    if (!transport || !channel || !parameters) {
+    // Check SID (> max, >= n_channels, or channel already occupied)
+    if (parameters->id > ANYRTC_SCTP_TRANSPORT_SID_MAX ||
+        parameters->id >= transport->n_channels ||
+        transport->channels[parameters->id]) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get SCTP transport
-    sctp_transport = transport->transport;
+    // Allocate SID to be used as an argument for the data channel handlers
+    return sid_create(sidp, parameters->id);
+}
 
-    // Negotiated?
-    if (parameters->negotiated) {
-        // Check SID (> max, >= n_channels, or channel already occupied)
-        if (parameters->id > ANYRTC_SCTP_TRANSPORT_SID_MAX ||
-                parameters->id >= sctp_transport->n_channels ||
-                sctp_transport->channels[parameters->id]) {
-            return ANYRTC_CODE_INVALID_ARGUMENT;
-        }
-
-        // Allocate SID to be used as an argument for the data channel handlers
-        error = sid_create(&sid, parameters->id);
-        goto out;
-    }
+/*
+ * Create a SCTP data channel that needs negotiation.
+ */
+static enum anyrtc_code channel_create_inband(
+        uint16_t** const sidp, // de-referenced, not checked
+        struct anyrtc_sctp_transport* const transport, // not checked
+        struct anyrtc_data_channel_parameters const * const parameters // read-only
+) {
+    enum anyrtc_code error;
+    size_t i;
+    uint16_t* sid;
+    struct sctp_sndinfo send_info = {0};
+    struct mbuf* buffer;
 
     // Check DTLS state
     // Note: We need to have an open DTLS connection to determine whether we use odd or even
     // SIDs.
     // TODO: Can we fix this somehow to make it possible to create data channels earlier?
-    if (sctp_transport->dtls_transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+    if (transport->dtls_transport->state != ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         return ANYRTC_CODE_INVALID_STATE;
     }
 
     // Use odd or even SIDs
-    switch (sctp_transport->dtls_transport->role) {
+    switch (transport->dtls_transport->role) {
         case ANYRTC_DTLS_ROLE_CLIENT:
             i = 0;
             break;
@@ -1084,12 +1080,13 @@ static enum anyrtc_code channel_create_handler(
     }
 
     // Find free SID
-    for (i; i < sctp_transport->n_channels; i += 2) {
-        if (!sctp_transport->channels[i]) {
+    sid = NULL;
+    for (i; i < transport->n_channels; i += 2) {
+        if (!transport->channels[i]) {
             // Allocate SID to be used as an argument for the data channel handlers
             error = sid_create(&sid, (uint16_t) i);
             if (error) {
-                goto out;
+                return error;
             }
             break;
         }
@@ -1099,6 +1096,7 @@ static enum anyrtc_code channel_create_handler(
     }
 
     // Create open message
+    buffer = NULL;
     error = data_channel_open_message_create(&buffer, parameters);
     if (error) {
         goto out;
@@ -1111,31 +1109,71 @@ static enum anyrtc_code channel_create_handler(
 
     // Send message
     error = anyrtc_sctp_transport_send(
-            sctp_transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
+            transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
     if (error) {
         goto out;
     }
 
 out:
-    if (!error) {
-        // Update channel with SID and reference
-        channel->transport_arg = mem_ref(sid);
-        sctp_transport->channels[*sid] = mem_ref(channel);
+    // Dereference
+    mem_deref(buffer);
 
-        // Update data channel state
-        if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
-        } else {
-            // Note: We need to wait for the transport to be connected before we can open
-            //       the channel
-            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
-        }
+    if (error) {
+        mem_deref(sid);
+    } else {
+        // Set pointer
+        *sidp = sid;
+    }
+    return error;
+}
+
+/*
+ * Create the SCTP data channel.
+ */
+static enum anyrtc_code channel_create_handler(
+        struct anyrtc_data_transport* const transport,
+        struct anyrtc_data_channel* const channel, // referenced
+        struct anyrtc_data_channel_parameters const * const parameters // read-only
+) {
+    struct anyrtc_sctp_transport* sctp_transport;
+    enum anyrtc_code error;
+    uint16_t* sid = NULL;
+
+
+    // Check arguments
+    if (!transport || !channel || !parameters) {
+        return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Dereference & done
-    mem_deref(buffer);
+    // Get SCTP transport
+    sctp_transport = transport->transport;
+
+    // Create negotiated or in-band data channel
+    if (parameters->negotiated) {
+        error = channel_create_negotiated(&sid, sctp_transport, parameters);
+    } else {
+        error = channel_create_inband(&sid, sctp_transport, parameters);
+    }
+    if (error) {
+        return error;
+    }
+
+    // Update channel with SID and reference
+    channel->transport_arg = mem_ref(sid);
+    sctp_transport->channels[*sid] = mem_ref(channel);
     mem_deref(sid);
-    return error;
+
+    // Update data channel state
+    if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
+    } else {
+        // Note: We need to wait for the transport to be connected before we can open
+        //       the channel
+        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
+    }
+
+    // Done
+    return ANYRTC_CODE_SUCCESS;
 }
 
 /*

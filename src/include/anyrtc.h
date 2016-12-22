@@ -390,7 +390,7 @@ typedef void (anyrtc_dtls_transport_receive_handler)(
 typedef enum anyrtc_code (anyrtc_data_transport_channel_create_handler)(
     struct anyrtc_data_transport* const transport,
     struct anyrtc_data_channel* const channel, // referenced
-    struct anyrtc_data_channel_parameters const * const parameters // copied
+    struct anyrtc_data_channel_parameters const * const parameters // read-only
 );
 
 /*
