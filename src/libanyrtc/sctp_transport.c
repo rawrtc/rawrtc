@@ -306,6 +306,8 @@ static void set_state(
         }
 
         // Open waiting channels
+        // Note: This call must be above calling the state handler to prevent the user from
+        //       being able to close the transport before the data channels are being opened.
         set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_OPEN, &from_channel_state);
     }
 

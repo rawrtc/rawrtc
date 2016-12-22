@@ -155,15 +155,11 @@ enum anyrtc_code anyrtc_data_channel_close(
 static void anyrtc_data_channel_parameters_destroy(
         void* const arg
 ) {
-    struct anyrtc_sctp_transport* const transport = arg;
-
-    // Stop transport
-    anyrtc_sctp_transport_stop(transport);
+    struct anyrtc_data_channel_parameters* const parameters = arg;
 
     // Dereference
-    mem_deref(transport->channels);
-    list_flush(&transport->buffered_messages);
-    mem_deref(transport->dtls_transport);
+    mem_deref(parameters->label);
+    mem_deref(parameters->protocol);
 }
 
 /*
