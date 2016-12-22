@@ -8,8 +8,6 @@
 
 #define EOE(code) exit_on_error(code, __FILE__, __LINE__)
 
-struct client;
-
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
@@ -366,7 +364,6 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Start main loop
     // TODO: Wrap re_main?
-    // TODO: Stop main loop once gathering is complete
     EOE(anyrtc_error_to_code(re_main(signal_handler)));
 
     // Stop clients

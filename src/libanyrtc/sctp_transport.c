@@ -1060,17 +1060,6 @@ static enum anyrtc_code channel_create_handler(
 
         // Allocate SID to be used as an argument for the data channel handlers
         error = sid_create(&sid, parameters->id);
-        if (error) {
-            goto out;
-        }
-
-        // Update state and done
-        if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
-        } else {
-            // Note: Special case for pre-negotiated channels that need to wait for the transport
-            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
-        }
         goto out;
     }
 
@@ -1132,6 +1121,15 @@ out:
         // Update channel with SID and reference
         channel->transport_arg = mem_ref(sid);
         sctp_transport->channels[*sid] = mem_ref(channel);
+
+        // Update data channel state
+        if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
+        } else {
+            // Note: We need to wait for the transport to be connected before we can open
+            //       the channel
+            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
+        }
     }
 
     // Dereference & done
