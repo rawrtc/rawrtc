@@ -36,7 +36,7 @@ enum anyrtc_code anyrtc_data_transport_create(
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(*transport), NULL);
+    transport = mem_zalloc(sizeof(*transport), anyrtc_sctp_transport_destroy);
     if (!transport) {
         return ANYRTC_CODE_NO_MEMORY;
     }
