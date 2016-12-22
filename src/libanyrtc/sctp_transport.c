@@ -55,10 +55,14 @@ static enum anyrtc_code data_channel_open_message_create(
         struct mbuf** const bufferp, // de-referenced, not checked
         struct anyrtc_data_channel_parameters const * const parameters // not checked
 ) {
-    size_t const label_length = strlen(parameters->label);
-    size_t const protocol_length = strlen(parameters->protocol);
+    size_t label_length;
+    size_t protocol_length;
     struct mbuf* buffer;
     int err;
+
+    // Get length of label and protocol
+    label_length = parameters->label ? strlen(parameters->label) : 0;
+    protocol_length = parameters->protocol ? strlen(parameters->protocol) : 0;
 
     // Check string length
     if (label_length > UINT16_MAX || protocol_length > UINT16_MAX) {
@@ -78,10 +82,13 @@ static enum anyrtc_code data_channel_open_message_create(
     err |= mbuf_write_u32(buffer, htonl(parameters->reliability_parameter));
     err |= mbuf_write_u16(buffer, htons((uint16_t) label_length));
     err |= mbuf_write_u16(buffer, htons((uint16_t) protocol_length));
-    err |= mbuf_write_mem(buffer, (uint8_t*) parameters->label, label_length);
-    err |= mbuf_write_mem(buffer, (uint8_t*) parameters->protocol, protocol_length);
+    if (parameters->label) {
+        err |= mbuf_write_mem(buffer, (uint8_t *) parameters->label, label_length);
+    }
+    if (parameters->protocol) {
+        err |= mbuf_write_mem(buffer, (uint8_t *) parameters->protocol, protocol_length);
+    }
 
-out:
     if (err) {
         mem_deref(buffer);
         return anyrtc_error_to_code(err);
@@ -964,6 +971,27 @@ out:
 }
 
 /*
+ * Allocate SID.
+ */
+static enum anyrtc_code sid_create(
+        uint16_t** const sidp, // not checked
+        uint16_t const value
+) {
+    // Allocate SID to be used as an argument for the data channel handlers
+    uint16_t* const sid = mem_alloc(sizeof(*sid), NULL);
+    if (!sid) {
+        return ANYRTC_CODE_NO_MEMORY;
+    }
+
+    // Set SID
+    *sid = value;
+
+    // Set pointer & done
+    *sidp = sid;
+    return ANYRTC_CODE_SUCCESS;
+}
+
+/*
  * Create the SCTP data channel.
  */
 static enum anyrtc_code channel_create_handler(
@@ -985,6 +1013,20 @@ static enum anyrtc_code channel_create_handler(
 
     // Get SCTP transport
     sctp_transport = transport->transport;
+
+    // Negotiated?
+    if (parameters->negotiated) {
+        // Check SID (> max, >= n_channels, or channel already occupied)
+        if (parameters->id > ANYRTC_SCTP_TRANSPORT_SID_MAX ||
+                parameters->id >= sctp_transport->n_channels ||
+                sctp_transport->channels[parameters->id]) {
+            return ANYRTC_CODE_INVALID_ARGUMENT;
+        }
+
+        // Allocate SID to be used as an argument for the data channel handlers
+        error = sid_create(&sid, parameters->id);
+        goto out;
+    }
 
     // Check DTLS state
     // Note: We need to have an open DTLS connection to determine whether we use odd or even
@@ -1010,13 +1052,10 @@ static enum anyrtc_code channel_create_handler(
     for (i; i < sctp_transport->n_channels; i += 2) {
         if (!sctp_transport->channels[i]) {
             // Allocate SID to be used as an argument for the data channel handlers
-            sid = mem_alloc(sizeof(*sid), NULL);
-            if (!sid) {
-                return ANYRTC_CODE_NO_MEMORY;
+            error = sid_create(&sid, (uint16_t) i);
+            if (error) {
+                goto out;
             }
-
-            // Set SID
-            *sid = (uint16_t) i;
             break;
         }
     }
@@ -1046,7 +1085,7 @@ out:
     if (!error) {
         // Update channel with SID and reference
         channel->transport_arg = mem_ref(sid);
-        sctp_transport->channels[i] = mem_ref(channel);
+        sctp_transport->channels[*sid] = mem_ref(channel);
     }
 
     // Dereference & done

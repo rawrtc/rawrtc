@@ -1285,6 +1285,32 @@ enum anyrtc_code anyrtc_sctp_transport_get_capabilities(
  */
 
 /*
+ * Create data channel parameters.
+ *
+ * For `ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_*`, the reliability parameter
+ * is being ignored.
+ *
+ * When using `ANYRTC_DATA_CHANNEL_TYPE_*_RETRANSMIT`, the reliability
+ * parameter specifies the number of times a retransmission occurs if
+ * not acknowledged before the message is being discarded.
+ *
+ * When using `ANYRTC_DATA_CHANNEL_TYPE_*_TIMED`, the reliability
+ * parameter specifies the time window in milliseconds during which
+ * (re-)transmissions may occur before the message is being discarded.
+ *
+ * In case `negotiated` is set to `false`, the `id` is being ignored.
+ */
+enum anyrtc_code anyrtc_data_channel_parameters_create(
+    struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
+    char const * const label, // copied, nullable
+    enum anyrtc_data_channel_type const channel_type,
+    uint32_t const reliability_parameter,
+    char const * const protocol, // copied
+    bool const negotiated,
+    uint16_t const id
+);
+
+/*
  * Create a data channel.
  */
 enum anyrtc_code anyrtc_data_channel_create(

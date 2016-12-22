@@ -13,6 +13,7 @@ struct client;
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
+    struct anyrtc_data_channel_parameters* channel_parameters;
     struct anyrtc_ice_parameters* ice_parameters;
     struct anyrtc_dtls_parameters* dtls_parameters;
     struct anyrtc_sctp_capabilities* sctp_capabilities;
@@ -148,6 +149,44 @@ void data_channel_handler(
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
 }
 
+void data_channel_open_handler(
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, client->channel_parameters->label);
+}
+
+void data_channel_buffered_amount_low_handler(
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Data channel buffered amount low: %s\n", client->name,
+                 client->channel_parameters->label);
+}
+
+void data_channel_error_handler(
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, client->channel_parameters->label);
+}
+
+void data_channel_close_handler(
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, client->channel_parameters->label);
+}
+
+void data_channel_message_handler(
+        uint8_t const * const data, // read-only
+        uint32_t const size,
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",
+                 client->name, client->channel_parameters->label, size);
+}
 
 static void signal_handler(
         int sig
@@ -191,11 +230,11 @@ void client_init(
             &local->data_transport, local->sctp_transport));
 
     // Create data channel
-//    EOE(anyrtc_data_channel_create(
-//            &local->data_channel, &local->data_transport, &local->data_channel_parameters,
-//            data_channel_open_handler, data_channel_buffered_amount_low_handler,
-//            data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
-//            local));
+    EOE(anyrtc_data_channel_create(
+            &local->data_channel, local->data_transport, local->channel_parameters,
+            data_channel_open_handler, data_channel_buffered_amount_low_handler,
+            data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
+            local));
 }
 
 void client_start(
@@ -234,14 +273,14 @@ void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
-//    EOE(anyrtc_data_channel_close(client->data_channel));
+    EOE(anyrtc_data_channel_close(client->data_channel));
     EOE(anyrtc_sctp_transport_stop(client->sctp_transport));
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
     EOE(anyrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
-//    client->data_channel = mem_deref(client->data_channel);
+    client->data_channel = mem_deref(client->data_channel);
     client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
@@ -257,6 +296,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    struct anyrtc_data_channel_parameters* channel_parameters;
 
     // Initialise
     EOE(anyrtc_init());
@@ -279,10 +319,16 @@ int main(int argc, char* argv[argc + 1]) {
             sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
+    // Create data channel parameters
+    EOE(anyrtc_data_channel_parameters_create(
+            &channel_parameters, "cat-noises", ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED,
+            0, NULL, false, 0));
+
     // Initialise clients
     struct client a = {
             .name = "A",
             .gather_options = gather_options,
+            .channel_parameters = channel_parameters,
             .ice_parameters = NULL,
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLING,
@@ -297,6 +343,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct client b = {
             .name = "B",
             .gather_options = gather_options,
+            .channel_parameters = channel_parameters,
             .ice_parameters = NULL,
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLED,
