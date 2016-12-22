@@ -119,8 +119,10 @@ out:
     if (error) {
         mem_deref(channel);
     } else {
-        // Update state & set pointer
-        channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
+        // Update state (if necessary) & set pointer
+        if (channel->state == ANYRTC_DATA_CHANNEL_STATE_INIT) {
+            channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
+        }
         *channelp = channel;
     }
     return error;

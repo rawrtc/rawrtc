@@ -243,7 +243,12 @@ static void set_data_channel_states(
 
     // Set state on all data channels
     for (i = 0; i < transport->n_channels; ++i) {
-        if (!from_state || (from_state && transport->channels[i]->state == *from_state)) {
+        if (!transport->channels[i]) {
+            continue;
+        }
+
+        // Update state
+        if (!from_state || transport->channels[i]->state == *from_state) {
             anyrtc_data_channel_set_state(transport->channels[i], to_state);
         }
     }
@@ -292,9 +297,6 @@ static void set_state(
         enum anyrtc_data_channel_state const from_channel_state =
                 ANYRTC_DATA_CHANNEL_STATE_WAITING;
 
-        // Open waiting channels
-        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_CLOSED, &from_channel_state);
-
         // Send buffered outgoing SCTP packets
         enum anyrtc_code const error = anyrtc_message_buffer_clear(
                 &transport->buffered_messages, sctp_send_outstanding, transport);
@@ -302,6 +304,9 @@ static void set_state(
             DEBUG_WARNING("Could not send buffered messages, reason: %s\n",
                           anyrtc_code_to_str(error));
         }
+
+        // Open waiting channels
+        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_OPEN, &from_channel_state);
     }
 
     // Call handler (if any)
@@ -1111,7 +1116,7 @@ static enum anyrtc_code channel_create_handler(
     // Set SCTP stream, protocol identifier and flags
     send_info.snd_sid = *sid;
     send_info.snd_flags = SCTP_EOR;
-    send_info.snd_ppid = htonl(ANYRTC_SCTP_TRANSPORT_PPID_DCEP);
+    send_info.snd_ppid = htonl(ANYRTC_DCEP_PPID_CONTROL);
 
     // Send message
     error = anyrtc_sctp_transport_send(

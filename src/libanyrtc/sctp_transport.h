@@ -8,7 +8,6 @@ enum {
     // Maybe add a configuration entry to enable/disable 'strict' mode
     ANYRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS = 65535,
     ANYRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE = 0,
-    ANYRTC_SCTP_TRANSPORT_PPID_DCEP = 0x32,
     ANYRTC_SCTP_TRANSPORT_SID_MAX = 65534
 };
 
