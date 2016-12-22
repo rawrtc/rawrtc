@@ -545,6 +545,7 @@ static void anyrtc_dtls_transport_destroy(
     struct anyrtc_dtls_transport* const transport = arg;
 
     // Stop transport
+    // TODO: Check effects in case transport has been destroyed due to error in create
     anyrtc_dtls_transport_stop(transport);
 
     // Dereference

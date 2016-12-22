@@ -220,6 +220,7 @@ static void anyrtc_ice_gatherer_destroy(
     struct anyrtc_ice_gatherer* const gatherer = arg;
 
     // Close gatherer
+    // TODO: Check effects in case transport has been destroyed due to error in create
     anyrtc_ice_gatherer_close(gatherer);
 
     // Dereference

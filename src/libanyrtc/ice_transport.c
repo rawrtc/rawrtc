@@ -42,6 +42,7 @@ static void anyrtc_ice_transport_destroy(
     struct anyrtc_ice_transport* const transport = arg;
 
     // Stop transport
+    // TODO: Check effects in case transport has been destroyed due to error in create
     anyrtc_ice_transport_stop(transport);
 
     // Dereference

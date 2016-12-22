@@ -111,7 +111,6 @@ enum anyrtc_code anyrtc_data_channel_create(
     }
 
     // Done
-    channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
     DEBUG_PRINTF("Created data channel: %s, protocol: %s\n",
                  parameters->label, parameters->protocol);
 
@@ -119,7 +118,8 @@ out:
     if (error) {
         mem_deref(channel);
     } else {
-        // Set pointer
+        // Update state & set pointer
+        channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
         *channelp = channel;
     }
     return error;

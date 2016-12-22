@@ -715,6 +715,7 @@ static void anyrtc_sctp_transport_destroy(
     struct anyrtc_sctp_transport* const transport = arg;
 
     // Stop transport
+    // TODO: Check effects in case transport has been destroyed due to error in create
     anyrtc_sctp_transport_stop(transport);
 
     // Dereference
