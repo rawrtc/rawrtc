@@ -231,17 +231,37 @@ out:
 }
 
 /*
+ * Change the states of all data channels.
+ * Caller MUST ensure that the same state is not set twice.
+ */
+static void set_data_channel_states(
+        struct anyrtc_sctp_transport* const transport, // not checked
+        enum anyrtc_data_channel_state const to_state,
+        enum anyrtc_data_channel_state const * const from_state // optional current state
+) {
+    size_t i;
+
+    // Set state on all data channels
+    for (i = 0; i < transport->n_channels; ++i) {
+        if (!from_state || (from_state && transport->channels[i]->state == *from_state)) {
+            anyrtc_data_channel_set_state(transport->channels[i], to_state);
+        }
+    }
+}
+
+/*
  * Change the state of the SCTP transport.
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
  */
 static void set_state(
-        struct anyrtc_sctp_transport* const transport,
+        struct anyrtc_sctp_transport* const transport, // not checked
         enum anyrtc_sctp_transport_state const state
 ) {
     // Closed?
     if (state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        // TODO: Close all data channels (?)
+        // Close all data channels
+        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_CLOSED, NULL);
 
         // Remove from DTLS transport
         // Note: No NULL checking needed as the function will do that for us
@@ -269,6 +289,12 @@ static void set_state(
     // Note: This needs to be done after the state has been updated because it uses the
     //       send function which checks the state.
     if (state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        enum anyrtc_data_channel_state const from_channel_state =
+                ANYRTC_DATA_CHANNEL_STATE_WAITING;
+
+        // Open waiting channels
+        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_CLOSED, &from_channel_state);
+
         // Send buffered outgoing SCTP packets
         enum anyrtc_code const error = anyrtc_message_buffer_clear(
                 &transport->buffered_messages, sctp_send_outstanding, transport);
@@ -1027,6 +1053,17 @@ static enum anyrtc_code channel_create_handler(
 
         // Allocate SID to be used as an argument for the data channel handlers
         error = sid_create(&sid, parameters->id);
+        if (error) {
+            goto out;
+        }
+
+        // Update state and done
+        if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
+        } else {
+            // Note: Special case for pre-negotiated channels that need to wait for the transport
+            anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
+        }
         goto out;
     }
 

@@ -10,8 +10,8 @@
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
  */
-static void set_state(
-        struct anyrtc_data_channel* const channel,
+void anyrtc_data_channel_set_state(
+        struct anyrtc_data_channel* const channel, // not checked
         enum anyrtc_data_channel_state const state
 ) {
     enum anyrtc_code error;
@@ -112,7 +112,8 @@ enum anyrtc_code anyrtc_data_channel_create(
 
     // Done
     DEBUG_PRINTF("Created data channel: %s, protocol: %s\n",
-                 parameters->label, parameters->protocol);
+                 parameters->label ? parameters->label : "N/A",
+                 parameters->protocol ? parameters->protocol : "N/A");
 
 out:
     if (error) {
@@ -142,7 +143,7 @@ enum anyrtc_code anyrtc_data_channel_close(
     }
 
     // Update state
-    set_state(channel, ANYRTC_DATA_CHANNEL_STATE_CLOSED);
+    anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_CLOSED);
     return ANYRTC_CODE_SUCCESS;
 }
 

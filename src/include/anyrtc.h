@@ -225,6 +225,8 @@ enum anyrtc_data_channel_state {
     ANYRTC_DATA_CHANNEL_STATE_INIT,
     // Note: This state means 'successfully allocated'.
     ANYRTC_DATA_CHANNEL_STATE_NEW,
+    // Note: This state indicates the channel must be opened once the transport is open
+    ANYRTC_DATA_CHANNEL_STATE_WAITING,
     ANYRTC_DATA_CHANNEL_STATE_OPEN,
     ANYRTC_DATA_CHANNEL_STATE_CLOSED
 };
