@@ -322,7 +322,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Create data channel parameters
     EOE(anyrtc_data_channel_parameters_create(
             &channel_parameters, "cat-noises", ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED,
-            0, NULL, false, 0));
+            0, NULL, true, 0));
 
     // Initialise clients
     struct client a = {

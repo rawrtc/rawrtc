@@ -840,6 +840,7 @@ enum anyrtc_code anyrtc_sctp_transport_create(
     if (error) {
         goto out;
     }
+    transport->n_channels = n_channels;
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
