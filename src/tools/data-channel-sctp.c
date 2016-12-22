@@ -132,7 +132,7 @@ static void dtls_transport_error_handler(
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
-void sctp_transport_state_change_handler(
+static void sctp_transport_state_change_handler(
     enum anyrtc_sctp_transport_state const state,
     void* const arg
 ) {
@@ -141,7 +141,7 @@ void sctp_transport_state_change_handler(
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
 }
 
-void data_channel_handler(
+static void data_channel_handler(
         struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
@@ -149,14 +149,14 @@ void data_channel_handler(
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
 }
 
-void data_channel_open_handler(
+static void data_channel_open_handler(
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, client->channel_parameters->label);
 }
 
-void data_channel_buffered_amount_low_handler(
+static void data_channel_buffered_amount_low_handler(
         void* const arg
 ) {
     struct client* const client = arg;
@@ -164,21 +164,21 @@ void data_channel_buffered_amount_low_handler(
                  client->channel_parameters->label);
 }
 
-void data_channel_error_handler(
+static void data_channel_error_handler(
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, client->channel_parameters->label);
 }
 
-void data_channel_close_handler(
+static void data_channel_close_handler(
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, client->channel_parameters->label);
 }
 
-void data_channel_message_handler(
+static void data_channel_message_handler(
         uint8_t const * const data, // read-only
         uint32_t const size,
         void* const arg
@@ -195,7 +195,7 @@ static void signal_handler(
     re_cancel();
 }
 
-void client_init(
+static void client_init(
         struct client* const local
 ) {
     // Generate certificates
@@ -237,7 +237,7 @@ void client_init(
             local));
 }
 
-void client_start(
+static void client_start(
         struct client* const local,
         struct client* const remote
 ) {
@@ -269,7 +269,7 @@ void client_start(
             local->sctp_transport, remote->sctp_capabilities));
 }
 
-void client_stop(
+static void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
@@ -374,6 +374,7 @@ int main(int argc, char* argv[argc + 1]) {
     client_stop(&b);
 
     // Free
+    mem_deref(channel_parameters);
     mem_deref(gather_options);
 
     // Bye

@@ -112,7 +112,7 @@ static void signal_handler(
     re_cancel();
 }
 
-struct anyrtc_ice_parameters* client_init(
+static struct anyrtc_ice_parameters* client_init(
         struct client* const client
 ) {
     struct anyrtc_ice_parameters* local_parameters;
@@ -134,7 +134,7 @@ struct anyrtc_ice_parameters* client_init(
     return local_parameters;
 }
 
-void client_start(
+static void client_start(
         struct client* const client
 ) {
     // Start gathering & transport
@@ -143,7 +143,7 @@ void client_start(
             client->ice_transport, client->gatherer, client->ice_remote_parameters, client->role));
 }
 
-void client_stop(
+static void client_stop(
         struct client* const client
 ) {
     // Stop transport & close gatherer

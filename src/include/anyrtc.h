@@ -220,6 +220,10 @@ enum anyrtc_data_transport_type {
  * TODO: private -> data_transport.h
  */
 enum anyrtc_data_channel_state {
+    // Note: We need this state to ensure that event handlers are not called
+    //       before the data channel has been created successfully.
+    ANYRTC_DATA_CHANNEL_STATE_INIT,
+    // Note: This state means 'successfully allocated'.
     ANYRTC_DATA_CHANNEL_STATE_NEW,
     ANYRTC_DATA_CHANNEL_STATE_OPEN,
     ANYRTC_DATA_CHANNEL_STATE_CLOSED

@@ -56,7 +56,10 @@ static void anyrtc_data_channel_destroy(
     struct anyrtc_data_channel* const channel = arg;
 
     // Close channel
-    anyrtc_data_channel_close(channel);
+    // Note: Don't close before NEW
+    if (channel->state != ANYRTC_DATA_CHANNEL_STATE_INIT) {
+        anyrtc_data_channel_close(channel);
+    }
 
     // Dereference
     mem_deref(channel->transport);
@@ -92,7 +95,7 @@ enum anyrtc_code anyrtc_data_channel_create(
     }
 
     // Set fields/reference
-    channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
+    channel->state = ANYRTC_DATA_CHANNEL_STATE_INIT;
     channel->transport = mem_ref(transport);
     channel->open_handler = open_handler;
     channel->buffered_amount_low_handler = buffered_amount_low_handler;
@@ -108,10 +111,11 @@ enum anyrtc_code anyrtc_data_channel_create(
     }
 
     // Done
+    channel->state = ANYRTC_DATA_CHANNEL_STATE_NEW;
     DEBUG_PRINTF("Created data channel: %s, protocol: %s\n",
                  parameters->label, parameters->protocol);
 
-    out:
+out:
     if (error) {
         mem_deref(channel);
     } else {

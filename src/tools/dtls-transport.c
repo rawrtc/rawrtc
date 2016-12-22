@@ -152,7 +152,7 @@ static void signal_handler(
     re_cancel();
 }
 
-void client_init(
+static void client_init(
         struct client* const local
 ) {
     // Generate certificates
@@ -178,7 +178,7 @@ void client_init(
             dtls_transport_state_change_handler, dtls_transport_error_handler, local));
 }
 
-void client_start(
+static void client_start(
         struct client* const local,
         struct client* const remote
 ) {
@@ -202,7 +202,7 @@ void client_start(
             local->dtls_transport, local->dtls_parameters));
 }
 
-void client_stop(
+static void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer

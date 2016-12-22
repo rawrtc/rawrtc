@@ -131,7 +131,7 @@ static void dtls_transport_error_handler(
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
-void sctp_transport_state_change_handler(
+static void sctp_transport_state_change_handler(
     enum anyrtc_sctp_transport_state const state,
     void* const arg
 ) {
@@ -168,14 +168,13 @@ void sctp_transport_state_change_handler(
     }
 }
 
-void data_channel_handler(
+static void data_channel_handler(
         struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
 }
-
 
 static void signal_handler(
         int sig
@@ -184,7 +183,7 @@ static void signal_handler(
     re_cancel();
 }
 
-void client_init(
+static void client_init(
         struct client* const local
 ) {
     // Generate certificates
@@ -215,7 +214,7 @@ void client_init(
             data_channel_handler, sctp_transport_state_change_handler, local));
 }
 
-void client_start(
+static void client_start(
         struct client* const local,
         struct client* const remote
 ) {
@@ -247,7 +246,7 @@ void client_start(
             local->sctp_transport, remote->sctp_capabilities));
 }
 
-void client_stop(
+static void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
