@@ -692,6 +692,7 @@ struct anyrtc_data_channel {
     enum anyrtc_data_channel_state state;
     struct anyrtc_data_transport* transport; // referenced
     void* transport_arg; // referenced
+    struct anyrtc_data_channel_parameters* parameters; // referenced
     anyrtc_data_channel_open_handler* open_handler; // nullable
     anyrtc_data_channel_buffered_amount_low_handler* buffered_amount_low_handler; // nullable
     anyrtc_data_channel_error_handler* error_handler; // nullable
@@ -1317,12 +1318,22 @@ enum anyrtc_code anyrtc_data_channel_parameters_create(
 );
 
 /*
+ * TODO
+ * anyrtc_data_channel_parameters_get_label
+ * anyrtc_data_channel_parameters_get_channel_type
+ * anyrtc_data_channel_parameters_get_reliability_parameter
+ * anyrtc_data_channel_parameters_get_protocol
+ * anyrtc_data_channel_parameters_get_negotiated
+ * anyrtc_data_channel_parameters_get_id
+ */
+
+/*
  * Create a data channel.
  */
 enum anyrtc_code anyrtc_data_channel_create(
     struct anyrtc_data_channel** const channelp, // de-referenced
     struct anyrtc_data_transport* const transport, // referenced
-    struct anyrtc_data_channel_parameters const * const parameters, // copied
+    struct anyrtc_data_channel_parameters* const parameters, // referenced
     anyrtc_data_channel_open_handler* const open_handler, // nullable
     anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
     anyrtc_data_channel_error_handler* const error_handler, // nullable
@@ -1355,7 +1366,17 @@ enum anyrtc_code anyrtc_data_channel_send(
  * anyrtc_data_channel_get_buffered_amount
  * anyrtc_data_channel_get_buffered_amount_low_threshold
  * anyrtc_data_channel_set_buffered_amount_low_threshold
- * anyrtc_data_channel_get_parameters
+ */
+
+/*
+ * Get the data channel's parameters.
+ */
+enum anyrtc_code anyrtc_data_channel_get_parameters(
+    struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
+    struct anyrtc_data_channel* const channel
+);
+
+/*
  * anyrtc_data_channel_set_open_handler
  * anyrtc_data_channel_set_buffered_amount_low_handler
  * anyrtc_data_channel_set_error_handler

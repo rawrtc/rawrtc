@@ -8,10 +8,38 @@
 
 #define EOE(code) exit_on_error(code, __FILE__, __LINE__)
 
+struct data_channel;
+
+static void data_channel_handler(
+    struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
+    void* const arg
+);
+
+static void data_channel_open_handler(
+    void* const arg
+);
+
+static void data_channel_buffered_amount_low_handler(
+    void* const arg
+);
+
+static void data_channel_error_handler(
+    void* const arg
+);
+
+static void data_channel_close_handler(
+    void* const arg
+);
+
+static void data_channel_message_handler(
+    uint8_t const * const data, // read-only
+    uint32_t const size,
+    void* const arg
+);
+
 struct client {
     char* name;
     struct anyrtc_ice_gather_options* gather_options;
-    struct anyrtc_data_channel_parameters* channel_parameters;
     struct anyrtc_ice_parameters* ice_parameters;
     struct anyrtc_dtls_parameters* dtls_parameters;
     struct anyrtc_sctp_capabilities* sctp_capabilities;
@@ -23,8 +51,15 @@ struct client {
     struct anyrtc_dtls_transport* dtls_transport;
     struct anyrtc_sctp_transport* sctp_transport;
     struct anyrtc_data_transport* data_transport;
-    struct anyrtc_data_channel* data_channel;
+    struct data_channel* data_channel_negotiated;
+    struct data_channel* data_channel;
     struct client* other_client;
+};
+
+struct data_channel {
+    struct client* client;
+    struct anyrtc_data_channel* channel;
+    char const* label;
 };
 
 static void before_exit() {
@@ -50,6 +85,15 @@ static void exit_on_error(enum anyrtc_code code, char const* const file, uint32_
             before_exit();
             exit((int) code);
     }
+}
+
+static void data_channel_destroy(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+
+    // Dereference
+    mem_deref(channel->channel);
 }
 
 static void ice_gatherer_state_change_handler(
@@ -83,6 +127,7 @@ static void ice_gatherer_local_candidate_handler(
     (void) candidate; (void) arg;
 
     if (candidate) {
+        // TODO: Seems that url can be null, fix or handle!
         DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
     } else {
         DEBUG_PRINTF("(%s) ICE gatherer last local candidate\n", client->name);
@@ -119,6 +164,49 @@ static void dtls_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
+
+    // Open? Create new data channel
+    // TODO: Move this once we can create data channels earlier
+    if (state == ANYRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        enum anyrtc_dtls_role role;
+
+        // Renew DTLS parameters
+        mem_deref(client->dtls_parameters);
+        EOE(anyrtc_dtls_transport_get_local_parameters(
+                &client->dtls_parameters, client->dtls_transport));
+
+        // Get DTLS role
+        EOE(anyrtc_dtls_parameters_get_role(&role, client->dtls_parameters));
+        DEBUG_PRINTF("(%s) DTLS role: %s\n", client->name, anyrtc_dtls_role_to_str(role));
+
+        // Client? Create data channel
+        if (role == ANYRTC_DTLS_ROLE_CLIENT) {
+            struct anyrtc_data_channel_parameters* channel_parameters;
+
+            // Create data channel argument
+            client->data_channel = mem_zalloc(sizeof(*client->data_channel), data_channel_destroy);
+            if (!client->data_channel) {
+                EOE(ANYRTC_CODE_NO_MEMORY);
+            }
+            client->data_channel->client = client;
+            client->data_channel->label = "bear-noises";
+
+            // Create data channel parameters
+            EOE(anyrtc_data_channel_parameters_create(
+                    &channel_parameters, client->data_channel->label,
+                    ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
+
+            // Create pre-negotiated data channel
+            EOE(anyrtc_data_channel_create(
+                    &client->data_channel->channel, client->data_transport, channel_parameters,
+                    data_channel_open_handler, data_channel_buffered_amount_low_handler,
+                    data_channel_error_handler, data_channel_close_handler,
+                    data_channel_message_handler, client->data_channel));
+
+            // Dereference
+            mem_deref(channel_parameters);
+        }
+    }
 }
 
 static void dtls_transport_error_handler(
@@ -143,37 +231,41 @@ static void data_channel_handler(
         struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
-    struct client* const client = arg;
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
 }
 
 static void data_channel_open_handler(
         void* const arg
 ) {
-    struct client* const client = arg;
-    DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, client->channel_parameters->label);
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
 }
 
 static void data_channel_buffered_amount_low_handler(
         void* const arg
 ) {
-    struct client* const client = arg;
-    DEBUG_PRINTF("(%s) Data channel buffered amount low: %s\n", client->name,
-                 client->channel_parameters->label);
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel buffered amount low: %s\n", client->name, channel->label);
 }
 
 static void data_channel_error_handler(
         void* const arg
 ) {
-    struct client* const client = arg;
-    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, client->channel_parameters->label);
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, channel->label);
 }
 
 static void data_channel_close_handler(
         void* const arg
 ) {
-    struct client* const client = arg;
-    DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, client->channel_parameters->label);
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, channel->label);
 }
 
 static void data_channel_message_handler(
@@ -181,9 +273,10 @@ static void data_channel_message_handler(
         uint32_t const size,
         void* const arg
 ) {
-    struct client* const client = arg;
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",
-                 client->name, client->channel_parameters->label, size);
+                 client->name, channel->label, size);
 }
 
 static void signal_handler(
@@ -196,6 +289,8 @@ static void signal_handler(
 static void client_init(
         struct client* const local
 ) {
+    struct anyrtc_data_channel_parameters* channel_parameters;
+
     // Generate certificates
     EOE(anyrtc_certificate_generate(&local->certificate, NULL));
     struct anyrtc_certificate* certificates[] = {local->certificate};
@@ -227,12 +322,29 @@ static void client_init(
     EOE(anyrtc_sctp_transport_get_data_transport(
             &local->data_transport, local->sctp_transport));
 
-    // Create data channel
+    // Create data channel argument
+    local->data_channel_negotiated = mem_zalloc(
+            sizeof(*local->data_channel_negotiated), data_channel_destroy);
+    if (!local->data_channel_negotiated) {
+        EOE(ANYRTC_CODE_NO_MEMORY);
+    }
+    local->data_channel_negotiated->client = local;
+    local->data_channel_negotiated->label = "cat-noises";
+
+    // Create data channel parameters
+    EOE(anyrtc_data_channel_parameters_create(
+            &channel_parameters, local->data_channel_negotiated->label,
+            ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED, 0, NULL, true, 0));
+
+    // Create pre-negotiated data channel
     EOE(anyrtc_data_channel_create(
-            &local->data_channel, local->data_transport, local->channel_parameters,
+            &local->data_channel_negotiated->channel, local->data_transport, channel_parameters,
             data_channel_open_handler, data_channel_buffered_amount_low_handler,
             data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
-            local));
+            local->data_channel_negotiated));
+
+    // Dereference
+    mem_deref(channel_parameters);
 }
 
 static void client_start(
@@ -271,7 +383,10 @@ static void client_stop(
         struct client* const client
 ) {
     // Stop transports & close gatherer
-    EOE(anyrtc_data_channel_close(client->data_channel));
+    if (client->data_channel) {
+        EOE(anyrtc_data_channel_close(client->data_channel->channel));
+    }
+    EOE(anyrtc_data_channel_close(client->data_channel_negotiated->channel));
     EOE(anyrtc_sctp_transport_stop(client->sctp_transport));
     EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
     EOE(anyrtc_ice_transport_stop(client->ice_transport));
@@ -279,6 +394,7 @@ static void client_stop(
 
     // Dereference & close
     client->data_channel = mem_deref(client->data_channel);
+    client->data_channel_negotiated = mem_deref(client->data_channel_negotiated);
     client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
@@ -294,7 +410,6 @@ int main(int argc, char* argv[argc + 1]) {
     struct anyrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
-    struct anyrtc_data_channel_parameters* channel_parameters;
 
     // Initialise
     EOE(anyrtc_init());
@@ -317,16 +432,10 @@ int main(int argc, char* argv[argc + 1]) {
             sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
             "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
 
-    // Create data channel parameters
-    EOE(anyrtc_data_channel_parameters_create(
-            &channel_parameters, "cat-noises", ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED,
-            0, NULL, true, 0));
-
     // Initialise clients
     struct client a = {
             .name = "A",
             .gather_options = gather_options,
-            .channel_parameters = channel_parameters,
             .ice_parameters = NULL,
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLING,
@@ -336,12 +445,14 @@ int main(int argc, char* argv[argc + 1]) {
             .ice_transport = NULL,
             .dtls_transport = NULL,
             .sctp_transport = NULL,
+            .data_transport = NULL,
+            .data_channel = NULL,
+            .data_channel_negotiated = NULL,
             .other_client = NULL,
     };
     struct client b = {
             .name = "B",
             .gather_options = gather_options,
-            .channel_parameters = channel_parameters,
             .ice_parameters = NULL,
             .dtls_parameters = NULL,
             .role = ANYRTC_ICE_ROLE_CONTROLLED,
@@ -351,6 +462,9 @@ int main(int argc, char* argv[argc + 1]) {
             .ice_transport = NULL,
             .dtls_transport = NULL,
             .sctp_transport = NULL,
+            .data_transport = NULL,
+            .data_channel = NULL,
+            .data_channel_negotiated = NULL,
             .other_client = NULL,
     };
     a.other_client = &b;
@@ -371,7 +485,6 @@ int main(int argc, char* argv[argc + 1]) {
     client_stop(&b);
 
     // Free
-    mem_deref(channel_parameters);
     mem_deref(gather_options);
 
     // Bye

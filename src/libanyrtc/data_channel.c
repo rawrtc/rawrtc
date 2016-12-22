@@ -64,6 +64,7 @@ static void anyrtc_data_channel_destroy(
     // Dereference
     mem_deref(channel->transport);
     mem_deref(channel->transport_arg);
+    mem_deref(channel->parameters);
 }
 
 /*
@@ -72,7 +73,7 @@ static void anyrtc_data_channel_destroy(
 enum anyrtc_code anyrtc_data_channel_create(
         struct anyrtc_data_channel** const channelp, // de-referenced
         struct anyrtc_data_transport* const transport, // referenced
-        struct anyrtc_data_channel_parameters const * const parameters, // copied
+        struct anyrtc_data_channel_parameters* const parameters, // referenced
         anyrtc_data_channel_open_handler* const open_handler, // nullable
         anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
         anyrtc_data_channel_error_handler* const error_handler, // nullable
@@ -97,6 +98,7 @@ enum anyrtc_code anyrtc_data_channel_create(
     // Set fields/reference
     channel->state = ANYRTC_DATA_CHANNEL_STATE_INIT;
     channel->transport = mem_ref(transport);
+    channel->parameters = mem_ref(parameters);
     channel->open_handler = open_handler;
     channel->buffered_amount_low_handler = buffered_amount_low_handler;
     channel->error_handler = error_handler;
@@ -150,79 +152,18 @@ enum anyrtc_code anyrtc_data_channel_close(
 }
 
 /*
- * Destructor for existing data channel parameters.
+ * Get the data channel's parameters.
  */
-static void anyrtc_data_channel_parameters_destroy(
-        void* const arg
-) {
-    struct anyrtc_data_channel_parameters* const parameters = arg;
-
-    // Dereference
-    mem_deref(parameters->label);
-    mem_deref(parameters->protocol);
-}
-
-/*
- * Create data channel parameters.
- *
- * For `ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_*`, the reliability parameter
- * is being ignored.
- *
- * When using `ANYRTC_DATA_CHANNEL_TYPE_*_RETRANSMIT`, the reliability
- * parameter specifies the number of times a retransmission occurs if
- * not acknowledged before the message is being discarded.
- *
- * When using `ANYRTC_DATA_CHANNEL_TYPE_*_TIMED`, the reliability
- * parameter specifies the time window in milliseconds during which
- * (re-)transmissions may occur before the message is being discarded.
- */
-enum anyrtc_code anyrtc_data_channel_parameters_create(
+enum anyrtc_code anyrtc_data_channel_get_parameters(
         struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
-        char const * const label, // copied, nullable
-        enum anyrtc_data_channel_type const channel_type,
-        uint32_t const reliability_parameter,
-        char const * const protocol, // copied, nullable
-        bool const negotiated,
-        uint16_t const id
+        struct anyrtc_data_channel* const channel
 ) {
-    struct anyrtc_data_channel_parameters* parameters;
-
     // Check arguments
-    if (!parametersp) {
+    if (!parametersp || !channel) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Allocate
-    parameters = mem_zalloc(sizeof(*parameters), anyrtc_data_channel_parameters_destroy);
-    if (!parameters) {
-        return ANYRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields / copy
-    if (label) {
-        anyrtc_strdup(&parameters->label, label);
-    }
-    parameters->channel_type = channel_type;
-    if (protocol) {
-        anyrtc_strdup(&parameters->protocol, protocol);
-    }
-    parameters->negotiated = negotiated;
-    if (negotiated) {
-        parameters->id = id;
-    }
-
-    // Set reliability parameter
-    switch (channel_type) {
-        case ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED:
-        case ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED:
-            parameters->reliability_parameter = 0;
-            break;
-        default:
-            parameters->reliability_parameter = reliability_parameter;
-            break;
-    }
-
     // Set pointer & done
-    *parametersp = parameters;
+    *parametersp = channel->parameters;
     return ANYRTC_CODE_SUCCESS;
 }

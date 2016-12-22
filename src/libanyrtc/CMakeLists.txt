@@ -4,6 +4,7 @@ set(anyrtc_SOURCES
         certificate.c
         crc32c.c
         data_channel.c
+        data_channel_parameters.c
         data_transport.c
         dtls_parameters.c
         dtls_transport.c
