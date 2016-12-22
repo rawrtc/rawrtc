@@ -93,6 +93,9 @@ static enum anyrtc_code data_channel_open_message_create(
         mem_deref(buffer);
         return anyrtc_error_to_code(err);
     } else {
+        // Set position
+        mbuf_set_pos(buffer, 0);
+
         // Set pointer & done
         *bufferp = buffer;
         return ANYRTC_CODE_SUCCESS;
@@ -123,6 +126,9 @@ out:
         mem_deref(buffer);
         return anyrtc_error_to_code(err);
     } else {
+        // Set position
+        mbuf_set_pos(buffer, 0);
+
         // Set pointer & done
         *bufferp = buffer;
         return ANYRTC_CODE_SUCCESS;
@@ -506,6 +512,8 @@ static int sctp_packet_handler(
         // Send
         error = anyrtc_dtls_transport_send(transport->dtls_transport, &mbuffer);
     } else {
+        int err;
+
         // Allocate
         struct mbuf* const mbuffer = mbuf_alloc(length);
         if (!mbuffer) {
@@ -513,9 +521,14 @@ static int sctp_packet_handler(
             goto out;
         }
 
-        // Copy and set size/end
-        memcpy(mbuffer->buf, buffer, length);
-        mbuffer->end = length;
+        // Copy and set position
+        err = mbuf_write_mem(mbuffer, buffer, length);
+        if (err) {
+            DEBUG_WARNING("Could not write to buffer, reason: %m\n", err);
+            mem_deref(mbuffer);
+            goto out;
+        }
+        mbuf_set_pos(mbuffer, 0);
 
         // Send (well, actually buffer...)
         error = anyrtc_dtls_transport_send(transport->dtls_transport, mbuffer);
@@ -1362,7 +1375,7 @@ enum anyrtc_code anyrtc_sctp_transport_send(
 //        spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
 //    }
 
-    // Connected?
+    // Send directly if connected
     if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         length = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
