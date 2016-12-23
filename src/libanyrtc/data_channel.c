@@ -86,7 +86,7 @@ enum anyrtc_code anyrtc_data_channel_create_internal(
     struct anyrtc_data_channel *channel;
 
     // Check arguments
-    if (!channelp || !transport || !parameters || !message_handler) {
+    if (!channelp || !transport || !parameters) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
     }
 
