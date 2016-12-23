@@ -69,12 +69,14 @@ static enum anyrtc_code data_channel_open_message_parse(
         struct mbuf* const buffer // not checked
 ) {
     uint_fast8_t channel_type;
+    uint_fast16_t priority;
     uint_fast32_t reliability_parameter;
     uint_fast16_t label_length;
     uint_fast16_t protocol_length;
+    int err;
     char* label = NULL;
     char* protocol = NULL;
-    int err = 0;
+    enum anyrtc_code error;
 
     // Check length
     // Note: -1 because we've already removed the message type
@@ -84,7 +86,7 @@ static enum anyrtc_code data_channel_open_message_parse(
 
     // Get fields
     channel_type = mbuf_read_u8(buffer);
-    *priorityp = ntohs(mbuf_read_u16(buffer));
+    priority = ntohs(mbuf_read_u16(buffer));
     reliability_parameter = ntohl(mbuf_read_u32(buffer));
     label_length = ntohs(mbuf_read_u16(buffer));
     protocol_length = ntohs(mbuf_read_u16(buffer));
@@ -109,6 +111,7 @@ static enum anyrtc_code data_channel_open_message_parse(
     if (label_length > 0) {
         err = mbuf_strdup(buffer, &label, label_length);
         if (err) {
+            error = anyrtc_error_to_code(err);
             goto out;
         }
     }
@@ -120,22 +123,29 @@ static enum anyrtc_code data_channel_open_message_parse(
     if (protocol_length > 0) {
         err = mbuf_strdup(buffer, &protocol, protocol_length);
         if (err) {
+            error = anyrtc_error_to_code(err);
             goto out;
         }
     }
 
     // Create data channel parameters
-    return anyrtc_data_channel_parameters_create_internal(
+    error = anyrtc_data_channel_parameters_create_internal(
             parametersp, label, (enum anyrtc_data_channel_type) channel_type,
             (uint32_t) reliability_parameter, protocol, false, id);
+    if (error) {
+        goto out;
+    }
 
 out:
     // Dereference
     mem_deref(label);
     mem_deref(protocol);
 
-    // Bye
-    return anyrtc_error_to_code(err);
+    if (!error) {
+        // Set priority value
+        *priorityp = priority;
+    }
+    return error;
 }
 
 /*
@@ -1286,7 +1296,6 @@ static void channel_register(
     // Update channel with SID and reference
     channel->transport_arg = mem_ref(sid);
     transport->channels[*sid] = mem_ref(channel);
-    mem_deref(sid);
 
     // Raise data channel event?
     if (raise_event) {
@@ -1441,7 +1450,8 @@ static enum anyrtc_code channel_create_handler(
     // Register data channel
     channel_register(sctp_transport, channel, sid, false);
 
-    // Done
+    // Dereference & done
+    mem_deref(sid);
     return ANYRTC_CODE_SUCCESS;
 }
 

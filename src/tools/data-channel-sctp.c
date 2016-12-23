@@ -231,8 +231,7 @@ static void data_channel_handler(
         struct anyrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
-    struct data_channel* const channel = arg;
-    struct client* const client = channel->client;
+    struct client* const client = arg;
     DEBUG_INFO("(%s) New data channel instance\n", client->name);
 }
 
