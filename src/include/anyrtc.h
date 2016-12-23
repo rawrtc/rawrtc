@@ -39,7 +39,7 @@ enum anyrtc_code {
     ANYRTC_CODE_INSUFFICIENT_SPACE,
     ANYRTC_CODE_STILL_IN_USE,
     ANYRTC_CODE_INVALID_MESSAGE
-};
+}; // Add translations for new return codes in `utils.c`!
 
 /*
  * Certificate private key types.

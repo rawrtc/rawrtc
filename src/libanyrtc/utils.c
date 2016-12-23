@@ -63,6 +63,12 @@ char const* anyrtc_code_to_str(
             return "invalid certificate";
         case ANYRTC_CODE_INVALID_FINGERPRINT:
             return "invalid fingerprint";
+        case ANYRTC_CODE_INSUFFICIENT_SPACE:
+            return "insufficient space";
+        case ANYRTC_CODE_STILL_IN_USE:
+            return "still in use";
+        case ANYRTC_CODE_INVALID_MESSAGE:
+            return "invalid message";
         default:
             return "(no error translation)";
     }
