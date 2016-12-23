@@ -83,10 +83,10 @@ static enum anyrtc_code data_channel_open_message_parse(
 
     // Get fields
     channel_type = mbuf_read_u8(buffer);
-    *priorityp = mbuf_read_u16(buffer);
-    reliability_parameter = mbuf_read_u32(buffer);
-    label_length = mbuf_read_u16(buffer);
-    protocol_length = mbuf_read_u16(buffer);
+    *priorityp = ntohs(mbuf_read_u16(buffer));
+    reliability_parameter = ntohl(mbuf_read_u32(buffer));
+    label_length = ntohs(mbuf_read_u16(buffer));
+    protocol_length = ntohs(mbuf_read_u16(buffer));
 
     // Validate channel type
     switch (channel_type) {
