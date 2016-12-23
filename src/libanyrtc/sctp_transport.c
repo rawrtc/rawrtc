@@ -11,6 +11,7 @@
 #include "message_buffer.h"
 #include "dtls_transport.h"
 #include "data_transport.h"
+#include "data_channel_parameters.h"
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
@@ -47,9 +48,85 @@ static uint16_t const sctp_events[] = {
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
 /*
+ * Parse a data channel open message.
+ */
+static enum anyrtc_code data_channel_open_message_parse(
+        struct anyrtc_data_channel_parameters** const parametersp, // de-referenced, not checked
+        uint_fast16_t* const priorityp, // de-referenced, not checked
+        uint16_t const id,
+        struct mbuf* const buffer // not checked
+) {
+    uint_fast8_t channel_type;
+    uint_fast32_t reliability_parameter;
+    uint_fast16_t label_length;
+    uint_fast16_t protocol_length;
+    char* label = NULL;
+    char* protocol = NULL;
+    int err = 0;
+
+    // Check length
+    if (mbuf_get_left(buffer) < ANYRTC_DCEP_MESSAGE_OPEN_BASE_SIZE) {
+        return ANYRTC_CODE_INVALID_MESSAGE;
+    }
+
+    // Get fields
+    channel_type = mbuf_read_u8(buffer);
+    *priorityp = mbuf_read_u16(buffer);
+    reliability_parameter = mbuf_read_u32(buffer);
+    label_length = mbuf_read_u16(buffer);
+    protocol_length = mbuf_read_u16(buffer);
+
+    // Validate channel type
+    switch (channel_type) {
+        case ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED:
+        case ANYRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED:
+        case ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_RETRANSMIT:
+        case ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT:
+        case ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_TIMED:
+        case ANYRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED:
+            break;
+        default:
+            return ANYRTC_CODE_INVALID_MESSAGE;
+    }
+
+    // Get label
+    if (label_length > SIZE_MAX || mbuf_get_left(buffer) < label_length) {
+        return ANYRTC_CODE_INVALID_MESSAGE;
+    }
+    if (label_length > 0) {
+        err = mbuf_strdup(buffer, &label, label_length);
+        if (err) {
+            goto out;
+        }
+    }
+
+    // Get protocol
+    if (protocol_length > SIZE_MAX || mbuf_get_left(buffer) < protocol_length) {
+        return ANYRTC_CODE_INVALID_MESSAGE;
+    }
+    if (protocol_length > 0) {
+        err = mbuf_strdup(buffer, &protocol, protocol_length);
+        if (err) {
+            goto out;
+        }
+    }
+
+    // Create data channel parameters
+    return anyrtc_data_channel_parameters_create_internal(
+            parametersp, label, (enum anyrtc_data_channel_type) channel_type,
+            (uint32_t) reliability_parameter, protocol, false, id);
+
+out:
+    // Dereference
+    mem_deref(label);
+    mem_deref(protocol);
+
+    // Bye
+    return anyrtc_error_to_code(err);
+}
+
+/*
  * Create a data channel open message.
- *
- * https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.1
  */
 static enum anyrtc_code data_channel_open_message_create(
         struct mbuf** const bufferp, // de-referenced, not checked
@@ -104,8 +181,6 @@ static enum anyrtc_code data_channel_open_message_create(
 
 /*
  * Create a data channel ack message.
- *
- * https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-5.2
  */
 static enum anyrtc_code data_channel_ack_message(
         struct mbuf** const bufferp // de-referenced, not checked
@@ -121,7 +196,6 @@ static enum anyrtc_code data_channel_ack_message(
     // Set fields
     err = mbuf_write_u8(buffer, ANYRTC_DCEP_MESSAGE_TYPE_ACK);
 
-out:
     if (err) {
         mem_deref(buffer);
         return anyrtc_error_to_code(err);
