@@ -994,7 +994,6 @@ static void anyrtc_sctp_transport_destroy(
     anyrtc_sctp_transport_stop(transport);
 
     // Dereference
-    mem_deref(transport->data_transport);
     mem_deref(transport->channels);
     list_flush(&transport->buffered_messages);
     mem_deref(transport->dtls_transport);
@@ -1509,11 +1508,10 @@ enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
         if (error) {
             return error;
         }
+    } else {
+        // +1 when handing out the instance
+        mem_ref(sctp_transport->data_transport);
     }
-
-    // Reference
-    // Note: +1 for internal reference if creating and +1 when handing out the instance
-    mem_ref(sctp_transport->data_transport);
 
     // Set pointer & done
     *transportp = sctp_transport->data_transport;
