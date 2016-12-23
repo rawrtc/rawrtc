@@ -20,10 +20,10 @@ static void anyrtc_data_channel_parameters_destroy(
 
 enum anyrtc_code parameters_create(
         struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
-        char const * const label, // referenced, nullable
+        char* const label, // referenced, nullable
         enum anyrtc_data_channel_type const channel_type,
         uint32_t const reliability_parameter,
-        char const * const protocol, // referenced, nullable
+        char* const protocol, // referenced, nullable
         bool const negotiated,
         uint16_t const id
 ) {
@@ -40,14 +40,10 @@ enum anyrtc_code parameters_create(
         return ANYRTC_CODE_NO_MEMORY;
     }
 
-    // Set fields / copy
-    if (label) {
-        anyrtc_strdup(&parameters->label, label);
-    }
+    // Set fields
+    parameters->label = label;
+    parameters->protocol = protocol;
     parameters->channel_type = channel_type;
-    if (protocol) {
-        anyrtc_strdup(&parameters->protocol, protocol);
-    }
     parameters->negotiated = negotiated;
     if (negotiated) {
         parameters->id = id;
