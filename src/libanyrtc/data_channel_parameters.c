@@ -18,7 +18,7 @@ static void anyrtc_data_channel_parameters_destroy(
     mem_deref(parameters->protocol);
 }
 
-enum anyrtc_code parameters_create(
+enum anyrtc_code data_parameters_create(
         struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
         char* const label, // referenced, nullable
         enum anyrtc_data_channel_type const channel_type,
@@ -66,7 +66,7 @@ enum anyrtc_code parameters_create(
 }
 
 /*
- * Create data channel parameters (internal use only).
+ * Create data channel parameters (internal).
  */
 enum anyrtc_code anyrtc_data_channel_parameters_create_internal(
         struct anyrtc_data_channel_parameters** const parametersp, // de-referenced
@@ -80,7 +80,7 @@ enum anyrtc_code anyrtc_data_channel_parameters_create_internal(
     enum anyrtc_code error;
 
     // Create parameters
-    error = parameters_create(
+    error = data_parameters_create(
             parametersp, label, channel_type, reliability_parameter, protocol, negotiated, id);
 
     if (!error) {
@@ -135,7 +135,7 @@ enum anyrtc_code anyrtc_data_channel_parameters_create(
     }
 
     // Create parameters
-    error = parameters_create(
+    error = data_parameters_create(
             parametersp, copied_label, channel_type, reliability_parameter, copied_protocol,
             negotiated, id);
 

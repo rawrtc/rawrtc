@@ -683,6 +683,7 @@ struct anyrtc_sctp_transport {
     uint16_t n_channels;
     FILE* trace_handle;
     struct socket* socket;
+    struct anyrtc_data_transport* data_transport; // referenced
 };
 
 /*
@@ -1339,7 +1340,7 @@ enum anyrtc_code anyrtc_data_channel_create(
     anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
     anyrtc_data_channel_error_handler* const error_handler, // nullable
     anyrtc_data_channel_close_handler* const close_handler, // nullable
-    anyrtc_data_channel_message_handler* const message_handler,
+    anyrtc_data_channel_message_handler* const message_handler, // nullable
     void* const arg // nullable
 );
 

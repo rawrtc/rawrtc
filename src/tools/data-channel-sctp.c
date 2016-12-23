@@ -233,7 +233,7 @@ static void data_channel_handler(
 ) {
     struct data_channel* const channel = arg;
     struct client* const client = channel->client;
-    DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
+    DEBUG_INFO("(%s) New data channel instance\n", client->name);
 }
 
 static void data_channel_open_handler(

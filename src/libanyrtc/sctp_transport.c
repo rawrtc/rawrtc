@@ -47,6 +47,18 @@ static uint16_t const sctp_events[] = {
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
+static enum anyrtc_code sid_create(
+    uint16_t** const sidp, // not checked
+    uint16_t const value
+);
+
+static void channel_register(
+    struct anyrtc_sctp_transport* const transport, // not checked
+    struct anyrtc_data_channel* const channel, // referenced, not checked
+    uint16_t* const sid, // not checked
+    bool const raise_event
+);
+
 /*
  * Parse a data channel open message.
  */
@@ -207,7 +219,6 @@ static enum anyrtc_code data_channel_ack_message(
         *bufferp = buffer;
         return ANYRTC_CODE_SUCCESS;
     }
-
 }
 
 /*
@@ -624,19 +635,171 @@ out:
 }
 
 /*
- * Handle incoming SCTP message.
- * TODO: Back to sctp_transport.c
+ * Handle data channel open message.
  */
-enum anyrtc_code data_receive_handler(
+static void handle_data_channel_open_message(
         struct anyrtc_sctp_transport* const transport,
         struct mbuf* const buffer,
         struct sctp_rcvinfo* const info
 ) {
-    info->rcv_ppid = ntohl(info->rcv_ppid);
-    DEBUG_INFO("STREAM ID: %"PRIu16", PPID: %"PRIu32"\n", info->rcv_sid, info->rcv_ppid);
+    enum anyrtc_code error;
+    struct anyrtc_data_channel_parameters* parameters;
+    uint_fast16_t priority;
+    struct anyrtc_data_transport* data_transport = NULL;
+    struct anyrtc_data_channel* channel = NULL;
+    uint16_t* sid = NULL;
 
-    DEBUG_WARNING("TODO: HANDLE MESSAGE\n");
-    return ANYRTC_CODE_NOT_IMPLEMENTED;
+    // Check SID corresponds to other peer's role
+    switch (transport->dtls_transport->role) {
+        case ANYRTC_DTLS_ROLE_AUTO:
+            // Note: This case should be impossible. If it happens, report it!
+            DEBUG_WARNING("Cannot validate SID due to undetermined DTLS role\n");
+            return;
+        case ANYRTC_DTLS_ROLE_CLIENT:
+            // Other peer must have chosen an odd SID
+            if (info->rcv_sid % 2 != 1) {
+                DEBUG_WARNING("Other peer incorrectly chose an even SID\n");
+                return;
+            }
+            break;
+        case ANYRTC_DTLS_ROLE_SERVER:
+            // Other peer must have chosen an even SID
+            if (info->rcv_sid % 2 != 0) {
+                DEBUG_WARNING("Other peer incorrectly chose an odd SID\n");
+                return;
+            }
+            break;
+        default:
+            return;
+    }
+
+    // Check if slot is occupied
+    if (transport->channels[info->rcv_sid]) {
+        DEBUG_WARNING("Other peer chose already occupied SID %"PRIu16"\n", info->rcv_sid);
+        return;
+    }
+
+    // Get parameters from data channel open message
+    error = data_channel_open_message_parse(&parameters, &priority, info->rcv_sid, buffer);
+    if (error) {
+        DEBUG_WARNING("Unable to parse DCEP open message, reason: %s\n", anyrtc_code_to_str(error));
+        return;
+    }
+
+    // Get data transport
+    error = anyrtc_sctp_transport_get_data_transport(&data_transport, transport);
+    if (error) {
+        goto out;
+    }
+
+    // Create data channel
+    error = anyrtc_data_channel_create_internal(
+            &channel, data_transport, parameters,
+            NULL, NULL, NULL, NULL, NULL, NULL,
+            false);
+    if (error) {
+        goto out;
+    }
+
+    // Allocate SID to be used as an argument for the data channel handlers
+    error = sid_create(&sid, info->rcv_sid);
+    if (error) {
+        goto out;
+    }
+
+    // TODO: Store priority for SCTP ndata,
+    //       see https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.4
+    (void) priority;
+
+    // Register data channel
+    channel_register(transport, channel, sid, true);
+
+out:
+    mem_deref(sid);
+    mem_deref(channel);
+    mem_deref(data_transport);
+    mem_deref(parameters);
+}
+
+/*
+ * Handle incoming DCEP control message.
+ */
+static void handle_dcep_message(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer,
+        struct sctp_rcvinfo* const info
+) {
+    // Handle by message type
+    // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
+    //       messages.
+    uint_fast16_t const message_type = mbuf_read_u8(buffer);
+    switch (message_type) {
+        case ANYRTC_DCEP_MESSAGE_TYPE_ACK:
+            // Note: Nothing to do as we move channels into waiting/open state directly
+            DEBUG_PRINTF("Received data channel ack message for channel with SID %"PRIu16"\n",
+                         info->rcv_sid);
+            break;
+        case ANYRTC_DCEP_MESSAGE_TYPE_OPEN:
+            DEBUG_PRINTF("Received data channel open message for channel with SID %"PRIu16"\n",
+                         info->rcv_sid);
+            handle_data_channel_open_message(transport, buffer, info);
+        default:
+            DEBUG_WARNING("Ignored incoming DCEP control message with unknown type: %"PRIu16"\n",
+                          message_type);
+            break;
+    }
+}
+
+/*
+ * Handle incoming data message.
+ */
+static void data_receive_handler(
+        struct anyrtc_sctp_transport* const transport,
+        struct mbuf* const buffer,
+        struct sctp_rcvinfo* const info
+) {
+    // Convert PPID first
+    info->rcv_ppid = ntohl(info->rcv_ppid);
+    DEBUG_PRINTF("Received message with SID %"PRIu16", PPID: %"PRIu32"\n",
+                 info->rcv_sid, info->rcv_ppid);
+
+    // Handle by PPID
+    switch (info->rcv_ppid) {
+        case ANYRTC_DCEP_PPID_CONTROL:
+            handle_dcep_message(transport, buffer, info);
+            break;
+        case ANYRTC_DCEP_PPID_UTF16:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_UTF16!\n");
+            break;
+        case ANYRTC_DCEP_PPID_UTF16_EMPTY:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_UTF16_EMPTY!\n");
+            break;
+        case ANYRTC_DCEP_PPID_UTF16_PARTIAL: // deprecated
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_UTF16_PARTIAL!\n");
+            break;
+        case ANYRTC_DCEP_PPID_BINARY:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_BINARY!\n");
+            break;
+        case ANYRTC_DCEP_PPID_BINARY_EMPTY:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_BINARY_EMPTY!\n");
+            break;
+        case ANYRTC_DCEP_PPID_BINARY_PARTIAL: // deprecated
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE ANYRTC_DCEP_PPID_BINARY_PARTIAL!\n");
+            break;
+        default:
+            DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu16"\n",
+                          info->rcv_ppid);
+            break;
+    }
+
+    // Dereference buffer
+    mem_deref(buffer);
 }
 
 /*
@@ -676,7 +839,6 @@ read:
         socklen_t info_length = sizeof(info);
         unsigned int info_type = 0;
         int recv_flags = 0;
-        enum anyrtc_code error;
 
         // TODO: Get next message size
         // TODO: Can we get the COMPLETE message size or just the current message size?
@@ -723,11 +885,7 @@ read:
         }
 
         // Pass data to handler
-        error = data_receive_handler(transport, buffer, &info);
-        if (error) {
-            DEBUG_WARNING("Could not handle incoming SCTP data channel message, reason: %s\n",
-                          anyrtc_code_to_str(error));
-        }
+        data_receive_handler(transport, buffer, &info);
 
 // Note: Label must be here to ensure that the buffer is being free'd
 write:
@@ -839,6 +997,7 @@ static void anyrtc_sctp_transport_destroy(
     anyrtc_sctp_transport_stop(transport);
 
     // Dereference
+    mem_deref(transport->data_transport);
     mem_deref(transport->channels);
     list_flush(&transport->buffered_messages);
     mem_deref(transport->dtls_transport);
@@ -1114,6 +1273,37 @@ static enum anyrtc_code sid_create(
 }
 
 /*
+ * Register data channel on transport.
+ */
+static void channel_register(
+        struct anyrtc_sctp_transport* const transport, // not checked
+        struct anyrtc_data_channel* const channel, // referenced, not checked
+        uint16_t* const sid, // not checked
+        bool const raise_event
+) {
+    // Update channel with SID and reference
+    channel->transport_arg = mem_ref(sid);
+    transport->channels[*sid] = mem_ref(channel);
+    mem_deref(sid);
+
+    // Raise data channel event?
+    if (raise_event) {
+        if (transport->data_channel_handler) {
+            transport->data_channel_handler(channel, transport->arg);
+        }
+    }
+
+    // Update data channel state
+    if (transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
+    } else {
+        // Note: We need to wait for the transport to be connected before we can open
+        //       the channel
+        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
+    }
+}
+
+/*
  * Create a negotiated SCTP data channel.
  */
 static enum anyrtc_code channel_create_negotiated(
@@ -1195,6 +1385,7 @@ static enum anyrtc_code channel_create_inband(
     send_info.snd_ppid = htonl(ANYRTC_DCEP_PPID_CONTROL);
 
     // Send message
+    DEBUG_PRINTF("Sending data channel open message for channel with SID %"PRIu16"\n", *sid);
     error = anyrtc_sctp_transport_send(
             transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
     if (error) {
@@ -1245,19 +1436,8 @@ static enum anyrtc_code channel_create_handler(
         return error;
     }
 
-    // Update channel with SID and reference
-    channel->transport_arg = mem_ref(sid);
-    sctp_transport->channels[*sid] = mem_ref(channel);
-    mem_deref(sid);
-
-    // Update data channel state
-    if (sctp_transport->state == ANYRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_OPEN);
-    } else {
-        // Note: We need to wait for the transport to be connected before we can open
-        //       the channel
-        anyrtc_data_channel_set_state(channel, ANYRTC_DATA_CHANNEL_STATE_WAITING);
-    }
+    // Register data channel
+    channel_register(sctp_transport, channel, sid, false);
 
     // Done
     return ANYRTC_CODE_SUCCESS;
@@ -1312,6 +1492,8 @@ enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
         struct anyrtc_data_transport** const transportp, // de-referenced
         struct anyrtc_sctp_transport* const sctp_transport // referenced
 ) {
+    enum anyrtc_code error;
+
     // Check arguments
     if (!sctp_transport) {
         return ANYRTC_CODE_INVALID_ARGUMENT;
@@ -1322,10 +1504,23 @@ enum anyrtc_code anyrtc_sctp_transport_get_data_transport(
         return ANYRTC_CODE_INVALID_STATE;
     }
 
-    // Create data transport
-    return anyrtc_data_transport_create(
-            transportp, ANYRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
-            channel_create_handler, channel_close_handler, channel_send_handler);
+    // Lazy-create data transport
+    if (!sctp_transport->data_transport) {
+        error = anyrtc_data_transport_create(
+                &sctp_transport->data_transport, ANYRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
+                channel_create_handler, channel_close_handler, channel_send_handler);
+        if (error) {
+            return error;
+        }
+    }
+
+    // Reference
+    // Note: +1 for internal reference if creating and +1 when handing out the instance
+    mem_ref(sctp_transport->data_transport);
+
+    // Set pointer & done
+    *transportp = sctp_transport->data_transport;
+    return ANYRTC_CODE_SUCCESS;
 }
 
 /*

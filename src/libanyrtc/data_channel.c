@@ -68,9 +68,9 @@ static void anyrtc_data_channel_destroy(
 }
 
 /*
- * Create a data channel.
+ * Create a data channel (internal).
  */
-enum anyrtc_code anyrtc_data_channel_create(
+enum anyrtc_code anyrtc_data_channel_create_internal(
         struct anyrtc_data_channel** const channelp, // de-referenced
         struct anyrtc_data_transport* const transport, // referenced
         struct anyrtc_data_channel_parameters* const parameters, // referenced
@@ -78,11 +78,12 @@ enum anyrtc_code anyrtc_data_channel_create(
         anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
         anyrtc_data_channel_error_handler* const error_handler, // nullable
         anyrtc_data_channel_close_handler* const close_handler, // nullable
-        anyrtc_data_channel_message_handler* const message_handler,
-        void* const arg // nullable
+        anyrtc_data_channel_message_handler* const message_handler, // nullable
+        void* const arg, // nullable
+        bool const call_handler
 ) {
     enum anyrtc_code error;
-    struct anyrtc_data_channel* channel;
+    struct anyrtc_data_channel *channel;
 
     // Check arguments
     if (!channelp || !transport || !parameters || !message_handler) {
@@ -107,9 +108,13 @@ enum anyrtc_code anyrtc_data_channel_create(
     channel->arg = arg;
 
     // Create data channel on transport
-    error = transport->channel_create(transport, channel, parameters);
-    if (error) {
-        goto out;
+    if (call_handler) {
+        error = transport->channel_create(transport, channel, parameters);
+        if (error) {
+            goto out;
+        }
+    } else {
+        error = ANYRTC_CODE_SUCCESS;
     }
 
     // Done
@@ -128,6 +133,27 @@ out:
         *channelp = channel;
     }
     return error;
+}
+
+/*
+ * Create a data channel.
+ */
+enum anyrtc_code anyrtc_data_channel_create(
+        struct anyrtc_data_channel** const channelp, // de-referenced
+        struct anyrtc_data_transport* const transport, // referenced
+        struct anyrtc_data_channel_parameters* const parameters, // referenced
+        anyrtc_data_channel_open_handler* const open_handler, // nullable
+        anyrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
+        anyrtc_data_channel_error_handler* const error_handler, // nullable
+        anyrtc_data_channel_close_handler* const close_handler, // nullable
+        anyrtc_data_channel_message_handler* const message_handler, // nullable
+        void* const arg // nullable
+) {
+    return anyrtc_data_channel_create_internal(
+            channelp, transport, parameters,
+            open_handler, buffered_amount_low_handler,
+            error_handler, close_handler, message_handler,
+            arg, true);
 }
 
 /*
