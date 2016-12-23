@@ -797,9 +797,6 @@ static void data_receive_handler(
                           info->rcv_ppid);
             break;
     }
-
-    // Dereference buffer
-    mem_deref(buffer);
 }
 
 /*
