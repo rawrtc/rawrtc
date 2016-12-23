@@ -77,7 +77,8 @@ static enum anyrtc_code data_channel_open_message_parse(
     int err = 0;
 
     // Check length
-    if (mbuf_get_left(buffer) < ANYRTC_DCEP_MESSAGE_OPEN_BASE_SIZE) {
+    // Note: -1 because we've already removed the message type
+    if (mbuf_get_left(buffer) < (ANYRTC_DCEP_MESSAGE_OPEN_BASE_SIZE - 1)) {
         return ANYRTC_CODE_INVALID_MESSAGE;
     }
 
@@ -689,6 +690,7 @@ static void handle_data_channel_open_message(
     // Get data transport
     error = anyrtc_sctp_transport_get_data_transport(&data_transport, transport);
     if (error) {
+        DEBUG_WARNING("Unable to get data transport, reason: %s\n", anyrtc_code_to_str(error));
         goto out;
     }
 
@@ -698,12 +700,15 @@ static void handle_data_channel_open_message(
             NULL, NULL, NULL, NULL, NULL, NULL,
             false);
     if (error) {
+        DEBUG_WARNING("Unable to create data channel, reason: %s\n", anyrtc_code_to_str(error));
         goto out;
     }
 
     // Allocate SID to be used as an argument for the data channel handlers
     error = sid_create(&sid, info->rcv_sid);
     if (error) {
+        DEBUG_WARNING("Unable to create data channel context, reason: %s\n",
+                      anyrtc_code_to_str(error));
         goto out;
     }
 
