@@ -743,6 +743,7 @@ static void handle_dcep_message(
             DEBUG_PRINTF("Received data channel open message for channel with SID %"PRIu16"\n",
                          info->rcv_sid);
             handle_data_channel_open_message(transport, buffer, info);
+            break;
         default:
             DEBUG_WARNING("Ignored incoming DCEP control message with unknown type: %"PRIu16"\n",
                           message_type);
