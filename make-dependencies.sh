@@ -260,7 +260,10 @@ fi
 cd build
 CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 make install -j${THREADS}
-# we have a name conflict for 'mbuf_init'
+# Note: It's important that we use the static library, otherwise a naming conflict for
+#       'mbuf_init' causes really messy allocation errors.
+rm ${PREFIX}/lib/libusrsctp.so*
+# We have a name conflict for 'mbuf_init'
 objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a
 cd ${MAIN_DIR}
 

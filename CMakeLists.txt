@@ -41,7 +41,7 @@ link_directories(${LIB_REW_LIBRARY_DIRS})
 
 # Dependency: usrsctp
 # TODO: Add a pkg-config file to usrsctp
-find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp libusrsctp)
+find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a)
 find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
 include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
