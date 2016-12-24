@@ -1073,6 +1073,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Initialise usrsctp
     if (!initialized) {
+        DEBUG_PRINTF("Initialising usrsctp\n");
         usrsctp_init(0, sctp_packet_handler, dbg_info);
 
         // TODO: Debugging depending on options

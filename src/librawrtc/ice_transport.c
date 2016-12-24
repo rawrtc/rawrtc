@@ -132,6 +132,13 @@ static void ice_established_handler(
         set_state(transport, RAWRTC_ICE_TRANSPORT_CONNECTED);
     }
 
+    // Ignore if completed
+    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
+    //       a late failed event.
+    if (transport->state == RAWRTC_ICE_TRANSPORT_COMPLETED) {
+        return;
+    }
+
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
         DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
@@ -169,6 +176,13 @@ static void ice_failed_handler(
 
     // Ignore if closed
     if (transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+        return;
+    }
+
+    // Ignore if completed
+    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
+    //       a late failed event.
+    if (transport->state == RAWRTC_ICE_TRANSPORT_COMPLETED) {
         return;
     }
 
