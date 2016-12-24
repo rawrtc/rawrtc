@@ -2,8 +2,8 @@
 redirect_sctp = executable(
     'redirect-sctp',
     ['redirect-sctp.c'],
-    include_directories: anyrtc_includes,
-    dependencies: anyrtc_dependencies,
-    link_with: lib_anyrtc,
+    include_directories: rawrtc_includes,
+    dependencies: rawrtc_dependencies,
+    link_with: lib_rawrtc,
     install: true
 )

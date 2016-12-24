@@ -2,7 +2,7 @@
 #include <stdlib.h> // strtol
 #include <string.h> // strerror
 #include <unistd.h> // STDIN_FILENO
-#include <anyrtc.h>
+#include <rawrtc.h>
 
 /* TODO: Replace with zf_log */
 #define DEBUG_MODULE "redirect-transport-app"
@@ -22,29 +22,29 @@ enum {
 };
 
 struct parameters {
-    struct anyrtc_ice_parameters* ice_parameters;
-    struct anyrtc_ice_candidates* ice_candidates;
-    struct anyrtc_dtls_parameters* dtls_parameters;
+    struct rawrtc_ice_parameters* ice_parameters;
+    struct rawrtc_ice_candidates* ice_candidates;
+    struct rawrtc_dtls_parameters* dtls_parameters;
 };
 
 struct client {
     char* name;
-    struct anyrtc_ice_gather_options* gather_options;
+    struct rawrtc_ice_gather_options* gather_options;
     char* redirect_ip;
     uint16_t redirect_port;
-    enum anyrtc_ice_role ice_role;
-    struct anyrtc_certificate* certificate;
-    struct anyrtc_ice_gatherer* gatherer;
-    struct anyrtc_ice_transport* ice_transport;
-    struct anyrtc_dtls_transport* dtls_transport;
-    struct anyrtc_redirect_transport* redirect_transport;
+    enum rawrtc_ice_role ice_role;
+    struct rawrtc_certificate* certificate;
+    struct rawrtc_ice_gatherer* gatherer;
+    struct rawrtc_ice_transport* ice_transport;
+    struct rawrtc_dtls_transport* dtls_transport;
+    struct rawrtc_redirect_transport* redirect_transport;
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
 
 static void before_exit() {
     // Close
-    anyrtc_close();
+    rawrtc_close();
 
     // Check memory leaks
     tmr_debug();
@@ -52,19 +52,19 @@ static void before_exit() {
 }
 
 static void exit_on_error(
-        enum anyrtc_code code,
+        enum rawrtc_code code,
         char const* const file,
         uint32_t line
 ) {
     switch (code) {
-        case ANYRTC_CODE_SUCCESS:
+        case RAWRTC_CODE_SUCCESS:
             return;
-        case ANYRTC_CODE_NOT_IMPLEMENTED:
+        case RAWRTC_CODE_NOT_IMPLEMENTED:
             DEBUG_WARNING("Not implemented in %s %"PRIu32"\n", file, line);
             return;
         default:
             DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n",
-                          file, line, code, anyrtc_code_to_str(code));
+                          file, line, code, rawrtc_code_to_str(code));
             before_exit();
             exit((int) code);
     }
@@ -127,7 +127,7 @@ static bool str_to_uint16(
     return true;
 }
 
-static enum anyrtc_code dict_get_entry(
+static enum rawrtc_code dict_get_entry(
         void* const valuep,
         struct odict* const parent,
         char* const key,
@@ -138,7 +138,7 @@ static enum anyrtc_code dict_get_entry(
 
     // Check arguments
     if (!valuep || !parent || !key) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Do lookup
@@ -148,16 +148,16 @@ static enum anyrtc_code dict_get_entry(
     if (!entry) {
         if (required) {
             DEBUG_WARNING("'%s' missing\n", key);
-            return ANYRTC_CODE_INVALID_ARGUMENT;
+            return RAWRTC_CODE_INVALID_ARGUMENT;
         } else {
-            return ANYRTC_CODE_NO_VALUE;
+            return RAWRTC_CODE_NO_VALUE;
         }
     }
 
     // Check for type
     if (entry->type != type) {
         DEBUG_WARNING("'%s' is of different type than expected\n", key);
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Set value according to type
@@ -182,14 +182,14 @@ static enum anyrtc_code dict_get_entry(
             *((char** const) valuep) = NULL; // meh!
             break;
         default:
-            return ANYRTC_CODE_INVALID_ARGUMENT;
+            return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Done
-    return ANYRTC_CODE_SUCCESS;
+    return RAWRTC_CODE_SUCCESS;
 }
 
-static enum anyrtc_code dict_get_uint32(
+static enum rawrtc_code dict_get_uint32(
         uint32_t* const valuep,
         struct odict* const parent,
         char* const key,
@@ -199,25 +199,25 @@ static enum anyrtc_code dict_get_uint32(
 
     // Check arguments
     if (!valuep || !parent || !key) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Get int_least32_t
-    enum anyrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
+    enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;
     }
 
     // Check bounds
     if (value < 0 || value > UINT32_MAX) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     } else {
         *valuep = (uint32_t) value;
-        return ANYRTC_CODE_SUCCESS;
+        return RAWRTC_CODE_SUCCESS;
     }
 }
 
-static enum anyrtc_code dict_get_uint16(
+static enum rawrtc_code dict_get_uint16(
         uint16_t* const valuep,
         struct odict* const parent,
         char* const key,
@@ -227,21 +227,21 @@ static enum anyrtc_code dict_get_uint16(
 
     // Check arguments
     if (!valuep || !parent || !key) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Get int_least32_t
-    enum anyrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
+    enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;
     }
 
     // Check bounds
     if (value < 0 || value > UINT16_MAX) {
-        return ANYRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     } else {
         *valuep = (uint16_t) value;
-        return ANYRTC_CODE_SUCCESS;
+        return RAWRTC_CODE_SUCCESS;
     }
 }
 
@@ -250,17 +250,17 @@ static void client_print_local_parameters(
 );
 
 static void ice_gatherer_state_change_handler(
-        enum anyrtc_ice_gatherer_state const state, // read-only
+        enum rawrtc_ice_gatherer_state const state, // read-only
         void* const arg
 ) {
     struct client* const client = arg;
-    char const * const state_name = anyrtc_ice_gatherer_state_to_name(state);
+    char const * const state_name = rawrtc_ice_gatherer_state_to_name(state);
     (void) arg;
     DEBUG_PRINTF("(%s) ICE gatherer state: %s\n", client->name, state_name);
 }
 
 static void ice_gatherer_error_handler(
-        struct anyrtc_ice_candidate* const host_candidate, // read-only, nullable
+        struct rawrtc_ice_candidate* const host_candidate, // read-only, nullable
         char const * const url, // read-only
         uint16_t const error_code, // read-only
         char const * const error_text, // read-only
@@ -272,7 +272,7 @@ static void ice_gatherer_error_handler(
 }
 
 static void ice_gatherer_local_candidate_handler(
-        struct anyrtc_ice_candidate* const candidate,
+        struct rawrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
@@ -289,18 +289,18 @@ static void ice_gatherer_local_candidate_handler(
 }
 
 static void ice_transport_state_change_handler(
-        enum anyrtc_ice_transport_state const state,
+        enum rawrtc_ice_transport_state const state,
         void* const arg
 ) {
     struct client* const client = arg;
-    char const * const state_name = anyrtc_ice_transport_state_to_name(state);
+    char const * const state_name = rawrtc_ice_transport_state_to_name(state);
     (void) arg;
     DEBUG_PRINTF("(%s) ICE transport state: %s\n", client->name, state_name);
 }
 
 static void ice_transport_candidate_pair_change_handler(
-        struct anyrtc_ice_candidate* const local, // read-only
-        struct anyrtc_ice_candidate* const remote, // read-only
+        struct rawrtc_ice_candidate* const local, // read-only
+        struct rawrtc_ice_candidate* const remote, // read-only
         void* const arg
 ) {
     struct client* const client = arg;
@@ -309,11 +309,11 @@ static void ice_transport_candidate_pair_change_handler(
 }
 
 static void dtls_transport_state_change_handler(
-        enum anyrtc_dtls_transport_state const state, // read-only
+        enum rawrtc_dtls_transport_state const state, // read-only
         void* const arg
 ) {
     struct client* const client = arg;
-    char const * const state_name = anyrtc_dtls_transport_state_to_name(state);
+    char const * const state_name = rawrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
 }
 
@@ -337,29 +337,29 @@ static void client_init(
         struct client* const client
 ) {
     // Generate certificates
-    EOE(anyrtc_certificate_generate(&client->certificate, NULL));
-    struct anyrtc_certificate* certificates[] = {client->certificate};
+    EOE(rawrtc_certificate_generate(&client->certificate, NULL));
+    struct rawrtc_certificate* certificates[] = {client->certificate};
 
     // Create ICE gatherer
-    EOE(anyrtc_ice_gatherer_create(
+    EOE(rawrtc_ice_gatherer_create(
             &client->gatherer, client->gather_options,
             ice_gatherer_state_change_handler, ice_gatherer_error_handler,
             ice_gatherer_local_candidate_handler, client));
 
     // Create ICE transport
-    EOE(anyrtc_ice_transport_create(
+    EOE(rawrtc_ice_transport_create(
             &client->ice_transport, client->gatherer,
             ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
             client));
 
     // Create DTLS transport
-    EOE(anyrtc_dtls_transport_create(
+    EOE(rawrtc_dtls_transport_create(
             &client->dtls_transport, client->ice_transport, certificates,
             sizeof(certificates) / sizeof(certificates[0]),
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
     // Create redirect transport
-    EOE(anyrtc_redirect_transport_create(
+    EOE(rawrtc_redirect_transport_create(
             &client->redirect_transport, client->dtls_transport,
             client->redirect_ip, client->redirect_port, 0, 0));
 }
@@ -368,7 +368,7 @@ static void client_start_gathering(
         struct client* const client
 ) {
     // Start gathering
-    EOE(anyrtc_ice_gatherer_gather(client->gatherer, NULL));
+    EOE(rawrtc_ice_gatherer_gather(client->gatherer, NULL));
 }
 
 static void client_get_parameters(
@@ -377,15 +377,15 @@ static void client_get_parameters(
     struct parameters* const local_parameters = &client->local_parameters;
 
     // Get local ICE parameters
-    EOE(anyrtc_ice_gatherer_get_local_parameters(
+    EOE(rawrtc_ice_gatherer_get_local_parameters(
             &local_parameters->ice_parameters, client->gatherer));
 
     // Get local ICE candidates
-    EOE(anyrtc_ice_gatherer_get_local_candidates(
+    EOE(rawrtc_ice_gatherer_get_local_candidates(
             &local_parameters->ice_candidates, client->gatherer));
 
     // Get local DTLS parameters
-    EOE(anyrtc_dtls_transport_get_local_parameters(
+    EOE(rawrtc_dtls_transport_get_local_parameters(
             &local_parameters->dtls_parameters, client->dtls_transport));
 }
 
@@ -395,7 +395,7 @@ static void client_set_parameters(
     struct parameters* const remote_parameters = &client->remote_parameters;
 
     // Set remote ICE candidates
-    EOE(anyrtc_ice_transport_set_remote_candidates(
+    EOE(rawrtc_ice_transport_set_remote_candidates(
             client->ice_transport, remote_parameters->ice_candidates->candidates,
             remote_parameters->ice_candidates->n_candidates));
 }
@@ -406,12 +406,12 @@ static void client_start_transports(
     struct parameters* const remote_parameters = &client->remote_parameters;
 
     // Start ICE transport
-    EOE(anyrtc_ice_transport_start(
+    EOE(rawrtc_ice_transport_start(
             client->ice_transport, client->gatherer, remote_parameters->ice_parameters,
             client->ice_role));
 
     // Start DTLS transport
-    EOE(anyrtc_dtls_transport_start(
+    EOE(rawrtc_dtls_transport_start(
             client->dtls_transport, remote_parameters->dtls_parameters));
 }
 
@@ -428,9 +428,9 @@ static void client_stop(
         struct client* const client
 ) {
     client->redirect_transport = mem_deref(client->redirect_transport);
-    EOE(anyrtc_dtls_transport_stop(client->dtls_transport));
-    EOE(anyrtc_ice_transport_stop(client->ice_transport));
-    EOE(anyrtc_ice_gatherer_close(client->gatherer));
+    EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
+    EOE(rawrtc_ice_transport_stop(client->ice_transport));
+    EOE(rawrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
     parameters_destroy(&client->remote_parameters);
@@ -446,7 +446,7 @@ static void client_stop(
 }
 
 static void client_set_ice_parameters(
-        struct anyrtc_ice_parameters* const parameters,
+        struct rawrtc_ice_parameters* const parameters,
         struct odict* const dict
 ) {
     char* username_fragment;
@@ -454,9 +454,9 @@ static void client_set_ice_parameters(
     bool ice_lite;
 
     // Get values
-    EOE(anyrtc_ice_parameters_get_username_fragment(&username_fragment, parameters));
-    EOE(anyrtc_ice_parameters_get_password(&password, parameters));
-    EOE(anyrtc_ice_parameters_get_ice_lite(&ice_lite, parameters));
+    EOE(rawrtc_ice_parameters_get_username_fragment(&username_fragment, parameters));
+    EOE(rawrtc_ice_parameters_get_password(&password, parameters));
+    EOE(rawrtc_ice_parameters_get_ice_lite(&ice_lite, parameters));
 
     // Set ICE parameters
     EOR(odict_entry_add(dict, "usernameFragment", ODICT_STRING, username_fragment));
@@ -469,7 +469,7 @@ static void client_set_ice_parameters(
 }
 
 static void client_set_ice_candidates(
-        struct anyrtc_ice_candidates* const parameters,
+        struct rawrtc_ice_candidates* const parameters,
         struct odict* const array
 ) {
     size_t i;
@@ -477,15 +477,15 @@ static void client_set_ice_candidates(
 
     // Set ICE candidates
     for (i = 0; i < parameters->n_candidates; ++i) {
-        enum anyrtc_code error;
-        struct anyrtc_ice_candidate* const candidate = parameters->candidates[i];
+        enum rawrtc_code error;
+        struct rawrtc_ice_candidate* const candidate = parameters->candidates[i];
         char* foundation;
         uint32_t priority;
         char* ip;
-        enum anyrtc_ice_protocol protocol;
+        enum rawrtc_ice_protocol protocol;
         uint16_t port;
-        enum anyrtc_ice_candidate_type type;
-        enum anyrtc_ice_tcp_candidate_type tcp_type = ANYRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
+        enum rawrtc_ice_candidate_type type;
+        enum rawrtc_ice_tcp_candidate_type tcp_type = RAWRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
         char* related_address = NULL;
         uint16_t related_port = 0;
         char* key;
@@ -494,29 +494,29 @@ static void client_set_ice_candidates(
         EOR(odict_alloc(&node, 16));
 
         // Get values
-        EOE(anyrtc_ice_candidate_get_foundation(&foundation, candidate));
-        EOE(anyrtc_ice_candidate_get_priority(&priority, candidate));
-        EOE(anyrtc_ice_candidate_get_ip(&ip, candidate));
-        EOE(anyrtc_ice_candidate_get_protocol(&protocol, candidate));
-        EOE(anyrtc_ice_candidate_get_port(&port, candidate));
-        EOE(anyrtc_ice_candidate_get_type(&type, candidate));
-        error = anyrtc_ice_candidate_get_tcp_type(&tcp_type, candidate);
-        EOE(error == ANYRTC_CODE_NO_VALUE ? ANYRTC_CODE_SUCCESS : error);
-        error = anyrtc_ice_candidate_get_related_address(&related_address, candidate);
-        EOE(error == ANYRTC_CODE_NO_VALUE ? ANYRTC_CODE_SUCCESS : error);
-        error = anyrtc_ice_candidate_get_related_port(&related_port, candidate);
-        EOE(error == ANYRTC_CODE_NO_VALUE ? ANYRTC_CODE_SUCCESS : error);
+        EOE(rawrtc_ice_candidate_get_foundation(&foundation, candidate));
+        EOE(rawrtc_ice_candidate_get_priority(&priority, candidate));
+        EOE(rawrtc_ice_candidate_get_ip(&ip, candidate));
+        EOE(rawrtc_ice_candidate_get_protocol(&protocol, candidate));
+        EOE(rawrtc_ice_candidate_get_port(&port, candidate));
+        EOE(rawrtc_ice_candidate_get_type(&type, candidate));
+        error = rawrtc_ice_candidate_get_tcp_type(&tcp_type, candidate);
+        EOE(error == RAWRTC_CODE_NO_VALUE ? RAWRTC_CODE_SUCCESS : error);
+        error = rawrtc_ice_candidate_get_related_address(&related_address, candidate);
+        EOE(error == RAWRTC_CODE_NO_VALUE ? RAWRTC_CODE_SUCCESS : error);
+        error = rawrtc_ice_candidate_get_related_port(&related_port, candidate);
+        EOE(error == RAWRTC_CODE_NO_VALUE ? RAWRTC_CODE_SUCCESS : error);
 
         // Set ICE candidate values
         EOR(odict_entry_add(node, "foundation", ODICT_STRING, foundation));
         EOR(odict_entry_add(node, "priority", ODICT_INT, priority));
         EOR(odict_entry_add(node, "ip", ODICT_STRING, ip));
-        EOR(odict_entry_add(node, "protocol", ODICT_STRING, anyrtc_ice_protocol_to_str(protocol)));
+        EOR(odict_entry_add(node, "protocol", ODICT_STRING, rawrtc_ice_protocol_to_str(protocol)));
         EOR(odict_entry_add(node, "port", ODICT_INT, port));
-        EOR(odict_entry_add(node, "type", ODICT_STRING, anyrtc_ice_candidate_type_to_str(type)));
-        if (type == ANYRTC_ICE_PROTOCOL_TCP) {
+        EOR(odict_entry_add(node, "type", ODICT_STRING, rawrtc_ice_candidate_type_to_str(type)));
+        if (type == RAWRTC_ICE_PROTOCOL_TCP) {
             EOR(odict_entry_add(node, "tcpType", ODICT_STRING,
-                                anyrtc_ice_tcp_candidate_type_to_str(tcp_type)));
+                                rawrtc_ice_tcp_candidate_type_to_str(tcp_type)));
         }
         if (related_address) {
             EOR(odict_entry_add(node, "relatedAddress", ODICT_STRING, related_address));
@@ -526,7 +526,7 @@ static void client_set_ice_candidates(
         }
 
         // Add to array
-        EOE(anyrtc_sdprintf(&key, "%zu", i));
+        EOE(rawrtc_sdprintf(&key, "%zu", i));
         EOR(odict_entry_add(array, key, ODICT_OBJECT, node));
 
         // Dereference values
@@ -539,28 +539,28 @@ static void client_set_ice_candidates(
 }
 
 static void client_set_dtls_parameters(
-        struct anyrtc_dtls_parameters* const parameters,
+        struct rawrtc_dtls_parameters* const parameters,
         struct odict* const dict
 ) {
-    enum anyrtc_dtls_role role;
+    enum rawrtc_dtls_role role;
     struct odict* array;
     struct odict* node;
-    struct anyrtc_dtls_fingerprints* fingerprints;
+    struct rawrtc_dtls_fingerprints* fingerprints;
     size_t i;
 
     // Get and set DTLS role
-    EOE(anyrtc_dtls_parameters_get_role(&role, parameters));
-    EOR(odict_entry_add(dict, "role", ODICT_STRING, anyrtc_dtls_role_to_str(role)));
+    EOE(rawrtc_dtls_parameters_get_role(&role, parameters));
+    EOR(odict_entry_add(dict, "role", ODICT_STRING, rawrtc_dtls_role_to_str(role)));
 
     // Create array
     EOR(odict_alloc(&array, 16));
 
     // Get and set fingerprints
-    EOE(anyrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters));
+    EOE(rawrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters));
     for (i = 0; i < parameters->fingerprints->n_fingerprints; ++i) {
-        struct anyrtc_dtls_fingerprint* const fingerprint =
+        struct rawrtc_dtls_fingerprint* const fingerprint =
                 parameters->fingerprints->fingerprints[i];
-        enum anyrtc_certificate_sign_algorithm sign_algorithm;
+        enum rawrtc_certificate_sign_algorithm sign_algorithm;
         char* value;
         char* key;
 
@@ -568,16 +568,16 @@ static void client_set_dtls_parameters(
         EOR(odict_alloc(&node, 16));
 
         // Get values
-        EOE(anyrtc_dtls_parameters_fingerprint_get_sign_algorithm(&sign_algorithm, fingerprint));
-        EOE(anyrtc_dtls_parameters_fingerprint_get_value(&value, fingerprint));
+        EOE(rawrtc_dtls_parameters_fingerprint_get_sign_algorithm(&sign_algorithm, fingerprint));
+        EOE(rawrtc_dtls_parameters_fingerprint_get_value(&value, fingerprint));
 
         // Set fingerprint values
         EOR(odict_entry_add(node, "algorithm", ODICT_STRING,
-                            anyrtc_certificate_sign_algorithm_to_str(sign_algorithm)));
+                            rawrtc_certificate_sign_algorithm_to_str(sign_algorithm)));
         EOR(odict_entry_add(node, "value", ODICT_STRING, value));
 
         // Add to array
-        EOE(anyrtc_sdprintf(&key, "%zu", i));
+        EOE(rawrtc_sdprintf(&key, "%zu", i));
         EOR(odict_entry_add(array, key, ODICT_OBJECT, node));
 
         // Dereference values
@@ -627,11 +627,11 @@ static void client_print_local_parameters(
     mem_deref(dict);
 }
 
-static enum anyrtc_code client_get_ice_parameters(
-        struct anyrtc_ice_parameters** const parametersp,
+static enum rawrtc_code client_get_ice_parameters(
+        struct rawrtc_ice_parameters** const parametersp,
         struct odict* const dict
 ) {
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     char* username_fragment;
     char* password;
     bool ice_lite;
@@ -645,13 +645,13 @@ static enum anyrtc_code client_get_ice_parameters(
     }
 
     // Create ICE parameters instance
-    return anyrtc_ice_parameters_create(parametersp, username_fragment, password, ice_lite);
+    return rawrtc_ice_parameters_create(parametersp, username_fragment, password, ice_lite);
 }
 
 static void client_ice_candidates_destroy(
         void* const arg
 ) {
-    struct anyrtc_ice_candidates* const candidates = arg;
+    struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;
 
     // Dereference each item
@@ -660,13 +660,13 @@ static void client_ice_candidates_destroy(
     }
 }
 
-static enum anyrtc_code client_get_ice_candidates(
-        struct anyrtc_ice_candidates** const candidatesp,
+static enum rawrtc_code client_get_ice_candidates(
+        struct rawrtc_ice_candidates** const candidatesp,
         struct odict* const dict
 ) {
     size_t n;
-    struct anyrtc_ice_candidates* candidates;
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
+    struct rawrtc_ice_candidates* candidates;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     struct le* le;
     size_t i;
 
@@ -674,7 +674,7 @@ static enum anyrtc_code client_get_ice_candidates(
     n = list_count(&dict->lst);
 
     // Allocate & set length immediately
-    candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct anyrtc_ice_candidate*) * n),
+    candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct rawrtc_ice_candidate*) * n),
                             client_ice_candidates_destroy);
     if (!candidates) {
         EWE("No memory to allocate ICE candidates array");
@@ -688,12 +688,12 @@ static enum anyrtc_code client_get_ice_candidates(
         uint32_t priority;
         char* ip;
         char const* protocol_str = NULL;
-        enum anyrtc_ice_protocol protocol;
+        enum rawrtc_ice_protocol protocol;
         uint16_t port;
         char const* type_str = NULL;
-        enum anyrtc_ice_candidate_type type;
+        enum rawrtc_ice_candidate_type type;
         char const* tcp_type_str = NULL;
-        enum anyrtc_ice_tcp_candidate_type tcp_type = ANYRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
+        enum rawrtc_ice_tcp_candidate_type tcp_type = RAWRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
         char* related_address = NULL;
         uint16_t related_port = 0;
 
@@ -702,13 +702,13 @@ static enum anyrtc_code client_get_ice_candidates(
         error |= dict_get_uint32(&priority, node, "priority", true);
         error |= dict_get_entry(&ip, node, "ip", ODICT_STRING, true);
         error |= dict_get_entry(&protocol_str, node, "protocol", ODICT_STRING, true);
-        error |= anyrtc_str_to_ice_protocol(&protocol, protocol_str);
+        error |= rawrtc_str_to_ice_protocol(&protocol, protocol_str);
         error |= dict_get_uint16(&port, node, "port", true);
         error |= dict_get_entry(&type_str, node, "type", ODICT_STRING, true);
-        error |= anyrtc_str_to_ice_candidate_type(&type, type_str);
-        if (protocol == ANYRTC_ICE_PROTOCOL_TCP) {
+        error |= rawrtc_str_to_ice_candidate_type(&type, type_str);
+        if (protocol == RAWRTC_ICE_PROTOCOL_TCP) {
             error |= dict_get_entry(&tcp_type_str, node, "tcpType", ODICT_STRING, true);
-            error |= anyrtc_str_to_ice_tcp_candidate_type(&tcp_type, tcp_type_str);
+            error |= rawrtc_str_to_ice_tcp_candidate_type(&tcp_type, tcp_type_str);
         }
         dict_get_entry(&related_address, node, "relatedAddress", ODICT_STRING, false);
         dict_get_uint16(&related_port, node, "relatedPort", false);
@@ -717,7 +717,7 @@ static enum anyrtc_code client_get_ice_candidates(
         }
 
         // Create and add ICE candidate
-        error = anyrtc_ice_candidate_create(
+        error = rawrtc_ice_candidate_create(
                 &candidates->candidates[i], foundation, priority, ip, protocol, port, type,
                 tcp_type, related_address, related_port);
         if (error) {
@@ -738,7 +738,7 @@ out:
 static void client_dtls_fingerprints_destroy(
         void* const arg
 ) {
-    struct anyrtc_dtls_fingerprints* const fingerprints = arg;
+    struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
 
     // Dereference each item
@@ -747,16 +747,16 @@ static void client_dtls_fingerprints_destroy(
     }
 }
 
-static enum anyrtc_code client_get_dtls_parameters(
-        struct anyrtc_dtls_parameters** const parametersp,
+static enum rawrtc_code client_get_dtls_parameters(
+        struct rawrtc_dtls_parameters** const parametersp,
         struct odict* const dict
 ) {
     size_t n;
-    struct anyrtc_dtls_parameters* parameters = NULL;
-    struct anyrtc_dtls_fingerprints* fingerprints;
-    enum anyrtc_code error;
+    struct rawrtc_dtls_parameters* parameters = NULL;
+    struct rawrtc_dtls_fingerprints* fingerprints;
+    enum rawrtc_code error;
     char const* role_str = NULL;
-    enum anyrtc_dtls_role role;
+    enum rawrtc_dtls_role role;
     struct odict* node;
     struct le* le;
     size_t i;
@@ -770,7 +770,7 @@ static enum anyrtc_code client_get_dtls_parameters(
 
     // Allocate & set length immediately
     fingerprints = mem_zalloc(
-            sizeof(*fingerprints) + (sizeof(struct anyrtc_dtls_fingerprints*) * n),
+            sizeof(*fingerprints) + (sizeof(struct rawrtc_dtls_fingerprints*) * n),
             client_dtls_fingerprints_destroy);
     if (!fingerprints) {
         EWE("No memory to allocate DTLS fingerprint array");
@@ -779,35 +779,35 @@ static enum anyrtc_code client_get_dtls_parameters(
 
     // Get role
     error |= dict_get_entry(&role_str, dict, "role", ODICT_STRING, true);
-    error |= anyrtc_str_to_dtls_role(&role, role_str);
+    error |= rawrtc_str_to_dtls_role(&role, role_str);
     if (error) {
-        role = ANYRTC_DTLS_ROLE_AUTO;
+        role = RAWRTC_DTLS_ROLE_AUTO;
     }
 
     // Get fingerprints
     for (le = list_head(&node->lst), i = 0; le != NULL; le = le->next, ++i) {
         node = ((struct odict_entry*) le->data)->u.odict;
         char* algorithm_str = NULL;
-        enum anyrtc_certificate_sign_algorithm algorithm;
+        enum rawrtc_certificate_sign_algorithm algorithm;
         char* value;
 
         // Get fingerprint
         error |= dict_get_entry(&algorithm_str, node, "algorithm", ODICT_STRING, true);
-        error |= anyrtc_str_to_certificate_sign_algorithm(&algorithm, algorithm_str);
+        error |= rawrtc_str_to_certificate_sign_algorithm(&algorithm, algorithm_str);
         error |= dict_get_entry(&value, node, "value", ODICT_STRING, true);
         if (error) {
             goto out;
         }
 
         // Create and add fingerprint
-        error = anyrtc_dtls_fingerprint_create(&fingerprints->fingerprints[i], algorithm, value);
+        error = rawrtc_dtls_fingerprint_create(&fingerprints->fingerprints[i], algorithm, value);
         if (error) {
             goto out;
         }
     }
 
     // Create DTLS parameters
-    error = anyrtc_dtls_parameters_create(
+    error = rawrtc_dtls_parameters_create(
             &parameters, role, fingerprints->fingerprints, fingerprints->n_fingerprints);
 
 out:
@@ -832,10 +832,10 @@ static void client_stdin_handler(
     bool do_exit = false;
     struct odict* dict = NULL;
     struct odict* node = NULL;
-    enum anyrtc_code error = ANYRTC_CODE_SUCCESS;
-    struct anyrtc_ice_parameters* ice_parameters = NULL;
-    struct anyrtc_ice_candidates* ice_candidates = NULL;
-    struct anyrtc_dtls_parameters* dtls_parameters = NULL;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
+    struct rawrtc_ice_parameters* ice_parameters = NULL;
+    struct rawrtc_ice_candidates* ice_candidates = NULL;
+    struct rawrtc_dtls_parameters* dtls_parameters = NULL;
     (void) flags;
 
     // Get message from stdin
@@ -895,15 +895,15 @@ static void exit_with_usage(char* program) {
 }
 
 int main(int argc, char* argv[argc + 1]) {
-    enum anyrtc_ice_role ice_role;
+    enum rawrtc_ice_role ice_role;
     uint16_t redirect_port;
-    struct anyrtc_ice_gather_options* gather_options;
+    struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
     struct client client = {0};
 
     // Initialise
-    EOE(anyrtc_init());
+    EOE(rawrtc_init());
 
     // Debug
     // TODO: This should be replaced by our own debugging system
@@ -918,10 +918,10 @@ int main(int argc, char* argv[argc + 1]) {
     // Get ICE role
     switch (argv[1][0]) {
         case '0':
-            ice_role = ANYRTC_ICE_ROLE_CONTROLLED;
+            ice_role = RAWRTC_ICE_ROLE_CONTROLLED;
             break;
         case '1':
-            ice_role = ANYRTC_ICE_ROLE_CONTROLLING;
+            ice_role = RAWRTC_ICE_ROLE_CONTROLLING;
             break;
         default:
             exit_with_usage(argv[0]);
@@ -934,17 +934,17 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Create ICE gather options
-    EOE(anyrtc_ice_gather_options_create(&gather_options, ANYRTC_ICE_GATHER_ALL));
+    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
 
     // Add ICE servers to ICE gather options
-    EOE(anyrtc_ice_gather_options_add_server(
+    EOE(rawrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls,
             sizeof(stun_google_com_urls) / sizeof(stun_google_com_urls[0]),
-            NULL, NULL, ANYRTC_ICE_CREDENTIAL_NONE));
-    EOE(anyrtc_ice_gather_options_add_server(
+            NULL, NULL, RAWRTC_ICE_CREDENTIAL_NONE));
+    EOE(rawrtc_ice_gather_options_add_server(
             gather_options, turn_zwuenf_org_urls,
             sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
-            "bruno", "onurb", ANYRTC_ICE_CREDENTIAL_PASSWORD));
+            "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Set client fields
     client.name = "A";
@@ -965,7 +965,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Start main loop
     // TODO: Wrap re_main?
     // TODO: Stop main loop once gathering is complete
-    EOE(anyrtc_error_to_code(re_main(signal_handler)));
+    EOE(rawrtc_error_to_code(re_main(signal_handler)));
 
     // Stop client & bye
     client_stop(&client);

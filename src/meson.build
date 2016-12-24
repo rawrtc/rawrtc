@@ -1,7 +1,7 @@
 # Add includes
-anyrtc_includes += include_directories('include')
+rawrtc_includes += include_directories('include')
 
 # Walk through subdirectories
 subdir('include')
-subdir('libanyrtc')
+subdir('librawrtc')
 subdir('tools')

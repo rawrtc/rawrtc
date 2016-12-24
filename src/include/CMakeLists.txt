@@ -1,2 +1,2 @@
 # Install header
-INSTALL (FILES anyrtc.h DESTINATION include)
+INSTALL (FILES rawrtc.h DESTINATION include)

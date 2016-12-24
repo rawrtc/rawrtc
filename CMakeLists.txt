@@ -1,9 +1,9 @@
 # Project
 cmake_minimum_required(VERSION 3.2)
-project(anyrtc)
-set(anyrtc_VERSION_MAJOR 0)
-set(anyrtc_VERSION_MINOR 0)
-set(anyrtc_VERSION_PATCH 1)
+project(rawrtc)
+set(rawrtc_VERSION_MAJOR 0)
+set(rawrtc_VERSION_MINOR 0)
+set(rawrtc_VERSION_PATCH 1)
 
 # Debug build type as default
 if (NOT CMAKE_BUILD_TYPE)
@@ -48,7 +48,7 @@ include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
 link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
 
 # Dependencies library list
-set(anyrtc_DEP_LIBRARIES
+set(rawrtc_DEP_LIBRARIES
         Threads::Threads
         ${LIB_RE_LIBRARIES}
         ${LIB_REW_LIBRARIES}

@@ -5,7 +5,7 @@ set -e
 export THREADS=12
 
 # Library prefix
-export LIB_PREFIX=anyrtc_
+export LIB_PREFIX=rawrtc_
 
 # Build path
 if [ -z "$BUILD_PATH" ]; then
@@ -19,10 +19,10 @@ OPENSSL_PATH="openssl-1.1.0c"
 #ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
 #ZF_LOG_BRANCH="master"
 #ZF_LOG_PATH="zf_log"
-LIBRE_GIT="https://vcs.zwuenf.org/anyrtc/re.git"
-LIBRE_BRANCH="anyrtc-patched"
+LIBRE_GIT="https://vcs.zwuenf.org/rawrtc/re.git"
+LIBRE_BRANCH="rawrtc-patched"
 LIBRE_PATH="re"
-LIBREW_GIT="https://vcs.zwuenf.org/anyrtc/rew.git"
+LIBREW_GIT="https://vcs.zwuenf.org/rawrtc/rew.git"
 LIBREW_BRANCH="gather_without_role"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/lgrahl/usrsctp-neat.git"

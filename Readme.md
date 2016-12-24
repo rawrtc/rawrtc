@@ -1,4 +1,4 @@
-# anyrtc
+# rawrtc
 
 A WebRTC and ORTC library with a small footprint that runs everywhere.
 
@@ -22,7 +22,7 @@ the necessary dependencies and this library system-wide.
 ### Dependencies & Meson Configuration
 
 ```
-> cd <path-to-anyrtc>
+> cd <path-to-rawrtc>
 > ./make-dependencies.sh
 ```
 
@@ -43,7 +43,7 @@ closed.
 #### Meson
 
 ```
-> cd <path-to-anyrtc>
+> cd <path-to-rawrtc>
 > meson build --default-library=static --prefix=${PWD}/build/prefix
 > cd build
 > ninja install
@@ -52,7 +52,7 @@ closed.
 #### CMake
 
 ```
-> cd <path-to-anyrtc>/build
+> cd <path-to-rawrtc>/build
 > cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
 > make install
 ```

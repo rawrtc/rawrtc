@@ -1,7 +1,7 @@
 # Project
-project('anyrtc', 'c', version: '0.0.1')
+project('rawrtc', 'c', version: '0.0.1')
 compiler = meson.get_compiler('c')
-anyrtc_dependencies = []
+rawrtc_dependencies = []
 
 # Dependencies
 prefix = get_option('prefix')
@@ -9,8 +9,8 @@ lib_zf_log = compiler.find_library('zf_log', dirs: prefix + '/lib')
 lib_re = dependency('libre', version: '>=0.4.15')
 lib_rew = dependency('librew', version: '>=0.4.0')
 lib_usrsctp = compiler.find_library('libusrsctp', dirs: prefix + '/lib')
-anyrtc_dependencies = [lib_zf_log, lib_re, lib_rew, lib_usrsctp]
-anyrtc_includes = [
+rawrtc_dependencies = [lib_zf_log, lib_re, lib_rew, lib_usrsctp]
+rawrtc_includes = [
     include_directories(prefix + '/include'),
     # TODO: Remove as soon as you found out how to access the corresponding parts
     #       without having to use the internal interface to ICE
@@ -23,10 +23,10 @@ subdir('src')
 # Generate pkg entry
 pkg_mod = import('pkgconfig')
 pkg_mod.generate(
-    libraries: lib_anyrtc,
+    libraries: lib_rawrtc,
     version: '0.0.1',  # TODO: Get version number from project
-    name: 'libanyrtc',
-    filebase: 'anyrtc',
+    name: 'librawrtc',
+    filebase: 'rawrtc',
     description: 'WebRTC and ORTC library.'
 )
 
