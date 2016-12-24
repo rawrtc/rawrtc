@@ -31,6 +31,10 @@ void anyrtc_data_channel_set_state(
         case ANYRTC_DATA_CHANNEL_STATE_CLOSED:
             // Warning: To close the channel, use `anyrtc_data_channel_close`!
 
+            // Note: We need to reference ourselves because the channel close handler may hold
+            //       and release the very last reference to this instance in the call.
+            mem_ref(channel);
+
             // Call transport close handler
             error = channel->transport->channel_close(channel);
             if (error) {
@@ -41,6 +45,9 @@ void anyrtc_data_channel_set_state(
             if (channel->close_handler) {
                 channel->close_handler(channel->arg);
             }
+
+            // Done
+            mem_deref(channel);
             break;
         default:
             break;

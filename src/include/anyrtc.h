@@ -699,7 +699,7 @@ struct anyrtc_data_channel {
     anyrtc_data_channel_buffered_amount_low_handler* buffered_amount_low_handler; // nullable
     anyrtc_data_channel_error_handler* error_handler; // nullable
     anyrtc_data_channel_close_handler* close_handler; // nullable
-    anyrtc_data_channel_message_handler* message_handler;
+    anyrtc_data_channel_message_handler* message_handler; // nullable
     void* arg; // nullable
 };
 

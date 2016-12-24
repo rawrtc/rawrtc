@@ -367,8 +367,11 @@ static void set_state(
 ) {
     // Closed?
     if (state == ANYRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        enum anyrtc_data_channel_state const from_state = ANYRTC_DATA_CHANNEL_STATE_OPEN;
+
         // Close all data channels
-        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_CLOSED, NULL);
+        // TODO: Close non-open channels as well?
+        set_data_channel_states(transport, ANYRTC_DATA_CHANNEL_STATE_CLOSED, &from_state);
 
         // Remove from DTLS transport
         // Note: No NULL checking needed as the function will do that for us
