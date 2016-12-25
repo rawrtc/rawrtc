@@ -69,6 +69,8 @@ char const* rawrtc_code_to_str(
             return "still in use";
         case RAWRTC_CODE_INVALID_MESSAGE:
             return "invalid message";
+        case RAWRTC_CODE_MESSAGE_TOO_LONG:
+            return "message too long";
         default:
             return "(no error translation)";
     }

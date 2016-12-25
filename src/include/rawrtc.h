@@ -38,7 +38,8 @@ enum rawrtc_code {
     RAWRTC_CODE_INVALID_FINGERPRINT,
     RAWRTC_CODE_INSUFFICIENT_SPACE,
     RAWRTC_CODE_STILL_IN_USE,
-    RAWRTC_CODE_INVALID_MESSAGE
+    RAWRTC_CODE_INVALID_MESSAGE,
+    RAWRTC_CODE_MESSAGE_TOO_LONG
 }; // Add translations for new return codes in `utils.c`!
 
 /*
@@ -409,7 +410,7 @@ typedef enum rawrtc_code (rawrtc_data_transport_channel_close_handler)(
  */
 typedef enum rawrtc_code (rawrtc_data_transport_channel_send_handler)(
     struct rawrtc_data_channel* const channel,
-    uint8_t const * const data,
+    uint8_t const * const data, // nullable (if size 0), copied
     uint32_t const size
 );
 
