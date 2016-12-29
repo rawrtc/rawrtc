@@ -210,6 +210,44 @@ enum rawrtc_code rawrtc_data_channel_get_parameters(
     }
 
     // Set pointer & done
-    *parametersp = channel->parameters;
+    *parametersp = mem_ref(channel->parameters);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Check if a data channel is reliable.
+ */
+enum rawrtc_code rawrtc_data_channel_get_reliability_information(
+        bool* const retransmitp, // de-referenced
+        bool* const timedp, // de-referenced
+        struct rawrtc_data_channel* const channel
+) {
+    // Check arguments
+    if (!retransmitp || !timedp || !channel) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Unordered?
+    if (channel->parameters->channel_type & 0x80) {
+        switch (channel->parameters->channel_type) {
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT:
+                *retransmitp = true;
+                *timedp = false;
+                break;
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED:
+                *retransmitp = false;
+                *timedp = true;
+                break;
+            default:
+                *retransmitp = false;
+                *timedp = false;
+                break;
+        }
+    } else {
+        *retransmitp = false;
+        *timedp = false;
+    }
+
+    // Done
     return RAWRTC_CODE_SUCCESS;
 }

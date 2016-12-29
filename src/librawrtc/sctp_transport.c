@@ -47,15 +47,16 @@ static uint16_t const sctp_events[] = {
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
-static enum rawrtc_code sid_create(
-    uint16_t** const sidp, // not checked
-    uint16_t const value
+static enum rawrtc_code context_create(
+    struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
+    uint16_t const sid,
+    bool const can_send_unordered
 );
 
 static void channel_register(
     struct rawrtc_sctp_transport* const transport, // not checked
     struct rawrtc_data_channel* const channel, // referenced, not checked
-    uint16_t* const sid, // not checked
+    struct rawrtc_sctp_data_channel_context* const context, // referenced, not checked
     bool const raise_event
 );
 
@@ -330,6 +331,71 @@ out:
         DEBUG_WARNING("Could not send buffered message, reason: %s\n",
                       rawrtc_code_to_str(error));
     }
+}
+
+/*
+ * Send an SCTP message on the data channel.
+ * TODO: Add EOR marking and some kind of an id (does ndata provide that?)
+ */
+static enum rawrtc_code send_message(
+        struct rawrtc_sctp_transport* const transport,
+        struct rawrtc_data_channel* const channel,
+        struct mbuf* buffer,
+        uint16_t const ppid
+) {
+    struct sctp_sendv_spa spa = {0};
+    enum rawrtc_code error;
+
+    // Get context
+    struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+
+    //    spa.sendv_sndinfo.snd_sid = 1;
+//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
+//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//
+//    spa.sendv_sndinfo.snd_sid = channel->sid;
+//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
+//    if ((channel->state == DATA_CHANNEL_OPEN) && (channel->unordered)) {
+//        spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
+//    }
+//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
+//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//    if (channel->pr_policy == SCTP_PR_SCTP_TTL || channel->pr_policy == SCTP_PR_SCTP_RTX) {
+//        spa.sendv_prinfo.pr_policy = channel->pr_policy;
+//        spa.sendv_prinfo.pr_value = channel->pr_value;
+//        spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
+//    }
+
+//    // Set stream identifier, protocol identifier and flags
+//    spa.sendv_sndinfo.snd_sid = context->sid;
+//    spa.sendv_sndinfo.snd_flags = SCTP_EOR; // TODO: Update signature
+//    spa.sendv_sndinfo.snd_ppid = htonl(ppid);
+//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
+//
+//    // Set partial reliability info
+//    if (ppid != RAWRTC_DCEP_PPID_CONTROL) {
+//        bool retransmit;
+//        bool timed;
+//
+//        // Get reliability info
+//        error = rawrtc_data_channel_get_reliability_information(&retransmit, &timed, channel);
+//        if (error) {
+//            return error;
+//        }
+//
+//        //
+//    }
+//
+//    // Send message
+//    DEBUG_PRINTF("Sending data channel ack message for channel with SID %"PRIu16"\n", *sid);
+//    error = rawrtc_sctp_transport_send(
+//            transport, buffer_out, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
+//    if (error) {
+//    DEBUG_WARNING("Unable to send data channel ack message, reason: %s\n",
+//                  rawrtc_code_to_str(error));
+//    goto out;
+//    }
 }
 
 /*
@@ -661,7 +727,7 @@ static void handle_data_channel_open_message(
     uint_fast16_t priority;
     struct rawrtc_data_transport* data_transport = NULL;
     struct rawrtc_data_channel* channel = NULL;
-    uint16_t* sid = NULL;
+    struct rawrtc_sctp_data_channel_context* context = NULL;
     struct sctp_sndinfo send_info = {0};
     struct mbuf* buffer_out = NULL;
 
@@ -719,8 +785,8 @@ static void handle_data_channel_open_message(
         goto out;
     }
 
-    // Allocate SID to be used as an argument for the data channel handlers
-    error = sid_create(&sid, info->rcv_sid);
+    // Allocate context to be used as an argument for the data channel handlers
+    error = context_create(&context, info->rcv_sid, true);
     if (error) {
         DEBUG_WARNING("Unable to create data channel context, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -732,7 +798,7 @@ static void handle_data_channel_open_message(
     (void) priority;
 
     // Register data channel
-    channel_register(transport, channel, sid, true);
+    channel_register(transport, channel, context, true);
 
     // Create ack message
     buffer_out = NULL;
@@ -743,13 +809,17 @@ static void handle_data_channel_open_message(
         goto out;
     }
 
+    // TODO: Move this into a `send_control_message` section.
+    // TODO: Also add a `send_message` function that sends ordered until a message has been received
+    // see: https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-6
+
     // Set SCTP stream, protocol identifier and flags
-    send_info.snd_sid = *sid;
+    send_info.snd_sid = context->sid;
     send_info.snd_flags = SCTP_EOR;
     send_info.snd_ppid = htonl(RAWRTC_DCEP_PPID_CONTROL);
 
     // Send message
-    DEBUG_PRINTF("Sending data channel ack message for channel with SID %"PRIu16"\n", *sid);
+    DEBUG_PRINTF("Sending data channel ack message for channel with SID %"PRIu16"\n", context->sid);
     error = rawrtc_sctp_transport_send(
             transport, buffer_out, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
     if (error) {
@@ -762,7 +832,7 @@ static void handle_data_channel_open_message(
 
 out:
     mem_deref(buffer_out);
-    mem_deref(sid);
+    mem_deref(context);
     mem_deref(channel);
     mem_deref(data_transport);
     mem_deref(parameters);
@@ -776,6 +846,8 @@ static void handle_dcep_message(
         struct mbuf* const buffer,
         struct sctp_rcvinfo* const info
 ) {
+    // TODO: Check SCTP data channel state (have 'open' message, have 'ack', ...)
+
     // Handle by message type
     // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
     //       messages.
@@ -804,7 +876,8 @@ static void handle_dcep_message(
 static void data_receive_handler(
         struct rawrtc_sctp_transport* const transport,
         struct mbuf* const buffer,
-        struct sctp_rcvinfo* const info
+        struct sctp_rcvinfo* const info,
+        int const flags
 ) {
     // Convert PPID first
     info->rcv_ppid = ntohl(info->rcv_ppid);
@@ -829,8 +902,9 @@ static void data_receive_handler(
             DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_PARTIAL!\n");
             break;
         case RAWRTC_DCEP_PPID_BINARY:
-            // TODO: Implement
             DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY!\n");
+            // TODO: Check if channel is ready for application data
+//            handle_application_message(transport, buffer, info);
             break;
         case RAWRTC_DCEP_PPID_BINARY_EMPTY:
             // TODO: Implement
@@ -930,7 +1004,7 @@ read:
         }
 
         // Pass data to handler
-        data_receive_handler(transport, buffer, &info);
+        data_receive_handler(transport, buffer, &info, recv_flags);
 
 // Note: Label must be here to ensure that the buffer is being free'd
 write:
@@ -1297,23 +1371,25 @@ out:
 }
 
 /*
- * Allocate SID.
+ * Allocate data channel context.
  */
-static enum rawrtc_code sid_create(
-        uint16_t** const sidp, // not checked
-        uint16_t const value
+static enum rawrtc_code context_create(
+        struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
+        uint16_t const sid,
+        bool const can_send_unordered
 ) {
-    // Allocate SID to be used as an argument for the data channel handlers
-    uint16_t* const sid = mem_alloc(sizeof(*sid), NULL);
-    if (!sid) {
+    // Allocate context
+    struct rawrtc_sctp_data_channel_context* const context = mem_alloc(sizeof(*context), NULL);
+    if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
 
-    // Set SID
-    *sid = value;
+    // Set fields
+    context->sid = sid;
+    context->can_send_unordered = can_send_unordered;
 
     // Set pointer & done
-    *sidp = sid;
+    *contextp = context;
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -1323,12 +1399,12 @@ static enum rawrtc_code sid_create(
 static void channel_register(
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel* const channel, // referenced, not checked
-        uint16_t* const sid, // not checked
+        struct rawrtc_sctp_data_channel_context* const context, // referenced, not checked
         bool const raise_event
 ) {
-    // Update channel with SID and reference
-    channel->transport_arg = mem_ref(sid);
-    transport->channels[*sid] = mem_ref(channel);
+    // Update channel with referenced context
+    channel->transport_arg = mem_ref(context);
+    transport->channels[context->sid] = mem_ref(channel);
 
     // Raise data channel event?
     if (raise_event) {
@@ -1351,7 +1427,7 @@ static void channel_register(
  * Create a negotiated SCTP data channel.
  */
 static enum rawrtc_code channel_create_negotiated(
-        uint16_t** const sidp, // de-referenced, not checked
+        struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
@@ -1362,21 +1438,21 @@ static enum rawrtc_code channel_create_negotiated(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Allocate SID to be used as an argument for the data channel handlers
-    return sid_create(sidp, parameters->id);
+    // Allocate context to be used as an argument for the data channel handlers
+    return context_create(contextp, parameters->id, true);
 }
 
 /*
  * Create a SCTP data channel that needs negotiation.
  */
 static enum rawrtc_code channel_create_inband(
-        uint16_t** const sidp, // de-referenced, not checked
+        struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
     enum rawrtc_code error;
     size_t i;
-    uint16_t* sid;
+    struct rawrtc_sctp_data_channel_context* context;
     struct sctp_sndinfo send_info = {0};
     struct mbuf* buffer;
 
@@ -1401,18 +1477,18 @@ static enum rawrtc_code channel_create_inband(
     }
 
     // Find free SID
-    sid = NULL;
+    context = NULL;
     for (i; i < transport->n_channels; i += 2) {
         if (!transport->channels[i]) {
-            // Allocate SID to be used as an argument for the data channel handlers
-            error = sid_create(&sid, (uint16_t) i);
+            // Allocate context to be used as an argument for the data channel handlers
+            error = context_create(&context, (uint16_t) i, false);
             if (error) {
                 return error;
             }
             break;
         }
     }
-    if (!sid) {
+    if (!context) {
         return RAWRTC_CODE_INSUFFICIENT_SPACE;
     }
 
@@ -1424,12 +1500,13 @@ static enum rawrtc_code channel_create_inband(
     }
 
     // Set SCTP stream, protocol identifier and flags
-    send_info.snd_sid = *sid;
+    send_info.snd_sid = context->sid;
     send_info.snd_flags = SCTP_EOR;
     send_info.snd_ppid = htonl(RAWRTC_DCEP_PPID_CONTROL);
 
     // Send message
-    DEBUG_PRINTF("Sending data channel open message for channel with SID %"PRIu16"\n", *sid);
+    DEBUG_PRINTF("Sending data channel open message for channel with SID %"PRIu16"\n",
+                 context->sid);
     error = rawrtc_sctp_transport_send(
             transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
     if (error) {
@@ -1441,10 +1518,10 @@ out:
     mem_deref(buffer);
 
     if (error) {
-        mem_deref(sid);
+        mem_deref(context);
     } else {
         // Set pointer
-        *sidp = sid;
+        *contextp = context;
     }
     return error;
 }
@@ -1459,7 +1536,7 @@ static enum rawrtc_code channel_create_handler(
 ) {
     struct rawrtc_sctp_transport* sctp_transport;
     enum rawrtc_code error;
-    uint16_t* sid = NULL;
+    struct rawrtc_sctp_data_channel_context* context;
 
 
     // Check arguments
@@ -1472,19 +1549,19 @@ static enum rawrtc_code channel_create_handler(
 
     // Create negotiated or in-band data channel
     if (parameters->negotiated) {
-        error = channel_create_negotiated(&sid, sctp_transport, parameters);
+        error = channel_create_negotiated(&context, sctp_transport, parameters);
     } else {
-        error = channel_create_inband(&sid, sctp_transport, parameters);
+        error = channel_create_inband(&context, sctp_transport, parameters);
     }
     if (error) {
         return error;
     }
 
     // Register data channel
-    channel_register(sctp_transport, channel, sid, false);
+    channel_register(sctp_transport, channel, context, false);
 
     // Dereference & done
-    mem_deref(sid);
+    mem_deref(context);
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -1495,19 +1572,19 @@ static enum rawrtc_code channel_close_handler(
         struct rawrtc_data_channel* const channel
 ) {
     struct rawrtc_sctp_transport* transport;
-    uint16_t sid;
+    struct rawrtc_sctp_data_channel_context* context;
 
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get SCTP transport & SID
+    // Get SCTP transport & context
     transport = channel->transport->transport;
-    sid = *((uint16_t*) channel->transport_arg);
+    context = channel->transport_arg;
 
     // Dereference channel and clear pointer
-    transport->channels[sid] = mem_deref(channel);
+    transport->channels[context->sid] = mem_deref(channel);
 
     // TODO: Anything else required here?
 
@@ -1532,12 +1609,13 @@ static enum rawrtc_code channel_send_handler(
     }
 
     // Check size
-    if (transport->remote_maximum_message_size != 0 &&
-            size > transport->remote_maximum_message_size) {
+    if (transport->remote_maximum_message_size != 0
+            && size > transport->remote_maximum_message_size) {
         return RAWRTC_CODE_MESSAGE_TOO_LONG;
     }
 
-    // TODO: Continue here
+    // Send
+    // TODO: CONTINUE HERE
 
     // TODO: Implement
     return RAWRTC_CODE_NOT_IMPLEMENTED;

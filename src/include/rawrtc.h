@@ -40,7 +40,7 @@ enum rawrtc_code {
     RAWRTC_CODE_STILL_IN_USE,
     RAWRTC_CODE_INVALID_MESSAGE,
     RAWRTC_CODE_MESSAGE_TOO_LONG
-}; // Add translations for new return codes in `utils.c`!
+}; // IMPORTANT: Add translations for new return codes in `utils.c`!
 
 /*
  * Certificate private key types.
@@ -170,7 +170,7 @@ enum rawrtc_data_channel_type {
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT = 0x81,
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_TIMED = 0x02,
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED = 0x82
-};
+}; // IMPORTANT: If you add a new type, update `rawrtc_data_channel_reliability_information`
 
 /*
  * SCTP transport state.
@@ -685,6 +685,15 @@ struct rawrtc_sctp_transport {
     FILE* trace_handle;
     struct socket* socket;
     struct rawrtc_data_transport* data_transport; // referenced
+};
+
+/*
+ * SCTP data channel context.
+ * TODO: private
+ */
+struct rawrtc_sctp_data_channel_context {
+    uint16_t sid;
+    bool can_send_unordered;
 };
 
 /*
