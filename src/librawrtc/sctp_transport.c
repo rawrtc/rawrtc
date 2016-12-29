@@ -575,7 +575,7 @@ static void handle_association_change_event(
     // Print debug output for event
     DEBUG_PRINTF("Association change: %H", debug_association_change_event, event);
 
-    // TODO: Handle
+    // Handle state
     switch (event->sac_state) {
         case SCTP_COMM_UP:
             // Connected
@@ -715,6 +715,40 @@ out:
 }
 
 /*
+ * Handle data channel ack message.
+ */
+static void handle_data_channel_ack_message(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_rcvinfo* const info
+) {
+    struct rawrtc_sctp_data_channel_context* context;
+
+    // Get channel and context
+    struct rawrtc_data_channel* const channel = transport->channels[info->rcv_sid];
+    if (!channel) {
+        DEBUG_WARNING("Received ack on an invalid channel with SID %"PRIu16"\n", info->rcv_sid);
+        goto error;
+    }
+    context = channel->transport_arg;
+
+    // TODO: We should probably track the state and close the channel if an ack is being received
+    //       on an already negotiated channel. For now, we only check that the ack is the first
+    //       message received (which is fair enough but may not be 100% correct in the future).
+    if (context->can_send_unordered) {
+        DEBUG_WARNING("Received ack but channel %"PRIu16" is already negotiated\n", info->rcv_sid);
+        goto error;
+    }
+
+    // Messages may now be sent unordered
+    context->can_send_unordered = true;
+    return;
+
+error:
+    // TODO: Reset stream with SID on error
+    return;
+}
+
+/*
  * Handle data channel open message.
  */
 static void handle_data_channel_open_message(
@@ -846,17 +880,15 @@ static void handle_dcep_message(
         struct mbuf* const buffer,
         struct sctp_rcvinfo* const info
 ) {
-    // TODO: Check SCTP data channel state (have 'open' message, have 'ack', ...)
-
     // Handle by message type
     // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
     //       messages.
     uint_fast16_t const message_type = mbuf_read_u8(buffer);
     switch (message_type) {
         case RAWRTC_DCEP_MESSAGE_TYPE_ACK:
-            // Note: Nothing to do as we move channels into waiting/open state directly
             DEBUG_PRINTF("Received data channel ack message for channel with SID %"PRIu16"\n",
                          info->rcv_sid);
+            handle_data_channel_ack_message(transport, info);
             break;
         case RAWRTC_DCEP_MESSAGE_TYPE_OPEN:
             DEBUG_PRINTF("Received data channel open message for channel with SID %"PRIu16"\n",
@@ -1439,7 +1471,7 @@ static enum rawrtc_code channel_create_negotiated(
     }
 
     // Allocate context to be used as an argument for the data channel handlers
-    return context_create(contextp, parameters->id, true);
+    return context_create(contextp, parameters->id, false);
 }
 
 /*
