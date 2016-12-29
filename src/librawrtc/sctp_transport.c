@@ -873,13 +873,86 @@ out:
 }
 
 /*
+ * Handle incoming application data messages.
+ */
+static void handle_application_message(
+        struct rawrtc_sctp_transport* const transport, // not checked
+        struct mbuf* const buffer, // not checked
+        struct sctp_rcvinfo* const info, // not checked
+        int const flags
+) {
+    struct rawrtc_sctp_data_channel_context* context;
+
+    // Get channel and context
+    struct rawrtc_data_channel* const channel = transport->channels[info->rcv_sid];
+    if (!channel) {
+        DEBUG_WARNING("Received application message on an invalid channel with SID %"PRIu16"\n",
+                      info->rcv_sid);
+        goto error;
+    }
+    context = channel->transport_arg;
+
+    // Messages may now be sent unordered
+    // TODO: Should we update this flag before or after the message has been received completely
+    //       (EOR)?
+    context->can_send_unordered = true;
+
+    // TODO: We need to buffer until EOR here as well (flags & MSG_EOR) but only for non-streaming
+    //       API
+    // TODO: Continue here once we know how EOR works in detail
+    DEBUG_WARNING("TODO: handle_application_message - BUFFER UNTIL EOR\n");
+
+    switch (info->rcv_ppid) {
+        case RAWRTC_DCEP_PPID_UTF16:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16!\n");
+            break;
+        case RAWRTC_DCEP_PPID_UTF16_EMPTY:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_EMPTY!\n");
+            break;
+        case RAWRTC_DCEP_PPID_UTF16_PARTIAL: // deprecated
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_PARTIAL!\n");
+            break;
+        case RAWRTC_DCEP_PPID_BINARY:
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY!\n");
+            break;
+        case RAWRTC_DCEP_PPID_BINARY_EMPTY:
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_EMPTY!\n");
+            break;
+        case RAWRTC_DCEP_PPID_BINARY_PARTIAL: // deprecated
+            // TODO: Implement
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_PARTIAL!\n");
+            break;
+        default:
+            DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu16"\n",
+                          info->rcv_ppid);
+            break;
+    }
+
+    // Done
+    return;
+
+error:
+    // TODO: Reset stream with SID on error
+    return;
+}
+
+/*
  * Handle incoming DCEP control message.
  */
 static void handle_dcep_message(
-        struct rawrtc_sctp_transport* const transport,
-        struct mbuf* const buffer,
-        struct sctp_rcvinfo* const info
+        struct rawrtc_sctp_transport* const transport, // not checked
+        struct mbuf* const buffer, // not checked
+        struct sctp_rcvinfo* const info, // not checked
+        int const flags
 ) {
+    // TODO: We need to buffer until EOR here as well (flags & MSG_EOR)
+    DEBUG_WARNING("TODO: handle_dcep_message - BUFFER UNTIL EOR\n");
+    // TODO: Continue here once we know how EOR works in detail
+
     // Handle by message type
     // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
     //       messages.
@@ -917,39 +990,10 @@ static void data_receive_handler(
                  info->rcv_sid, info->rcv_ppid);
 
     // Handle by PPID
-    switch (info->rcv_ppid) {
-        case RAWRTC_DCEP_PPID_CONTROL:
-            handle_dcep_message(transport, buffer, info);
-            break;
-        case RAWRTC_DCEP_PPID_UTF16:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16!\n");
-            break;
-        case RAWRTC_DCEP_PPID_UTF16_EMPTY:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_EMPTY!\n");
-            break;
-        case RAWRTC_DCEP_PPID_UTF16_PARTIAL: // deprecated
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_PARTIAL!\n");
-            break;
-        case RAWRTC_DCEP_PPID_BINARY:
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY!\n");
-            // TODO: Check if channel is ready for application data
-//            handle_application_message(transport, buffer, info);
-            break;
-        case RAWRTC_DCEP_PPID_BINARY_EMPTY:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_EMPTY!\n");
-            break;
-        case RAWRTC_DCEP_PPID_BINARY_PARTIAL: // deprecated
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_PARTIAL!\n");
-            break;
-        default:
-            DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu16"\n",
-                          info->rcv_ppid);
-            break;
+    if (info->rcv_ppid == RAWRTC_DCEP_PPID_CONTROL) {
+        handle_dcep_message(transport, buffer, info, flags);
+    } else {
+        handle_application_message(transport, buffer, info, flags);
     }
 }
 
