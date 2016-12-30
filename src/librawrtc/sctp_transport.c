@@ -831,9 +831,6 @@ static void handle_data_channel_open_message(
     //       see https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.4
     (void) priority;
 
-    // Register data channel
-    channel_register(transport, channel, context, true);
-
     // Create ack message
     buffer_out = NULL;
     error = data_channel_ack_message_create(&buffer_out);
@@ -851,6 +848,9 @@ static void handle_data_channel_open_message(
                       rawrtc_code_to_str(error));
         goto out;
     }
+
+    // Register data channel
+    channel_register(transport, channel, context, true);
 
     // TODO: Reset stream with SID on error
 
