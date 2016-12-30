@@ -161,6 +161,13 @@ enum rawrtc_dtls_transport_state {
 };
 
 /*
+ * Data channel is unordered bit flag.
+ */
+enum {
+    RAWRTC_DATA_CHANNEL_TYPE_IS_UNORDERED = 0x80
+};
+
+/*
  * Data channel types.
  */
 enum rawrtc_data_channel_type {
@@ -170,7 +177,9 @@ enum rawrtc_data_channel_type {
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT = 0x81,
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_TIMED = 0x02,
     RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED = 0x82
-}; // IMPORTANT: If you add a new type, update `rawrtc_data_channel_reliability_information`
+}; // IMPORTANT: If you add a new type, ensure that every data channel transport handles it
+   //            correctly! Also, ensure this still works with the unordered bit flag above or
+   //            update the implementations.
 
 /*
  * SCTP transport state.
@@ -405,13 +414,12 @@ typedef enum rawrtc_code (rawrtc_data_transport_channel_close_handler)(
 
 /*
  * Send data via the data channel (transport handler).
- * TODO: Add binary/string flag
  * TODO: private -> data_transport.h
  */
 typedef enum rawrtc_code (rawrtc_data_transport_channel_send_handler)(
     struct rawrtc_data_channel* const channel,
-    uint8_t const * const data, // nullable (if size 0), copied
-    uint32_t const size
+    struct mbuf* const buffer, // nullable (if size 0), referenced
+    bool const is_binary
 );
 
 
@@ -1363,12 +1371,11 @@ enum rawrtc_code rawrtc_data_channel_close(
 
 /*
  * Send data via the data channel.
- * TODO: Add binary/string flag
  */
 enum rawrtc_code rawrtc_data_channel_send(
     struct rawrtc_data_channel* const channel,
-    uint8_t const * const data,
-    uint32_t const size
+    struct mbuf* const buffer, // nullable (if empty message), referenced
+    bool const is_binary
 );
 
 /*

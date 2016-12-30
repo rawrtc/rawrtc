@@ -26,9 +26,3 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
     void* const arg, // nullable
     bool const call_handler
 );
-
-enum rawrtc_code rawrtc_data_channel_get_reliability_information(
-    bool* const retransmitp, // de-referenced
-    bool* const timedp, // de-referenced
-    struct rawrtc_data_channel* const channel
-);

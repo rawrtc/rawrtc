@@ -153,7 +153,7 @@ static void sctp_transport_state_change_handler(
         // Set SCTP stream, protocol identifier and flags
         spa.sendv_sndinfo.snd_sid = 0;
         spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-        spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_DCEP_PPID_CONTROL);
+        spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
         spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
 
         // Send message

@@ -240,7 +240,23 @@ static void data_channel_open_handler(
 ) {
     struct data_channel* const channel = arg;
     struct client* const client = channel->client;
+    struct mbuf* buffer;
+    enum rawrtc_code error;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
+
+    // Compose meowing message
+    buffer = mbuf_alloc(1024);
+    mbuf_printf(buffer, "Hello! Sending this message on channel: %s", channel->label);
+    mbuf_set_pos(buffer, 0);
+
+    // Send message
+    DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
+                 mbuf_get_left(buffer));
+    error = rawrtc_data_channel_send(channel->channel, buffer, true);
+    if (error) {
+        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+    }
+    mem_deref(buffer);
 }
 
 static void data_channel_buffered_amount_low_handler(

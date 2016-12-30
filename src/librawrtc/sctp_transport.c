@@ -338,64 +338,65 @@ out:
  * TODO: Add EOR marking and some kind of an id (does ndata provide that?)
  */
 static enum rawrtc_code send_message(
-        struct rawrtc_sctp_transport* const transport,
-        struct rawrtc_data_channel* const channel,
-        struct mbuf* buffer,
-        uint16_t const ppid
+        struct rawrtc_sctp_transport* const transport, // not checked
+        struct rawrtc_data_channel* const channel, // nullable (if DCEP message)
+        struct rawrtc_sctp_data_channel_context* const context, // not checked
+        struct mbuf* const buffer, // not checked
+        uint_fast32_t const ppid
 ) {
     struct sctp_sendv_spa spa = {0};
     enum rawrtc_code error;
 
-    // Get context
-    struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+    // Set stream identifier, protocol identifier and flags
+    spa.sendv_sndinfo.snd_sid = context->sid;
+    spa.sendv_sndinfo.snd_flags = SCTP_EOR; // TODO: Update signature
+    spa.sendv_sndinfo.snd_ppid = htonl((uint32_t) ppid);
+    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
 
-    //    spa.sendv_sndinfo.snd_sid = 1;
-//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
-//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-//
-//    spa.sendv_sndinfo.snd_sid = channel->sid;
-//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-//    if ((channel->state == DATA_CHANNEL_OPEN) && (channel->unordered)) {
-//        spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
-//    }
-//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
-//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-//    if (channel->pr_policy == SCTP_PR_SCTP_TTL || channel->pr_policy == SCTP_PR_SCTP_RTX) {
-//        spa.sendv_prinfo.pr_policy = channel->pr_policy;
-//        spa.sendv_prinfo.pr_value = channel->pr_value;
-//        spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
-//    }
+    // Set ordered/unordered and partial reliability policy
+    if (ppid != RAWRTC_SCTP_TRANSPORT_PPID_DCEP) {
+        // Check channel
+        if (!channel) {
+            return RAWRTC_CODE_INVALID_ARGUMENT;
+        }
 
-//    // Set stream identifier, protocol identifier and flags
-//    spa.sendv_sndinfo.snd_sid = context->sid;
-//    spa.sendv_sndinfo.snd_flags = SCTP_EOR; // TODO: Update signature
-//    spa.sendv_sndinfo.snd_ppid = htonl(ppid);
-//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-//
-//    // Set partial reliability info
-//    if (ppid != RAWRTC_DCEP_PPID_CONTROL) {
-//        bool retransmit;
-//        bool timed;
-//
-//        // Get reliability info
-//        error = rawrtc_data_channel_get_reliability_information(&retransmit, &timed, channel);
-//        if (error) {
-//            return error;
-//        }
-//
-//        //
-//    }
-//
-//    // Send message
-//    DEBUG_PRINTF("Sending data channel ack message for channel with SID %"PRIu16"\n", *sid);
-//    error = rawrtc_sctp_transport_send(
-//            transport, buffer_out, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
-//    if (error) {
-//    DEBUG_WARNING("Unable to send data channel ack message, reason: %s\n",
-//                  rawrtc_code_to_str(error));
-//    goto out;
-//    }
+        // Unordered?
+        if (channel->parameters->channel_type & RAWRTC_DATA_CHANNEL_TYPE_IS_UNORDERED &&
+                context->can_send_unordered) {
+            spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
+        }
+
+        // Partial reliability policy
+        switch (ppid) {
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_RETRANSMIT:
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_RETRANSMIT:
+                // Set amount of retransmissions
+                spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_RTX;
+                spa.sendv_prinfo.pr_value = channel->parameters->reliability_parameter;
+                spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_ORDERED_TIMED:
+            case RAWRTC_DATA_CHANNEL_TYPE_UNRELIABLE_UNORDERED_TIMED:
+                // Set TTL
+                spa.sendv_prinfo.pr_policy = SCTP_PR_SCTP_TTL;
+                spa.sendv_prinfo.pr_value = channel->parameters->reliability_parameter;
+                spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
+            default:
+                // Nothing to do
+                break;
+        }
+    }
+
+    // Send message
+    DEBUG_PRINTF("Sending message with SID %"PRIu16", PPID: %"PRIu32"\n", context->sid, ppid);
+    error = rawrtc_sctp_transport_send(
+            transport, buffer, &spa, sizeof(spa), SCTP_SENDV_SPA, 0);
+    if (error) {
+        DEBUG_WARNING("Unable to send message, reason: %s\n", rawrtc_code_to_str(error));
+        return error;
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -762,7 +763,6 @@ static void handle_data_channel_open_message(
     struct rawrtc_data_transport* data_transport = NULL;
     struct rawrtc_data_channel* channel = NULL;
     struct rawrtc_sctp_data_channel_context* context = NULL;
-    struct sctp_sndinfo send_info = {0};
     struct mbuf* buffer_out = NULL;
 
     // Check SID corresponds to other peer's role
@@ -843,19 +843,9 @@ static void handle_data_channel_open_message(
         goto out;
     }
 
-    // TODO: Move this into a `send_control_message` section.
-    // TODO: Also add a `send_message` function that sends ordered until a message has been received
-    // see: https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09#section-6
-
-    // Set SCTP stream, protocol identifier and flags
-    send_info.snd_sid = context->sid;
-    send_info.snd_flags = SCTP_EOR;
-    send_info.snd_ppid = htonl(RAWRTC_DCEP_PPID_CONTROL);
-
     // Send message
     DEBUG_PRINTF("Sending data channel ack message for channel with SID %"PRIu16"\n", context->sid);
-    error = rawrtc_sctp_transport_send(
-            transport, buffer_out, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
+    error = send_message(transport, NULL, context, buffer_out, RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
     if (error) {
         DEBUG_WARNING("Unable to send data channel ack message, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -901,33 +891,34 @@ static void handle_application_message(
     //       API
     // TODO: Continue here once we know how EOR works in detail
     DEBUG_WARNING("TODO: handle_application_message - BUFFER UNTIL EOR\n");
+    DEBUG_WARNING("MESSAGE: %b\n", mbuf_buf(buffer), mbuf_get_left(buffer));
 
     switch (info->rcv_ppid) {
-        case RAWRTC_DCEP_PPID_UTF16:
+        case RAWRTC_SCTP_TRANSPORT_PPID_UTF16:
             // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16!\n");
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16!\n");
             break;
-        case RAWRTC_DCEP_PPID_UTF16_EMPTY:
+        case RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY:
             // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_EMPTY!\n");
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY!\n");
             break;
-        case RAWRTC_DCEP_PPID_UTF16_PARTIAL: // deprecated
+        case RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL: // deprecated
             // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_UTF16_PARTIAL!\n");
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL!\n");
             break;
-        case RAWRTC_DCEP_PPID_BINARY:
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY!\n");
+        case RAWRTC_SCTP_TRANSPORT_PPID_BINARY:
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY!\n");
             break;
-        case RAWRTC_DCEP_PPID_BINARY_EMPTY:
+        case RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY:
             // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_EMPTY!\n");
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY!\n");
             break;
-        case RAWRTC_DCEP_PPID_BINARY_PARTIAL: // deprecated
+        case RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL: // deprecated
             // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_DCEP_PPID_BINARY_PARTIAL!\n");
+            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL!\n");
             break;
         default:
-            DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu16"\n",
+            DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu32"\n",
                           info->rcv_ppid);
             break;
     }
@@ -990,7 +981,7 @@ static void data_receive_handler(
                  info->rcv_sid, info->rcv_ppid);
 
     // Handle by PPID
-    if (info->rcv_ppid == RAWRTC_DCEP_PPID_CONTROL) {
+    if (info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_DCEP) {
         handle_dcep_message(transport, buffer, info, flags);
     } else {
         handle_application_message(transport, buffer, info, flags);
@@ -1377,7 +1368,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     if (usrsctp_setsockopt(
             transport->socket, IPPROTO_SCTP, SCTP_RECVRCVINFO,
             &option_value, sizeof(option_value))) {
-        DEBUG_WARNING("Could not set socket option, reason: %m\n", errno);
+        DEBUG_WARNING("Could not set info option, reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
     }
@@ -1399,6 +1390,16 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
                            &av.assoc_value, sizeof(av.assoc_value))) {
         DEBUG_WARNING("Could not set no-delay, reason: %m\n", errno);
+        error = rawrtc_error_to_code(errno);
+        goto out;
+    }
+
+    // Set explicit EOR
+    option_value = 1;
+    if (usrsctp_setsockopt(
+            transport->socket, IPPROTO_SCTP, SCTP_EXPLICIT_EOR,
+            &option_value, sizeof(option_value))) {
+        DEBUG_WARNING("Could not enable explicit EOR, reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
     }
@@ -1515,7 +1516,8 @@ static enum rawrtc_code channel_create_negotiated(
     }
 
     // Allocate context to be used as an argument for the data channel handlers
-    return context_create(contextp, parameters->id, false);
+    // TODO: Is it okay to already allow sending unordered messages here? Assuming: Yes.
+    return context_create(contextp, parameters->id, true);
 }
 
 /*
@@ -1523,13 +1525,13 @@ static enum rawrtc_code channel_create_negotiated(
  */
 static enum rawrtc_code channel_create_inband(
         struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
+        struct rawrtc_data_channel* const channel, // not checked
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
     enum rawrtc_code error;
     size_t i;
     struct rawrtc_sctp_data_channel_context* context;
-    struct sctp_sndinfo send_info = {0};
     struct mbuf* buffer;
 
     // Check DTLS state
@@ -1575,16 +1577,10 @@ static enum rawrtc_code channel_create_inband(
         goto out;
     }
 
-    // Set SCTP stream, protocol identifier and flags
-    send_info.snd_sid = context->sid;
-    send_info.snd_flags = SCTP_EOR;
-    send_info.snd_ppid = htonl(RAWRTC_DCEP_PPID_CONTROL);
-
     // Send message
     DEBUG_PRINTF("Sending data channel open message for channel with SID %"PRIu16"\n",
                  context->sid);
-    error = rawrtc_sctp_transport_send(
-            transport, buffer, &send_info, sizeof(send_info), SCTP_SENDV_SNDINFO, 0);
+    error = send_message(transport, NULL, context, buffer, RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
     if (error) {
         goto out;
     }
@@ -1627,7 +1623,7 @@ static enum rawrtc_code channel_create_handler(
     if (parameters->negotiated) {
         error = channel_create_negotiated(&context, sctp_transport, parameters);
     } else {
-        error = channel_create_inband(&context, sctp_transport, parameters);
+        error = channel_create_inband(&context, channel, sctp_transport, parameters);
     }
     if (error) {
         return error;
@@ -1670,31 +1666,73 @@ static enum rawrtc_code channel_close_handler(
 
 /*
  * Send data via the data channel (transport handler).
- * TODO: Add binary/string flag
  */
 static enum rawrtc_code channel_send_handler(
         struct rawrtc_data_channel* const channel,
-        uint8_t const * const data, // nullable (if size 0), copied
-        uint32_t const size
+        struct mbuf* const buffer, // nullable (if size 0), referenced
+        bool const is_binary
 ) {
-    struct rawrtc_sctp_transport* const transport = channel->transport->transport;
+    struct rawrtc_sctp_transport* transport;
+    uint_fast32_t ppid;
+    struct mbuf* buffer_empty = NULL;
+    enum rawrtc_code error;
 
     // Check arguments
-    if (!channel || (!data && size > 0)) {
+    if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check size
-    if (transport->remote_maximum_message_size != 0
-            && size > transport->remote_maximum_message_size) {
-        return RAWRTC_CODE_MESSAGE_TOO_LONG;
+    // Get SCTP transport
+    transport = channel->transport->transport;
+
+    // Empty message?
+    if (!buffer) {
+        // Set PPID
+        if (is_binary) {
+            ppid = RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY;
+        } else {
+            ppid = RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY;
+        }
+
+        // Create helper message as SCTP is unable to send messages of size 0
+        buffer_empty = mbuf_alloc(RAWRTC_SCTP_TRANSPORT_EMPTY_MESSAGE_SIZE);
+        if (!buffer_empty) {
+            return RAWRTC_CODE_NO_MEMORY;
+        }
+
+        // Note: The content is being ignored
+        error = rawrtc_error_to_code(mbuf_write_u8(buffer_empty, 0));
+        if (error) {
+            goto out;
+        }
+    } else {
+        // Check size
+        if (transport->remote_maximum_message_size != 0 &&
+            mbuf_get_left(buffer) > transport->remote_maximum_message_size) {
+            return RAWRTC_CODE_MESSAGE_TOO_LONG;
+        }
+
+        // Set PPID
+        // Note: We will not use the deprecated fragmentation & reassembly
+        if (is_binary) {
+            ppid = RAWRTC_SCTP_TRANSPORT_PPID_BINARY;
+        } else {
+            ppid = RAWRTC_SCTP_TRANSPORT_PPID_UTF16;
+        }
     }
 
     // Send
-    // TODO: CONTINUE HERE
+    error = send_message(transport, channel, channel->transport_arg, buffer, ppid);
+    if (error) {
+        goto out;
+    }
 
-    // TODO: Implement
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
+out:
+    // Dereference
+    mem_deref(buffer_empty);
+
+    // Done
+    return error;
 }
 
 /*
@@ -1834,26 +1872,6 @@ enum rawrtc_code rawrtc_sctp_transport_send(
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
-
-    // TODO: Move to DCEP
-    // Set SCTP stream, protocol identifier, flags, partial reliability, ...
-//    spa.sendv_sndinfo.snd_sid = 1;
-//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
-//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-//
-//    spa.sendv_sndinfo.snd_sid = channel->sid;
-//    spa.sendv_sndinfo.snd_flags = SCTP_EOR;
-//    if ((channel->state == DATA_CHANNEL_OPEN) && (channel->unordered)) {
-//        spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
-//    }
-//    spa.sendv_sndinfo.snd_ppid = htonl(RAWRTC_SCTP_TRANSPORT_PPID_DCEP);
-//    spa.sendv_flags = SCTP_SEND_SNDINFO_VALID;
-//    if (channel->pr_policy == SCTP_PR_SCTP_TTL || channel->pr_policy == SCTP_PR_SCTP_RTX) {
-//        spa.sendv_prinfo.pr_policy = channel->pr_policy;
-//        spa.sendv_prinfo.pr_value = channel->pr_value;
-//        spa.sendv_flags |= SCTP_SEND_PRINFO_VALID;
-//    }
 
     // Send directly if connected
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
