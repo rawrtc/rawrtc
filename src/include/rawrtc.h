@@ -365,8 +365,7 @@ typedef void (rawrtc_data_channel_close_handler)(
  * TODO: ORTC is really unclear about that handler. Consider improving it with a PR.
  */
 typedef void (rawrtc_data_channel_message_handler)(
-    uint8_t const * const data, // read-only
-    uint32_t const size,
+    struct mbuf* const buffer,
     void* const arg
 );
 

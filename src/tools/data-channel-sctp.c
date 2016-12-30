@@ -32,8 +32,7 @@ static void data_channel_close_handler(
 );
 
 static void data_channel_message_handler(
-    uint8_t const * const data, // read-only
-    uint32_t const size,
+    struct mbuf* const buffer,
     void* const arg
 );
 
@@ -284,14 +283,13 @@ static void data_channel_close_handler(
 }
 
 static void data_channel_message_handler(
-        uint8_t const * const data, // read-only
-        uint32_t const size,
+        struct mbuf* const buffer,
         void* const arg
 ) {
     struct data_channel* const channel = arg;
     struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",
-                 client->name, channel->label, size);
+                 client->name, channel->label, mbuf_get_left(buffer));
 }
 
 static void signal_handler(
