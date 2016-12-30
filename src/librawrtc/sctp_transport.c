@@ -887,11 +887,14 @@ static void handle_application_message(
     //       (EOR)?
     context->can_send_unordered = true;
 
-    // TODO: We need to buffer until EOR here as well (flags & MSG_EOR) but only for non-streaming
-    //       API
-    // TODO: Continue here once we know how EOR works in detail
-    DEBUG_WARNING("TODO: handle_application_message - BUFFER UNTIL EOR\n");
-    DEBUG_WARNING("MESSAGE: %b\n", mbuf_buf(buffer), mbuf_get_left(buffer));
+    // Need to buffer?
+    if (!channel->options->deliver_partially && !(flags & MSG_EOR)) {
+        // TODO: We need to buffer until EOR here as well (flags & MSG_EOR) but only for non-streaming
+        //       API
+        // TODO: Continue here once we know how EOR works in detail
+        DEBUG_WARNING("TODO: handle_application_message - BUFFER UNTIL EOR\n");
+        DEBUG_WARNING("MESSAGE: %b\n", mbuf_buf(buffer), mbuf_get_left(buffer));
+    }
 
     switch (info->rcv_ppid) {
         case RAWRTC_SCTP_TRANSPORT_PPID_UTF16:
@@ -940,9 +943,11 @@ static void handle_dcep_message(
         struct sctp_rcvinfo* const info, // not checked
         int const flags
 ) {
-    // TODO: We need to buffer until EOR here as well (flags & MSG_EOR)
-    DEBUG_WARNING("TODO: handle_dcep_message - BUFFER UNTIL EOR\n");
-    // TODO: Continue here once we know how EOR works in detail
+    if (!(flags & MSG_EOR)) {
+        // TODO: We need to buffer until EOR here as well (flags & MSG_EOR)
+        DEBUG_WARNING("TODO: handle_dcep_message - BUFFER UNTIL EOR\n");
+        // TODO: Continue here once we know how EOR works in detail
+    }
 
     // Handle by message type
     // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
@@ -1502,6 +1507,7 @@ static void channel_register(
             if (error) {
                 DEBUG_WARNING("Unable to late-apply options, reason: %s\n",
                               rawrtc_code_to_str(error));
+                // TODO: What now? Close?
             }
         }
     }
