@@ -366,6 +366,7 @@ typedef void (rawrtc_data_channel_close_handler)(
  */
 typedef void (rawrtc_data_channel_message_handler)(
     struct mbuf* const buffer,
+    bool const is_binary,
     void* const arg
 );
 

@@ -33,6 +33,7 @@ static void data_channel_close_handler(
 
 static void data_channel_message_handler(
     struct mbuf* const buffer,
+    bool const is_binary,
     void* const arg
 );
 
@@ -284,6 +285,7 @@ static void data_channel_close_handler(
 
 static void data_channel_message_handler(
         struct mbuf* const buffer,
+        bool const is_binary,
         void* const arg
 ) {
     struct data_channel* const channel = arg;
