@@ -182,6 +182,15 @@ enum rawrtc_data_channel_type {
    //            update the implementations.
 
 /*
+ * Data channel message flags.
+ */
+enum rawrtc_data_channel_message_flag {
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE = 0,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 1,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 2,
+};
+
+/*
  * SCTP transport state.
  */
 enum rawrtc_sctp_transport_state {
@@ -361,26 +370,22 @@ typedef void (rawrtc_data_channel_close_handler)(
 
 /*
  * Data channel message handler.
- * TODO: Add binary/string flag
  * TODO: ORTC is really unclear about that handler. Consider improving it with a PR.
  */
 typedef void (rawrtc_data_channel_message_handler)(
     struct mbuf* const buffer,
-    bool const is_binary,
+    enum rawrtc_data_channel_message_flag const flags,
     void* const arg
 );
 
 /*
- * Data channel streaming message handler.
- */
-typedef void (rawrtc_data_channel_streaming_message_handler)(
-    // TODO: Specify streaming API handler
-);
-
-/*
  * Data channel handler.
+ *
+ * You can return a data channel options instance you want to apply on
+ * the new channel. Return `NULL` in case you want to apply the default
+ * options.
  */
-typedef void (rawrtc_data_channel_handler)(
+typedef struct rawrtc_data_channel_options* (rawrtc_data_channel_handler)(
     struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
     void* const arg
 );
@@ -667,6 +672,14 @@ struct rawrtc_data_channel_parameters {
 };
 
 /*
+ * Data channel options.
+ * TODO: private
+ */
+struct rawrtc_data_channel_options {
+    bool deliver_partially;
+};
+
+/*
  * SCTP capabilities.
  * TODO: private
  */
@@ -713,6 +726,7 @@ struct rawrtc_data_channel {
     struct rawrtc_data_transport* transport; // referenced
     void* transport_arg; // referenced
     struct rawrtc_data_channel_parameters* parameters; // referenced
+    struct rawrtc_data_channel_options* options; // nullable, referenced
     rawrtc_data_channel_open_handler* open_handler; // nullable
     rawrtc_data_channel_buffered_amount_low_handler* buffered_amount_low_handler; // nullable
     rawrtc_data_channel_error_handler* error_handler; // nullable
@@ -1348,12 +1362,26 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
  */
 
 /*
+ * Create data channel options.
+ *
+ * - `deliver_partially`: Enable this if you want to receive partial
+ *   messages. Disable if messages should arrive complete. If enabled,
+ *   message chunks will be delivered until the message is complete.
+ *   Other messages' chunks WILL NOT be interleaved on the same channel.
+ */
+enum rawrtc_code rawrtc_data_channel_options_create(
+    struct rawrtc_data_channel_options** const optionsp, // de-referenced
+    bool const deliver_partially
+);
+
+/*
  * Create a data channel.
  */
 enum rawrtc_code rawrtc_data_channel_create(
     struct rawrtc_data_channel** const channelp, // de-referenced
     struct rawrtc_data_transport* const transport, // referenced
     struct rawrtc_data_channel_parameters* const parameters, // referenced
+    struct rawrtc_data_channel_options* const options, // nullable, referenced
     rawrtc_data_channel_open_handler* const open_handler, // nullable
     rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
     rawrtc_data_channel_error_handler* const error_handler, // nullable

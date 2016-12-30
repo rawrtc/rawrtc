@@ -10,7 +10,7 @@
 
 struct data_channel;
 
-static void data_channel_handler(
+static struct rawrtc_data_channel_options* data_channel_handler(
     struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
     void* const arg
 );
@@ -33,7 +33,7 @@ static void data_channel_close_handler(
 
 static void data_channel_message_handler(
     struct mbuf* const buffer,
-    bool const is_binary,
+    enum rawrtc_data_channel_message_flag const flags,
     void* const arg
 );
 
@@ -198,7 +198,8 @@ static void dtls_transport_state_change_handler(
 
             // Create pre-negotiated data channel
             EOE(rawrtc_data_channel_create(
-                    &client->data_channel->channel, client->data_transport, channel_parameters,
+                    &client->data_channel->channel, client->data_transport,
+                    channel_parameters, NULL,
                     data_channel_open_handler, data_channel_buffered_amount_low_handler,
                     data_channel_error_handler, data_channel_close_handler,
                     data_channel_message_handler, client->data_channel));
@@ -227,12 +228,13 @@ static void sctp_transport_state_change_handler(
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
 }
 
-static void data_channel_handler(
+static struct rawrtc_data_channel_options* data_channel_handler(
         struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_INFO("(%s) New data channel instance\n", client->name);
+    return NULL; // Use default options
 }
 
 static void data_channel_open_handler(
@@ -285,7 +287,7 @@ static void data_channel_close_handler(
 
 static void data_channel_message_handler(
         struct mbuf* const buffer,
-        bool const is_binary,
+        enum rawrtc_data_channel_message_flag const flags,
         void* const arg
 ) {
     struct data_channel* const channel = arg;
@@ -353,7 +355,8 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_data_channel_create(
-            &local->data_channel_negotiated->channel, local->data_transport, channel_parameters,
+            &local->data_channel_negotiated->channel, local->data_transport,
+            channel_parameters, NULL,
             data_channel_open_handler, data_channel_buffered_amount_low_handler,
             data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
             local->data_channel_negotiated));

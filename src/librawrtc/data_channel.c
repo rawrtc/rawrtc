@@ -1,4 +1,5 @@
 #include <rawrtc.h>
+#include "utils.h"
 #include "data_transport.h"
 
 #define DEBUG_MODULE "data-channel"
@@ -72,6 +73,47 @@ static void rawrtc_data_channel_destroy(
     mem_deref(channel->transport);
     mem_deref(channel->transport_arg);
     mem_deref(channel->parameters);
+
+    // Dereference options
+    if (channel->options != &rawrtc_default_data_channel_options) {
+        mem_deref(channel->options);
+    }
+}
+
+/*
+ * Set options on a data channel (internal).
+ *
+ * Warning: The caller MUST ensure that this function is being used
+ * before any messages is being received on the data channel!
+ */
+enum rawrtc_code rawrtc_data_channel_set_options(
+        struct rawrtc_data_channel* const channel,
+        struct rawrtc_data_channel_options* options // nullable, referenced
+) {
+    // Check arguments
+    if (!channel) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Default options
+    if (!options) {
+        options = &rawrtc_default_data_channel_options;
+    }
+
+    // Clear previos options
+    if (channel->options && channel->options != &rawrtc_default_data_channel_options) {
+        mem_deref(channel->options);
+    }
+
+    // Set options
+    if (options == &rawrtc_default_data_channel_options) {
+        channel->options = options;
+    } else {
+        channel->options = mem_ref(options);
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -81,6 +123,7 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
         struct rawrtc_data_channel** const channelp, // de-referenced
         struct rawrtc_data_transport* const transport, // referenced
         struct rawrtc_data_channel_parameters* const parameters, // referenced
+        struct rawrtc_data_channel_options* options, // nullable, referenced
         rawrtc_data_channel_open_handler* const open_handler, // nullable
         rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
         rawrtc_data_channel_error_handler* const error_handler, // nullable
@@ -113,6 +156,12 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
     channel->close_handler = close_handler;
     channel->message_handler = message_handler;
     channel->arg = arg;
+
+    // Set options
+    error = rawrtc_data_channel_set_options(channel, options);
+    if (error) {
+        goto out;
+    }
 
     // Create data channel on transport
     if (call_handler) {
@@ -149,6 +198,7 @@ enum rawrtc_code rawrtc_data_channel_create(
         struct rawrtc_data_channel** const channelp, // de-referenced
         struct rawrtc_data_transport* const transport, // referenced
         struct rawrtc_data_channel_parameters* const parameters, // referenced
+        struct rawrtc_data_channel_options* const options, // nullable, referenced
         rawrtc_data_channel_open_handler* const open_handler, // nullable
         rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
         rawrtc_data_channel_error_handler* const error_handler, // nullable
@@ -157,7 +207,7 @@ enum rawrtc_code rawrtc_data_channel_create(
         void* const arg // nullable
 ) {
     return rawrtc_data_channel_create_internal(
-            channelp, transport, parameters,
+            channelp, transport, parameters, options,
             open_handler, buffered_amount_low_handler,
             error_handler, close_handler, message_handler,
             arg, true);

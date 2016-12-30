@@ -168,12 +168,13 @@ static void sctp_transport_state_change_handler(
     }
 }
 
-static void data_channel_handler(
+static struct rawrtc_data_channel_options* data_channel_handler(
         struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
         void* const arg
 ) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) New data channel instance\n", client->name);
+    return NULL; // Use default options
 }
 
 static void signal_handler(

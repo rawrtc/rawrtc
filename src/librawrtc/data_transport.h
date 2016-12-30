@@ -14,10 +14,16 @@ enum rawrtc_code rawrtc_data_transport_create(
     rawrtc_data_transport_channel_send_handler* const channel_send_handler
 );
 
+enum rawrtc_code rawrtc_data_channel_set_options(
+    struct rawrtc_data_channel* const channel,
+    struct rawrtc_data_channel_options* options // nullable, referenced
+);
+
 enum rawrtc_code rawrtc_data_channel_create_internal(
     struct rawrtc_data_channel** const channelp, // de-referenced
     struct rawrtc_data_transport* const transport, // referenced
     struct rawrtc_data_channel_parameters* const parameters, // referenced
+    struct rawrtc_data_channel_options* options, // nullable, referenced
     rawrtc_data_channel_open_handler* const open_handler, // nullable
     rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
     rawrtc_data_channel_error_handler* const error_handler, // nullable

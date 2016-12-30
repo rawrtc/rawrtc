@@ -31,6 +31,13 @@ struct rawrtc_certificate_options rawrtc_default_certificate_options = {
 };
 
 /*
+ * Default data channel options.
+ */
+struct rawrtc_data_channel_options rawrtc_default_data_channel_options = {
+        .deliver_partially = false
+};
+
+/*
  * Translate a rawrtc return code to a string.
  */
 char const* rawrtc_code_to_str(

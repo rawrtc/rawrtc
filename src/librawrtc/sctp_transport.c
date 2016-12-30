@@ -811,7 +811,7 @@ static void handle_data_channel_open_message(
 
     // Create data channel
     error = rawrtc_data_channel_create_internal(
-            &channel, data_transport, parameters,
+            &channel, data_transport, parameters, NULL,
             NULL, NULL, NULL, NULL, NULL, NULL,
             false);
     if (error) {
@@ -1279,7 +1279,9 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         // Set amount of outgoing streams
         usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(n_channels);
 
-        // TODO: Enable SCTP ndata
+        // Enable interleaving messages for different streams (incoming)
+        // See: https://tools.ietf.org/html/rfc6458#section-8.1.20
+        usrsctp_sysctl_set_sctp_default_frag_interleave(2);
 
         // Initialised
         initialized = true;
@@ -1372,6 +1374,9 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         error = rawrtc_error_to_code(errno);
         goto out;
     }
+
+    // TODO: Enable interleaving messages for different streams (outgoing)
+    // https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-ndata-08#section-4.3.1
 
     // Discard pending packets when closing
     // (so we don't get a callback when the transport is already free'd)
@@ -1486,7 +1491,18 @@ static void channel_register(
     // Raise data channel event?
     if (raise_event) {
         if (transport->data_channel_handler) {
-            transport->data_channel_handler(channel, transport->arg);
+            enum rawrtc_code error;
+
+            // Call data channel handler and retrieve options
+            struct rawrtc_data_channel_options* const options =
+                    transport->data_channel_handler(channel, transport->arg);
+
+            // Apply options
+            error = rawrtc_data_channel_set_options(channel, options);
+            if (error) {
+                DEBUG_WARNING("Unable to late-apply options, reason: %s\n",
+                              rawrtc_code_to_str(error));
+            }
         }
     }
 
