@@ -16,6 +16,8 @@
 //#endif
 //#include <zf_log.h>
 
+#define RAWRTC_DEBUG_LEVEL 5
+
 #include <re.h>
 #include <rew.h>
 

@@ -17,8 +17,8 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "certificate"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * Print and flush the OpenSSL error queue.

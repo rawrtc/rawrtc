@@ -12,45 +12,52 @@ enum ice_cand_type rawrtc_ice_candidate_type_to_ice_cand_type(
 );
 
 enum rawrtc_code rawrtc_ice_cand_type_to_ice_candidate_type(
-        enum rawrtc_ice_candidate_type* const typep, // de-referenced
-        const enum ice_cand_type re_type
+    enum rawrtc_ice_candidate_type* const typep, // de-referenced
+    const enum ice_cand_type re_type
 );
 
 enum ice_tcptype rawrtc_ice_tcp_candidate_type_to_ice_tcptype(
-        const enum rawrtc_ice_tcp_candidate_type type
+    const enum rawrtc_ice_tcp_candidate_type type
 );
 
 enum rawrtc_code rawrtc_ice_tcptype_to_ice_tcp_candidate_type(
-        enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
-        const enum ice_tcptype re_type
+    enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
+    const enum ice_tcptype re_type
 );
 
 enum trice_role rawrtc_ice_role_to_trice_role(
-        enum rawrtc_ice_role const role
+    enum rawrtc_ice_role const role
 );
 
 enum rawrtc_code rawrtc_trice_role_to_ice_role(
-        enum rawrtc_ice_role* const rolep, // de-referenced
-        enum trice_role const re_role
+    enum rawrtc_ice_role* const rolep, // de-referenced
+    enum trice_role const re_role
 );
 
 enum tls_keytype rawrtc_certificate_key_type_to_tls_keytype(
-        const enum rawrtc_certificate_key_type type
+    const enum rawrtc_certificate_key_type type
 );
 
 enum rawrtc_code rawrtc_tls_keytype_to_certificate_key_type(
-        enum rawrtc_certificate_key_type* const typep, // de-referenced
-        enum tls_keytype const re_type
+    enum rawrtc_certificate_key_type* const typep, // de-referenced
+    enum tls_keytype const re_type
 );
 
 enum rawrtc_code rawrtc_certificate_sign_algorithm_to_tls_fingerprint(
-        enum tls_fingerprint* const fingerprintp, // de-referenced
-        enum rawrtc_certificate_sign_algorithm const algorithm
+    enum tls_fingerprint* const fingerprintp, // de-referenced
+    enum rawrtc_certificate_sign_algorithm const algorithm
 );
 
 enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
-        enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
-        enum tls_fingerprint re_algorithm
+    enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
+    enum tls_fingerprint re_algorithm
+);
+
+/*
+ * Translate a data transport type to str.
+ */
+char const * rawrtc_data_transport_type_to_str(
+    enum rawrtc_data_transport_type const type
 );
 
 EVP_MD const * const rawrtc_get_sign_function(

@@ -9,8 +9,8 @@
 #include "candidate_helper.h"
 
 #define DEBUG_MODULE "ice-gatherer"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 static void rawrtc_ice_gather_options_destroy(
         void* const arg
@@ -272,8 +272,8 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
 
     // Set ICE configuration and create trice instance
     // TODO: Add parameters to function arguments?
-    gatherer->ice_config.debug = true;
-    gatherer->ice_config.trace = true;
+    gatherer->ice_config.debug = (DEBUG_LEVEL >= 7) ? true : false;
+    gatherer->ice_config.trace = (DEBUG_LEVEL >= 7) ? true : false;
     gatherer->ice_config.ansi = true;
     gatherer->ice_config.enable_prflx = true;
     error = rawrtc_error_to_code(trice_alloc(

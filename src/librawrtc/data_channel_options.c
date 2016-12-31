@@ -1,10 +1,6 @@
 #include <rawrtc.h>
 #include "data_channel_options.h"
 
-#define DEBUG_MODULE "data-channel-settings"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
-
 /*
  * Create data channel options.
  *

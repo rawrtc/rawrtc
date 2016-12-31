@@ -3,8 +3,8 @@
 #include "data_transport.h"
 
 #define DEBUG_MODULE "data-channel"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * Change the state of the data channel.

@@ -1,9 +1,10 @@
 #include <rawrtc.h>
+#include "utils.h"
 #include "data_transport.h"
 
 #define DEBUG_MODULE "data-transport"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * Destructor for an existing data transport.
@@ -49,6 +50,7 @@ enum rawrtc_code rawrtc_data_transport_create(
     transport->channel_send = channel_send_handler;
 
     // Set pointer & done
+    DEBUG_PRINTF("Created data transport of type %s\n", rawrtc_data_transport_type_to_str(type));
     *transportp = transport;
     return RAWRTC_CODE_SUCCESS;
 }

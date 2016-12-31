@@ -4,8 +4,8 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-candidate"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * Calculate the ICE candidate priority.

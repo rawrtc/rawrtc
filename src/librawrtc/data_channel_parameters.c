@@ -1,10 +1,6 @@
 #include <rawrtc.h>
 #include "data_channel_parameters.h"
 
-#define DEBUG_MODULE "data-channel-parameters"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
-
 /*
  * Destructor for existing data channel parameters.
  */

@@ -676,6 +676,34 @@ enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
     return RAWRTC_CODE_NO_VALUE;
 }
 
+enum rawrtc_data_transport_type const map_enum_data_transport_type[] = {
+    RAWRTC_DATA_TRANSPORT_TYPE_SCTP,
+};
+
+char const * const map_str_data_transport_type[] = {
+    "SCTP",
+};
+
+size_t const map_data_transport_type_length =
+        sizeof(map_enum_data_transport_type) / sizeof(map_enum_data_transport_type[0]);
+
+/*
+ * Translate a data transport type to str.
+ */
+char const * rawrtc_data_transport_type_to_str(
+        enum rawrtc_data_transport_type const type
+) {
+    size_t i;
+
+    for (i = 0; i < map_data_transport_type_length; ++i) {
+        if (map_enum_data_transport_type[i] == type) {
+            return map_str_data_transport_type[i];
+        }
+    }
+
+    return "???";
+}
+
 /*
  * Get the EVP_MD* structure for a certificate sign algorithm type.
  */

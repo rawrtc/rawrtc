@@ -10,8 +10,8 @@
 #include "redirect_transport.h"
 
 #define DEBUG_MODULE "redirect-transport"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * TODO: Lacks state transition event callback

@@ -3,7 +3,9 @@
 #include <errno.h> // errno
 #include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, htons
-#define SCTP_DEBUG
+#if (RAWRTC_DEBUG_LEVEL >= 7)
+    #define SCTP_DEBUG
+#endif
 #include <usrsctp.h> // usrsctp*
 #include <rawrtc.h>
 #include "main.h"
@@ -15,8 +17,8 @@
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 // SCTP outgoing message context (needed when buffering)
 struct send_context {
@@ -435,6 +437,7 @@ static void set_state(
     // Closed?
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         enum rawrtc_data_channel_state const from_state = RAWRTC_DATA_CHANNEL_STATE_OPEN;
+        DEBUG_INFO("SCTP connection closed\n");
 
         // Close all data channels
         // TODO: Close non-open channels as well?
@@ -468,6 +471,7 @@ static void set_state(
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         enum rawrtc_data_channel_state const from_channel_state =
                 RAWRTC_DATA_CHANNEL_STATE_WAITING;
+        DEBUG_INFO("SCTP connection established\n");
 
         // Send buffered outgoing SCTP packets
         enum rawrtc_code const error = rawrtc_message_buffer_clear(

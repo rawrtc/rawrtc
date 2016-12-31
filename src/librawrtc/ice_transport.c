@@ -4,8 +4,8 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-transport"
-#define DEBUG_LEVEL 7
-#include <re_dbg.h>
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
 
 /*
  * Get the corresponding name for an ICE transport state.
@@ -129,6 +129,7 @@ static void ice_established_handler(
 
     // State: checking -> connected
     if (transport->state == RAWRTC_ICE_TRANSPORT_CHECKING) {
+        DEBUG_INFO("ICE connection established\n");
         set_state(transport, RAWRTC_ICE_TRANSPORT_CONNECTED);
     }
 
@@ -144,6 +145,7 @@ static void ice_established_handler(
         DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
 
         // At least one candidate pair succeeded, transition to completed
+        DEBUG_INFO("ICE connection completed\n");
         set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
     }
 
@@ -193,9 +195,11 @@ static void ice_failed_handler(
         // Do we have one candidate pair that succeeded?
         if (list_head(trice_validl(transport->gatherer->ice))) {
             // Yes, transition to completed
+            DEBUG_INFO("ICE connection completed\n");
             set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
         } else {
             // No, transition to failed
+            DEBUG_INFO("ICE connection failed\n");
             set_state(transport, RAWRTC_ICE_TRANSPORT_FAILED);
         }
     }
