@@ -118,6 +118,8 @@ enum rawrtc_code rawrtc_message_buffer_merge(
     void* context;
     struct mbuf* buffer = NULL;
     int err = 0;
+    size_t pos;
+    size_t end;
 
     // Check arguments
     if (!bufferp || !contextp || !message_buffer) {
@@ -145,10 +147,15 @@ enum rawrtc_code rawrtc_message_buffer_merge(
             if (buffered_message->buffer) {
                 // Set buffer & resize to sum of all buffers
                 buffer = buffered_message->buffer;
-                err = mbuf_resize(buffer, buffer_sum_left(message_buffer));
+                pos = buffer->pos;
+                end = buffer->end;
+                err = mbuf_resize(buffer, pos + buffer_sum_left(message_buffer));
                 if (err) {
                     goto out;
                 }
+
+                // Skip to end (needed to use `mbuf_write_mem` for merging)
+                mbuf_skip_to_end(buffer);
             }
 
             // Skip copying
@@ -166,8 +173,16 @@ enum rawrtc_code rawrtc_message_buffer_merge(
     }
 
 out:
+    if (buffer) {
+        // Reset position
+        mbuf_set_pos(buffer, pos);
+    }
+
     if (err) {
         if (buffer) {
+            // Reset end
+            mbuf_set_end(buffer, end);
+
             // Undo resize
             mbuf_trim(buffer);
         }

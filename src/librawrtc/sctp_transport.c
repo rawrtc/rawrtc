@@ -17,7 +17,7 @@
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
-#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 // SCTP outgoing message context (needed when buffering)
@@ -911,6 +911,7 @@ static enum rawrtc_code buffer_message_received_raise_complete(
             info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL &&
             info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL;
     enum rawrtc_code error;
+    struct sctp_rcvinfo* copied_info;
 
     // First and last message?
     if (first && complete) {
@@ -921,29 +922,27 @@ static enum rawrtc_code buffer_message_received_raise_complete(
         return RAWRTC_CODE_SUCCESS;
     }
 
-    // Buffer (if not last message)
-    if (!complete) {
-        struct sctp_rcvinfo* copied_info;
-
-        // Create message context (if first)
-        if (first) {
-            error = receive_info_alloc(&copied_info, info);
-            if (error) {
-                return error;
-            }
-        } else {
-            copied_info = NULL;
-        }
-
-        // Buffer message
-        error = rawrtc_message_buffer_append(message_buffer, buffer, copied_info);
-        mem_deref(copied_info);
+    // Create message context (if first)
+    if (first) {
+        error = receive_info_alloc(&copied_info, info);
         if (error) {
             return error;
         }
+    } else {
+        copied_info = NULL;
+    }
 
+    // Buffer message
+    error = rawrtc_message_buffer_append(message_buffer, buffer, copied_info);
+    mem_deref(copied_info);
+    if (error) {
+        return error;
+    }
+    DEBUG_PRINTF("Buffered incoming message chunk of size %zu\n", mbuf_get_left(buffer));
+
+    // Stop (if not last message)
+    if (!complete) {
         // Set pointer & done
-        DEBUG_PRINTF("Buffered incoming message chunk of size %zu\n", mbuf_get_left(buffer));
         *bufferp = NULL;
         *infop = NULL;
         return RAWRTC_CODE_SUCCESS;
