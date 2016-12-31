@@ -196,7 +196,7 @@ static void dtls_transport_state_change_handler(
                     &channel_parameters, client->data_channel->label,
                     RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
 
-            // Create pre-negotiated data channel
+            // Create data channel
             EOE(rawrtc_data_channel_create(
                     &client->data_channel->channel, client->data_transport,
                     channel_parameters, NULL,

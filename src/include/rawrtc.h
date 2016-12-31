@@ -186,8 +186,8 @@ enum rawrtc_data_channel_type {
  */
 enum rawrtc_data_channel_message_flag {
     RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE = 0,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 1,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 2,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 1,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 2
 };
 
 /*
@@ -716,6 +716,7 @@ struct rawrtc_sctp_transport {
 struct rawrtc_sctp_data_channel_context {
     uint16_t sid;
     bool can_send_unordered;
+    struct list buffered_application_chunks_incoming;
 };
 
 /*

@@ -47,7 +47,7 @@ static uint16_t const sctp_events[] = {
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
-static enum rawrtc_code context_create(
+static enum rawrtc_code channel_context_create(
     struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
     uint16_t const sid,
     bool const can_send_unordered
@@ -820,7 +820,7 @@ static void handle_data_channel_open_message(
     }
 
     // Allocate context to be used as an argument for the data channel handlers
-    error = context_create(&context, info->rcv_sid, true);
+    error = channel_context_create(&context, info->rcv_sid, true);
     if (error) {
         DEBUG_WARNING("Unable to create data channel context, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -901,7 +901,10 @@ static enum rawrtc_code buffer_message_received_raise_complete(
         int const flags
 ) {
     bool const first = list_head(message_buffer) == NULL;
-    bool const complete = (flags & MSG_EOR) ? true : false;
+    bool const complete =
+            (flags & MSG_EOR) &&
+            info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL &&
+            info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL;
     enum rawrtc_code error;
 
     // First and last message?
@@ -958,17 +961,22 @@ static enum rawrtc_code buffer_message_received_raise_complete(
  */
 static void handle_application_message(
         struct rawrtc_sctp_transport* const transport, // not checked
-        struct mbuf* const buffer, // not checked
-        struct sctp_rcvinfo* const info, // not checked
+        struct mbuf* const current_buffer, // not checked
+        struct sctp_rcvinfo* const current_info, // not checked
         int const flags
 ) {
     struct rawrtc_sctp_data_channel_context* context;
+    enum rawrtc_code error;
+    struct mbuf* buffer;
+    struct sctp_rcvinfo* info;
+    bool is_copy;
+    enum rawrtc_data_channel_message_flag message_flags = RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE;
 
     // Get channel and context
-    struct rawrtc_data_channel* const channel = transport->channels[info->rcv_sid];
+    struct rawrtc_data_channel* const channel = transport->channels[current_info->rcv_sid];
     if (!channel) {
         DEBUG_WARNING("Received application message on an invalid channel with SID %"PRIu16"\n",
-                      info->rcv_sid);
+                      current_info->rcv_sid);
         goto error;
     }
     context = channel->transport_arg;
@@ -978,46 +986,76 @@ static void handle_application_message(
     //       (EOR)? Guessing: Once first chunk has been received.
     context->can_send_unordered = true;
 
-    // Need to buffer?
-    if (!channel->options->deliver_partially && !(flags & MSG_EOR)) {
-        // TODO: We need to buffer until EOR here as well (flags & MSG_EOR) but only for non-streaming
-        //       API
-        // TODO: Continue here once we know how EOR works in detail
-        DEBUG_WARNING("TODO: handle_application_message - BUFFER UNTIL EOR\n");
-        DEBUG_WARNING("MESSAGE: %b\n", mbuf_buf(buffer), mbuf_get_left(buffer));
+    // Handle empty / Buffer if partially delivery is off / deliver directly
+    if (current_info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY ||
+            current_info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY) {
+        buffer = current_buffer;
+        info = current_info;
+        is_copy = false;
+
+        // Let the buffer appear to be empty
+        mbuf_skip_to_end(buffer);
+
+        // Empty message is complete
+        message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
+
+    } else if (!channel->options->deliver_partially) {
+        // Buffer message (if needed) and get complete message (if any)
+        error = buffer_message_received_raise_complete(
+                &buffer, &info, &is_copy,
+                &context->buffered_application_chunks_incoming,
+                current_buffer, current_info, flags);
+        if (error) {
+            DEBUG_WARNING("Could not buffer/merge application message, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            goto error;
+        }
+
+        // Do we have a complete message we need to handle?
+        if (!buffer) {
+            return;
+        }
+        message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
+    } else {
+        // Partial delivery on, pass buffer directly
+        buffer = current_buffer;
+        info = current_info;
+        is_copy = false;
+
+        // Complete?
+        if (flags & MSG_EOR) {
+            message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
+        }
     }
 
+    // Handle application message
     switch (info->rcv_ppid) {
         case RAWRTC_SCTP_TRANSPORT_PPID_UTF16:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16!\n");
-            break;
         case RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY!\n");
-            break;
-        case RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL: // deprecated
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL!\n");
+        case RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL:
             break;
         case RAWRTC_SCTP_TRANSPORT_PPID_BINARY:
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY!\n");
-            break;
         case RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY:
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY!\n");
-            break;
-        case RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL: // deprecated
-            // TODO: Implement
-            DEBUG_WARNING("TODO: HANDLE RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL!\n");
+        case RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL:
+            message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY;
             break;
         default:
             DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu32"\n",
                           info->rcv_ppid);
+            goto error; // TODO: Is this correct (resetting stream on unknown PPID)?
             break;
     }
 
-    // Done
+    // Pass message to handler
+    if (channel->message_handler) {
+        channel->message_handler(buffer, message_flags, channel->arg);
+    }
+
+    // Dereference (if needed) and done
+    if (is_copy) {
+        mem_deref(buffer);
+        mem_deref(info);
+    }
     return;
 
 error:
@@ -1030,20 +1068,20 @@ error:
  */
 static void handle_dcep_message(
         struct rawrtc_sctp_transport* const transport, // not checked
-        struct mbuf* const buffer, // not checked
-        struct sctp_rcvinfo* const info, // not checked
+        struct mbuf* const current_buffer, // not checked
+        struct sctp_rcvinfo* const current_info, // not checked
         int const flags
 ) {
     enum rawrtc_code error;
-    struct mbuf* complete_buffer;
-    struct sctp_rcvinfo* complete_info;
+    struct mbuf* buffer;
+    struct sctp_rcvinfo* info;
     bool is_copy;
 
     // Buffer message (if needed) and get complete message (if any)
     error = buffer_message_received_raise_complete(
-            &complete_buffer, &complete_info, &is_copy,
+            &buffer, &info, &is_copy,
             &transport->buffered_dcep_chunks_incoming,
-            buffer, info, flags);
+            current_buffer, current_info, flags);
     if (error) {
         DEBUG_WARNING("Could not buffer/merge DCEP message, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -1051,7 +1089,7 @@ static void handle_dcep_message(
     }
 
     // Do we have a complete message we need to handle?
-    if (!complete_buffer) {
+    if (!buffer) {
         return;
     }
 
@@ -1078,8 +1116,8 @@ static void handle_dcep_message(
 
     // Dereference (if needed) and done
     if (is_copy) {
-        mem_deref(complete_buffer);
-        mem_deref(complete_info);
+        mem_deref(buffer);
+        mem_deref(info);
     }
     return;
 
@@ -1576,15 +1614,28 @@ out:
 }
 
 /*
+ * Destructor for an existing data channel context.
+ */
+static void channel_context_destroy(
+        void* const arg
+) {
+    struct rawrtc_sctp_data_channel_context* const context = arg;
+
+    // Flush list
+    list_flush(&context->buffered_application_chunks_incoming);
+}
+
+/*
  * Allocate data channel context.
  */
-static enum rawrtc_code context_create(
+static enum rawrtc_code channel_context_create(
         struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
         uint16_t const sid,
         bool const can_send_unordered
 ) {
     // Allocate context
-    struct rawrtc_sctp_data_channel_context* const context = mem_alloc(sizeof(*context), NULL);
+    struct rawrtc_sctp_data_channel_context* const context =
+            mem_alloc(sizeof(*context), channel_context_destroy);
     if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
@@ -1592,6 +1643,7 @@ static enum rawrtc_code context_create(
     // Set fields
     context->sid = sid;
     context->can_send_unordered = can_send_unordered;
+    list_init(&context->buffered_application_chunks_incoming);
 
     // Set pointer & done
     *contextp = context;
@@ -1657,7 +1709,7 @@ static enum rawrtc_code channel_create_negotiated(
 
     // Allocate context to be used as an argument for the data channel handlers
     // TODO: Is it okay to already allow sending unordered messages here? Assuming: Yes.
-    return context_create(contextp, parameters->id, true);
+    return channel_context_create(contextp, parameters->id, true);
 }
 
 /*
@@ -1699,7 +1751,7 @@ static enum rawrtc_code channel_create_inband(
     for (i; i < transport->n_channels; i += 2) {
         if (!transport->channels[i]) {
             // Allocate context to be used as an argument for the data channel handlers
-            error = context_create(&context, (uint16_t) i, false);
+            error = channel_context_create(&context, (uint16_t) i, false);
             if (error) {
                 return error;
             }
