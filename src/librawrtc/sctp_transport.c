@@ -17,7 +17,7 @@
 #include "sctp_transport.h"
 
 #define DEBUG_MODULE "sctp-transport"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 // SCTP outgoing message context (needed when buffering)
@@ -883,7 +883,7 @@ enum rawrtc_code receive_info_alloc(
     }
 
     // Copy info data
-    memcpy(&copied_info, info, sizeof(*copied_info));
+    memcpy(copied_info, info, sizeof(*copied_info));
 
     // Set pointer & done
     *infop = copied_info;
@@ -2136,7 +2136,6 @@ enum rawrtc_code rawrtc_sctp_transport_send(
                 transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
                 info, info_size, info_type, flags);
         if (length < 0) {
-            DEBUG_WARNING("usrsctp_sendv failed with %m\n", errno);
             return rawrtc_error_to_code(errno);
         }
         return RAWRTC_CODE_SUCCESS;

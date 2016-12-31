@@ -257,20 +257,18 @@ static void data_channel_open_handler(
     struct data_channel* const channel = arg;
     struct client* const client = channel->client;
     struct mbuf* buffer;
-    size_t i;
     enum rawrtc_code error;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
 
-    // Compose message (64 KiB)
-    // TODO: Find out why messages > 64 KiB lead to a segmentation fault
-    buffer = mbuf_alloc(1 << 16);
+    // Compose message (128 KiB)
+    // TODO: Find out why messages > 128 KiB lead to a segmentation fault
+    buffer = mbuf_alloc(1 << 17);
     EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
     EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
     mbuf_set_pos(buffer, 0);
 
     // Send message
-    DEBUG_PRINTF("Sending %zu bytes: %b\n", mbuf_get_left(buffer), mbuf_buf(buffer),
-                 mbuf_get_left(buffer));
+    DEBUG_PRINTF("Sending %zu bytes\n", mbuf_get_left(buffer));
     error = rawrtc_data_channel_send(channel->channel, buffer, true);
     if (error) {
         DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
