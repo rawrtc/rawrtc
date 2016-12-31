@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <rawrtc.h>
 
 /* TODO: Replace with zf_log */
@@ -7,6 +8,7 @@
 #include <re_dbg.h>
 
 #define EOE(code) exit_on_error(code, __FILE__, __LINE__)
+#define EOR(code) exit_on_re_error(code, __FILE__, __LINE__)
 
 struct data_channel;
 
@@ -84,6 +86,18 @@ static void exit_on_error(enum rawrtc_code code, char const* const file, uint32_
                     file, line, code, rawrtc_code_to_str(code));
             before_exit();
             exit((int) code);
+    }
+}
+
+static void exit_on_re_error(
+        int code,
+        char const* const file,
+        uint32_t line
+) {
+    if (code != 0) {
+        DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n", file, line, code, strerror(code));
+        before_exit();
+        exit(code);
     }
 }
 
@@ -243,12 +257,16 @@ static void data_channel_open_handler(
     struct data_channel* const channel = arg;
     struct client* const client = channel->client;
     struct mbuf* buffer;
+    size_t i;
     enum rawrtc_code error;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
 
     // Compose meowing message
     buffer = mbuf_alloc(1024);
-    mbuf_printf(buffer, "Hello! Sending this message on channel: %s", channel->label);
+    EOR(mbuf_printf(buffer, "Hello! Sending this message on channel: %s", channel->label));
+    for (i = 0; i < 1000; ++i) {
+        EOR(mbuf_printf(buffer, "MEOW! "));
+    }
     mbuf_set_pos(buffer, 0);
 
     // Send message

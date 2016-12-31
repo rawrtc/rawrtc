@@ -1,7 +1,7 @@
 #include <stdio.h> // fopen
 #include <string.h> // memcpy, strlen
 #include <errno.h> // errno
-#include <sys/socket.h> // AF_INET, SOCK_STREAM, linger, sockaddr_storage
+#include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, htons
 #define SCTP_DEBUG
 #include <usrsctp.h> // usrsctp*
