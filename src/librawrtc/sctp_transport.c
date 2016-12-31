@@ -1247,7 +1247,7 @@ write:
     // Can write?
     // TODO: How often is this called? What does 'write' tell me?
     if (events & SCTP_EVENT_WRITE) {
-        DEBUG_WARNING("TODO: CAN WRITE\n");
+//        DEBUG_WARNING("TODO: CAN WRITE\n");
     }
 
 out:
@@ -2136,6 +2136,7 @@ enum rawrtc_code rawrtc_sctp_transport_send(
                 transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
                 info, info_size, info_type, flags);
         if (length < 0) {
+            DEBUG_WARNING("usrsctp_sendv failed with %m\n", errno);
             return rawrtc_error_to_code(errno);
         }
         return RAWRTC_CODE_SUCCESS;

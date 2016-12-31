@@ -78,6 +78,8 @@ char const* rawrtc_code_to_str(
             return "invalid message";
         case RAWRTC_CODE_MESSAGE_TOO_LONG:
             return "message too long";
+        case RAWRTC_CODE_TRY_AGAIN_LATER:
+            return "try again later";
         default:
             return "(no error translation)";
     }
@@ -99,6 +101,10 @@ enum rawrtc_code rawrtc_error_to_code(
             return RAWRTC_CODE_NO_MEMORY;
         case EAUTH:
             return RAWRTC_CODE_INVALID_CERTIFICATE;
+        case EAGAIN:
+            return RAWRTC_CODE_TRY_AGAIN_LATER;
+        case EBADMSG:
+            return RAWRTC_CODE_INVALID_MESSAGE;
         default:
             return RAWRTC_CODE_UNKNOWN_ERROR;
     }
