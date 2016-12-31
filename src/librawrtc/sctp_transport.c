@@ -618,6 +618,7 @@ static void handle_notification(
     switch (notification->sn_header.sn_type) {
         case SCTP_ASSOC_CHANGE:
             handle_association_change_event(transport, &notification->sn_assoc_change);
+            break;
         case SCTP_STREAM_RESET_EVENT:
             // TODO: Handle
             // https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.7
