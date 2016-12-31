@@ -53,7 +53,7 @@ enum {
 
 enum rawrtc_code rawrtc_sctp_transport_send(
     struct rawrtc_sctp_transport* const transport,
-    struct mbuf* const buffer_in,
+    struct mbuf* const buffer,
     void* const info,
     socklen_t const info_size,
     unsigned int const info_type,

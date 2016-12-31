@@ -2,6 +2,25 @@
 #include "message_buffer.h"
 
 /*
+ * Get the sum of bytes of all message buffer's left.
+ */
+size_t buffer_sum_left(
+        struct list* const message_buffer // not checked
+) {
+    struct le* le;
+    size_t size = 0;
+
+    // Handle each message
+    for (le = list_head(message_buffer); le != NULL; le = le->next) {
+        struct rawrtc_buffered_message* const buffered_message = le->data;
+        size += mbuf_get_left(buffered_message->buffer);
+    }
+
+    // Done
+    return size;
+}
+
+/*
  * Destructor for an existing buffered message.
  */
 static void rawrtc_message_buffer_destroy(
@@ -73,4 +92,93 @@ enum rawrtc_code rawrtc_message_buffer_clear(
 
     // Done
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Merge all buffered messages into a single buffer.
+ *
+ * If no message is present, both `bufferp`'s and `contextp`'s value
+ * will be set to `NULL` and the return code will be
+ * `RAWRTC_CODE_NO_VALUE`.
+ *
+ * In case all messages did not provide a buffer, `bufferp`'s value will
+ * be set to `NULL` but `contextp`'s value will represent the context of
+ * the fist message (which may also be `NULL`). The return code will be
+ * `RAWRTC_CODE_SUCCESS`.
+ *
+ * Note: Only the first message's context will be returned.
+ */
+enum rawrtc_code rawrtc_message_buffer_merge(
+        struct mbuf** const bufferp, // de-referenced
+        void** const contextp, // de-referenced
+        struct list* const message_buffer
+) {
+    struct le* le;
+    struct rawrtc_buffered_message* buffered_message;
+    void* context;
+    struct mbuf* buffer = NULL;
+    int err = 0;
+
+    // Check arguments
+    if (!bufferp || !contextp || !message_buffer) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get first message (or return none)
+    le = list_head(message_buffer);
+    if (!le) {
+        *bufferp = NULL;
+        *contextp = NULL;
+        return RAWRTC_CODE_NO_VALUE;
+    }
+
+    // Get context from first message
+    buffered_message = le->data;
+    context = buffered_message->context;
+
+    // Handle each message
+    for (le; le != NULL; le = le->next) {
+        buffered_message = le->data;
+
+        // Get buffer (if not already set)
+        if (!buffer) {
+            if (buffered_message->buffer) {
+                // Set buffer & resize to sum of all buffers
+                buffer = buffered_message->buffer;
+                err = mbuf_resize(buffer, buffer_sum_left(message_buffer));
+                if (err) {
+                    goto out;
+                }
+            }
+
+            // Skip copying
+            continue;
+        }
+
+        // Copy data (if any)
+        if (buffered_message->buffer) {
+            err = mbuf_write_mem(buffer, mbuf_buf(buffered_message->buffer),
+                                 mbuf_get_left(buffered_message->buffer));
+            if (err) {
+                goto out;
+            }
+        }
+    }
+
+out:
+    if (err) {
+        if (buffer) {
+            // Undo resize
+            mbuf_trim(buffer);
+        }
+    } else {
+        // Set pointer
+        *bufferp = mem_ref(buffer);
+        *contextp = mem_ref(context);
+
+        // Dereference all messages
+        list_flush(message_buffer);
+    }
+
+    return rawrtc_error_to_code(err);
 }

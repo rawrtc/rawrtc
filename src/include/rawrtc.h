@@ -700,7 +700,8 @@ struct rawrtc_sctp_transport {
     rawrtc_data_channel_handler* data_channel_handler; // nullable
     rawrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
-    struct list buffered_messages;
+    struct list buffered_messages_outgoing;
+    struct list buffered_dcep_chunks_incoming;
     struct rawrtc_data_channel** channels;
     uint16_t n_channels;
     FILE* trace_handle;
