@@ -95,16 +95,18 @@ enum rawrtc_code rawrtc_error_to_code(
     switch (code) {
         case 0:
             return RAWRTC_CODE_SUCCESS;
-        case EINVAL:
-            return RAWRTC_CODE_INVALID_ARGUMENT;
-        case ENOMEM:
-            return RAWRTC_CODE_NO_MEMORY;
-        case EAUTH:
-            return RAWRTC_CODE_INVALID_CERTIFICATE;
         case EAGAIN:
             return RAWRTC_CODE_TRY_AGAIN_LATER;
+        case EAUTH:
+            return RAWRTC_CODE_INVALID_CERTIFICATE;
         case EBADMSG:
             return RAWRTC_CODE_INVALID_MESSAGE;
+        case EINVAL:
+            return RAWRTC_CODE_INVALID_ARGUMENT;
+        case EMSGSIZE:
+            return RAWRTC_CODE_MESSAGE_TOO_LONG;
+        case ENOMEM:
+            return RAWRTC_CODE_NO_MEMORY;
         default:
             return RAWRTC_CODE_UNKNOWN_ERROR;
     }
