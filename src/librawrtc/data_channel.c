@@ -18,6 +18,7 @@ void rawrtc_data_channel_set_state(
     enum rawrtc_code error;
 
     // Set state
+    // Note: Keep this here as it will prevent infinite recursion during closing/destroying
     channel->state = state;
 
     // Call transport handler (if any) and user application handler
@@ -30,25 +31,18 @@ void rawrtc_data_channel_set_state(
             break;
 
         case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
-            // Warning: To close the channel, use `rawrtc_data_channel_close`!
-
-            // Note: We need to reference ourselves because the channel close handler may hold
-            //       and release the very last reference to this instance in the call.
-            mem_ref(channel);
+            // Call handler
+            // Note: The handler needs to be called before the channel is being closed because
+            //       there might be no reference afterwards.
+            if (channel->close_handler) {
+                channel->close_handler(channel->arg);
+            }
 
             // Call transport close handler
             error = channel->transport->channel_close(channel);
             if (error) {
                 DEBUG_WARNING("Unable to close data channel, reason: %s\n", rawrtc_code_to_str(error));
             }
-
-            // Call handler
-            if (channel->close_handler) {
-                channel->close_handler(channel->arg);
-            }
-
-            // Done
-            mem_deref(channel);
             break;
         default:
             break;
@@ -64,7 +58,10 @@ static void rawrtc_data_channel_destroy(
     struct rawrtc_data_channel* const channel = arg;
 
     // Close channel
-    // Note: Don't close before NEW
+    // Note: Don't close before `NEW` because there's uninitialised stuff before `NEW`.
+    // Note: Recursion might occur but `rawrtc_data_channel_set_state` ensures that the state
+    //       changes to `CLOSED` before further recursion happens, thus preventing double-closing
+    //       or other nasty stuff.
     if (channel->state != RAWRTC_DATA_CHANNEL_STATE_INIT) {
         rawrtc_data_channel_close(channel);
     }

@@ -1851,8 +1851,16 @@ static enum rawrtc_code channel_close_handler(
     transport = channel->transport->transport;
     context = channel->transport_arg;
 
-    // Dereference channel and clear pointer
-    transport->channels[context->sid] = mem_deref(channel);
+    // Dereference channel and clear pointer (if channel was registered before)
+    // Note: The context will be NULL if the channel was not registered before
+    if (context) {
+        // Safety check
+        if (transport->channels[context->sid] == channel) {
+            transport->channels[context->sid] = mem_deref(channel);
+        } else {
+            DEBUG_WARNING("Invalid channel instance in slot. Please report this.\n");
+        }
+    }
 
     // TODO: Anything else required here?
 

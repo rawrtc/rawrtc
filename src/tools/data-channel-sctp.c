@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <rawrtc.h>
@@ -439,6 +440,29 @@ static void client_stop(
     client->certificate = mem_deref(client->certificate);
 }
 
+static void client_stdin_handler(
+        int flags,
+        void* const arg
+) {
+    char buffer[128];
+    size_t length;
+    (void) flags;
+    (void) arg;
+
+    // Get message from stdin
+    if (!fgets((char*) buffer, 128, stdin)) {
+        EOR(errno);
+    }
+    length = strlen(buffer);
+
+    // Exit?
+    if (length == 1 && buffer[0] == '\n') {
+        // Stop main loop
+        DEBUG_INFO("Exiting\n");
+        re_cancel();
+    }
+}
+
 int main(int argc, char* argv[argc + 1]) {
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
@@ -509,13 +533,19 @@ int main(int argc, char* argv[argc + 1]) {
     client_start(&a, &b);
     client_start(&b, &a);
 
+    // Listen on stdin
+    EOR(fd_listen(STDIN_FILENO, FD_READ, client_stdin_handler, NULL));
+
     // Start main loop
     // TODO: Wrap re_main?
-    EOE(rawrtc_error_to_code(re_main(signal_handler)));
+    EOR(re_main(signal_handler));
 
     // Stop clients
     client_stop(&a);
     client_stop(&b);
+
+    // Stop listening on STDIN
+    fd_close(STDIN_FILENO);
 
     // Free
     mem_deref(gather_options);
