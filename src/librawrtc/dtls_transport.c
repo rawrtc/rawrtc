@@ -95,7 +95,7 @@ char const * const rawrtc_dtls_transport_state_to_name(
 /*
  * Handle outgoing buffered DTLS messages.
  */
-static void dtls_outgoing_buffer_handler(
+static bool dtls_outgoing_buffer_handler(
         struct mbuf* const buffer,
         void* const context,
         void* const arg
@@ -110,6 +110,9 @@ static void dtls_outgoing_buffer_handler(
         DEBUG_WARNING("Could not send buffered packet, reason: %s\n",
                       rawrtc_code_to_str(error));
     }
+
+    // Continue iterating through message queue
+    return true;
 }
 
 /*
@@ -487,7 +490,7 @@ static size_t mtu_handler(
 /*
  * Handle received UDP messages.
  */
-static void udp_receive_handler(
+static bool udp_receive_handler(
         struct mbuf* const buffer,
         void* const context,
         void* const arg
@@ -519,6 +522,9 @@ static void udp_receive_handler(
     // Note: No need to check if the transport is already closed as the messages will re-appear in
     //       the `dtls_receive_handler`.
     dtls_receive(transport->socket, source, buffer);
+
+    // Continue iterating through message queue
+    return true;
 }
 
 /*
@@ -912,7 +918,7 @@ enum rawrtc_code rawrtc_dtls_transport_have_data_transport(
  * Pipe buffered messages into the data receive handler that has a
  * different signature.
  */
-static void intermediate_receive_handler(
+static bool intermediate_receive_handler(
         struct mbuf* const buffer,
         void* const context,
         void* const arg
@@ -922,6 +928,9 @@ static void intermediate_receive_handler(
 
     // Pipe into the actual receive handler
     transport->receive_handler(buffer, transport->receive_handler_arg);
+
+    // Continue iterating through message queue
+    return true;
 }
 
 /*

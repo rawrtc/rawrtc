@@ -35,6 +35,8 @@ static void rawrtc_message_buffer_destroy(
 
 /*
  * Create a message buffer.
+ *
+ * TODO: Add timestamp to be able to ignore old messages
  */
 enum rawrtc_code rawrtc_message_buffer_append(
         struct list* const message_buffer,
@@ -65,7 +67,9 @@ enum rawrtc_code rawrtc_message_buffer_append(
 
 /*
  * Apply a receive handler to buffered messages.
- * TODO: Add timestamp to be able to ignore old messages
+ *
+ * Will stop iterating and return `RAWRTC_CODE_STOP_ITERATION` in case
+ * the message handler returned `false`.
  */
 enum rawrtc_code rawrtc_message_buffer_clear(
         struct list* const message_buffer,
@@ -73,6 +77,7 @@ enum rawrtc_code rawrtc_message_buffer_clear(
         void* arg
 ) {
     struct le* le;
+    bool unlink;
 
     // Check arguments
     if (!message_buffer || !message_handler) {
@@ -80,15 +85,26 @@ enum rawrtc_code rawrtc_message_buffer_clear(
     }
 
     // Handle each message
-    for (le = list_head(message_buffer); le != NULL; le = le->next) {
+    le = list_head(message_buffer);
+    while (le != NULL) {
         struct rawrtc_buffered_message* const buffered_message = le->data;
 
-        // Handle buffered message
-        message_handler(buffered_message->buffer, buffered_message->context, arg);
-    }
+        // Handle message
+        unlink = message_handler(buffered_message->buffer, buffered_message->context, arg);
+        if (unlink) {
+            list_unlink(le);
+        }
 
-    // Dereference all messages
-    list_flush(message_buffer);
+        // Get next message
+        le = le->next;
+
+        // Remove message
+        if (unlink) {
+            mem_deref(buffered_message);
+        } else {
+            return RAWRTC_CODE_STOP_ITERATION;
+        }
+    }
 
     // Done
     return RAWRTC_CODE_SUCCESS;

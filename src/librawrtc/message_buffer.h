@@ -2,8 +2,12 @@
 
 /*
  * Handle buffered messages.
+ *
+ * Return `true` if the message has been handled successfully and can
+ * be unliked, `false` to stop processing messages and keep the current
+ * message in the list.
  */
-typedef void (rawrtc_message_buffer_handler)(
+typedef bool (rawrtc_message_buffer_handler)(
     struct mbuf* const buffer,
     void* const context,
     void* const arg

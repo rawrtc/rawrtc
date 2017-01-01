@@ -42,7 +42,8 @@ enum rawrtc_code {
     RAWRTC_CODE_STILL_IN_USE,
     RAWRTC_CODE_INVALID_MESSAGE,
     RAWRTC_CODE_MESSAGE_TOO_LONG,
-    RAWRTC_CODE_TRY_AGAIN_LATER
+    RAWRTC_CODE_TRY_AGAIN_LATER,
+    RAWRTC_CODE_STOP_ITERATION
 }; // IMPORTANT: Add translations for new return codes in `utils.c`!
 
 /*

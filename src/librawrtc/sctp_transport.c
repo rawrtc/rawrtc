@@ -25,8 +25,6 @@ struct send_context {
     unsigned int info_type;
     union {
         struct sctp_sndinfo sndinfo;
-        struct sctp_prinfo prinfo;
-        struct sctp_authinfo authinfo;
         struct sctp_sendv_spa spa;
     } info;
     int flags;
@@ -60,6 +58,15 @@ static void channel_register(
     struct rawrtc_data_channel* const channel, // referenced, not checked
     struct rawrtc_sctp_data_channel_context* const context, // referenced, not checked
     bool const raise_event
+);
+
+enum rawrtc_code sctp_transport_send(
+    struct rawrtc_sctp_transport* const transport, // not checked
+    struct mbuf* const buffer, // not checked
+    void* const info, // not checked
+    socklen_t const info_size,
+    unsigned int const info_type,
+    int const flags
 );
 
 /*
@@ -281,9 +288,9 @@ static void trace_packet(
 }
 
 /*
- * Send outstanding buffered SCTP messages.
+ * Send a deferred SCTP message.
  */
-static void sctp_send_outstanding(
+static bool sctp_send_deferred_message(
         struct mbuf* const buffer,
         void* const context,
         void* const arg
@@ -296,21 +303,9 @@ static void sctp_send_outstanding(
 
     // Determine info pointer and info size
     switch (send_context->info_type) {
-        case SCTP_SENDV_NOINFO:
-            info = NULL;
-            info_size = 0;
-            break;
         case SCTP_SENDV_SNDINFO:
             info = (void*) &send_context->info.sndinfo;
             info_size = sizeof(send_context->info.sndinfo);
-            break;
-        case SCTP_SENDV_PRINFO:
-            info = (void*) &send_context->info.prinfo;
-            info_size = sizeof(send_context->info.prinfo);
-            break;
-        case SCTP_SENDV_AUTHINFO:
-            info = (void*) &send_context->info.authinfo;
-            info_size = sizeof(send_context->info.authinfo);
             break;
         case SCTP_SENDV_SPA:
             info = (void*) &send_context->info.spa;
@@ -321,16 +316,42 @@ static void sctp_send_outstanding(
             goto out;
     }
 
-    // Send
-    error = rawrtc_sctp_transport_send(
+    // Try sending
+    DEBUG_PRINTF("Sending deferred message\n");
+    error = sctp_transport_send(
             transport, buffer, info, info_size, send_context->info_type, send_context->flags);
-    if (error) {
-        goto out;
+    switch (error) {
+        case RAWRTC_CODE_TRY_AGAIN_LATER:
+            // Stop iterating through message queue
+            return false;
+        case RAWRTC_CODE_MESSAGE_TOO_LONG:
+            DEBUG_WARNING("Incorrect message size guess, report this!\n");
+        default:
+            goto out;
+            break;
     }
 
 out:
     if (error) {
         DEBUG_WARNING("Could not send buffered message, reason: %s\n",
+                      rawrtc_code_to_str(error));
+    }
+
+    // Continue iterating through message queue
+    return true;
+}
+
+/*
+ * Send all deferred messages.
+ */
+static void sctp_send_deferred_messages(
+        struct rawrtc_sctp_transport* const transport // not checked
+) {
+    // Send buffered outgoing SCTP packets
+    enum rawrtc_code const error = rawrtc_message_buffer_clear(
+            &transport->buffered_messages_outgoing, sctp_send_deferred_message, transport);
+    if (error && error != RAWRTC_CODE_STOP_ITERATION) {
+        DEBUG_WARNING("Could not send deferred messages, reason: %s\n",
                       rawrtc_code_to_str(error));
     }
 }
@@ -473,13 +494,8 @@ static void set_state(
                 RAWRTC_DATA_CHANNEL_STATE_WAITING;
         DEBUG_INFO("SCTP connection established\n");
 
-        // Send buffered outgoing SCTP packets
-        enum rawrtc_code const error = rawrtc_message_buffer_clear(
-                &transport->buffered_messages_outgoing, sctp_send_outstanding, transport);
-        if (error) {
-            DEBUG_WARNING("Could not send buffered messages, reason: %s\n",
-                          rawrtc_code_to_str(error));
-        }
+        // Send deferred messages
+        sctp_send_deferred_messages(transport);
 
         // Open waiting channels
         // Note: This call must be above calling the state handler to prevent the user from
@@ -1244,9 +1260,9 @@ write:
     }
 
     // Can write?
-    // TODO: How often is this called? What does 'write' tell me?
     if (events & SCTP_EVENT_WRITE) {
-//        DEBUG_WARNING("TODO: CAN WRITE\n");
+        // Send all deferred messages
+        sctp_send_deferred_messages(transport);
     }
 
 out:
@@ -2081,12 +2097,6 @@ enum rawrtc_code message_send_context_create(
             case SCTP_SENDV_SNDINFO:
                 memcpy(&context->info.sndinfo, info, sizeof(context->info.sndinfo));
                 break;
-            case SCTP_SENDV_PRINFO:
-                memcpy(&context->info.prinfo, info, sizeof(context->info.prinfo));
-                break;
-            case SCTP_SENDV_AUTHINFO:
-                memcpy(&context->info.authinfo, info, sizeof(context->info.authinfo));
-                break;
             case SCTP_SENDV_SPA:
                 memcpy(&context->info.spa, info, sizeof(context->info.spa));
                 break;
@@ -2111,8 +2121,86 @@ out:
 }
 
 /*
+ * Send a message (non-deferred) via the SCTP transport.
+ */
+enum rawrtc_code sctp_transport_send(
+        struct rawrtc_sctp_transport* const transport, // not checked
+        struct mbuf* const buffer, // not checked
+        void* const info, // not checked
+        socklen_t const info_size,
+        unsigned int const info_type,
+        int const flags
+) {
+    uint16_t* send_flags;
+    bool eor_set;
+    size_t length;
+    ssize_t written;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
+
+    // Check state
+    if (transport->state != RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // Get reference to send flags
+    switch (info_type) {
+        case SCTP_SENDV_SNDINFO:
+            send_flags = &((struct sctp_sndinfo* const) info)->snd_flags;
+            break;
+        case SCTP_SENDV_SPA:
+            send_flags = &((struct sctp_sendv_spa* const) info)->sendv_sndinfo.snd_flags;
+            break;
+        default:
+            return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // EOR set?
+    eor_set = *send_flags & SCTP_EOR ? true : false;
+
+    // Send until buffer is empty
+    do {
+        size_t const left = mbuf_get_left(buffer);
+
+        // Carefully chunk the buffer
+        if (left > usrsctp_sysctl_get_sctp_sendspace()) {
+            length = usrsctp_sysctl_get_sctp_sendspace();
+
+            // Unset EOR flag
+            *send_flags &= ~SCTP_EOR;
+        } else {
+            length = left;
+        }
+
+        // Send
+        DEBUG_PRINTF("Sending %zu/%zu bytes\n", length, left);
+        written = usrsctp_sendv(
+                transport->socket, mbuf_buf(buffer), length, NULL, 0,
+                info, info_size, info_type, flags);
+        if (written < 0) {
+            goto out;
+            return rawrtc_error_to_code(errno);
+        }
+
+        // TODO: Remove
+        if (written < length) {
+            DEBUG_WARNING("Sent %zu/%zu bytes\n", length, written);
+        }
+
+        // Update buffer position
+        mbuf_advance(buffer, written);
+    } while (mbuf_get_left(buffer) > 0);
+
+out:
+    // Reset EOR flag
+    if (eor_set) {
+        *send_flags |= SCTP_EOR;
+    }
+
+    return error;
+}
+
+/*
  * Send a message via the SCTP transport.
- * TODO: Add partial reliability options.
  */
 enum rawrtc_code rawrtc_sctp_transport_send(
         struct rawrtc_sctp_transport* const transport,
@@ -2122,7 +2210,6 @@ enum rawrtc_code rawrtc_sctp_transport_send(
         unsigned int const info_type,
         int const flags
 ) {
-    ssize_t length;
     struct send_context* context;
     enum rawrtc_code error;
 
@@ -2131,21 +2218,26 @@ enum rawrtc_code rawrtc_sctp_transport_send(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check state
-    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        return RAWRTC_CODE_INVALID_STATE;
-    }
-
-    // Send directly if connected
-    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-        // TODO: Handle EAGAIN & co.
-        length = usrsctp_sendv(
-                transport->socket, mbuf_buf(buffer), mbuf_get_left(buffer), NULL, 0,
-                info, info_size, info_type, flags);
-        if (length < 0) {
-            return rawrtc_error_to_code(errno);
+    // Send directly (if connected and no outstanding messages)
+    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED &&
+            !list_head(&transport->buffered_messages_outgoing)) {
+        // Try sending
+        DEBUG_PRINTF("Message queue is empty, sending directly\n");
+        error = sctp_transport_send(
+                transport, buffer, info, info_size, info_type, flags);
+        switch (error) {
+            case RAWRTC_CODE_SUCCESS:
+                // Done
+                return RAWRTC_CODE_SUCCESS;
+            case RAWRTC_CODE_TRY_AGAIN_LATER:
+                DEBUG_PRINTF("Need to buffer message and wait for a write request\n");
+                break;
+            case RAWRTC_CODE_MESSAGE_TOO_LONG:
+                DEBUG_WARNING("Incorrect message size guess, report this!\n");
+                return error;
+            default:
+                return error;
         }
-        return RAWRTC_CODE_SUCCESS;
     }
 
     // Create message context (for buffering)

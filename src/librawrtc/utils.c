@@ -80,6 +80,8 @@ char const* rawrtc_code_to_str(
             return "message too long";
         case RAWRTC_CODE_TRY_AGAIN_LATER:
             return "try again later";
+        case RAWRTC_CODE_STOP_ITERATION:
+            return "stop iteration";
         default:
             return "(no error translation)";
     }

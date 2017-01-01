@@ -261,9 +261,8 @@ static void data_channel_open_handler(
     enum rawrtc_code error;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
 
-    // Compose message (128 KiB)
-    // TODO: Find out why messages > 128 KiB lead to a segmentation fault
-    buffer = mbuf_alloc(1 << 17);
+    // Compose message (256 KiB)
+    buffer = mbuf_alloc(1 << 18);
     EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
     EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
     mbuf_set_pos(buffer, 0);
