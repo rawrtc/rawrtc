@@ -1,6 +1,10 @@
 #include <rawrtc.h>
 #include "message_buffer.h"
 
+#define DEBUG_MODULE "message-buffer"
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#include "debug.h"
+
 /*
  * Get the sum of bytes of all message buffer's left.
  */
@@ -145,6 +149,7 @@ enum rawrtc_code rawrtc_message_buffer_merge(
     // Get first message (or return none)
     le = list_head(message_buffer);
     if (!le) {
+        DEBUG_PRINTF("Nothing to merge\n");
         *bufferp = NULL;
         *contextp = NULL;
         return RAWRTC_CODE_NO_VALUE;
@@ -153,6 +158,8 @@ enum rawrtc_code rawrtc_message_buffer_merge(
     // Get context from first message
     buffered_message = le->data;
     context = buffered_message->context;
+
+    DEBUG_PRINTF("Merging %zu buffered messages\n", list_count(message_buffer));
 
     // Handle each message
     for (le; le != NULL; le = le->next) {
@@ -169,6 +176,8 @@ enum rawrtc_code rawrtc_message_buffer_merge(
                 if (err) {
                     goto out;
                 }
+
+                DEBUG_PRINTF("Resized buffer to %zu bytes\n", buffer->size);
 
                 // Skip to end (needed to use `mbuf_write_mem` for merging)
                 mbuf_skip_to_end(buffer);
@@ -201,6 +210,7 @@ out:
 
             // Undo resize
             mbuf_trim(buffer);
+            DEBUG_PRINTF("Resized buffer back to %zu bytes due to error\n", buffer->size);
         }
     } else {
         // Set pointer
@@ -209,6 +219,7 @@ out:
 
         // Dereference all messages
         list_flush(message_buffer);
+        DEBUG_PRINTF("Merging complete\n");
     }
 
     return rawrtc_error_to_code(err);
