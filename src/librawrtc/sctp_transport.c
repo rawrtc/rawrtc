@@ -40,7 +40,7 @@ static uint16_t const sctp_events[] = {
 //    SCTP_REMOTE_ERROR,
 //    SCTP_SHUTDOWN_EVENT,
 //    SCTP_ADAPTATION_INDICATION,
-//    SCTP_SEND_FAILED_EVENT,
+    SCTP_SEND_FAILED_EVENT,
     SCTP_STREAM_RESET_EVENT,
     SCTP_STREAM_CHANGE_EVENT,
 //    SCTP_SENDER_DRY_EVENT
@@ -638,6 +638,11 @@ static void handle_notification(
     switch (notification->sn_header.sn_type) {
         case SCTP_ASSOC_CHANGE:
             handle_association_change_event(transport, &notification->sn_assoc_change);
+            break;
+        case SCTP_SEND_FAILED_EVENT:
+            // TODO: Handle
+            DEBUG_WARNING("TODO: HANDLE SEND FAILED\n");
+            // handle_send_failed_event(transport, &(notification->sn_strreset_event));
             break;
         case SCTP_STREAM_RESET_EVENT:
             // TODO: Handle
@@ -1878,22 +1883,23 @@ static enum rawrtc_code channel_close_handler(
     // Get SCTP transport & context
     transport = channel->transport->transport;
     context = channel->transport_arg;
-    DEBUG_NOTICE("Closing channel with SID %"PRIu16"\n", context->sid);
-
-    // TODO: Reset outgoing streams
 
     // Dereference channel and clear pointer (if channel was registered before)
     // Note: The context will be NULL if the channel was not registered before
     if (context) {
+        DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", context->sid);
+
+        // TODO: Reset outgoing streams
+
         // Safety check
         if (transport->channels[context->sid] == channel) {
             transport->channels[context->sid] = mem_deref(channel);
         } else {
             DEBUG_WARNING("Invalid channel instance in slot. Please report this.\n");
         }
-    }
 
-    // TODO: Anything else required here?
+        // TODO: Anything else required here?
+    }
 
     // Done
     return RAWRTC_CODE_SUCCESS;
@@ -2178,8 +2184,8 @@ enum rawrtc_code sctp_transport_send(
 
         // Carefully chunk the buffer
         // TODO: Use the partial delivery point value
-        if (left > usrsctp_sysctl_get_sctp_sendspace() / 2) {
-            length = usrsctp_sysctl_get_sctp_sendspace() / 2;
+        if (left > usrsctp_sysctl_get_sctp_sendspace() / 4) {
+            length = usrsctp_sysctl_get_sctp_sendspace() / 4;
 
             // Unset EOR flag
             *send_flags &= ~SCTP_EOR;
@@ -2192,22 +2198,26 @@ enum rawrtc_code sctp_transport_send(
         written = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), length, NULL, 0,
                 info, info_size, info_type, flags);
+        DEBUG_NOTICE("usrsctp_sendv(socket=%p, buffer=%p, length=%zu) -> %zd (errno: %m)\n",
+                     transport->socket, mbuf_buf(buffer), length, written, errno);
         if (written < 0) {
             error = rawrtc_error_to_code(errno);
             goto out;
         }
 
-        // TODO: Why don't we just get `EAGAIN`?
+        // TODO: Remove
         if (written == 0) {
             DEBUG_NOTICE("@tuexen: usrsctp_sendv returned 0\n");
             error = RAWRTC_CODE_TRY_AGAIN_LATER;
             goto out;
         }
 
-        // TODO: Remove
+        // If not all bytes have been written, this obviously means that usrsctp's buffer is full
+        // and we need to try again later.
         if (written < length) {
-//            DEBUG_WARNING("Sent %zu/%zu bytes\n", written, length);
-            (void) error;
+            // TODO: Comment in and remove section above
+//            error = RAWRTC_CODE_TRY_AGAIN_LATER;
+//            goto out;
         }
 
         // Update buffer position

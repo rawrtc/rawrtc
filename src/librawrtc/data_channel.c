@@ -31,10 +31,6 @@ void rawrtc_data_channel_set_state(
             break;
 
         case RAWRTC_DATA_CHANNEL_STATE_CLOSING:
-            // Note: The transport may have the last reference to the channel, so we need to
-            //       reference the channel until it is closed.
-            mem_ref(channel);
-
             // Call transport close handler
             error = channel->transport->channel_close(channel);
             if (error) {
@@ -44,15 +40,13 @@ void rawrtc_data_channel_set_state(
                 // Close anyway
                 rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
             }
+            break;
 
         case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
             // Call handler
             if (channel->close_handler) {
                 channel->close_handler(channel->arg);
             }
-
-            // Note: See note in CLOSING for reason
-            mem_deref(channel);
             break;
         default:
             break;
