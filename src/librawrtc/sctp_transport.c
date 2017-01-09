@@ -462,7 +462,7 @@ static void set_state(
 
         // Close all data channels
         // TODO: Close non-open channels as well?
-        set_data_channel_states(transport, RAWRTC_DATA_CHANNEL_STATE_CLOSED, &from_state);
+        set_data_channel_states(transport, RAWRTC_DATA_CHANNEL_STATE_CLOSING, &from_state);
 
         // Remove from DTLS transport
         // Note: No NULL checking needed as the function will do that for us
@@ -1502,7 +1502,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
-#ifdef SCTP_DEBUG
+//#ifdef SCTP_DEBUG
     rand_str(trace_handle_id, sizeof(trace_handle_id));
     error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
     if (error) {
@@ -1516,7 +1516,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
             DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
         }
     }
-#endif
+//#endif
 
     // Create SCTP socket
     DEBUG_PRINTF("Creating SCTP socket\n");
@@ -1878,6 +1878,9 @@ static enum rawrtc_code channel_close_handler(
     // Get SCTP transport & context
     transport = channel->transport->transport;
     context = channel->transport_arg;
+    DEBUG_NOTICE("Closing channel with SID %"PRIu16"\n", context->sid);
+
+    // TODO: Reset outgoing streams
 
     // Dereference channel and clear pointer (if channel was registered before)
     // Note: The context will be NULL if the channel was not registered before
@@ -2196,6 +2199,7 @@ enum rawrtc_code sctp_transport_send(
 
         // TODO: Why don't we just get `EAGAIN`?
         if (written == 0) {
+            DEBUG_NOTICE("@tuexen: usrsctp_sendv returned 0\n");
             error = RAWRTC_CODE_TRY_AGAIN_LATER;
             goto out;
         }

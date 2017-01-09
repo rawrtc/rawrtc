@@ -30,19 +30,29 @@ void rawrtc_data_channel_set_state(
             }
             break;
 
-        case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
-            // Call handler
-            // Note: The handler needs to be called before the channel is being closed because
-            //       there might be no reference afterwards.
-            if (channel->close_handler) {
-                channel->close_handler(channel->arg);
-            }
+        case RAWRTC_DATA_CHANNEL_STATE_CLOSING:
+            // Note: The transport may have the last reference to the channel, so we need to
+            //       reference the channel until it is closed.
+            mem_ref(channel);
 
             // Call transport close handler
             error = channel->transport->channel_close(channel);
             if (error) {
-                DEBUG_WARNING("Unable to close data channel, reason: %s\n", rawrtc_code_to_str(error));
+                DEBUG_WARNING("Unable to close data channel, reason: %s\n",
+                              rawrtc_code_to_str(error));
+
+                // Close anyway
+                rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
             }
+
+        case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
+            // Call handler
+            if (channel->close_handler) {
+                channel->close_handler(channel->arg);
+            }
+
+            // Note: See note in CLOSING for reason
+            mem_deref(channel);
             break;
         default:
             break;
@@ -56,6 +66,13 @@ static void rawrtc_data_channel_destroy(
         void* const arg
 ) {
     struct rawrtc_data_channel* const channel = arg;
+
+    // Unset all handlers to prevent callbacks after unreferencing
+    channel->message_handler = NULL;
+    channel->close_handler = NULL;
+    channel->error_handler = NULL;
+    channel->buffered_amount_low_handler = NULL;
+    channel->open_handler = NULL;
 
     // Close channel
     // Note: Don't close before `NEW` because there's uninitialised stuff before `NEW`.
@@ -239,8 +256,10 @@ enum rawrtc_code rawrtc_data_channel_close(
         return RAWRTC_CODE_SUCCESS;
     }
 
-    // Update state
-    rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
+    // Update state (if not already closing)
+    if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSING) {
+        rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
+    }
     return RAWRTC_CODE_SUCCESS;
 }
 

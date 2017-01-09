@@ -252,6 +252,7 @@ enum rawrtc_data_channel_state {
     // Note: This state indicates the channel must be opened once the transport is open
     RAWRTC_DATA_CHANNEL_STATE_WAITING,
     RAWRTC_DATA_CHANNEL_STATE_OPEN,
+    RAWRTC_DATA_CHANNEL_STATE_CLOSING,
     RAWRTC_DATA_CHANNEL_STATE_CLOSED
 };
 

@@ -98,6 +98,9 @@ enum rawrtc_code rawrtc_error_to_code(
         case 0:
             return RAWRTC_CODE_SUCCESS;
         case EAGAIN:
+#if (EAGAIN != EWOULDBLOCK)
+        case EWOULDBLOCK:
+#endif
             return RAWRTC_CODE_TRY_AGAIN_LATER;
         case EAUTH:
             return RAWRTC_CODE_INVALID_CERTIFICATE;
