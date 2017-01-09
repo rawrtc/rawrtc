@@ -268,7 +268,7 @@ static void data_channel_open_handler(
     mbuf_set_pos(buffer, 0);
 
     // Send message
-    DEBUG_PRINTF("Sending %zu bytes\n", mbuf_get_left(buffer));
+    DEBUG_PRINTF("(%s) Sending %zu bytes\n", client->name, mbuf_get_left(buffer));
     error = rawrtc_data_channel_send(channel->channel, buffer, true);
     if (error) {
         DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));

@@ -5,7 +5,7 @@
 #include <rawrtc.h>
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "redirect-transport-app"
+#define DEBUG_MODULE "redirect-transport-interop-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 

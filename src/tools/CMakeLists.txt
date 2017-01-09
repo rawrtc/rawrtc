@@ -20,8 +20,8 @@ target_link_libraries(dtls-transport
 install(TARGETS dtls-transport
         DESTINATION bin)
 
-# Tool: redirect-transport
-add_executable(redirect-transport redirect-transport.c)
+# Tool: redirect-transport-interop
+add_executable(redirect-transport redirect-transport-interop.c)
 target_link_libraries(redirect-transport
         rawrtc)
 install(TARGETS redirect-transport
@@ -40,3 +40,11 @@ target_link_libraries(data-channel-sctp
         rawrtc)
 install(TARGETS data-channel-sctp
         DESTINATION bin)
+
+# Tool: data-channel-interop
+add_executable(data-channel-interop data-channel-interop.c)
+target_link_libraries(data-channel-interop
+        rawrtc)
+install(TARGETS data-channel-interop
+        DESTINATION bin)
+

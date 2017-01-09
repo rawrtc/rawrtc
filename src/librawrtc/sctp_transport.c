@@ -1069,6 +1069,9 @@ static void handle_application_message(
     // Pass message to handler
     if (channel->message_handler) {
         channel->message_handler(buffer, message_flags, channel->arg);
+    } else {
+        DEBUG_WARNING("No message handler, message of %zu bytes has been discarded\n",
+                      mbuf_get_left(buffer));
     }
 
     // Dereference (if needed) and done
@@ -1261,8 +1264,15 @@ write:
 
     // Can write?
     if (events & SCTP_EVENT_WRITE) {
-        // Send all deferred messages
-        sctp_send_deferred_messages(transport);
+        // Send all deferred messages (if not already sending)
+        // TODO: Check if this flag is really necessary
+        if (!transport->sending_in_progress) {
+            transport->sending_in_progress = true;
+            sctp_send_deferred_messages(transport);
+            transport->sending_in_progress = false;
+        } else {
+            DEBUG_WARNING("Sending still in progress!\n");
+        }
     }
 
 out:
@@ -1492,6 +1502,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
+#ifdef SCTP_DEBUG
     rand_str(trace_handle_id, sizeof(trace_handle_id));
     error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
     if (error) {
@@ -1505,6 +1516,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
             DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
         }
     }
+#endif
 
     // Create SCTP socket
     DEBUG_PRINTF("Creating SCTP socket\n");
@@ -2135,7 +2147,7 @@ enum rawrtc_code sctp_transport_send(
     bool eor_set;
     size_t length;
     ssize_t written;
-    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
+    enum rawrtc_code error;
 
     // Check state
     if (transport->state != RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
@@ -2162,8 +2174,9 @@ enum rawrtc_code sctp_transport_send(
         size_t const left = mbuf_get_left(buffer);
 
         // Carefully chunk the buffer
-        if (left > usrsctp_sysctl_get_sctp_sendspace()) {
-            length = usrsctp_sysctl_get_sctp_sendspace();
+        // TODO: Use the partial delivery point value
+        if (left > usrsctp_sysctl_get_sctp_sendspace() / 2) {
+            length = usrsctp_sysctl_get_sctp_sendspace() / 2;
 
             // Unset EOR flag
             *send_flags &= ~SCTP_EOR;
@@ -2172,23 +2185,33 @@ enum rawrtc_code sctp_transport_send(
         }
 
         // Send
-        DEBUG_PRINTF("Sending %zu/%zu bytes\n", length, left);
+        DEBUG_PRINTF("Try sending %zu/%zu bytes\n", length, left);
         written = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), length, NULL, 0,
                 info, info_size, info_type, flags);
         if (written < 0) {
+            error = rawrtc_error_to_code(errno);
             goto out;
-            return rawrtc_error_to_code(errno);
+        }
+
+        // TODO: Why don't we just get `EAGAIN`?
+        if (written == 0) {
+            error = RAWRTC_CODE_TRY_AGAIN_LATER;
+            goto out;
         }
 
         // TODO: Remove
         if (written < length) {
-            DEBUG_WARNING("Sent %zu/%zu bytes\n", length, written);
+//            DEBUG_WARNING("Sent %zu/%zu bytes\n", written, length);
+            (void) error;
         }
 
         // Update buffer position
         mbuf_advance(buffer, written);
     } while (mbuf_get_left(buffer) > 0);
+
+    // Done
+    error = RAWRTC_CODE_SUCCESS;
 
 out:
     // Reset EOR flag

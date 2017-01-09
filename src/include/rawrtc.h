@@ -710,6 +710,7 @@ struct rawrtc_sctp_transport {
     uint16_t n_channels;
     FILE* trace_handle;
     struct socket* socket;
+    bool sending_in_progress;
     struct rawrtc_data_transport* data_transport; // referenced
 };
 
