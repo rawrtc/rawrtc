@@ -30,8 +30,9 @@ struct send_context {
     int flags;
 };
 
-// Initialised flag
-static bool initialized = false;
+// Initialised counter & usrsctp timer
+static uint_fast32_t initialized = 0;
+static struct tmr usrsctp_timer;
 
 // Events to subscribe to
 static uint16_t const sctp_events[] = {
@@ -1286,6 +1287,21 @@ out:
 }
 
 /*
+ * Handle SCTP timer tick.
+ */
+static void timer_handler(
+        void* const arg
+) {
+    (void) arg;
+
+    // Restart timer
+    tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+
+    // Pass delta ms to usrsctp
+    usrsctp_handle_timers(RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT);
+}
+
+/*
  * Handle incoming DTLS messages.
  */
 static void dtls_receive_handler(
@@ -1381,6 +1397,19 @@ static void rawrtc_sctp_transport_destroy(
     mem_deref(transport->channels);
     list_flush(&transport->buffered_messages_outgoing);
     mem_deref(transport->dtls_transport);
+
+    // Decrease in-use counter
+    --initialized;
+
+    // Close usrsctp (if needed)
+    if (initialized == 0) {
+        // Cancel timer
+        tmr_cancel(&usrsctp_timer);
+
+        // Close
+        usrsctp_finish();
+        DEBUG_NOTICE("Closed usrsctp\n");
+    }
 }
 
 /*
@@ -1436,8 +1465,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Initialise usrsctp
-    if (!initialized) {
+    // Initialise usrsctp (if needed)
+    if (initialized == 0) {
         DEBUG_PRINTF("Initialising usrsctp\n");
         usrsctp_init(0, sctp_packet_handler, dbg_info);
 
@@ -1478,8 +1507,9 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         // See: https://tools.ietf.org/html/rfc6458#section-8.1.20
         usrsctp_sysctl_set_sctp_default_frag_interleave(2);
 
-        // Initialised
-        initialized = true;
+        // Start timers
+        tmr_init(&usrsctp_timer);
+        tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
     }
 
     // Allocate
@@ -1487,6 +1517,10 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
+
+    // Increase in-use counter
+    // Note: This needs to be below allocation to ensure the counter is decreased properly on error
+    ++initialized;
 
     // Set fields/reference
     transport->state = RAWRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
