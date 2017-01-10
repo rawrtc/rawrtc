@@ -2,7 +2,6 @@
 
 enum {
     RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT = 10, // TODO: @ruengeler why 10ms?
-    RAWRTC_SCTP_TRANSPORT_DEFAULT_BUFFER = 65536,
     RAWRTC_SCTP_TRANSPORT_DEFAULT_PORT = 5000,
     // TODO: Suggest re-adding reconfiguration of number of streams to spec
     // because this requires too many streams to allocate who eat up memory

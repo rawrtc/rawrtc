@@ -33,6 +33,7 @@ struct send_context {
 // Initialised counter & usrsctp timer
 static uint_fast32_t initialized = 0;
 static struct tmr usrsctp_timer;
+static size_t chunk_size;
 
 // Events to subscribe to
 static uint16_t const sctp_events[] = {
@@ -1219,7 +1220,7 @@ read:
         // TODO: Can we get the COMPLETE message size or just the current message size?
 
         // Create buffer
-        buffer = mbuf_alloc(RAWRTC_SCTP_TRANSPORT_DEFAULT_BUFFER);
+        buffer = mbuf_alloc(chunk_size);
         if (!buffer) {
             DEBUG_WARNING("Cannot allocate buffer, no memory");
             // TODO: This needs to be handled in a better way, otherwise it's probably going
@@ -1541,7 +1542,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
-//#ifdef SCTP_DEBUG
+#ifdef SCTP_DEBUG
     rand_str(trace_handle_id, sizeof(trace_handle_id));
     error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
     if (error) {
@@ -1555,7 +1556,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
             DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
         }
     }
-//#endif
+#endif
 
     // Create SCTP socket
     DEBUG_PRINTF("Creating SCTP socket\n");
@@ -1582,6 +1583,29 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
+    }
+
+    // Determine chunk size
+    if (initialized == 1) {
+        socklen_t option_size = sizeof(int); // PD point is int according to spec
+        if (usrsctp_getsockopt(
+                transport->socket, IPPROTO_SCTP, SCTP_PARTIAL_DELIVERY_POINT,
+                &option_value, &option_size)) {
+            DEBUG_WARNING("Could not retrieve partial delivery point, reason: %m\n", errno);
+            error = rawrtc_error_to_code(errno);
+            goto out;
+        }
+
+        // Check value
+        if (option_size != sizeof(int) || option_value < 1) {
+            DEBUG_WARNING("Invalid partial delivery point value: %d\n", option_value);
+            error = RAWRTC_CODE_INITIALISE_FAIL;
+            goto out;
+        }
+
+        // Store value
+        chunk_size = (size_t) option_value;
+        DEBUG_PRINTF("Chunk size: %zu\n", chunk_size);
     }
 
     // Enable the Stream Reconfiguration extension
@@ -2218,8 +2242,8 @@ enum rawrtc_code sctp_transport_send(
 
         // Carefully chunk the buffer
         // TODO: Use the partial delivery point value
-        if (left > (usrsctp_sysctl_get_sctp_sendspace() / 2)) {
-            length = usrsctp_sysctl_get_sctp_sendspace() / 2;
+        if (left > chunk_size) {
+            length = chunk_size;
 
             // Unset EOR flag
             send_info->snd_flags &= ~SCTP_EOR;
