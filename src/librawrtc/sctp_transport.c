@@ -2152,7 +2152,7 @@ enum rawrtc_code sctp_transport_send(
         unsigned int const info_type,
         int const flags
 ) {
-    uint16_t* send_flags;
+    struct sctp_sndinfo* send_info;
     bool eor_set;
     size_t length;
     ssize_t written;
@@ -2166,17 +2166,17 @@ enum rawrtc_code sctp_transport_send(
     // Get reference to send flags
     switch (info_type) {
         case SCTP_SENDV_SNDINFO:
-            send_flags = &((struct sctp_sndinfo* const) info)->snd_flags;
+            send_info = (struct sctp_sndinfo* const) info;
             break;
         case SCTP_SENDV_SPA:
-            send_flags = &((struct sctp_sendv_spa* const) info)->sendv_sndinfo.snd_flags;
+            send_info = &((struct sctp_sendv_spa* const) info)->sendv_sndinfo;
             break;
         default:
             return RAWRTC_CODE_INVALID_STATE;
     }
 
     // EOR set?
-    eor_set = *send_flags & SCTP_EOR ? true : false;
+    eor_set = send_info->snd_flags & SCTP_EOR ? true : false;
 
     // Send until buffer is empty
     do {
@@ -2184,13 +2184,18 @@ enum rawrtc_code sctp_transport_send(
 
         // Carefully chunk the buffer
         // TODO: Use the partial delivery point value
-        if (left > usrsctp_sysctl_get_sctp_sendspace() / 4) {
-            length = usrsctp_sysctl_get_sctp_sendspace() / 4;
+        if (left > (usrsctp_sysctl_get_sctp_sendspace() / 2)) {
+            length = usrsctp_sysctl_get_sctp_sendspace() / 2;
 
             // Unset EOR flag
-            *send_flags &= ~SCTP_EOR;
+            send_info->snd_flags &= ~SCTP_EOR;
         } else {
             length = left;
+
+            // Reset EOR flag
+            if (eor_set) {
+                send_info->snd_flags |= SCTP_EOR;
+            }
         }
 
         // Send
@@ -2198,8 +2203,15 @@ enum rawrtc_code sctp_transport_send(
         written = usrsctp_sendv(
                 transport->socket, mbuf_buf(buffer), length, NULL, 0,
                 info, info_size, info_type, flags);
-        DEBUG_NOTICE("usrsctp_sendv(socket=%p, buffer=%p, length=%zu) -> %zd (errno: %m)\n",
-                     transport->socket, mbuf_buf(buffer), length, written, errno);
+#ifdef SCTP_DEBUG
+        DEBUG_PRINTF("usrsctp_sendv(socket=%p, buffer=%p, length=%zu/%zu, info={sid: %"PRIu16", "
+                     "ppid: %"PRIu32", eor: %s (was %s}) -> %zd (errno: %m)\n",
+                     transport->socket, mbuf_buf(buffer), length, left, send_info->snd_sid,
+                     ntohl(send_info->snd_ppid),
+                     send_info->snd_flags & SCTP_EOR ? "true" : "false",
+                     eor_set ? "true" : "false",
+                     written, errno);
+#endif
         if (written < 0) {
             error = rawrtc_error_to_code(errno);
             goto out;
@@ -2230,7 +2242,7 @@ enum rawrtc_code sctp_transport_send(
 out:
     // Reset EOR flag
     if (eor_set) {
-        *send_flags |= SCTP_EOR;
+        send_info->snd_flags |= SCTP_EOR;
     }
 
     return error;
