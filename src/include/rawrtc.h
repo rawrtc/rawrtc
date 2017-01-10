@@ -20,6 +20,7 @@
 
 #include <re.h>
 #include <rew.h>
+#include <usrsctp.h>
 
 /*
  * Return codes.
@@ -706,7 +707,8 @@ struct rawrtc_sctp_transport {
     rawrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
     struct list buffered_messages_outgoing;
-    struct list buffered_dcep_chunks_incoming;
+    struct mbuf* buffer_dcep_inbound;
+    struct sctp_rcvinfo info_dcep_inbound;
     struct rawrtc_data_channel** channels;
     uint16_t n_channels;
     FILE* trace_handle;
@@ -722,7 +724,8 @@ struct rawrtc_sctp_transport {
 struct rawrtc_sctp_data_channel_context {
     uint16_t sid;
     bool can_send_unordered;
-    struct list buffered_application_chunks_incoming;
+    struct mbuf* buffer_inbound;
+    struct sctp_rcvinfo info_inbound;
 };
 
 /*

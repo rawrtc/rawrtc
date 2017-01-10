@@ -891,96 +891,77 @@ out:
 }
 
 /*
- * Copy receive info data.
- */
-enum rawrtc_code receive_info_alloc(
-        struct sctp_rcvinfo** const infop, // de-referenced, not checked
-        struct sctp_rcvinfo* const info // not checked
-) {
-    struct sctp_rcvinfo* copied_info;
-
-    // Allocate context
-    copied_info = mem_alloc(sizeof(*copied_info), NULL);
-    if (!copied_info) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Copy info data
-    memcpy(copied_info, info, sizeof(*copied_info));
-
-    // Set pointer & done
-    *infop = copied_info;
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Buffer incoming messages and set `bufferp`'s and `infop`'s value
- * in case the message is complete and should be handled. `is_copy`'s
- * value will be set to `true` in case the values above need to be
- * un-referenced once handling is complete.
+ * Buffer incoming messages
+ *
+ * Return `RAWRTC_CODE_SUCCESS` in case the message is complete and
+ * should be handled. Otherwise, return `RAWRTC_CODE_NO_VALUE`.
  */
 static enum rawrtc_code buffer_message_received_raise_complete(
-        struct mbuf** const bufferp, // de-referenced, not checked
-        struct sctp_rcvinfo** const infop, // de-referenced, not checked
-        bool* const is_copy, // de-referenced, not checked
-        struct list* message_buffer, // not checked
-        struct mbuf* const buffer, // not checked
+        struct mbuf** const buffer_inboundp, // de-referenced, not checked
+        struct sctp_rcvinfo* const info_inboundp, // de-referenced, not checked
+        struct mbuf* const message_buffer, // not checked
         struct sctp_rcvinfo* const info, // not checked
         int const flags
 ) {
-    bool const first = list_head(message_buffer) == NULL;
     bool const complete =
             (flags & MSG_EOR) &&
             info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL &&
             info->rcv_ppid != RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL;
     enum rawrtc_code error;
-    struct sctp_rcvinfo* copied_info;
 
-    // First and last message?
-    if (first && complete) {
-        DEBUG_PRINTF("Incoming message of size %zu is already complete\n", mbuf_get_left(buffer));
-        *bufferp = buffer;
-        *infop = info;
-        *is_copy = false;
-        return RAWRTC_CODE_SUCCESS;
-    }
+    // Reference buffer and copy receive info (if first)
+    if (*buffer_inboundp == NULL) {
+        // Reference & set buffer
+        *buffer_inboundp = mem_ref(message_buffer);
 
-    // Create message context (if first)
-    if (first) {
-        error = receive_info_alloc(&copied_info, info);
-        if (error) {
-            return error;
+        // Copy receive info
+        memcpy(info_inboundp, info, sizeof(*info));
+
+        // Complete?
+        if (complete) {
+            DEBUG_PRINTF("Incoming message of size %zu is already complete\n",
+                         mbuf_get_left(message_buffer));
+            error = RAWRTC_CODE_SUCCESS;
+            goto out;
         }
-    } else {
-        copied_info = NULL;
+
+        // Clear headroom (if any)
+        if ((*buffer_inboundp)->pos > 0) {
+            error = rawrtc_error_to_code(mbuf_shift(*buffer_inboundp, -(*buffer_inboundp)->pos));
+            if (error) {
+                goto out;
+            }
+        }
+
+        // Skip to end (for upcoming chunks)
+        mbuf_skip_to_end(*buffer_inboundp);
     }
 
-    // Buffer message
-    error = rawrtc_message_buffer_append(message_buffer, buffer, copied_info);
-    mem_deref(copied_info);
+    // Copy message into existing buffer
+    error = rawrtc_error_to_code(mbuf_write_mem(
+            *buffer_inboundp, mbuf_buf(message_buffer), mbuf_get_left(message_buffer)));
     if (error) {
-        return error;
+        goto out;
     }
-    DEBUG_PRINTF("Buffered incoming message chunk of size %zu\n", mbuf_get_left(buffer));
+    DEBUG_PRINTF("Buffered incoming message chunk of size %zu\n", mbuf_get_left(message_buffer));
 
     // Stop (if not last message)
     if (!complete) {
-        // Set pointer & done
-        *bufferp = NULL;
-        *infop = NULL;
-        return RAWRTC_CODE_SUCCESS;
+        error = RAWRTC_CODE_NO_VALUE;
+        goto out;
     }
 
-    // Merge all messages (if last message)
-    error = rawrtc_message_buffer_merge(bufferp, (void** const) infop, message_buffer);
-    if (error) {
-        return error;
-    }
-
-    // Done
+    // Set position & done
+    mbuf_set_pos(*buffer_inboundp, 0);
     DEBUG_PRINTF("Merged incoming message chunks to size %zu\n", mbuf_get_left(*bufferp));
-    *is_copy = true;
-    return RAWRTC_CODE_SUCCESS;
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
+        // Discard the message
+        *buffer_inboundp = mem_deref(*buffer_inboundp);
+    }
+    return error;
 }
 
 /*
@@ -988,23 +969,21 @@ static enum rawrtc_code buffer_message_received_raise_complete(
  */
 static void handle_application_message(
         struct rawrtc_sctp_transport* const transport, // not checked
-        struct mbuf* const current_buffer, // not checked
-        struct sctp_rcvinfo* const current_info, // not checked
+        struct mbuf* const buffer, // not checked
+        struct sctp_rcvinfo* info, // not checked
         int const flags
 ) {
-    struct rawrtc_sctp_data_channel_context* context;
     enum rawrtc_code error;
-    struct mbuf* buffer;
-    struct sctp_rcvinfo* info;
-    bool is_copy;
+    struct rawrtc_sctp_data_channel_context* context = NULL;
     enum rawrtc_data_channel_message_flag message_flags = RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE;
 
     // Get channel and context
-    struct rawrtc_data_channel* const channel = transport->channels[current_info->rcv_sid];
+    struct rawrtc_data_channel* const channel = transport->channels[info->rcv_sid];
     if (!channel) {
         DEBUG_WARNING("Received application message on an invalid channel with SID %"PRIu16"\n",
-                      current_info->rcv_sid);
-        goto error;
+                      info->rcv_sid);
+        error = RAWRTC_CODE_INVALID_MESSAGE;
+        goto out;
     }
     context = channel->transport_arg;
 
@@ -1013,15 +992,21 @@ static void handle_application_message(
     //       (EOR)? Guessing: Once first chunk has been received.
     context->can_send_unordered = true;
 
-    // Handle empty / Buffer if partially delivery is off / deliver directly
-    if (current_info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY ||
-            current_info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY) {
-        buffer = current_buffer;
-        info = current_info;
-        is_copy = false;
+    // Handle empty / Buffer if partial delivery is off / deliver directly
+    if (info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY ||
+            info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY) {
+        // Incomplete empty message?
+        if (flags & SCTP_EOR) {
+            DEBUG_WARNING("Empty but incomplete message, WTF are you doing?\n");
+            error = RAWRTC_CODE_INVALID_MESSAGE;
+            goto out;
+        }
+
+        // Reference (because we un-reference at the end and copy info)
+        context->buffer_inbound = mem_ref(buffer);
 
         // Let the buffer appear to be empty
-        mbuf_skip_to_end(buffer);
+        mbuf_skip_to_end(context->buffer_inbound);
 
         // Empty message is complete
         message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
@@ -1029,25 +1014,29 @@ static void handle_application_message(
     } else if (!channel->options->deliver_partially) {
         // Buffer message (if needed) and get complete message (if any)
         error = buffer_message_received_raise_complete(
-                &buffer, &info, &is_copy,
-                &context->buffered_application_chunks_incoming,
-                current_buffer, current_info, flags);
-        if (error) {
-            DEBUG_WARNING("Could not buffer/merge application message, reason: %s\n",
-                          rawrtc_code_to_str(error));
-            goto error;
+                &context->buffer_inbound, &context->info_inbound,
+                buffer, info, flags);
+        switch (error) {
+            case RAWRTC_CODE_SUCCESS:
+                break;
+            case RAWRTC_CODE_NO_VALUE:
+                // Message buffered, early return here
+                return;
+            default:
+                DEBUG_WARNING("Could not buffer/complete application message, reason: %s\n",
+                              rawrtc_code_to_str(error));
+                goto out;
+                break;
         }
 
-        // Do we have a complete message we need to handle?
-        if (!buffer) {
-            return;
-        }
+        // Update info pointer
+        info = &context->info_inbound;
+
+        // Message is complete
         message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
     } else {
         // Partial delivery on, pass buffer directly
-        buffer = current_buffer;
-        info = current_info;
-        is_copy = false;
+        context->buffer_inbound = mem_ref(buffer);
 
         // Complete?
         if (flags & MSG_EOR) {
@@ -1069,28 +1058,34 @@ static void handle_application_message(
         default:
             DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu32"\n",
                           info->rcv_ppid);
-            goto error; // TODO: Is this correct (resetting stream on unknown PPID)?
+            error = RAWRTC_CODE_INVALID_MESSAGE;
+            goto out;
             break;
     }
 
     // Pass message to handler
     if (channel->message_handler) {
-        channel->message_handler(buffer, message_flags, channel->arg);
+        channel->message_handler(context->buffer_inbound, message_flags, channel->arg);
     } else {
         DEBUG_WARNING("No message handler, message of %zu bytes has been discarded\n",
-                      mbuf_get_left(buffer));
+                      mbuf_get_left(context->buffer_inbound));
     }
 
-    // Dereference (if needed) and done
-    if (is_copy) {
-        mem_deref(buffer);
-        mem_deref(info);
-    }
-    return;
+    // Done
+    error = RAWRTC_CODE_SUCCESS;
 
-error:
-    // TODO: Reset stream with SID on error
-    return;
+out:
+    if (error) {
+        DEBUG_WARNING("Unable to handle application message, reason: %s\n",
+                      rawrtc_code_to_str(error));
+
+        // TODO: Reset stream with SID
+    }
+
+    // Dereference
+    if (context) {
+        context->buffer_inbound = mem_deref(context->buffer_inbound);
+    }
 }
 
 /*
@@ -1098,35 +1093,36 @@ error:
  */
 static void handle_dcep_message(
         struct rawrtc_sctp_transport* const transport, // not checked
-        struct mbuf* const current_buffer, // not checked
-        struct sctp_rcvinfo* const current_info, // not checked
+        struct mbuf* const buffer, // not checked
+        struct sctp_rcvinfo* info, // not checked
         int const flags
 ) {
     enum rawrtc_code error;
-    struct mbuf* buffer;
-    struct sctp_rcvinfo* info;
-    bool is_copy;
 
     // Buffer message (if needed) and get complete message (if any)
     error = buffer_message_received_raise_complete(
-            &buffer, &info, &is_copy,
-            &transport->buffered_dcep_chunks_incoming,
-            current_buffer, current_info, flags);
-    if (error) {
-        DEBUG_WARNING("Could not buffer/merge DCEP message, reason: %s\n",
-                      rawrtc_code_to_str(error));
-        goto error;
+            &transport->buffer_dcep_inbound, &transport->info_dcep_inbound,
+            buffer, info, flags);
+    switch (error) {
+        case RAWRTC_CODE_SUCCESS:
+            break;
+        case RAWRTC_CODE_NO_VALUE:
+            // Message buffered, early return here
+            return;
+        default:
+            DEBUG_WARNING("Could not buffer/complete DCEP message, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            goto out;
+            break;
     }
 
-    // Do we have a complete message we need to handle?
-    if (!buffer) {
-        return;
-    }
+    // Update info pointer
+    info = &transport->info_dcep_inbound;
 
     // Handle by message type
     // Note: There MUST be at least a byte present in the buffer as SCTP cannot handle empty
     //       messages.
-    uint_fast16_t const message_type = mbuf_read_u8(buffer);
+    uint_fast16_t const message_type = mbuf_read_u8(transport->buffer_dcep_inbound);
     switch (message_type) {
         case RAWRTC_DCEP_MESSAGE_TYPE_ACK:
             DEBUG_PRINTF("Received data channel ack message for channel with SID %"PRIu16"\n",
@@ -1136,7 +1132,7 @@ static void handle_dcep_message(
         case RAWRTC_DCEP_MESSAGE_TYPE_OPEN:
             DEBUG_PRINTF("Received data channel open message for channel with SID %"PRIu16"\n",
                          info->rcv_sid);
-            handle_data_channel_open_message(transport, buffer, info);
+            handle_data_channel_open_message(transport, transport->buffer_dcep_inbound, info);
             break;
         default:
             DEBUG_WARNING("Ignored incoming DCEP control message with unknown type: %"PRIu16"\n",
@@ -1144,16 +1140,18 @@ static void handle_dcep_message(
             break;
     }
 
-    // Dereference (if needed) and done
-    if (is_copy) {
-        mem_deref(buffer);
-        mem_deref(info);
-    }
-    return;
+    // Done
+    error = RAWRTC_CODE_SUCCESS;
 
-error:
-    // TODO: Close transport (?)
-    return;
+out:
+    if (error) {
+        DEBUG_WARNING("Unable to handle DCEP message, reason: %s\n", rawrtc_code_to_str(error));
+
+        // TODO: Close channel?
+    }
+
+    // Dereference
+    transport->buffer_dcep_inbound = mem_deref(transport->buffer_dcep_inbound);
 }
 
 /*
@@ -1396,6 +1394,7 @@ static void rawrtc_sctp_transport_destroy(
 
     // Dereference
     mem_deref(transport->channels);
+    mem_deref(transport->buffer_dcep_inbound);
     list_flush(&transport->buffered_messages_outgoing);
     mem_deref(transport->dtls_transport);
 
@@ -1531,7 +1530,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     transport->state_change_handler = state_change_handler;
     transport->arg = arg;
     list_init(&transport->buffered_messages_outgoing);
-    list_init(&transport->buffered_dcep_chunks_incoming);
 
     // Allocate channel array
     error = data_channels_alloc(&transport->channels, n_channels, 0);
@@ -1716,8 +1714,8 @@ static void channel_context_destroy(
 ) {
     struct rawrtc_sctp_data_channel_context* const context = arg;
 
-    // Flush list
-    list_flush(&context->buffered_application_chunks_incoming);
+    // Dereference
+    mem_deref(context->buffer_inbound);
 }
 
 /*
@@ -1730,7 +1728,7 @@ static enum rawrtc_code channel_context_create(
 ) {
     // Allocate context
     struct rawrtc_sctp_data_channel_context* const context =
-            mem_alloc(sizeof(*context), channel_context_destroy);
+            mem_zalloc(sizeof(*context), channel_context_destroy);
     if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
@@ -1738,7 +1736,6 @@ static enum rawrtc_code channel_context_create(
     // Set fields
     context->sid = sid;
     context->can_send_unordered = can_send_unordered;
-    list_init(&context->buffered_application_chunks_incoming);
 
     // Set pointer & done
     *contextp = context;
