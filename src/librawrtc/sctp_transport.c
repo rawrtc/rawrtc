@@ -40,12 +40,12 @@ static uint16_t const sctp_events[] = {
     SCTP_ASSOC_CHANGE,
 //    SCTP_PEER_ADDR_CHANGE,
 //    SCTP_REMOTE_ERROR,
-//    SCTP_SHUTDOWN_EVENT,
+    SCTP_SHUTDOWN_EVENT,
 //    SCTP_ADAPTATION_INDICATION,
     SCTP_SEND_FAILED_EVENT,
     SCTP_STREAM_RESET_EVENT,
     SCTP_STREAM_CHANGE_EVENT,
-//    SCTP_SENDER_DRY_EVENT
+    SCTP_SENDER_DRY_EVENT
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
 
@@ -589,6 +589,32 @@ int debug_association_change_event(
 }
 
 /*
+ * Print debug information for an SCTP send failed event.
+ */
+int debug_send_failed_event(
+        struct re_printf* const pf,
+        struct sctp_send_failed_event* const event
+) {
+    int err = 0;
+
+    if (event->ssfe_flags & SCTP_DATA_UNSENT) {
+        err |= re_hprintf(pf, "Unsent ");
+    }
+    if (event->ssfe_flags & SCTP_DATA_SENT) {
+        err |= re_hprintf(pf, "Sent ");
+    }
+    if (event->ssfe_flags & ~(SCTP_DATA_SENT | SCTP_DATA_UNSENT)) {
+        err |= re_hprintf(pf, "(flags = %x) ", event->ssfe_flags);
+    }
+    err |= re_hprintf(
+            pf,
+            "message with PPID %"PRIu32", SID = %"PRIu16", flags: 0x%04x due to error = 0x%08x\n",
+            ntohl(event->ssfe_info.snd_ppid), event->ssfe_info.snd_sid,
+            event->ssfe_info.snd_flags, event->ssfe_error);
+    return err;
+}
+
+/*
  * Handle SCTP association change event.
  */
 static void handle_association_change_event(
@@ -606,6 +632,9 @@ static void handle_association_change_event(
                 set_state(transport, RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED);
             }
             break;
+        case SCTP_RESTART:
+            // TODO: Handle?
+            break;
         case SCTP_CANT_STR_ASSOC:
         case SCTP_SHUTDOWN_COMP:
         case SCTP_COMM_LOST:
@@ -618,6 +647,89 @@ static void handle_association_change_event(
         default:
             break;
     }
+}
+
+/*
+ * Handle SCTP send failed event.
+ */
+static void handle_send_failed_event(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_send_failed_event* const event
+) {
+    // Print debug output for event
+    DEBUG_PRINTF("Send failed event: %H", debug_send_failed_event, event);
+
+    // TODO: We could inform the data channel that an error occurred here... but why would we?
+    (void) transport;
+    (void) event;
+}
+
+/*
+ * Raise buffered amount low on a data channel.
+ */
+static void raise_buffered_amount_low_event(
+        struct rawrtc_data_channel* const channel
+) {
+    // Check for channel
+    if (!channel) {
+        return;
+    }
+
+    // Check for event handler
+    if (channel->buffered_amount_low_handler) {
+        // Get context
+        struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+
+        // Raise event
+        DEBUG_PRINTF("Raising buffered amount low event on channel with SID %"PRIu16"\n",
+                     context->sid);
+        channel->buffered_amount_low_handler(channel->arg);
+    }
+}
+
+/*
+ * Handle SCTP sender dry (no outstanding data) event.
+ */
+static void handle_sender_dry_event(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_sender_dry_event* const event
+) {
+    uint_fast16_t i;
+    uint_fast16_t stop;
+    (void) event;
+
+    // If there are outstanding messages, don't raise an event
+    if (list_head(&transport->buffered_messages_outgoing)) {
+        return;
+    }
+
+    // Set buffered amount low
+    transport->flags |= RAWRTC_SCTP_TRANSPORT_FLAGS_BUFFERED_AMOUNT_LOW;
+
+    // Reset counter if #channels has been reduced
+    if (transport->current_channel_sid >= transport->n_channels) {
+        i = 0;
+    } else {
+        i = transport->current_channel_sid;
+    }
+
+    // Raise event on each data channel
+    stop = i;
+    do {
+        // Raise event
+        raise_buffered_amount_low_event(transport->channels[i]);
+
+        // Update/wrap
+        i = (i + 1) % transport->n_channels;
+
+        // Stop if the flag has been cleared
+        if (!(transport->flags & RAWRTC_SCTP_TRANSPORT_FLAGS_BUFFERED_AMOUNT_LOW)) {
+            break;
+        }
+    } while (i != stop);
+
+    // Update current channel SID
+    transport->current_channel_sid = i;
 }
 
 /*
@@ -643,8 +755,14 @@ static void handle_notification(
             break;
         case SCTP_SEND_FAILED_EVENT:
             // TODO: Handle
-            DEBUG_WARNING("TODO: HANDLE SEND FAILED\n");
-            // handle_send_failed_event(transport, &(notification->sn_strreset_event));
+            handle_send_failed_event(transport, &notification->sn_send_failed_event);
+            break;
+        case SCTP_SENDER_DRY_EVENT:
+            handle_sender_dry_event(transport, &notification->sn_sender_dry_event);
+            break;
+        case SCTP_SHUTDOWN_EVENT:
+            // TODO: Stop sending (this is a bit tricky to implement, so skipping for now)
+            //handle_shutdown_event(transport, &notification->sn_shutdown_event);
             break;
         case SCTP_STREAM_RESET_EVENT:
             // TODO: Handle
@@ -1271,10 +1389,10 @@ write:
     if (events & SCTP_EVENT_WRITE) {
         // Send all deferred messages (if not already sending)
         // TODO: Check if this flag is really necessary
-        if (!transport->sending_in_progress) {
-            transport->sending_in_progress = true;
+        if (!(transport->flags & RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS)) {
+            transport->flags |= RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
             sctp_send_deferred_messages(transport);
-            transport->sending_in_progress = false;
+            transport->flags &= ~RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
         } else {
             DEBUG_WARNING("Sending still in progress!\n");
         }
@@ -1333,7 +1451,7 @@ static void data_channels_destroy(
         void* const arg
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
-    size_t i;
+    uint_fast16_t i;
 
     // Dereference all members
     for (i = 0; i < transport->n_channels; ++i) {
@@ -1348,8 +1466,8 @@ static void data_channels_destroy(
  */
 enum rawrtc_code data_channels_alloc(
         struct rawrtc_data_channel*** channelsp, // de-referenced
-        uint16_t const n_channels,
-        uint16_t const n_channels_previously
+        uint_fast16_t const n_channels,
+        uint_fast16_t const n_channels_previously
 ) {
     size_t i;
     struct rawrtc_data_channel** channels;
@@ -1424,7 +1542,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         void* const arg // nullable
 ) {
     enum rawrtc_code error;
-    uint16_t n_channels;
+    uint_fast16_t n_channels;
     bool have_data_transport;
     struct rawrtc_sctp_transport* transport;
     char trace_handle_id[8];
@@ -1537,6 +1655,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         goto out;
     }
     transport->n_channels = n_channels;
+    transport->current_channel_sid = 0;
 
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
@@ -1814,7 +1933,7 @@ static enum rawrtc_code channel_create_inband(
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
     enum rawrtc_code error;
-    size_t i;
+    uint_fast16_t i;
     struct rawrtc_sctp_data_channel_context* context;
     struct mbuf* buffer;
 
@@ -2321,6 +2440,9 @@ enum rawrtc_code rawrtc_sctp_transport_send(
     if (!transport || !buffer) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+
+    // Clear buffered amount low flag
+    transport->flags &= ~RAWRTC_SCTP_TRANSPORT_FLAGS_BUFFERED_AMOUNT_LOW;
 
     // Send directly (if connected and no outstanding messages)
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED &&

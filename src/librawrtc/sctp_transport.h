@@ -13,6 +13,14 @@ enum {
 };
 
 /*
+ * SCTP transport flags.
+ */
+enum {
+    RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS = 1 << 0,
+    RAWRTC_SCTP_TRANSPORT_FLAGS_BUFFERED_AMOUNT_LOW = 1 << 1
+};
+
+/*
  * DCEP message types.
  */
 enum {

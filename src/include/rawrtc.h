@@ -710,10 +710,11 @@ struct rawrtc_sctp_transport {
     struct mbuf* buffer_dcep_inbound;
     struct sctp_rcvinfo info_dcep_inbound;
     struct rawrtc_data_channel** channels;
-    uint16_t n_channels;
+    uint_fast16_t n_channels;
+    uint_fast16_t current_channel_sid;
     FILE* trace_handle;
     struct socket* socket;
-    bool sending_in_progress;
+    uint_fast8_t flags;
     struct rawrtc_data_transport* data_transport; // referenced
 };
 
