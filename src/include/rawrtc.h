@@ -190,9 +190,9 @@ enum rawrtc_data_channel_type {
  * Data channel message flags.
  */
 enum rawrtc_data_channel_message_flag {
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE = 0,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 1,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 2
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE = 1 << 0,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 1 << 1,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 1 << 2
 };
 
 /*
@@ -242,16 +242,9 @@ enum rawrtc_data_transport_type {
 
 /*
  * Data channel state.
- * TODO: private -> data_transport.h
  */
 enum rawrtc_data_channel_state {
-    // Note: We need this state to ensure that event handlers are not called
-    //       before the data channel has been created successfully.
-    RAWRTC_DATA_CHANNEL_STATE_INIT,
-    // Note: This state means 'successfully allocated'.
-    RAWRTC_DATA_CHANNEL_STATE_NEW,
-    // Note: This state indicates the channel must be opened once the transport is open
-    RAWRTC_DATA_CHANNEL_STATE_WAITING,
+    RAWRTC_DATA_CHANNEL_STATE_CONNECTING,
     RAWRTC_DATA_CHANNEL_STATE_OPEN,
     RAWRTC_DATA_CHANNEL_STATE_CLOSING,
     RAWRTC_DATA_CHANNEL_STATE_CLOSED
@@ -724,7 +717,7 @@ struct rawrtc_sctp_transport {
  */
 struct rawrtc_sctp_data_channel_context {
     uint16_t sid;
-    bool can_send_unordered;
+    uint_fast8_t flags;
     struct mbuf* buffer_inbound;
     struct sctp_rcvinfo info_inbound;
 };
@@ -734,6 +727,7 @@ struct rawrtc_sctp_data_channel_context {
  * TODO: private
  */
 struct rawrtc_data_channel {
+    uint_fast8_t flags;
     enum rawrtc_data_channel_state state;
     struct rawrtc_data_transport* transport; // referenced
     void* transport_arg; // referenced
@@ -1364,11 +1358,35 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
 );
 
 /*
+ * Get the label from the data channel parameters.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no label has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*parameters*
+ * must be unreferenced.
+ */
+enum rawrtc_code rawrtc_data_channel_parameters_get_label(
+    char** const labelp, // de-referenced
+    struct rawrtc_data_channel_parameters* const parameters
+);
+
+/*
  * TODO
- * rawrtc_data_channel_parameters_get_label
  * rawrtc_data_channel_parameters_get_channel_type
  * rawrtc_data_channel_parameters_get_reliability_parameter
- * rawrtc_data_channel_parameters_get_protocol
+ */
+
+/*
+ * Get the protocol from the data channel parameters.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no protocol has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*protocolp*
+ * must be unreferenced.
+ */
+enum rawrtc_code rawrtc_data_channel_parameters_get_protocol(
+    char** const protocolp, // de-referenced
+    struct rawrtc_data_channel_parameters* const parameters
+);
+
+/*
+ * TODO
  * rawrtc_data_channel_parameters_get_negotiated
  * rawrtc_data_channel_parameters_get_id
  */
@@ -1384,6 +1402,13 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
 enum rawrtc_code rawrtc_data_channel_options_create(
     struct rawrtc_data_channel_options** const optionsp, // de-referenced
     bool const deliver_partially
+);
+
+/*
+ * Get the corresponding name for a data channel state.
+ */
+char const * const rawrtc_data_channel_state_to_name(
+    enum rawrtc_data_channel_state const state
 );
 
 /*

@@ -55,6 +55,11 @@ static enum rawrtc_code channel_context_create(
     bool const can_send_unordered
 );
 
+static bool channel_registered(
+    struct rawrtc_sctp_transport* const transport, // not checked
+    struct rawrtc_data_channel* const channel // not checked
+);
+
 static void channel_register(
     struct rawrtc_sctp_transport* const transport, // not checked
     struct rawrtc_data_channel* const channel, // referenced, not checked
@@ -387,7 +392,7 @@ static enum rawrtc_code send_message(
 
         // Unordered?
         if (channel->parameters->channel_type & RAWRTC_DATA_CHANNEL_TYPE_IS_UNORDERED &&
-                context->can_send_unordered) {
+                context->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_CAN_SEND_UNORDERED) {
             spa.sendv_sndinfo.snd_flags |= SCTP_UNORDERED;
         }
 
@@ -433,18 +438,44 @@ static void set_data_channel_states(
         enum rawrtc_data_channel_state const to_state,
         enum rawrtc_data_channel_state const * const from_state // optional current state
 ) {
-    size_t i;
+    uint_fast16_t i;
 
     // Set state on all data channels
     for (i = 0; i < transport->n_channels; ++i) {
-        if (!transport->channels[i]) {
+        struct rawrtc_data_channel* const channel = transport->channels[i];
+        if (!channel) {
             continue;
         }
 
         // Update state
-        if (!from_state || transport->channels[i]->state == *from_state) {
-            rawrtc_data_channel_set_state(transport->channels[i], to_state);
+        if (!from_state || channel->state == *from_state) {
+            rawrtc_data_channel_set_state(channel, to_state);
         }
+    }
+}
+
+/*
+ * Close all data channels.
+ * Warning: This will not use the closing procedure, use `channel_close_handler` instead.
+ */
+static void close_data_channels(
+        struct rawrtc_sctp_transport* const transport // not checked
+) {
+    uint_fast16_t i;
+
+    // Set state on all data channels
+    for (i = 0; i < transport->n_channels; ++i) {
+        struct rawrtc_data_channel* const channel = transport->channels[i];
+        if (!channel) {
+            continue;
+        }
+
+        // Update state
+        DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", i);
+        rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
+
+        // Dereference
+        transport->channels[i] = mem_deref(channel);
     }
 }
 
@@ -459,12 +490,10 @@ static void set_state(
 ) {
     // Closed?
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        enum rawrtc_data_channel_state const from_state = RAWRTC_DATA_CHANNEL_STATE_OPEN;
         DEBUG_INFO("SCTP connection closed\n");
 
         // Close all data channels
-        // TODO: Close non-open channels as well?
-        set_data_channel_states(transport, RAWRTC_DATA_CHANNEL_STATE_CLOSING, &from_state);
+        close_data_channels(transport);
 
         // Remove from DTLS transport
         // Note: No NULL checking needed as the function will do that for us
@@ -493,7 +522,7 @@ static void set_state(
     //       send function which checks the state.
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         enum rawrtc_data_channel_state const from_channel_state =
-                RAWRTC_DATA_CHANNEL_STATE_WAITING;
+                RAWRTC_DATA_CHANNEL_STATE_CONNECTING;
         DEBUG_INFO("SCTP connection established\n");
 
         // Send deferred messages
@@ -509,6 +538,77 @@ static void set_state(
     if (transport->state_change_handler) {
         transport->state_change_handler(state, transport->arg);
     }
+}
+
+/*
+ * Reset the outgoing stream of a data channel.
+ * Note: This function will only return an error in case the stream could not be reset properly
+ *       In this case, the channel will be closed and removed from the transport immediately.
+ */
+static enum rawrtc_code reset_outgoing_stream(
+    struct rawrtc_sctp_transport* const transport, // not checked
+    struct rawrtc_data_channel* const channel // not checked
+) {
+    struct sctp_reset_streams* reset_streams = NULL;
+    size_t length;
+    enum rawrtc_code error;
+
+    // Get context
+    struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+
+    // Check if there are pending outgoing messages
+    if (list_head(&transport->buffered_messages_outgoing)) {
+        context->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_PENDING_STREAM_RESET;
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Calculate length
+    length = sizeof(*reset_streams) + sizeof(uint16_t);
+
+    // Allocate
+    reset_streams = mem_zalloc(length, NULL);
+    if (!reset_streams) {
+        error = RAWRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+
+    // Set fields
+    reset_streams->srs_flags = SCTP_STREAM_RESET_OUTGOING;
+    reset_streams->srs_number_streams = 1;
+    reset_streams->srs_stream_list[0] = context->sid;
+
+    // Reset stream
+    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
+                           reset_streams, (socklen_t) length)) {
+        error = rawrtc_error_to_code(errno);
+        goto out;
+    }
+
+    // Done
+    DEBUG_PRINTF("Outgoing stream %"PRIu16" reset procedure started\n", context->sid);
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    // Dereference
+    mem_deref(reset_streams);
+
+    if (error) {
+        // Improper closing
+        DEBUG_WARNING("Could not reset outgoing stream %"PRIu16", reason: %s, closing channel "
+                      "improperly\n", context->sid, rawrtc_code_to_str(error));
+
+        // Close
+        rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
+
+        // Sanity check
+        if (!channel_registered(transport, channel)) {
+            return RAWRTC_CODE_UNKNOWN_ERROR;
+        }
+
+        // Remove from transport
+        transport->channels[context->sid] = mem_deref(channel);
+    }
+    return error;
 }
 
 /*
@@ -615,6 +715,41 @@ int debug_send_failed_event(
 }
 
 /*
+ * Print debug information for an SCTP stream reset event.
+ */
+int debug_stream_reset_event(
+        struct re_printf* const pf,
+        struct sctp_stream_reset_event* const event
+) {
+    int err = 0;
+    uint_fast32_t length;
+    uint_fast32_t i;
+
+    // Get #sid's
+    length = (event->strreset_length - sizeof(*event)) / sizeof(uint16_t);
+
+    err |= re_hprintf(pf, "flags = %x, ", event->strreset_flags);
+    if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN) {
+        if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN) {
+            err |= re_hprintf(pf, "incoming/");
+        }
+        err |= re_hprintf(pf, "incoming ");
+    }
+    if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN) {
+        err |= re_hprintf(pf, "outgoing ");
+    }
+    err |= re_hprintf(pf, "stream ids = ");
+    for (i = 0; i < length; ++i) {
+        if (i > 0) {
+            err |= re_hprintf(pf, ", ");
+        }
+        err |= re_hprintf(pf, "%"PRIu16, event->strreset_stream_list[i]);
+    }
+    err |= re_hprintf(pf, "\n");
+    return err;
+}
+
+/*
  * Handle SCTP association change event.
  */
 static void handle_association_change_event(
@@ -668,13 +803,8 @@ static void handle_send_failed_event(
  * Raise buffered amount low on a data channel.
  */
 static void raise_buffered_amount_low_event(
-        struct rawrtc_data_channel* const channel
+        struct rawrtc_data_channel* const channel // not checked
 ) {
-    // Check for channel
-    if (!channel) {
-        return;
-    }
-
     // Check for event handler
     if (channel->buffered_amount_low_handler) {
         // Get context
@@ -700,6 +830,7 @@ static void handle_sender_dry_event(
 
     // If there are outstanding messages, don't raise an event
     if (list_head(&transport->buffered_messages_outgoing)) {
+        DEBUG_PRINTF("Pending messages, ignoring sender dry event\n");
         return;
     }
 
@@ -716,10 +847,27 @@ static void handle_sender_dry_event(
     // Raise event on each data channel
     stop = i;
     do {
-        // Raise event
-        raise_buffered_amount_low_event(transport->channels[i]);
+        struct rawrtc_data_channel* const channel = transport->channels[i];
+        if (channel) {
+            struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+
+            // Handle flags
+            if (context->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_PENDING_STREAM_RESET) {
+                // Reset pending outgoing stream
+                // TODO: This should probably be handled earlier but requires having separate
+                //       lists for each data channel to be sure that the stream is not reset before
+                //       all pending messages have been sent.
+                reset_outgoing_stream(transport, channel);
+                context->flags &= ~RAWRTC_SCTP_DATA_CHANNEL_FLAGS_PENDING_STREAM_RESET;
+            } else {
+                // Raise event
+                raise_buffered_amount_low_event(transport->channels[i]);
+            }
+        }
 
         // Update/wrap
+        // Note: uint16 is sufficient here as the maximum number of channels is
+        //       65534, so 65535 will still fit
         i = (i + 1) % transport->n_channels;
 
         // Stop if the flag has been cleared
@@ -730,6 +878,80 @@ static void handle_sender_dry_event(
 
     // Update current channel SID
     transport->current_channel_sid = i;
+}
+
+/*
+ * Handle stream reset event (data channel closed).
+ */
+static void handle_stream_reset_event(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_stream_reset_event* const event
+) {
+    uint_fast32_t length;
+    uint_fast32_t i;
+
+    // Get #sid's
+    length = (event->strreset_length - sizeof(*event)) / sizeof(uint16_t);
+
+    // Print debug output for event
+    DEBUG_PRINTF("Stream reset event: %H", debug_stream_reset_event, event, length);
+
+    // Ignore denied/failed events
+    if (event->strreset_flags & SCTP_STREAM_RESET_DENIED
+        || event->strreset_flags & SCTP_STREAM_RESET_FAILED) {
+        return;
+    }
+
+    // Handle stream resets
+    for (i = 0; i < length; ++i) {
+        uint_fast16_t const sid = (uint_fast16_t) event->strreset_stream_list[i];
+        struct rawrtc_data_channel* channel;
+        struct rawrtc_sctp_data_channel_context* context;
+
+        // Check if channel exists
+        if (sid >= transport->n_channels || !transport->channels[sid]) {
+            DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
+            continue;
+        }
+
+        // Get channel and context
+        channel = transport->channels[sid];
+        context = channel->transport_arg;
+
+        // Incoming stream reset
+        if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN) {
+            // Set flag
+            channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET;
+
+            // Reset outgoing stream (if needed)
+            if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSING
+                && channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSED) {
+                if (reset_outgoing_stream(transport, channel)) {
+                    // Error, channel has been closed automatically
+                    continue;
+                }
+
+                // Set to closing
+                rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
+            }
+        }
+
+        // Outgoing stream reset (this is raised from our own stream reset)
+        if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN) {
+            // Set flag
+            channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET;
+        }
+
+        // Close if both incoming and outgoing stream has been reset
+        if (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET
+            && channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET) {
+            // Set to closed
+            rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
+
+            // Remove from transport
+            transport->channels[context->sid] = mem_deref(channel);
+        }
+    }
 }
 
 /*
@@ -754,7 +976,6 @@ static void handle_notification(
             handle_association_change_event(transport, &notification->sn_assoc_change);
             break;
         case SCTP_SEND_FAILED_EVENT:
-            // TODO: Handle
             handle_send_failed_event(transport, &notification->sn_send_failed_event);
             break;
         case SCTP_SENDER_DRY_EVENT:
@@ -765,10 +986,7 @@ static void handle_notification(
             //handle_shutdown_event(transport, &notification->sn_shutdown_event);
             break;
         case SCTP_STREAM_RESET_EVENT:
-            // TODO: Handle
-            // https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.7
-            DEBUG_WARNING("TODO: HANDLE STREAM RESET\n");
-            // handle_stream_reset_event(transport, &(notification->sn_strreset_event));
+            handle_stream_reset_event(transport, &notification->sn_strreset_event);
             break;
         case SCTP_STREAM_CHANGE_EVENT:
             // TODO: Handle
@@ -881,13 +1099,13 @@ static void handle_data_channel_ack_message(
     // TODO: We should probably track the state and close the channel if an ack is being received
     //       on an already negotiated channel. For now, we only check that the ack is the first
     //       message received (which is fair enough but may not be 100% correct in the future).
-    if (context->can_send_unordered) {
+    if (context->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_CAN_SEND_UNORDERED) {
         DEBUG_WARNING("Received ack but channel %"PRIu16" is already negotiated\n", info->rcv_sid);
         goto error;
     }
 
     // Messages may now be sent unordered
-    context->can_send_unordered = true;
+    context->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_CAN_SEND_UNORDERED;
     return;
 
 error:
@@ -1108,7 +1326,7 @@ static void handle_application_message(
     // Messages may now be sent unordered
     // TODO: Should we update this flag before or after the message has been received completely
     //       (EOR)? Guessing: Once first chunk has been received.
-    context->can_send_unordered = true;
+    context->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_CAN_SEND_UNORDERED;
 
     // Handle empty / Buffer if partial delivery is off / deliver directly
     if (info->rcv_ppid == RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY ||
@@ -1185,7 +1403,7 @@ static void handle_application_message(
     if (channel->message_handler) {
         channel->message_handler(context->buffer_inbound, message_flags, channel->arg);
     } else {
-        DEBUG_WARNING("No message handler, message of %zu bytes has been discarded\n",
+        DEBUG_NOTICE("No message handler, message of %zu bytes has been discarded\n",
                       mbuf_get_left(context->buffer_inbound));
     }
 
@@ -1306,6 +1524,7 @@ static void upcall_handler(
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
     int events = usrsctp_get_events(sock);
+    (void) flags; // TODO: What does this indicate?
 
     // Lock event loop mutex
     rawrtc_thread_enter();
@@ -1854,11 +2073,32 @@ static enum rawrtc_code channel_context_create(
 
     // Set fields
     context->sid = sid;
-    context->can_send_unordered = can_send_unordered;
+    if (can_send_unordered) {
+        context->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_CAN_SEND_UNORDERED;
+    }
 
     // Set pointer & done
     *contextp = context;
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Check if a data channel is registered in the transport.
+ */
+static bool channel_registered(
+        struct rawrtc_sctp_transport* const transport, // not checked
+        struct rawrtc_data_channel* const channel // not checked
+) {
+    // Get context
+    struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+
+    // Check status
+    if (transport->channels[context->sid] != channel) {
+        DEBUG_WARNING("Invalid channel instance in slot. Please report this.\n");
+        return false;
+    } else {
+        return true;
+    }
 }
 
 /*
@@ -1896,10 +2136,6 @@ static void channel_register(
     // Update data channel state
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_OPEN);
-    } else {
-        // Note: We need to wait for the transport to be connected before we can open
-        //       the channel
-        rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_WAITING);
     }
 }
 
@@ -1928,7 +2164,6 @@ static enum rawrtc_code channel_create_negotiated(
  */
 static enum rawrtc_code channel_create_inband(
         struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
-        struct rawrtc_data_channel* const channel, // not checked
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
@@ -2026,7 +2261,7 @@ static enum rawrtc_code channel_create_handler(
     if (parameters->negotiated) {
         error = channel_create_negotiated(&context, sctp_transport, parameters);
     } else {
-        error = channel_create_inband(&context, channel, sctp_transport, parameters);
+        error = channel_create_inband(&context, sctp_transport, parameters);
     }
     if (error) {
         return error;
@@ -2063,16 +2298,17 @@ static enum rawrtc_code channel_close_handler(
     if (context) {
         DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", context->sid);
 
-        // TODO: Reset outgoing streams
-
-        // Safety check
-        if (transport->channels[context->sid] == channel) {
-            transport->channels[context->sid] = mem_deref(channel);
-        } else {
-            DEBUG_WARNING("Invalid channel instance in slot. Please report this.\n");
+        // Sanity check
+        if (!channel_registered(transport, channel)) {
+            return RAWRTC_CODE_UNKNOWN_ERROR;
         }
 
-        // TODO: Anything else required here?
+        // Reset outgoing streams
+        // Important: This function will change the state of the channel to CLOSED
+        //            and remove the channel from the transport on error.
+        if (!reset_outgoing_stream(transport, channel)) {
+            rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
+        }
     }
 
     // Done
@@ -2357,7 +2593,6 @@ enum rawrtc_code sctp_transport_send(
         size_t const left = mbuf_get_left(buffer);
 
         // Carefully chunk the buffer
-        // TODO: Use the partial delivery point value
         if (left > chunk_size) {
             length = chunk_size;
 

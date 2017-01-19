@@ -7,6 +7,26 @@
 #include "debug.h"
 
 /*
+ * Get the corresponding name for a data channel state.
+ */
+char const * const rawrtc_data_channel_state_to_name(
+        enum rawrtc_data_channel_state const state
+) {
+    switch (state) {
+        case RAWRTC_DATA_CHANNEL_STATE_CONNECTING:
+            return "connecting";
+        case RAWRTC_DATA_CHANNEL_STATE_OPEN:
+            return "open";
+        case RAWRTC_DATA_CHANNEL_STATE_CLOSING:
+            return "closing";
+        case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
+            return "closed";
+        default:
+            return "???";
+    }
+}
+
+/*
  * Change the state of the data channel.
  * Will call the corresponding handler.
  * Caller MUST ensure that the same state is not set twice.
@@ -15,11 +35,12 @@ void rawrtc_data_channel_set_state(
         struct rawrtc_data_channel* const channel, // not checked
         enum rawrtc_data_channel_state const state
 ) {
-    enum rawrtc_code error;
-
     // Set state
     // Note: Keep this here as it will prevent infinite recursion during closing/destroying
     channel->state = state;
+    DEBUG_PRINTF("Data channel '%s' state changed to %s\n",
+                 channel->parameters->label ? channel->parameters->label : "N/A",
+                 rawrtc_data_channel_state_to_name(state));
 
     // Call transport handler (if any) and user application handler
     switch (state) {
@@ -31,15 +52,7 @@ void rawrtc_data_channel_set_state(
             break;
 
         case RAWRTC_DATA_CHANNEL_STATE_CLOSING:
-            // Call transport close handler
-            error = channel->transport->channel_close(channel);
-            if (error) {
-                DEBUG_WARNING("Unable to close data channel, reason: %s\n",
-                              rawrtc_code_to_str(error));
-
-                // Close anyway
-                rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
-            }
+            // Nothing to do.
             break;
 
         case RAWRTC_DATA_CHANNEL_STATE_CLOSED:
@@ -69,13 +82,8 @@ static void rawrtc_data_channel_destroy(
     channel->open_handler = NULL;
 
     // Close channel
-    // Note: Don't close before `NEW` because there's uninitialised stuff before `NEW`.
-    // Note: Recursion might occur but `rawrtc_data_channel_set_state` ensures that the state
-    //       changes to `CLOSED` before further recursion happens, thus preventing double-closing
-    //       or other nasty stuff.
-    if (channel->state != RAWRTC_DATA_CHANNEL_STATE_INIT) {
-        rawrtc_data_channel_close(channel);
-    }
+    // Note: The function will ensure that the channel is not closed before it's initialised
+    rawrtc_data_channel_close(channel);
 
     // Dereference
     mem_deref(channel->transport);
@@ -92,7 +100,7 @@ static void rawrtc_data_channel_destroy(
  * Set options on a data channel (internal).
  *
  * Warning: The caller MUST ensure that this function is being used
- * before any messages is being received on the data channel!
+ * before any messages are being received on the data channel!
  */
 enum rawrtc_code rawrtc_data_channel_set_options(
         struct rawrtc_data_channel* const channel,
@@ -155,7 +163,7 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
     }
 
     // Set fields/reference
-    channel->state = RAWRTC_DATA_CHANNEL_STATE_INIT;
+    channel->state = RAWRTC_DATA_CHANNEL_STATE_CONNECTING;
     channel->transport = mem_ref(transport);
     channel->parameters = mem_ref(parameters);
     channel->open_handler = open_handler;
@@ -190,10 +198,8 @@ out:
     if (error) {
         mem_deref(channel);
     } else {
-        // Update state (if necessary) & set pointer
-        if (channel->state == RAWRTC_DATA_CHANNEL_STATE_INIT) {
-            channel->state = RAWRTC_DATA_CHANNEL_STATE_NEW;
-        }
+        // Update flags & set pointer
+        channel->flags |= RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED;
         *channelp = channel;
     }
     return error;
@@ -230,6 +236,17 @@ enum rawrtc_code rawrtc_data_channel_send(
         struct mbuf* const buffer, // nullable (if empty message), referenced
         bool const is_binary
 ) {
+    // Check arguments
+    if (!channel) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    // TODO: Is this correct or can we send during `connecting` as well?
+    if (channel->state != RAWRTC_DATA_CHANNEL_STATE_OPEN) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
     // Call handler
     return channel->transport->channel_send(channel, buffer, is_binary);
 }
@@ -245,16 +262,21 @@ enum rawrtc_code rawrtc_data_channel_close(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check state
-    if (channel->state == RAWRTC_DATA_CHANNEL_STATE_CLOSED) {
+    // Don't close before the channel is initialised
+    // Note: This is needed as this function may be called in the destructor of the data channel
+    if (!(channel->flags & RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED)) {
         return RAWRTC_CODE_SUCCESS;
     }
 
-    // Update state (if not already closing)
-    if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSING) {
-        rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
+    // Check state
+    if (channel->state == RAWRTC_DATA_CHANNEL_STATE_CLOSING
+            || channel->state == RAWRTC_DATA_CHANNEL_STATE_CLOSED) {
+        return RAWRTC_CODE_SUCCESS;
     }
-    return RAWRTC_CODE_SUCCESS;
+
+    // Close channel
+    DEBUG_PRINTF("Closing data channel: %s\n", channel->parameters->label);
+    return channel->transport->channel_close(channel);
 }
 
 /*

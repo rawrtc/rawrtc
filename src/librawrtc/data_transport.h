@@ -1,5 +1,12 @@
 #pragma once
 
+/*
+ * Data channel flags.
+ */
+enum {
+    RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED = 1 << 0
+};
+
 void rawrtc_data_channel_set_state(
     struct rawrtc_data_channel* const channel,
     enum rawrtc_data_channel_state const state

@@ -144,3 +144,51 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
     // Done
     return error;
 }
+
+/*
+ * Get the label from the data channel parameters.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no label has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*labelp*
+ * must be unreferenced.
+ */
+enum rawrtc_code rawrtc_data_channel_parameters_get_label(
+        char** const labelp, // de-referenced
+        struct rawrtc_data_channel_parameters* const parameters
+) {
+    // Check arguments
+    if (!labelp || !parameters) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set value
+    if (parameters->label) {
+        *labelp = mem_ref(parameters->label);
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+}
+
+/*
+ * Get the protocol from the data channel parameters.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no protocol has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*protocolp*
+ * must be unreferenced.
+ */
+enum rawrtc_code rawrtc_data_channel_parameters_get_protocol(
+        char** const protocolp, // de-referenced
+        struct rawrtc_data_channel_parameters* const parameters
+) {
+    // Check arguments
+    if (!protocolp || !parameters) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set value
+    if (parameters->protocol) {
+        *protocolp = mem_ref(parameters->protocol);
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+}
