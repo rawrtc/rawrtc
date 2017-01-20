@@ -9,15 +9,37 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-struct data_channel;
+struct client {
+    char* name;
+    struct rawrtc_ice_gather_options* gather_options;
+    struct rawrtc_ice_parameters* ice_parameters;
+    struct rawrtc_dtls_parameters* dtls_parameters;
+    enum rawrtc_ice_role const role;
+    struct rawrtc_certificate* certificate;
+    uint16_t sctp_port;
+    struct rawrtc_ice_gatherer* gatherer;
+    struct rawrtc_ice_transport* ice_transport;
+    struct rawrtc_dtls_transport* dtls_transport;
+    struct rawrtc_sctp_transport* sctp_transport;
+    struct rawrtc_data_transport* data_transport;
+    struct data_channel* data_channel_negotiated;
+    struct data_channel* data_channel;
+    struct client* other_client;
+};
+
+struct data_channel {
+    struct client* client;
+    struct rawrtc_data_channel* channel;
+    char const* label;
+};
 
 static struct rawrtc_data_channel_options* data_channel_handler(
-    struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
-    void* const arg
+        struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
+        void* const arg
 );
 
 static void data_channel_open_handler(
-    void* const arg
+        void* const arg
 );
 
 static void data_channel_buffered_amount_low_handler(
@@ -37,31 +59,6 @@ static void data_channel_message_handler(
     enum rawrtc_data_channel_message_flag const flags,
     void* const arg
 );
-
-struct client {
-    char* name;
-    struct rawrtc_ice_gather_options* gather_options;
-    struct rawrtc_ice_parameters* ice_parameters;
-    struct rawrtc_dtls_parameters* dtls_parameters;
-    struct rawrtc_sctp_capabilities* sctp_capabilities;
-    enum rawrtc_ice_role const role;
-    struct rawrtc_certificate* certificate;
-    uint16_t sctp_port;
-    struct rawrtc_ice_gatherer* gatherer;
-    struct rawrtc_ice_transport* ice_transport;
-    struct rawrtc_dtls_transport* dtls_transport;
-    struct rawrtc_sctp_transport* sctp_transport;
-    struct rawrtc_data_transport* data_transport;
-    struct data_channel* data_channel_negotiated;
-    struct data_channel* data_channel;
-    struct client* other_client;
-};
-
-struct data_channel {
-    struct client* client;
-    struct rawrtc_data_channel* channel;
-    char const* label;
-};
 
 static struct tmr timer = {0};
 
@@ -415,13 +412,9 @@ static void client_start(
     EOE(rawrtc_dtls_transport_start(
             local->dtls_transport, remote->dtls_parameters));
 
-    // Get SCTP capabilities
-    EOE(rawrtc_sctp_transport_get_capabilities(
-            &remote->sctp_capabilities, remote->sctp_transport));
-
     // Start SCTP transport
     EOE(rawrtc_sctp_transport_start(
-            local->sctp_transport, remote->sctp_capabilities));
+            local->sctp_transport, &rawrtc_sctp_transport_capabilities, remote->sctp_port));
 }
 
 static void client_stop(
@@ -440,7 +433,6 @@ static void client_stop(
     // Dereference & close
     client->data_channel = mem_deref(client->data_channel);
     client->data_channel_negotiated = mem_deref(client->data_channel_negotiated);
-    client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
     client->data_transport = mem_deref(client->data_transport);

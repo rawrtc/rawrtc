@@ -212,13 +212,9 @@ static void client_start(
     EOE(rawrtc_dtls_transport_start(
             local->dtls_transport, remote->dtls_parameters));
 
-    // Get SCTP capabilities
-    EOE(rawrtc_sctp_transport_get_capabilities(
-            &remote->sctp_capabilities, remote->sctp_transport));
-
     // Start SCTP transport
     EOE(rawrtc_sctp_transport_start(
-            local->sctp_transport, remote->sctp_capabilities));
+            local->sctp_transport, &rawrtc_sctp_transport_capabilities, remote->sctp_port));
 }
 
 static void client_stop(

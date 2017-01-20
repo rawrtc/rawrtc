@@ -20,6 +20,13 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
+/*
+ * Local SCTP capabilities.
+ */
+struct rawrtc_sctp_capabilities const rawrtc_sctp_transport_capabilities = {
+    .max_message_size = RAWRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE
+};
+
 // SCTP outgoing message context (needed when buffering)
 struct send_context {
     unsigned int info_type;
@@ -2428,7 +2435,8 @@ enum rawrtc_code rawrtc_sctp_transport_get_data_transport(
  */
 enum rawrtc_code rawrtc_sctp_transport_start(
         struct rawrtc_sctp_transport* const transport,
-        struct rawrtc_sctp_capabilities* const remote_capabilities // copied
+        struct rawrtc_sctp_capabilities const * const remote_capabilities, // copied
+        uint16_t remote_port // zeroable
 ) {
     struct sockaddr_conn peer = {0};
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
@@ -2443,12 +2451,19 @@ enum rawrtc_code rawrtc_sctp_transport_start(
         return RAWRTC_CODE_INVALID_STATE;
     }
 
+    // Set default port (if 0)
+    if (remote_port == 0) {
+        remote_port = transport->port;
+    }
+
+    // Store maximum message size
+    transport->remote_maximum_message_size = remote_capabilities->max_message_size;
+
     // Set remote address
     peer.sconn_family = AF_CONN;
     // TODO: Check for existance of sconn_len
     //sconn.sconn_len = sizeof(peer);
-    // TODO: Open an issue about missing remote port on ORTC spec.
-    peer.sconn_port = htons(remote_capabilities->port);
+    peer.sconn_port = htons(remote_port);
     peer.sconn_addr = transport;
 
     // Connect
@@ -2722,35 +2737,20 @@ out:
 }
 
 /*
- * Get local SCTP capabilities of a transport.
+ * Get the local port of the SCTP transport.
  */
-enum rawrtc_code rawrtc_sctp_transport_get_capabilities(
-        struct rawrtc_sctp_capabilities** const capabilitiesp, // de-referenced
+enum rawrtc_code rawrtc_sctp_transport_get_port(
+        uint16_t* const port, // de-referenced
         struct rawrtc_sctp_transport* const transport
 ) {
-    struct rawrtc_sctp_capabilities* capabilities;
-
     // Check arguments
-    if (!capabilitiesp || !transport) {
+    if (!port || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check state
-    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        return RAWRTC_CODE_INVALID_STATE;
-    }
+    // Set port
+    *port = transport->port;
 
-    // Allocate capabilities
-    capabilities = mem_zalloc(sizeof(*capabilities), NULL);
-    if (!capabilities) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields
-    capabilities->port = transport->port;
-    capabilities->max_message_size = RAWRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE;
-
-    // Set pointer & done
-    *capabilitiesp = capabilities;
+    // Done
     return RAWRTC_CODE_SUCCESS;
 }

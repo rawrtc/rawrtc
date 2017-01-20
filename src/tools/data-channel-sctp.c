@@ -14,10 +14,16 @@ enum {
     PARAMETERS_MAX_LENGTH = 8192,
 };
 
+struct sctp_parameters {
+    struct rawrtc_sctp_capabilities capabilities;
+    uint16_t port;
+};
+
 struct parameters {
     struct rawrtc_ice_parameters* ice_parameters;
     struct rawrtc_ice_candidates* ice_candidates;
     struct rawrtc_dtls_parameters* dtls_parameters;
+    struct sctp_parameters sctp_parameters;
 };
 
 struct client {
