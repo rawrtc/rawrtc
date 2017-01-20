@@ -53,9 +53,6 @@ enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
     enum tls_fingerprint re_algorithm
 );
 
-/*
- * Translate a data transport type to str.
- */
 char const * rawrtc_data_transport_type_to_str(
     enum rawrtc_data_transport_type const type
 );
@@ -81,3 +78,41 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     size_t const buffer_size,
     char* source
 );
+
+extern enum rawrtc_code const rawrtc_ignore_success[];
+extern size_t const rawrtc_ignore_success_length;
+
+void rawrtc_before_exit();
+
+void rawrtc_exit_on_error(
+    enum rawrtc_code const code,
+    enum rawrtc_code const ignore[],
+    size_t const n_ignore,
+    char const* const file,
+    uint32_t const line
+);
+
+void rawrtc_exit_on_posix_error(
+    int code,
+    char const* const file,
+    uint32_t line
+);
+
+void rawrtc_exit_with_error(
+    char const* const file,
+    uint32_t line,
+    char const* const formatter,
+    ...
+);
+
+/* Lots of helper macros for the various tools */
+#define EOE(code) rawrtc_exit_on_error(code, rawrtc_ignore_success,\
+    sizeof(enum rawrtc_code) / sizeof(enum rawrtc_code), __FILE__, __LINE__)
+#define EOEIGN(code, ignore) rawrtc_exit_on_error(code, ignore,\
+    rawrtc_ignore_success_length, __FILE__, __LINE__)
+#define EOR(code) rawrtc_exit_on_posix_error(code, __FILE__, __LINE__)
+#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (__GNUC__ >= 3)
+#define EWE(...) rawrtc_exit_with_error(__FILE__, __LINE__, __VA_ARGS__)
+#elif defined(__GNUC__)
+#define EWE(args...) rawrtc_exit_with_error(__FILE__, __LINE__, args)
+#endif

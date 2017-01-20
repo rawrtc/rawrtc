@@ -3,19 +3,12 @@
 #include <string.h> // strerror
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
+#include "../librawrtc/utils.h" /* TODO: Replace with <rawrtc_internal/utils.h> */
 
 /* TODO: Replace with zf_log */
 #define DEBUG_MODULE "redirect-transport-interop-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
-
-#define EOE(code) exit_on_error(code, __FILE__, __LINE__)
-#define EOR(code) exit_on_re_error(code, __FILE__, __LINE__)
-#if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (__GNUC__ >= 3)
-#define EWE(...) exit_with_error(__FILE__, __LINE__, __VA_ARGS__)
-#elif defined(__GNUC__)
-#define EWE(args...) exit_with_error(__FILE__, __LINE__, args)
-#endif
 
 enum {
     PARAMETERS_MAX_LENGTH = 8192,
@@ -41,69 +34,6 @@ struct client {
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
-
-static void before_exit() {
-    // Close
-    rawrtc_close();
-
-    // Check memory leaks
-    tmr_debug();
-    mem_debug();
-}
-
-static void exit_on_error(
-        enum rawrtc_code code,
-        char const* const file,
-        uint32_t line
-) {
-    switch (code) {
-        case RAWRTC_CODE_SUCCESS:
-            return;
-        case RAWRTC_CODE_NOT_IMPLEMENTED:
-            DEBUG_WARNING("Not implemented in %s %"PRIu32"\n", file, line);
-            return;
-        default:
-            DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n",
-                          file, line, code, rawrtc_code_to_str(code));
-            before_exit();
-            exit((int) code);
-    }
-}
-
-static void exit_on_re_error(
-        int code,
-        char const* const file,
-        uint32_t line
-) {
-    if (code != 0) {
-        DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n", file, line, code, strerror(code));
-        before_exit();
-        exit(code);
-    }
-}
-
-static void exit_with_error(
-        char const* const file,
-        uint32_t line,
-        char const* const formatter,
-        ...
-) {
-    char* message;
-
-    // Format message
-    va_list ap;
-    va_start(ap, formatter);
-    re_vsdprintf(&message, formatter, ap);
-    va_end(ap);
-
-    // Print message
-    DEBUG_WARNING("%s %"PRIu32": %s\n", file, line, message);
-
-    // Dereference & bye
-    mem_deref(message);
-    before_exit();
-    exit(2);
-}
 
 static bool str_to_uint16(
         uint16_t* const numberp,
@@ -884,7 +814,7 @@ out:
     if (do_exit) {
         // Stop client & bye
         client_stop(client);
-        before_exit();
+        rawrtc_before_exit();
         exit(0);
     }
 }
@@ -969,6 +899,6 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Stop client & bye
     client_stop(&client);
-    before_exit();
+    rawrtc_before_exit();
     return 0;
 }

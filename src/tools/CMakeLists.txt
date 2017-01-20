@@ -6,32 +6,39 @@ target_link_libraries(ice-gatherer
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
-# Tool: ice-transport
-add_executable(ice-transport ice-transport.c)
-target_link_libraries(ice-transport
+# Tool: ice-transport-loopback
+add_executable(ice-transport-loopback ice-transport-loopback.c)
+target_link_libraries(ice-transport-loopback
         rawrtc)
-install(TARGETS ice-transport
+install(TARGETS ice-transport-loopback
         DESTINATION bin)
 
-# Tool: dtls-transport
-add_executable(dtls-transport dtls-transport.c)
-target_link_libraries(dtls-transport
+# Tool: dtls-transport-loopback
+add_executable(dtls-transport-loopback dtls-transport-loopback.c)
+target_link_libraries(dtls-transport-loopback
         rawrtc)
-install(TARGETS dtls-transport
+install(TARGETS dtls-transport-loopback
         DESTINATION bin)
 
-# Tool: redirect-transport-interop
-add_executable(redirect-transport redirect-transport-interop.c)
+# Tool: redirect-transport
+add_executable(redirect-transport redirect-transport.c)
 target_link_libraries(redirect-transport
         rawrtc)
 install(TARGETS redirect-transport
         DESTINATION bin)
 
-# Tool: sctp-transport
-add_executable(sctp-transport sctp-transport.c)
-target_link_libraries(sctp-transport
+# Tool: sctp-transport-loopback
+add_executable(sctp-transport-loopback sctp-transport-loopback.c)
+target_link_libraries(sctp-transport-loopback
         rawrtc)
-install(TARGETS sctp-transport
+install(TARGETS sctp-transport-loopback
+        DESTINATION bin)
+
+# Tool: data-channel-sctp-loopback
+add_executable(data-channel-sctp-loopback data-channel-sctp-loopback.c)
+target_link_libraries(data-channel-sctp-loopback
+        rawrtc)
+install(TARGETS data-channel-sctp-loopback
         DESTINATION bin)
 
 # Tool: data-channel-sctp
@@ -39,12 +46,5 @@ add_executable(data-channel-sctp data-channel-sctp.c)
 target_link_libraries(data-channel-sctp
         rawrtc)
 install(TARGETS data-channel-sctp
-        DESTINATION bin)
-
-# Tool: data-channel-interop
-add_executable(data-channel-interop data-channel-interop.c)
-target_link_libraries(data-channel-interop
-        rawrtc)
-install(TARGETS data-channel-interop
         DESTINATION bin)
 

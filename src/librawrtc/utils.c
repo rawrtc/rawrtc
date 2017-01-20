@@ -6,6 +6,11 @@
 #include <rawrtc.h>
 #include "utils.h"
 
+#define DEBUG_MODULE "utils"
+// Note: Always log level 7 as logging is only used in tool functions.
+#define RAWRTC_DEBUG_MODULE_LEVEL 7
+#include "debug.h"
+
 /*
  * Default rawrtc options.
  */
@@ -912,3 +917,97 @@ enum rawrtc_code rawrtc_sdprintf(
     return rawrtc_error_to_code(err);
 }
 
+/*
+ * Ignore success code list.
+ */
+enum rawrtc_code const rawrtc_ignore_success[] = {RAWRTC_CODE_SUCCESS};
+size_t const rawrtc_ignore_success_length =
+        sizeof(rawrtc_ignore_success) / sizeof(rawrtc_ignore_success[0]);
+
+/*
+ * Function to be called before exiting.
+ */
+void rawrtc_before_exit() {
+    // Close
+    rawrtc_close();
+
+    // Check memory leaks
+    tmr_debug();
+    mem_debug();
+}
+
+/*
+ * Exit on error code.
+ */
+void rawrtc_exit_on_error(
+        enum rawrtc_code const code,
+        enum rawrtc_code const ignore[],
+        size_t const n_ignore,
+        char const* const file,
+        uint32_t const line
+) {
+    size_t i;
+
+    // Ignore?
+    for (i = 0; i < n_ignore; ++i) {
+        if (code == ignore[i]) {
+            return;
+        }
+    }
+
+    // Handle
+    switch (code) {
+        case RAWRTC_CODE_SUCCESS:
+            return;
+        case RAWRTC_CODE_NOT_IMPLEMENTED:
+            DEBUG_WARNING("Not implemented in %s %"PRIu32"\n",
+                          file, line);
+            return;
+        default:
+            DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n",
+                          file, line, code, rawrtc_code_to_str(code));
+            rawrtc_before_exit();
+            exit((int) code);
+    }
+}
+
+/*
+ * Exit on POSIX error code.
+ */
+void rawrtc_exit_on_posix_error(
+        int code,
+        char const* const file,
+        uint32_t line
+) {
+    if (code != 0) {
+        DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n", file, line, code, strerror(code));
+        rawrtc_before_exit();
+        exit(code);
+    }
+}
+
+/*
+ * Exit with a custom error message.
+ */
+void rawrtc_exit_with_error(
+        char const* const file,
+        uint32_t line,
+        char const* const formatter,
+        ...
+) {
+    char* message;
+
+    // Format message
+    va_list ap;
+    va_start(ap, formatter);
+    re_vsdprintf(&message, formatter, ap);
+    va_end(ap);
+
+    // Print message
+    DEBUG_WARNING("%s %"PRIu32": %s\n", file, line, message);
+
+    // Dereference & bye
+    mem_deref(message);
+    rawrtc_before_exit();
+    exit(1);
+}

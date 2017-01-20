@@ -1,14 +1,13 @@
 #include <stdio.h>
 #include <rawrtc.h>
 #include <usrsctp.h> // sctp_sendv_spa
-#include "../librawrtc/sctp_transport.h"
+#include "../librawrtc/sctp_transport.h" /* TODO: Replace with <rawrtc_internal/sctp_transport.h> */
+#include "../librawrtc/utils.h" /* TODO: Replace with <rawrtc_internal/utils.h> */
 
 /* TODO: Replace with zf_log */
 #define DEBUG_MODULE "sctp-transport-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
-
-#define EOE(code) exit_on_error(code, __FILE__, __LINE__)
 
 struct client;
 
@@ -27,31 +26,6 @@ struct client {
     struct rawrtc_sctp_transport* sctp_transport;
     struct client* other_client;
 };
-
-static void before_exit() {
-    // Close
-    rawrtc_close();
-
-    // Check memory leaks
-    tmr_debug();
-    mem_debug();
-}
-
-static void exit_on_error(enum rawrtc_code code, char const* const file, uint32_t line) {
-    switch (code) {
-        case RAWRTC_CODE_SUCCESS:
-            return;
-        case RAWRTC_CODE_NOT_IMPLEMENTED:
-            fprintf(stderr, "Not implemented in %s %"PRIu32"\n",
-                    file, line);
-            return;
-        default:
-            fprintf(stderr, "Error in %s %"PRIu32" (%d): %s\n",
-                    file, line, code, rawrtc_code_to_str(code));
-            before_exit();
-            exit((int) code);
-    }
-}
 
 static void ice_gatherer_state_change_handler(
         enum rawrtc_ice_gatherer_state const state, // read-only
@@ -344,6 +318,6 @@ int main(int argc, char* argv[argc + 1]) {
     mem_deref(gather_options);
 
     // Bye
-    before_exit();
+    rawrtc_before_exit();
     return 0;
 }
