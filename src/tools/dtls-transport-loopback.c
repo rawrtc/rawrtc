@@ -4,7 +4,7 @@
 #include "../librawrtc/utils.h" /* TODO: Replace with <rawrtc_internal/utils.h> */
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "dtls-transport-app"
+#define DEBUG_MODULE "dtls-transport-loopback-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 

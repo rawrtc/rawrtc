@@ -5,7 +5,7 @@
 #include "../librawrtc/utils.h" /* TODO: Replace with <rawrtc_internal/utils.h> */
 
 /* TODO: Replace with zf_log */
-#define DEBUG_MODULE "data-channel-sctp-app"
+#define DEBUG_MODULE "data-channel-sctp-loopback-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
