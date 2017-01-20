@@ -15,7 +15,7 @@ enum {
 };
 
 struct sctp_parameters {
-    struct rawrtc_sctp_capabilities capabilities;
+    struct rawrtc_sctp_capabilities* capabilities;
     uint16_t port;
 };
 
@@ -29,17 +29,57 @@ struct parameters {
 struct client {
     char* name;
     struct rawrtc_ice_gather_options* gather_options;
-    char* redirect_ip;
-    uint16_t redirect_port;
     enum rawrtc_ice_role ice_role;
     struct rawrtc_certificate* certificate;
     struct rawrtc_ice_gatherer* gatherer;
     struct rawrtc_ice_transport* ice_transport;
     struct rawrtc_dtls_transport* dtls_transport;
-    struct rawrtc_redirect_transport* redirect_transport;
+    struct rawrtc_sctp_transport* sctp_transport;
+    struct rawrtc_data_transport* data_transport;
+    struct data_channel* data_channel_negotiated;
+    struct data_channel* data_channel;
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
+
+struct data_channel {
+    struct client* client;
+    struct rawrtc_data_channel* channel;
+    char const* label;
+};
+
+static struct rawrtc_data_channel_options* data_channel_handler(
+    struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
+    void* const arg
+);
+
+static void data_channel_open_handler(
+    void* const arg
+);
+
+static void data_channel_buffered_amount_low_handler(
+    void* const arg
+);
+
+static void data_channel_error_handler(
+    void* const arg
+);
+
+static void data_channel_close_handler(
+    void* const arg
+);
+
+static void data_channel_message_handler(
+    struct mbuf* const buffer,
+    enum rawrtc_data_channel_message_flag const flags,
+    void* const arg
+);
+
+static void client_print_local_parameters(
+    struct client *client
+);
+
+static struct tmr timer = {0};
 
 static bool str_to_uint16(
         uint16_t* const numberp,
@@ -106,7 +146,7 @@ static enum rawrtc_code dict_get_entry(
             *((char** const) valuep) = entry->u.str;
             break;
         case ODICT_INT:
-            *((int* const) valuep) = entry->u.integer;
+            *((int64_t* const) valuep) = entry->u.integer;
             break;
         case ODICT_DOUBLE:
             *((double* const) valuep) = entry->u.dbl;
@@ -159,14 +199,14 @@ static enum rawrtc_code dict_get_uint16(
         char* const key,
         bool required
 ) {
-    int_least32_t value;
+    int64_t value;
 
     // Check arguments
     if (!valuep || !parent || !key) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get int_least32_t
+    // Get int64_t
     enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;
@@ -181,9 +221,14 @@ static enum rawrtc_code dict_get_uint16(
     }
 }
 
-static void client_print_local_parameters(
-        struct client *client
-);
+static void data_channel_destroy(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+
+    // Dereference
+    mem_deref(channel->channel);
+}
 
 static void ice_gatherer_state_change_handler(
         enum rawrtc_ice_gatherer_state const state, // read-only
@@ -251,6 +296,50 @@ static void dtls_transport_state_change_handler(
     struct client* const client = arg;
     char const * const state_name = rawrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
+
+    // Open? Create new data channel
+    // TODO: Move this once we can create data channels earlier
+    if (state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
+        enum rawrtc_dtls_role role;
+
+        // Renew DTLS parameters
+        mem_deref(client->local_parameters.dtls_parameters);
+        EOE(rawrtc_dtls_transport_get_local_parameters(
+                &client->local_parameters.dtls_parameters, client->dtls_transport));
+
+        // Get DTLS role
+        EOE(rawrtc_dtls_parameters_get_role(&role, client->local_parameters.dtls_parameters));
+        DEBUG_PRINTF("(%s) DTLS role: %s\n", client->name, rawrtc_dtls_role_to_str(role));
+
+        // Client? Create data channel
+        if (role == RAWRTC_DTLS_ROLE_CLIENT) {
+            struct rawrtc_data_channel_parameters* channel_parameters;
+
+            // Create data channel argument
+            client->data_channel = mem_zalloc(sizeof(*client->data_channel), data_channel_destroy);
+            if (!client->data_channel) {
+                EOE(RAWRTC_CODE_NO_MEMORY);
+            }
+            client->data_channel->client = client;
+            client->data_channel->label = "bear-noises";
+
+            // Create data channel parameters
+            EOE(rawrtc_data_channel_parameters_create(
+                    &channel_parameters, client->data_channel->label,
+                    RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
+
+            // Create data channel
+            EOE(rawrtc_data_channel_create(
+                    &client->data_channel->channel, client->data_transport,
+                    channel_parameters, NULL,
+                    data_channel_open_handler, data_channel_buffered_amount_low_handler,
+                    data_channel_error_handler, data_channel_close_handler,
+                    data_channel_message_handler, client->data_channel));
+
+            // Dereference
+            mem_deref(channel_parameters);
+        }
+    }
 }
 
 static void dtls_transport_error_handler(
@@ -260,6 +349,134 @@ static void dtls_transport_error_handler(
     struct client* const client = arg;
     // TODO: Print error message
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
+}
+
+static void sctp_transport_state_change_handler(
+        enum rawrtc_sctp_transport_state const state,
+        void* const arg
+) {
+    struct client* const client = arg;
+    char const * const state_name = rawrtc_sctp_transport_state_to_name(state);
+    DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
+}
+
+static struct rawrtc_data_channel_options* data_channel_handler(
+        struct rawrtc_data_channel* const channel, // read-only, MUST be referenced when used
+        void* const arg
+) {
+    struct client* const client = arg;
+    struct rawrtc_data_channel_parameters* parameters;
+    enum rawrtc_code const ignore[] = {RAWRTC_CODE_NO_VALUE};
+    char* label = NULL;
+
+    // Get data channel label and protocol
+    EOE(rawrtc_data_channel_get_parameters(&parameters, channel));
+    EOEIGN(rawrtc_data_channel_parameters_get_label(&label, parameters), ignore);
+    DEBUG_INFO("(%s) New data channel instance: %s\n", client->name, label ? label : "N/A");
+    mem_deref(label);
+    mem_deref(parameters);
+
+    // Use default options
+    return NULL;
+}
+
+
+static void timer_handler(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    struct mbuf* buffer;
+    enum rawrtc_code error;
+    enum rawrtc_dtls_role role;
+
+    // Compose message (16 MiB)
+    buffer = mbuf_alloc(1 << 24);
+    EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
+    EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
+    mbuf_set_pos(buffer, 0);
+
+    // Send message
+    DEBUG_PRINTF("(%s) Sending %zu bytes\n", client->name, mbuf_get_left(buffer));
+    error = rawrtc_data_channel_send(channel->channel, buffer, true);
+    if (error) {
+        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+    }
+    mem_deref(buffer);
+
+    // Get DTLS role
+    EOE(rawrtc_dtls_parameters_get_role(&role, client->local_parameters.dtls_parameters));
+    if (role == RAWRTC_DTLS_ROLE_CLIENT) {
+        // Close bear-noises
+        DEBUG_PRINTF("(%s) Closing channel\n", client->name, channel->label);
+        EOR(rawrtc_data_channel_close(client->data_channel->channel));
+    }
+}
+
+static void data_channel_open_handler(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    struct mbuf* buffer;
+    enum rawrtc_code error;
+    DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
+
+    // Send data delayed on bear-noises
+    if (str_cmp(channel->label, "bear-noises") == 0) {
+        tmr_start(&timer, 5000, timer_handler, channel);
+        return;
+    }
+
+    // Compose message (256 KiB)
+    buffer = mbuf_alloc(1 << 18);
+    EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
+    EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
+    mbuf_set_pos(buffer, 0);
+
+    // Send message
+    DEBUG_PRINTF("(%s) Sending %zu bytes\n", client->name, mbuf_get_left(buffer));
+    error = rawrtc_data_channel_send(channel->channel, buffer, true);
+    if (error) {
+        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+    }
+    mem_deref(buffer);
+}
+
+static void data_channel_buffered_amount_low_handler(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel buffered amount low: %s\n", client->name, channel->label);
+}
+
+static void data_channel_error_handler(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, channel->label);
+}
+
+static void data_channel_close_handler(
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, channel->label);
+}
+
+static void data_channel_message_handler(
+        struct mbuf* const buffer,
+        enum rawrtc_data_channel_message_flag const flags,
+        void* const arg
+) {
+    struct data_channel* const channel = arg;
+    struct client* const client = channel->client;
+    (void) flags;
+    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",
+                 client->name, channel->label, mbuf_get_left(buffer));
 }
 
 static void signal_handler(
@@ -272,6 +489,8 @@ static void signal_handler(
 static void client_init(
         struct client* const client
 ) {
+    struct rawrtc_data_channel_parameters* channel_parameters;
+
     // Generate certificates
     EOE(rawrtc_certificate_generate(&client->certificate, NULL));
     struct rawrtc_certificate* certificates[] = {client->certificate};
@@ -294,10 +513,40 @@ static void client_init(
             sizeof(certificates) / sizeof(certificates[0]),
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
-    // Create redirect transport
-    EOE(rawrtc_redirect_transport_create(
-            &client->redirect_transport, client->dtls_transport,
-            client->redirect_ip, client->redirect_port, 0, 0));
+    // Create SCTP transport
+    EOE(rawrtc_sctp_transport_create(
+            &client->sctp_transport, client->dtls_transport,
+            client->local_parameters.sctp_parameters.port,
+            data_channel_handler, sctp_transport_state_change_handler, client));
+
+    // Get data transport
+    EOE(rawrtc_sctp_transport_get_data_transport(
+            &client->data_transport, client->sctp_transport));
+
+    // Create data channel argument
+    client->data_channel_negotiated = mem_zalloc(
+            sizeof(*client->data_channel_negotiated), data_channel_destroy);
+    if (!client->data_channel_negotiated) {
+        EOE(RAWRTC_CODE_NO_MEMORY);
+    }
+    client->data_channel_negotiated->client = client;
+    client->data_channel_negotiated->label = "cat-noises";
+
+    // Create data channel parameters
+    EOE(rawrtc_data_channel_parameters_create(
+            &channel_parameters, client->data_channel_negotiated->label,
+            RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED, 0, NULL, true, 0));
+
+    // Create pre-negotiated data channel
+    EOE(rawrtc_data_channel_create(
+            &client->data_channel_negotiated->channel, client->data_transport,
+            channel_parameters, NULL,
+            data_channel_open_handler, data_channel_buffered_amount_low_handler,
+            data_channel_error_handler, data_channel_close_handler, data_channel_message_handler,
+            client->data_channel_negotiated));
+
+    // Dereference
+    mem_deref(channel_parameters);
 }
 
 static void client_start_gathering(
@@ -323,6 +572,12 @@ static void client_get_parameters(
     // Get local DTLS parameters
     EOE(rawrtc_dtls_transport_get_local_parameters(
             &local_parameters->dtls_parameters, client->dtls_transport));
+
+    // Get local SCTP parameters
+    EOE(rawrtc_sctp_transport_get_capabilities(
+            &local_parameters->sctp_parameters.capabilities));
+    EOE(rawrtc_sctp_transport_get_port(
+            &local_parameters->sctp_parameters.port, client->sctp_transport));
 }
 
 static void client_set_parameters(
@@ -349,6 +604,11 @@ static void client_start_transports(
     // Start DTLS transport
     EOE(rawrtc_dtls_transport_start(
             client->dtls_transport, remote_parameters->dtls_parameters));
+
+    // Start SCTP transport
+    EOE(rawrtc_sctp_transport_start(
+            client->sctp_transport, remote_parameters->sctp_parameters.capabilities,
+            remote_parameters->sctp_parameters.port));
 }
 
 static void parameters_destroy(
@@ -358,12 +618,16 @@ static void parameters_destroy(
     parameters->ice_parameters = mem_deref(parameters->ice_parameters);
     parameters->ice_candidates = mem_deref(parameters->ice_candidates);
     parameters->dtls_parameters = mem_deref(parameters->dtls_parameters);
+    if (parameters->sctp_parameters.capabilities) {
+        parameters->sctp_parameters.capabilities =
+                mem_deref(parameters->sctp_parameters.capabilities);
+    }
 }
 
 static void client_stop(
         struct client* const client
 ) {
-    client->redirect_transport = mem_deref(client->redirect_transport);
+    EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
     EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
@@ -371,6 +635,10 @@ static void client_stop(
     // Dereference & close
     parameters_destroy(&client->remote_parameters);
     parameters_destroy(&client->local_parameters);
+    client->data_channel = mem_deref(client->data_channel);
+    client->data_channel_negotiated = mem_deref(client->data_channel_negotiated);
+    client->data_transport = mem_deref(client->data_transport);
+    client->sctp_transport = mem_deref(client->sctp_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -530,6 +798,23 @@ static void client_set_dtls_parameters(
     mem_deref(array);
 }
 
+static void client_set_sctp_parameters(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_parameters* const parameters,
+        struct odict* const dict
+) {
+    uint64_t max_message_size;
+    uint16_t port;
+
+    // Get values
+    EOE(rawrtc_sctp_capabilities_get_max_message_size(&max_message_size, parameters->capabilities));
+    EOE(rawrtc_sctp_transport_get_port(&port, transport));
+
+    // Set ICE parameters
+    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, max_message_size));
+    EOR(odict_entry_add(dict, "port", ODICT_INT, port));
+}
+
 static void client_print_local_parameters(
         struct client *client
 ) {
@@ -554,6 +839,11 @@ static void client_print_local_parameters(
     EOR(odict_alloc(&node, 16));
     client_set_dtls_parameters(client->local_parameters.dtls_parameters, node);
     EOR(odict_entry_add(dict, "dtlsParameters", ODICT_OBJECT, node));
+    mem_deref(node);
+    EOR(odict_alloc(&node, 16));
+    client_set_sctp_parameters(client->sctp_transport, &client->local_parameters.sctp_parameters,
+                               node);
+    EOR(odict_entry_add(dict, "sctpParameters", ODICT_OBJECT, node));
     mem_deref(node);
 
     // Print JSON
@@ -758,6 +1048,30 @@ out:
     return error;
 }
 
+static enum rawrtc_code client_get_sctp_parameters(
+        struct sctp_parameters* const parameters,
+        struct odict* const dict
+) {
+    enum rawrtc_code error;
+    uint64_t max_message_size;
+
+    // Get maximum message size
+    error = dict_get_entry(&max_message_size, dict, "maxMessageSize", ODICT_INT, true);
+    if (error) {
+        return error;
+    }
+
+    // Get port
+    error = dict_get_uint16(&parameters->port, dict, "port", false);
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
+        // Note: Nothing to do in NO VALUE case as port has been set to 0 by default
+        return error;
+    }
+
+    // Create SCTP capabilities instance
+    return rawrtc_sctp_capabilities_create(&parameters->capabilities, max_message_size);
+}
+
 static void client_stdin_handler(
         int flags,
         void* const arg
@@ -772,6 +1086,7 @@ static void client_stdin_handler(
     struct rawrtc_ice_parameters* ice_parameters = NULL;
     struct rawrtc_ice_candidates* ice_candidates = NULL;
     struct rawrtc_dtls_parameters* dtls_parameters = NULL;
+    struct sctp_parameters sctp_parameters = {0};
     (void) flags;
 
     // Get message from stdin
@@ -795,10 +1110,15 @@ static void client_stdin_handler(
     error |= client_get_ice_candidates(&ice_candidates, node);
     error |= dict_get_entry(&node, dict, "dtlsParameters", ODICT_OBJECT, true);
     error |= client_get_dtls_parameters(&dtls_parameters, node);
+    error |= dict_get_entry(&node, dict, "sctpParameters", ODICT_OBJECT, true);
+    error |= client_get_sctp_parameters(&sctp_parameters, node);
 
     // Ok?
     if (error) {
         DEBUG_WARNING("Invalid remote parameters\n");
+        if (sctp_parameters.capabilities) {
+            mem_deref(sctp_parameters.capabilities);
+        }
         goto out;
     }
 
@@ -806,11 +1126,13 @@ static void client_stdin_handler(
     client->remote_parameters.ice_parameters = mem_ref(ice_parameters);
     client->remote_parameters.ice_candidates = mem_ref(ice_candidates);
     client->remote_parameters.dtls_parameters = mem_ref(dtls_parameters);
+    memcpy(&client->remote_parameters.sctp_parameters, &sctp_parameters, sizeof(sctp_parameters));
     DEBUG_INFO("Applying remote parameters\n");
     client_set_parameters(client);
     client_start_transports(client);
     
 out:
+    // Dereference
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
@@ -826,13 +1148,12 @@ out:
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port>", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port>]", program);
     exit(1);
 }
 
 int main(int argc, char* argv[argc + 1]) {
     enum rawrtc_ice_role ice_role;
-    uint16_t redirect_port;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
@@ -847,7 +1168,7 @@ int main(int argc, char* argv[argc + 1]) {
     DEBUG_PRINTF("Init\n");
 
     // Check arguments length
-    if (argc < 4) {
+    if (argc < 2) {
         exit_with_usage(argv[0]);
     }
 
@@ -864,8 +1185,8 @@ int main(int argc, char* argv[argc + 1]) {
             return 1;
     }
 
-    // Get redirect port
-    if (!str_to_uint16(&redirect_port, argv[3])) {
+    // Get SCTP port (optional)
+    if (argc == 3 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[2])) {
         exit_with_usage(argv[0]);
     }
 
@@ -886,8 +1207,6 @@ int main(int argc, char* argv[argc + 1]) {
     client.name = "A";
     client.gather_options = gather_options;
     client.ice_role = ice_role;
-    client.redirect_ip = argv[2];
-    client.redirect_port = redirect_port;
 
     // Setup client
     client_init(&client);

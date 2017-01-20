@@ -16,6 +16,7 @@ set(rawrtc_SOURCES
         main.c
         message_buffer.c
         redirect_transport.c
+        sctp_capabilities.c
         sctp_transport.c
         utils.c)
 

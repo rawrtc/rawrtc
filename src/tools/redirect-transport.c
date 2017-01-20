@@ -100,7 +100,7 @@ static enum rawrtc_code dict_get_entry(
             *((char** const) valuep) = entry->u.str;
             break;
         case ODICT_INT:
-            *((int* const) valuep) = entry->u.integer;
+            *((int64_t* const) valuep) = entry->u.integer;
             break;
         case ODICT_DOUBLE:
             *((double* const) valuep) = entry->u.dbl;
@@ -125,14 +125,14 @@ static enum rawrtc_code dict_get_uint32(
         char* const key,
         bool required
 ) {
-    int_least32_t value;
+    int64_t value;
 
     // Check arguments
     if (!valuep || !parent || !key) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get int_least32_t
+    // Get int64_t
     enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;
@@ -153,14 +153,14 @@ static enum rawrtc_code dict_get_uint16(
         char* const key,
         bool required
 ) {
-    int_least32_t value;
+    int64_t value;
 
     // Check arguments
     if (!valuep || !parent || !key) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get int_least32_t
+    // Get int64_t
     enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;

@@ -20,13 +20,6 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
-/*
- * Local SCTP capabilities.
- */
-struct rawrtc_sctp_capabilities const rawrtc_sctp_transport_capabilities = {
-    .max_message_size = RAWRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE
-};
-
 // SCTP outgoing message context (needed when buffering)
 struct send_context {
     unsigned int info_type;
@@ -2740,16 +2733,16 @@ out:
  * Get the local port of the SCTP transport.
  */
 enum rawrtc_code rawrtc_sctp_transport_get_port(
-        uint16_t* const port, // de-referenced
+        uint16_t* const portp, // de-referenced
         struct rawrtc_sctp_transport* const transport
 ) {
     // Check arguments
-    if (!port || !transport) {
+    if (!portp || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Set port
-    *port = transport->port;
+    *portp = transport->port;
 
     // Done
     return RAWRTC_CODE_SUCCESS;

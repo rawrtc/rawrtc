@@ -7,7 +7,6 @@ enum {
     // because this requires too many streams to allocate who eat up memory
     // Maybe add a configuration entry to enable/disable 'strict' mode
     RAWRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS = 65535,
-    RAWRTC_SCTP_TRANSPORT_MAX_MESSAGE_SIZE = 0,
     RAWRTC_SCTP_TRANSPORT_SID_MAX = 65534,
     RAWRTC_SCTP_TRANSPORT_EMPTY_MESSAGE_SIZE = 1
 };

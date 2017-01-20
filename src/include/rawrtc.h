@@ -1272,16 +1272,27 @@ enum rawrtc_code rawrtc_redirect_transport_create(
 );
 
 /*
+ * Create a new SCTP transport capabilities instance.
+ */
+enum rawrtc_code rawrtc_sctp_capabilities_create(
+        struct rawrtc_sctp_capabilities** const capabilitiesp, // de-referenced
+        uint64_t const max_message_size
+);
+
+/*
+ * Get the SCTP parameter's maximum message size value.
+ */
+enum rawrtc_code rawrtc_sctp_capabilities_get_max_message_size(
+        uint64_t* const max_message_sizep, // de-referenced
+        struct rawrtc_sctp_capabilities* const capabilities
+);
+
+/*
  * Get the corresponding name for an SCTP transport state.
  */
 char const * const rawrtc_sctp_transport_state_to_name(
     enum rawrtc_sctp_transport_state const state
 );
-
-/*
- * Local SCTP capabilities.
- */
-extern struct rawrtc_sctp_capabilities const rawrtc_sctp_transport_capabilities;
 
 /*
  * Create an SCTP transport.
@@ -1329,13 +1340,19 @@ enum rawrtc_code rawrtc_sctp_transport_stop(
  * Get the local port of the SCTP transport.
  */
 enum rawrtc_code rawrtc_sctp_transport_get_port(
-    uint16_t* const port, // de-referenced
+    uint16_t* const portp, // de-referenced
     struct rawrtc_sctp_transport* const transport
 );
 
 /*
+ * Get the local SCTP transport capabilities (static).
+ */
+enum rawrtc_code rawrtc_sctp_transport_get_capabilities(
+    struct rawrtc_sctp_capabilities** const capabilitiesp // de-referenced
+);
+
+/*
  * TODO (from RTCSctpTransport interface)
- * rawrtc_sctp_transport_get_capabilities
  * rawrtc_sctp_transport_set_data_channel_handler
  */
 

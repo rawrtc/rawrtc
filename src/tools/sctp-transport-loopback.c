@@ -187,6 +187,9 @@ static void client_init(
     EOE(rawrtc_sctp_transport_create(
             &local->sctp_transport, local->dtls_transport, local->sctp_port,
             data_channel_handler, sctp_transport_state_change_handler, local));
+
+    // Get SCTP capabilities
+    EOE(rawrtc_sctp_transport_get_capabilities(&local->sctp_capabilities));
 }
 
 static void client_start(
@@ -214,7 +217,7 @@ static void client_start(
 
     // Start SCTP transport
     EOE(rawrtc_sctp_transport_start(
-            local->sctp_transport, &rawrtc_sctp_transport_capabilities, remote->sctp_port));
+            local->sctp_transport, remote->sctp_capabilities, remote->sctp_port));
 }
 
 static void client_stop(
