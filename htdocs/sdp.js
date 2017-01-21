@@ -1,4 +1,12 @@
- /* eslint-env node */
+/*
+ * Copyright Philipp Hancke
+ * License: MIT
+ * Source: https://github.com/fippo/sdp
+ *
+ * Extended by Lennart Grahl
+ */
+
+/* eslint-env node */
 'use strict';
 
 // SDP helpers.
@@ -144,7 +152,7 @@ SDPUtils.parseExtmap = function(line) {
 // RTCRtpHeaderExtension.
 SDPUtils.writeExtmap = function(headerExtension) {
   return 'a=extmap:' + (headerExtension.id || headerExtension.preferredId) +
-       ' ' + headerExtension.uri + '\r\n';
+      ' ' + headerExtension.uri + '\r\n';
 };
 
 // Parses an ftmp line, returns dictionary. Sample input:
@@ -198,7 +206,7 @@ SDPUtils.writeRtcpFb = function(codec) {
     // FIXME: special handling for trr-int?
     codec.rtcpFeedback.forEach(function(fb) {
       lines += 'a=rtcp-fb:' + pt + ' ' + fb.type +
-      (fb.parameter && fb.parameter.length ? ' ' + fb.parameter : '') +
+          (fb.parameter && fb.parameter.length ? ' ' + fb.parameter : '') +
           '\r\n';
     });
   }
@@ -220,6 +228,46 @@ SDPUtils.parseSsrcMedia = function(line) {
     parts.attribute = line.substr(sp + 1);
   }
   return parts;
+};
+
+// Extracts SCTP capabilities from SDP media section or sessionpart.
+SDPUtils.getSctpCapabilities = function(mediaSection, sessionpart) {
+  var lines = SDPUtils.splitLines(mediaSection);
+  // Search in session part, too.
+  lines = lines.concat(SDPUtils.splitLines(sessionpart));
+  var maxMessageSize = lines.filter(function(line) {
+    return line.indexOf('a=max-message-size:') === 0;
+  });
+  // TODO: Use 65536 once browsers have fixed their implementations,
+  //       see: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html
+  maxMessageSize = maxMessageSize.length ? maxMessageSize[0].substr(19) : 16384;
+  return {
+    maxMessageSize: maxMessageSize
+  };
+};
+
+// Serializes SCTP capabilities to SDP.
+SDPUtils.writeSctpCapabilities = function(capabilities) {
+  return 'a=max-message-size:' + capabilities.maxMessageSize + '\r\n';
+};
+
+// Extracts SCTP port from SDP media section or sessionpart.
+SDPUtils.getSctpPort = function(mediaSection, sessionpart) {
+  var lines = SDPUtils.splitLines(mediaSection);
+  // Search in session part, too.
+  lines = lines.concat(SDPUtils.splitLines(sessionpart));
+  var port = lines.filter(function(line) {
+    return line.indexOf('a=sctp-port:') === 0;
+  });
+  port = port.length ? port[0].substr(12) : 5000;
+  return port;
+};
+
+// Serializes SCTP port to SDP.
+SDPUtils.writeSctpPort = function(port) {
+  // TODO: Enable once chromium has added support
+  // return 'a=sctp-port:' + (port ? port : 5000) + '\r\n';
+  return '';
 };
 
 // Extracts DTLS parameters from SDP media section or sessionpart.
@@ -245,7 +293,8 @@ SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
 
 // Serializes DTLS parameters to SDP.
 SDPUtils.writeDtlsParameters = function(params, setupType) {
-  var sdp = 'a=setup:' + setupType + '\r\n';
+  var sdp = 'a=dtls-id:' + SDPUtils.generateIdentifier() + '\r\n';
+  sdp += 'a=setup:' + setupType + '\r\n';
   params.fingerprints.forEach(function(fp) {
     sdp += 'a=fingerprint:' + fp.algorithm + ' ' + fp.value + '\r\n';
   });
@@ -297,7 +346,7 @@ SDPUtils.parseRtpParameters = function(mediaSection) {
       codec.parameters = fmtps.length ? SDPUtils.parseFmtp(fmtps[0]) : {};
       codec.rtcpFeedback = SDPUtils.matchPrefix(
           mediaSection, 'a=rtcp-fb:' + pt + ' ')
-        .map(SDPUtils.parseRtcpFb);
+          .map(SDPUtils.parseRtcpFb);
       description.codecs.push(codec);
       // parse FEC mechanisms from rtpmap lines.
       switch (codec.name.toUpperCase()) {
@@ -327,11 +376,11 @@ SDPUtils.writeRtpDescription = function(kind, caps) {
   sdp += caps.codecs.length > 0 ? '9' : '0'; // reject if no codecs.
   sdp += ' UDP/TLS/RTP/SAVPF ';
   sdp += caps.codecs.map(function(codec) {
-    if (codec.preferredPayloadType !== undefined) {
-      return codec.preferredPayloadType;
-    }
-    return codec.payloadType;
-  }).join(' ') + '\r\n';
+        if (codec.preferredPayloadType !== undefined) {
+          return codec.preferredPayloadType;
+        }
+        return codec.payloadType;
+      }).join(' ') + '\r\n';
 
   sdp += 'c=IN IP4 0.0.0.0\r\n';
   sdp += 'a=rtcp:9 IN IP4 0.0.0.0\r\n';
@@ -342,8 +391,21 @@ SDPUtils.writeRtpDescription = function(kind, caps) {
     sdp += SDPUtils.writeFmtp(codec);
     sdp += SDPUtils.writeRtcpFb(codec);
   });
-  // FIXME: add headerExtensions, fecMechanismş and rtcp.
+  var maxptime = 0;
+  caps.codecs.forEach(function(codec) {
+    if (codec.maxptime > maxptime) {
+      maxptime = codec.maxptime;
+    }
+  });
+  if (maxptime > 0) {
+    sdp += 'a=maxptime:' + maxptime + '\r\n';
+  }
   sdp += 'a=rtcp-mux\r\n';
+
+  caps.headerExtensions.forEach(function(extension) {
+    sdp += SDPUtils.writeExtmap(extension);
+  });
+  // FIXME: write fecMechanisms.
   return sdp;
 };
 
@@ -357,23 +419,23 @@ SDPUtils.parseRtpEncodingParameters = function(mediaSection) {
 
   // filter a=ssrc:... cname:, ignore PlanB-msid
   var ssrcs = SDPUtils.matchPrefix(mediaSection, 'a=ssrc:')
-  .map(function(line) {
-    return SDPUtils.parseSsrcMedia(line);
-  })
-  .filter(function(parts) {
-    return parts.attribute === 'cname';
-  });
+      .map(function(line) {
+        return SDPUtils.parseSsrcMedia(line);
+      })
+      .filter(function(parts) {
+        return parts.attribute === 'cname';
+      });
   var primarySsrc = ssrcs.length > 0 && ssrcs[0].ssrc;
   var secondarySsrc;
 
   var flows = SDPUtils.matchPrefix(mediaSection, 'a=ssrc-group:FID')
-  .map(function(line) {
-    var parts = line.split(' ');
-    parts.shift();
-    return parts.map(function(part) {
-      return parseInt(part, 10);
-    });
-  });
+      .map(function(line) {
+        var parts = line.split(' ');
+        parts.shift();
+        return parts.map(function(part) {
+          return parseInt(part, 10);
+        });
+      });
   if (flows.length > 0 && flows[0].length > 1 && flows[0][0] === primarySsrc) {
     secondarySsrc = flows[0][1];
   }

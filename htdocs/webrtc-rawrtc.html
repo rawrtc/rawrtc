@@ -19,7 +19,12 @@ textarea {
     <script type="text/javascript">
         var peer = new ControllingPeer();
         peer.createPeerConnection();
-        var dc = peer.createDataChannel();
+        var cat = peer.createDataChannel(peer.pc.createDataChannel('cat-noises', {
+            ordered: true,
+            negotiated: true,
+            id: 0
+        }));
+        peer.createDataChannel();
         peer.getLocalParameters()
         .then((parameters) => {
             console.log('Local parameters:', parameters);

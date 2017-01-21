@@ -77,22 +77,22 @@ class Peer {
 
         // Bind data channel events
         dc.onopen = function(event) {
-            console.log('Data channel', dc.id, 'open');
+            console.log('Data channel', dc.label, '(', dc.id, ')', 'open');
             // Send 'hello'
             dc.send('Hello from WebRTC on', navigator.userAgent);
         };
         dc.onbufferedamountlow = function(event) {
-            console.log('Data channel', dc.id, 'buffered amount low');
+            console.log('Data channel', dc.label, '(', dc.id, ')', 'buffered amount low');
         };
         dc.onerror = function(event) {
-            console.error('Data channel', dc.id, 'error:', event);
+            console.error('Data channel', dc.label, '(', dc.id, ')', 'error:', event);
         };
         dc.onclose = function(event) {
-            console.log('Data channel', dc.id, 'closed');
+            console.log('Data channel', dc.label, '(', dc.id, ')', 'closed');
         };
         dc.onmessage = function(event) {
             var length = event.data.size || event.data.byteLength || event.data.length;
-            console.info('Data channel', dc.id, 'message size:', length);
+            console.info('Data channel', dc.label, '(', dc.id, ')', 'message size:', length);
         };
 
         return dc;
@@ -115,6 +115,7 @@ class Peer {
                 iceParameters: null,
                 iceCandidates: [],
                 dtlsParameters: null,
+                sctpParameters: null,
             };
 
             // Split sections
@@ -143,10 +144,18 @@ class Peer {
                 if (!parameters.dtlsParameters) {
                     parameters.dtlsParameters = SDPUtils.getDtlsParameters(mediaSection, session);
                 }
+
+                // Get SCTP parameters
+                if (!parameters.sctpParameters) {
+                    parameters.sctpParameters = SDPUtils.getSctpCapabilities(mediaSection, session);
+                    parameters.sctpParameters.port = SDPUtils.getSctpPort(mediaSection, session);
+                }
             });
 
             // ICE lite parameter
-            if (!parameters.iceParameters || !parameters.dtlsParameters) {
+            if (!parameters.iceParameters
+                    || !parameters.dtlsParameters
+                    || !parameters.sctpParameters) {
                 error = 'Could not retrieve required parameters from local description';
                 console.error(error);
                 reject(error);
@@ -172,7 +181,7 @@ class Peer {
         });
     }
 
-    setRemoteParameters(parameters, type, sctpPort = 5000, localMid = null) {
+    setRemoteParameters(parameters, type, localMid = null) {
         return new Promise((resolve, reject) => {
             if (this.remoteDescription) {
                 resolve(this.remoteDescription);
@@ -197,12 +206,16 @@ class Peer {
             if (parameters.iceParameters.iceLite) {
                 sdp += 'a=ice-lite\r\n';
             }
-            sdp += 'm=application 9 DTLS/SCTP ' + sctpPort + '\r\n';
+            // TODO: Enable once browsers have updated
+            // sdp += 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n';
+            sdp += 'm=application 9 DTLS/SCTP ' + parameters.sctpParameters.port + '\r\n';
             sdp += 'c=IN IP4 0.0.0.0\r\n';
+
+            // Add ICE parameters
             sdp += SDPUtils.writeIceParameters(parameters.iceParameters);
 
             // Translate DTLS role
-            // Note: This somehow didn't make it into SDPUtils
+            // TODO: This somehow didn't make it into SDPUtils
             var setupType;
             switch (parameters.dtlsParameters.role) {
                 case 'client':
@@ -227,9 +240,14 @@ class Peer {
                     break;
             }
 
+            // Add DTLS parameters
             sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters, setupType);
             sdp += 'a=mid:' + localMid + '\r\n';
-            sdp += 'a=sctpmap:' + sctpPort + ' webrtc-datachannel 1024\r\n';
+
+            // Add SCTP parameters
+            sdp += SDPUtils.writeSctpCapabilities(parameters.sctpParameters);
+            sdp += SDPUtils.writeSctpPort(parameters.sctpParameters.port);
+            console.log('Remote description:\n' + sdp);
 
             // Set remote description
             this.pc.setRemoteDescription({type: type, sdp: sdp})
@@ -312,8 +330,8 @@ class ControllingPeer extends Peer {
         });
     }
 
-    setRemoteParameters(parameters, sctpPort = 5000, localMid = null) {
-        return super.setRemoteParameters(parameters, 'answer', sctpPort, localMid);
+    setRemoteParameters(parameters, localMid = null) {
+        return super.setRemoteParameters(parameters, 'answer', localMid);
     }
 }
 
@@ -363,7 +381,7 @@ class ControlledPeer extends Peer {
         });
     }
 
-    setRemoteParameters(parameters, sctpPort = 5000, localMid = null) {
-        return super.setRemoteParameters(parameters, 'offer', sctpPort, localMid);
+    setRemoteParameters(parameters, localMid = null) {
+        return super.setRemoteParameters(parameters, 'offer', localMid);
     }
 }

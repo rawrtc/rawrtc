@@ -390,8 +390,8 @@ static void timer_handler(
     enum rawrtc_code error;
     enum rawrtc_dtls_role role;
 
-    // Compose message (16 MiB)
-    buffer = mbuf_alloc(1 << 24);
+    // Compose message (16 KiB)
+    buffer = mbuf_alloc(1 << 14);
     EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
     EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
     mbuf_set_pos(buffer, 0);
@@ -424,12 +424,12 @@ static void data_channel_open_handler(
 
     // Send data delayed on bear-noises
     if (str_cmp(channel->label, "bear-noises") == 0) {
-        tmr_start(&timer, 5000, timer_handler, channel);
+        tmr_start(&timer, 15000, timer_handler, channel);
         return;
     }
 
-    // Compose message (256 KiB)
-    buffer = mbuf_alloc(1 << 18);
+    // Compose message (8 KiB)
+    buffer = mbuf_alloc(1 << 13);
     EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
     EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
     mbuf_set_pos(buffer, 0);
@@ -1142,6 +1142,7 @@ out:
     if (do_exit) {
         // Stop client & bye
         client_stop(client);
+        tmr_cancel(&timer);
         rawrtc_before_exit();
         exit(0);
     }
