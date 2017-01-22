@@ -248,7 +248,7 @@ SDPUtils.getSctpCapabilities = function(mediaSection, sessionpart) {
 
 // Serializes SCTP capabilities to SDP.
 SDPUtils.writeSctpCapabilities = function(capabilities) {
-  return 'a=max-message-size:' + capabilities.maxMessageSize + '\r\n';
+  return 'a=max-message-size:' + capabilities.maxMessageSize + '\r\n'; // (03)
 };
 
 // Extracts SCTP port from SDP media section or sessionpart.
@@ -265,8 +265,8 @@ SDPUtils.getSctpPort = function(mediaSection, sessionpart) {
 
 // Serializes SCTP port to SDP.
 SDPUtils.writeSctpPort = function(port) {
-  // TODO: Enable once chromium has added support
-  // return 'a=sctp-port:' + (port ? port : 5000) + '\r\n';
+  // TODO: Enable (chromium can't cope with it)
+  // return 'a=sctp-port:' + (port ? port : 5000) + '\r\n'; // (03)
   return '';
 };
 
@@ -293,8 +293,7 @@ SDPUtils.getDtlsParameters = function(mediaSection, sessionpart) {
 
 // Serializes DTLS parameters to SDP.
 SDPUtils.writeDtlsParameters = function(params, setupType) {
-  var sdp = 'a=dtls-id:' + SDPUtils.generateIdentifier() + '\r\n';
-  sdp += 'a=setup:' + setupType + '\r\n';
+  var sdp = 'a=setup:' + setupType + '\r\n';
   params.fingerprints.forEach(function(fp) {
     sdp += 'a=fingerprint:' + fp.algorithm + ' ' + fp.value + '\r\n';
   });

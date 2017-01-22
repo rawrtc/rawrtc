@@ -17,7 +17,7 @@ uint32_t rawrtc_ice_candidate_calculate_priority(
         int const protocol,
         enum ice_tcptype const tcp_type
 ) {
-    return 0;
+    return 1;
 }
 
 /*

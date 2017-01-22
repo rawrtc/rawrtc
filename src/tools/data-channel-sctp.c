@@ -86,19 +86,19 @@ static bool str_to_uint16(
         char* const str
 ) {
     char* end;
-    int_least32_t number = (int_least32_t) strtol(str, &end, 10);
+    unsigned long number = strtoul(str, &end, 10);
 
-    // Don't ask, strtol is insane...
-    if (number == 0 && str == end) {
+    // Check result (this function is insane, srsly...)
+    if (*end != '\0' || (number == ULONG_MAX && errno == ERANGE)) {
         return false;
     }
 
     // Check bounds
-    if (number < 0 || number > UINT16_MAX) {
+    if (number > UINT16_MAX) {
         return false;
     }
 
-    // Phew, we did it...
+    // Done
     *numberp = (uint16_t) number;
     return true;
 }

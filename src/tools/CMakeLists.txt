@@ -20,11 +20,11 @@ target_link_libraries(dtls-transport-loopback
 install(TARGETS dtls-transport-loopback
         DESTINATION bin)
 
-# Tool: redirect-transport
-add_executable(redirect-transport redirect-transport.c)
-target_link_libraries(redirect-transport
+# Tool: sctp-redirect-transport
+add_executable(sctp-redirect-transport sctp-redirect-transport.c)
+target_link_libraries(sctp-redirect-transport
         rawrtc)
-install(TARGETS redirect-transport
+install(TARGETS sctp-redirect-transport
         DESTINATION bin)
 
 # Tool: sctp-transport-loopback

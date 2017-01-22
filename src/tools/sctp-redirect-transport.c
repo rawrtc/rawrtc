@@ -14,10 +14,16 @@ enum {
     PARAMETERS_MAX_LENGTH = 8192,
 };
 
+struct sctp_parameters {
+    struct rawrtc_sctp_capabilities* capabilities;
+    uint16_t port;
+};
+
 struct parameters {
     struct rawrtc_ice_parameters* ice_parameters;
     struct rawrtc_ice_candidates* ice_candidates;
     struct rawrtc_dtls_parameters* dtls_parameters;
+    struct sctp_parameters sctp_parameters;
 };
 
 struct client {
@@ -30,7 +36,7 @@ struct client {
     struct rawrtc_ice_gatherer* gatherer;
     struct rawrtc_ice_transport* ice_transport;
     struct rawrtc_dtls_transport* dtls_transport;
-    struct rawrtc_redirect_transport* redirect_transport;
+    struct rawrtc_sctp_redirect_transport* sctp_redirect_transport;
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
@@ -40,20 +46,42 @@ static bool str_to_uint16(
         char* const str
 ) {
     char* end;
-    int_least32_t number = (int_least32_t) strtol(str, &end, 10);
+    unsigned long number = strtoul(str, &end, 10);
 
-    // Don't ask, strtol is insane...
-    if (number == 0 && str == end) {
+    // Check result (this function is insane, srsly...)
+    if (*end != '\0' || (number == ULONG_MAX && errno == ERANGE)) {
         return false;
     }
 
     // Check bounds
-    if (number < 0 || number > UINT16_MAX) {
+    if (number > UINT16_MAX) {
         return false;
     }
 
-    // Phew, we did it...
+    // Done
     *numberp = (uint16_t) number;
+    return true;
+}
+
+static bool str_to_uint64(
+        uint64_t* const numberp,
+        char* const str
+) {
+    char* end;
+    unsigned long long number = strtoull(str, &end, 10);
+
+    // Check result (this function is insane, srsly...)
+    if (*end != '\0' || (number == ULONG_MAX && errno == ERANGE)) {
+        return false;
+    }
+
+    // Check bounds
+    if (number > UINT64_MAX) {
+        return false;
+    }
+
+    // Done
+    *numberp = (uint64_t) number;
     return true;
 }
 
@@ -288,10 +316,10 @@ static void client_init(
             sizeof(certificates) / sizeof(certificates[0]),
             dtls_transport_state_change_handler, dtls_transport_error_handler, client));
 
-    // Create redirect transport
-    EOE(rawrtc_redirect_transport_create(
-            &client->redirect_transport, client->dtls_transport,
-            client->redirect_ip, client->redirect_port, 0, 0));
+    // Create SCTP redirect transport
+    EOE(rawrtc_sctp_redirect_transport_create(
+            &client->sctp_redirect_transport, client->dtls_transport,
+            0, client->redirect_ip, client->redirect_port));
 }
 
 static void client_start_gathering(
@@ -317,6 +345,10 @@ static void client_get_parameters(
     // Get local DTLS parameters
     EOE(rawrtc_dtls_transport_get_local_parameters(
             &local_parameters->dtls_parameters, client->dtls_transport));
+
+    // Get redirected local SCTP port
+    EOE(rawrtc_sctp_redirect_transport_get_port(
+            &local_parameters->sctp_parameters.port, client->sctp_redirect_transport));
 }
 
 static void client_set_parameters(
@@ -343,6 +375,11 @@ static void client_start_transports(
     // Start DTLS transport
     EOE(rawrtc_dtls_transport_start(
             client->dtls_transport, remote_parameters->dtls_parameters));
+
+    // Start SCTP redirect transport
+    EOE(rawrtc_sctp_redirect_transport_start(
+            client->sctp_redirect_transport, remote_parameters->sctp_parameters.capabilities,
+            remote_parameters->sctp_parameters.port));
 }
 
 static void parameters_destroy(
@@ -352,12 +389,16 @@ static void parameters_destroy(
     parameters->ice_parameters = mem_deref(parameters->ice_parameters);
     parameters->ice_candidates = mem_deref(parameters->ice_candidates);
     parameters->dtls_parameters = mem_deref(parameters->dtls_parameters);
+    if (parameters->sctp_parameters.capabilities) {
+        parameters->sctp_parameters.capabilities =
+                mem_deref(parameters->sctp_parameters.capabilities);
+    }
 }
 
 static void client_stop(
         struct client* const client
 ) {
-    client->redirect_transport = mem_deref(client->redirect_transport);
+    EOE(rawrtc_sctp_redirect_transport_stop(client->sctp_redirect_transport));
     EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
@@ -365,6 +406,7 @@ static void client_stop(
     // Dereference & close
     parameters_destroy(&client->remote_parameters);
     parameters_destroy(&client->local_parameters);
+    client->sctp_redirect_transport = mem_deref(client->sctp_redirect_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
@@ -524,6 +566,23 @@ static void client_set_dtls_parameters(
     mem_deref(array);
 }
 
+static void client_set_sctp_parameters(
+        struct rawrtc_sctp_redirect_transport* const transport,
+        struct sctp_parameters* const parameters,
+        struct odict* const dict
+) {
+    uint64_t max_message_size;
+    uint16_t port;
+
+    // Get values
+    EOE(rawrtc_sctp_capabilities_get_max_message_size(&max_message_size, parameters->capabilities));
+    EOE(rawrtc_sctp_redirect_transport_get_port(&port, transport));
+
+    // Set ICE parameters
+    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, max_message_size));
+    EOR(odict_entry_add(dict, "port", ODICT_INT, port));
+}
+
 static void client_print_local_parameters(
         struct client *client
 ) {
@@ -548,6 +607,11 @@ static void client_print_local_parameters(
     EOR(odict_alloc(&node, 16));
     client_set_dtls_parameters(client->local_parameters.dtls_parameters, node);
     EOR(odict_entry_add(dict, "dtlsParameters", ODICT_OBJECT, node));
+    mem_deref(node);
+    EOR(odict_alloc(&node, 16));
+    client_set_sctp_parameters(client->sctp_redirect_transport,
+                               &client->local_parameters.sctp_parameters, node);
+    EOR(odict_entry_add(dict, "sctpParameters", ODICT_OBJECT, node));
     mem_deref(node);
 
     // Print JSON
@@ -752,6 +816,30 @@ out:
     return error;
 }
 
+static enum rawrtc_code client_get_sctp_parameters(
+        struct sctp_parameters* const parameters,
+        struct odict* const dict
+) {
+    enum rawrtc_code error;
+    uint64_t max_message_size;
+
+    // Get maximum message size
+    error = dict_get_entry(&max_message_size, dict, "maxMessageSize", ODICT_INT, true);
+    if (error) {
+        return error;
+    }
+
+    // Get port
+    error = dict_get_uint16(&parameters->port, dict, "port", false);
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
+        // Note: Nothing to do in NO VALUE case as port has been set to 0 by default
+        return error;
+    }
+
+    // Create SCTP capabilities instance
+    return rawrtc_sctp_capabilities_create(&parameters->capabilities, max_message_size);
+}
+
 static void client_stdin_handler(
         int flags,
         void* const arg
@@ -766,6 +854,7 @@ static void client_stdin_handler(
     struct rawrtc_ice_parameters* ice_parameters = NULL;
     struct rawrtc_ice_candidates* ice_candidates = NULL;
     struct rawrtc_dtls_parameters* dtls_parameters = NULL;
+    struct sctp_parameters sctp_parameters = {0};
     (void) flags;
 
     // Get message from stdin
@@ -789,10 +878,15 @@ static void client_stdin_handler(
     error |= client_get_ice_candidates(&ice_candidates, node);
     error |= dict_get_entry(&node, dict, "dtlsParameters", ODICT_OBJECT, true);
     error |= client_get_dtls_parameters(&dtls_parameters, node);
+    error |= dict_get_entry(&node, dict, "sctpParameters", ODICT_OBJECT, true);
+    error |= client_get_sctp_parameters(&sctp_parameters, node);
 
     // Ok?
     if (error) {
         DEBUG_WARNING("Invalid remote parameters\n");
+        if (sctp_parameters.capabilities) {
+            mem_deref(sctp_parameters.capabilities);
+        }
         goto out;
     }
 
@@ -800,6 +894,7 @@ static void client_stdin_handler(
     client->remote_parameters.ice_parameters = mem_ref(ice_parameters);
     client->remote_parameters.ice_candidates = mem_ref(ice_candidates);
     client->remote_parameters.dtls_parameters = mem_ref(dtls_parameters);
+    memcpy(&client->remote_parameters.sctp_parameters, &sctp_parameters, sizeof(sctp_parameters));
     DEBUG_INFO("Applying remote parameters\n");
     client_set_parameters(client);
     client_start_transports(client);
@@ -820,13 +915,15 @@ out:
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port>", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port> [<sctp-port>] "
+                  "[<maximum-message-size>]", program);
     exit(1);
 }
 
 int main(int argc, char* argv[argc + 1]) {
     enum rawrtc_ice_role ice_role;
     uint16_t redirect_port;
+    uint64_t maximum_message_size;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
@@ -862,6 +959,23 @@ int main(int argc, char* argv[argc + 1]) {
     if (!str_to_uint16(&redirect_port, argv[3])) {
         exit_with_usage(argv[0]);
     }
+
+    // Get SCTP port (optional)
+    if (argc >= 5 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[4])) {
+        exit_with_usage(argv[0]);
+    }
+
+    // Get maximum message size (optional)
+    if (argc >= 6 && !str_to_uint64(&maximum_message_size, argv[4])) {
+        exit_with_usage(argv[0]);
+    } else {
+        // TODO: Find out what dctt can handle
+        maximum_message_size = 0;
+    }
+
+    // Create local SCTP capabilities
+    rawrtc_sctp_capabilities_create(
+            &client.local_parameters.sctp_parameters.capabilities, maximum_message_size);
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));

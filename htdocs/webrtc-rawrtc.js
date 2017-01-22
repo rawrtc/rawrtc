@@ -198,22 +198,6 @@ class Peer {
             }
             this.remoteParameters = parameters;
 
-            // Write SDP
-            var sdp = SDPUtils.writeSessionBoilerplate();
-
-            // Write media section
-            sdp += 'a=msid-semantic: WMS\r\n'; // magic pixie dust
-            if (parameters.iceParameters.iceLite) {
-                sdp += 'a=ice-lite\r\n';
-            }
-            // TODO: Enable once browsers have updated
-            // sdp += 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n';
-            sdp += 'm=application 9 DTLS/SCTP ' + parameters.sctpParameters.port + '\r\n';
-            sdp += 'c=IN IP4 0.0.0.0\r\n';
-
-            // Add ICE parameters
-            sdp += SDPUtils.writeIceParameters(parameters.iceParameters);
-
             // Translate DTLS role
             // TODO: This somehow didn't make it into SDPUtils
             var setupType;
@@ -240,13 +224,35 @@ class Peer {
                     break;
             }
 
-            // Add DTLS parameters
-            sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters, setupType);
-            sdp += 'a=mid:' + localMid + '\r\n';
+            // Write session section
+            var sdp = SDPUtils.writeSessionBoilerplate();
+            sdp += 'a=group:BUNDLE ' + localMid + '\r\n';
+            sdp += 'a=ice-options:trickle\r\n';
+            if (parameters.iceParameters.iceLite) {
+                sdp += 'a=ice-lite\r\n';
+            }
 
-            // Add SCTP parameters
+            // Write media section
+            // TODO: Replace
+            // sdp += 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\n'; // (03)
+            sdp += 'm=application 9 DTLS/SCTP ' + parameters.sctpParameters.port + '\r\n'; // (01)
+            sdp += 'c=IN IP4 0.0.0.0\r\n';
+            sdp += 'a=mid:' + localMid + '\r\n';
+            sdp += 'a=sendrecv\r\n';
+
+            // SCTP part
             sdp += SDPUtils.writeSctpCapabilities(parameters.sctpParameters);
             sdp += SDPUtils.writeSctpPort(parameters.sctpParameters.port);
+            sdp += 'a=sctpmap:' + parameters.sctpParameters.port + ' webrtc-datachannel 256\r\n'; // (01)
+
+            // DTLS part
+            sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters, setupType);
+
+            // ICE part
+            sdp += 'a=connection:new\r\n'; // (03)
+            sdp += SDPUtils.writeIceParameters(parameters.iceParameters);
+
+            // Done
             console.log('Remote description:\n' + sdp);
 
             // Set remote description

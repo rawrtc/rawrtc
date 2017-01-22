@@ -87,6 +87,8 @@ char const* rawrtc_code_to_str(
             return "try again later";
         case RAWRTC_CODE_STOP_ITERATION:
             return "stop iteration";
+        case RAWRTC_CODE_NOT_PERMITTED:
+            return "not permitted";
         default:
             return "(no error translation)";
     }
@@ -117,6 +119,8 @@ enum rawrtc_code rawrtc_error_to_code(
             return RAWRTC_CODE_MESSAGE_TOO_LONG;
         case ENOMEM:
             return RAWRTC_CODE_NO_MEMORY;
+        case EPERM:
+            return RAWRTC_CODE_NOT_PERMITTED;
         default:
             return RAWRTC_CODE_UNKNOWN_ERROR;
     }

@@ -44,7 +44,8 @@ enum rawrtc_code {
     RAWRTC_CODE_INVALID_MESSAGE,
     RAWRTC_CODE_MESSAGE_TOO_LONG,
     RAWRTC_CODE_TRY_AGAIN_LATER,
-    RAWRTC_CODE_STOP_ITERATION
+    RAWRTC_CODE_STOP_ITERATION,
+    RAWRTC_CODE_NOT_PERMITTED,
 }; // IMPORTANT: Add translations for new return codes in `utils.c`!
 
 /*
@@ -233,14 +234,6 @@ enum rawrtc_ice_tcp_candidate_type {
 };
 
 /*
- * Data transport type.
- * TODO: private -> data_transport.h
- */
-enum rawrtc_data_transport_type {
-    RAWRTC_DATA_TRANSPORT_TYPE_SCTP
-};
-
-/*
  * Data channel state.
  */
 enum rawrtc_data_channel_state {
@@ -251,6 +244,24 @@ enum rawrtc_data_channel_state {
 };
 
 
+
+/*
+ * SCTP redirect transport states.
+ * TODO: Private -> sctp_redirect_transport.h
+ */
+enum rawrtc_sctp_redirect_transport_state {
+    RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_NEW,
+    RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_OPEN,
+    RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_CLOSED
+};
+
+/*
+ * Data transport type.
+ * TODO: private -> data_transport.h
+ */
+enum rawrtc_data_transport_type {
+    RAWRTC_DATA_TRANSPORT_TYPE_SCTP
+};
 
 /*
  * Struct prototypes.
@@ -636,7 +647,8 @@ struct rawrtc_dtls_transport {
 /*
  * Redirect transport.
  */
-struct rawrtc_redirect_transport {
+struct rawrtc_sctp_redirect_transport {
+    enum rawrtc_sctp_redirect_transport_state state;
     struct rawrtc_dtls_transport* dtls_transport; // referenced
     uint16_t local_port;
     uint16_t remote_port;
@@ -1259,16 +1271,38 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
  */
 
 /*
- * Create a redirect transport.
- * `local_port` and `remote_port` may be `0`.
+ * Create an SCTP redirect transport.
  */
-enum rawrtc_code rawrtc_redirect_transport_create(
-    struct rawrtc_redirect_transport** const transportp, // de-referenced
+enum rawrtc_code rawrtc_sctp_redirect_transport_create(
+    struct rawrtc_sctp_redirect_transport** const transportp, // de-referenced
     struct rawrtc_dtls_transport* const dtls_transport, // referenced
+    uint16_t const port, // zeroable
     char* const redirect_ip, // copied
-    uint16_t const redirect_port,
-    uint16_t const local_port, // zeroable
-    uint16_t const remote_port // zeroable
+    uint16_t const redirect_port
+);
+
+/*
+ * Start an SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_start(
+    struct rawrtc_sctp_redirect_transport* const transport,
+    struct rawrtc_sctp_capabilities const * const remote_capabilities, // copied
+    uint16_t remote_port // zeroable
+);
+
+/*
+ * Stop and close the SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_stop(
+    struct rawrtc_sctp_redirect_transport* const transport
+);
+
+/*
+ * Get the redirected local SCTP port of the SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_get_port(
+    uint16_t* const portp, // de-referenced
+    struct rawrtc_sctp_redirect_transport* const transport
 );
 
 /*

@@ -2484,7 +2484,7 @@ out:
 
 
 /*
- * Stop and close the DTLS transport.
+ * Stop and close the SCTP transport.
  */
 enum rawrtc_code rawrtc_sctp_transport_stop(
         struct rawrtc_sctp_transport* const transport

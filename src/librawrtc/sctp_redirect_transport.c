@@ -7,16 +7,15 @@
 #include <rawrtc.h>
 #include "crc32c.h"
 #include "dtls_transport.h"
-#include "redirect_transport.h"
+#include "sctp_redirect_transport.h"
 
 #define DEBUG_MODULE "redirect-transport"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
- * TODO: Lacks state transition event callback
+ * Patch local and remote port in the SCTP packet header.
  */
-
 static void patch_sctp_header(
         struct mbuf* const buffer,
         uint16_t const source,
@@ -65,7 +64,7 @@ static void redirect_from_raw(
         int flags,
         void *const arg
 ) {
-    struct rawrtc_redirect_transport* const transport = arg;
+    struct rawrtc_sctp_redirect_transport* const transport = arg;
     struct mbuf* buffer;
     enum rawrtc_code error;
     struct sockaddr_in from_address;
@@ -144,8 +143,15 @@ static void redirect_to_raw(
         struct mbuf* const buffer,
         void* const arg
 ) {
-    struct rawrtc_redirect_transport* const transport = arg;
+    struct rawrtc_sctp_redirect_transport* const transport = arg;
     ssize_t length;
+
+    // Check state
+    if (transport->state != RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_OPEN) {
+        DEBUG_NOTICE("Ignored packet of %zu bytes as transport is not open\n",
+                     mbuf_get_left(buffer));
+        return;
+    }
 
     // Update SCTP header with changed ports
     patch_sctp_header(buffer, transport->local_port, sa_port(&transport->redirect_address));
@@ -163,22 +169,44 @@ static void redirect_to_raw(
 }
 
 /*
- * Destructor for an existing ICE transport.
+ * Change the state of the SCTP redirect transport.
+ * Caller MUST ensure that the same state is not set twice.
  */
-static void rawrtc_redirect_transport_destroy(
-        void* const arg
+static void set_state(
+        struct rawrtc_sctp_redirect_transport* const transport, // not checked
+        enum rawrtc_sctp_redirect_transport_state const state
 ) {
-    struct rawrtc_redirect_transport* const transport = arg;
+    // Closed?
+    if (state == RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_CLOSED) {
+        // Stop listening and close raw socket
+        if (transport->socket != -1) {
+            fd_close(transport->socket);
+            if (close(transport->socket)) {
+                DEBUG_WARNING("Closing raw socket failed: %m\n", errno);
+            }
+        }
 
-    // Stop listening and close raw socket
-    fd_close(transport->socket);
-    if (close(transport->socket)) {
-        DEBUG_WARNING("Closing raw socket failed: %m\n", errno);
+        // Remove from DTLS transport
+        // Note: No NULL checking needed as the function will do that for us
+        rawrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
     }
 
-    // Remove from DTLS transport
-    // Note: No NULL checking needed as the function will do that for us
-    rawrtc_dtls_transport_clear_data_transport(transport->dtls_transport);
+    // Set state
+    transport->state = state;
+
+    // TODO: Raise event
+}
+
+/*
+ * Destructor for an existing SCTP redirect transport.
+ */
+static void rawrtc_sctp_redirect_transport_destroy(
+        void* const arg
+) {
+    struct rawrtc_sctp_redirect_transport* const transport = arg;
+
+    // Stop transport
+    rawrtc_sctp_redirect_transport_stop(transport);
 
     // Dereference
     mem_deref(transport->dtls_transport);
@@ -186,20 +214,17 @@ static void rawrtc_redirect_transport_destroy(
 }
 
 /*
- * Create a redirect transport.
- * `local_port` and `remote_port` may be `0`.
- * TODO: https://github.com/w3c/ortc/issues/625
+ * Create an SCTP redirect transport.
  */
-enum rawrtc_code rawrtc_redirect_transport_create(
-        struct rawrtc_redirect_transport** const transportp, // de-referenced
+enum rawrtc_code rawrtc_sctp_redirect_transport_create(
+        struct rawrtc_sctp_redirect_transport** const transportp, // de-referenced
         struct rawrtc_dtls_transport* const dtls_transport, // referenced
+        uint16_t const port, // zeroable
         char* const redirect_ip, // copied
-        uint16_t const redirect_port,
-        uint16_t const local_port, // zeroable
-        uint16_t const remote_port // zeroable
+        uint16_t const redirect_port
 ) {
     bool have_data_transport;
-    struct rawrtc_redirect_transport* transport;
+    struct rawrtc_sctp_redirect_transport* transport;
     enum rawrtc_code error;
 
     // Check arguments
@@ -223,15 +248,15 @@ enum rawrtc_code rawrtc_redirect_transport_create(
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(*transport), rawrtc_redirect_transport_destroy);
+    transport = mem_zalloc(sizeof(*transport), rawrtc_sctp_redirect_transport_destroy);
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
 
     // Set fields
+    transport->state = RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_NEW;
     transport->dtls_transport = mem_ref(dtls_transport);
-    transport->local_port = local_port ? local_port : RAWRTC_REDIRECT_TRANSPORT_DEFAULT_PORT;
-    transport->remote_port = remote_port ? remote_port : RAWRTC_REDIRECT_TRANSPORT_DEFAULT_PORT;
+    transport->local_port = port ? port : RAWRTC_SCTP_REDIRECT_TRANSPORT_DEFAULT_PORT;
     error = rawrtc_error_to_code(sa_set_str(
             &transport->redirect_address, redirect_ip, redirect_port));
     if (error) {
@@ -254,6 +279,44 @@ enum rawrtc_code rawrtc_redirect_transport_create(
 
     // TODO: Set non-blocking
 
+out:
+    if (error) {
+        mem_deref(transport);
+    } else {
+        // Set pointer
+        *transportp = transport;
+    }
+    return error;
+}
+
+/*
+ * Start an SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_start(
+        struct rawrtc_sctp_redirect_transport* const transport,
+        struct rawrtc_sctp_capabilities const * const remote_capabilities, // copied
+        uint16_t remote_port // zeroable
+) {
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!transport || !remote_capabilities) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state != RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_NEW) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // Set default port (if 0)
+    if (remote_port == 0) {
+        remote_port = transport->local_port;
+    }
+
+    // Store remote port
+    transport->remote_port = remote_port;
+
     // Listen on raw socket
     error = rawrtc_error_to_code(fd_listen(
             transport->socket, FD_READ, redirect_from_raw, transport));
@@ -263,17 +326,59 @@ enum rawrtc_code rawrtc_redirect_transport_create(
 
     // Attach to ICE transport
     error = rawrtc_dtls_transport_set_data_transport(
-            dtls_transport, redirect_to_raw, transport);
+            transport->dtls_transport, redirect_to_raw, transport);
     if (error) {
         goto out;
     }
 
+    // Update state & done
+    set_state(transport, RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_OPEN);
+    error = RAWRTC_CODE_SUCCESS;
+
 out:
     if (error) {
-        mem_deref(transport);
-    } else {
-        // Set pointer
-        *transportp = transport;
+        // Stop listening on raw socket
+        fd_close(transport->socket);
     }
     return error;
+}
+
+/*
+ * Stop and close the SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_stop(
+        struct rawrtc_sctp_redirect_transport* const transport
+) {
+    // Check arguments
+    if (!transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (transport->state == RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_CLOSED) {
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Update state
+    set_state(transport, RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_CLOSED);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the redirected local SCTP port of the SCTP redirect transport.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_get_port(
+        uint16_t* const portp, // de-referenced
+        struct rawrtc_sctp_redirect_transport* const transport
+) {
+    // Check arguments
+    if (!portp || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set port
+    *portp = transport->local_port;
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
