@@ -15,6 +15,7 @@ class Peer {
             _waitGatheringComplete.reject = reject;
         });
         this._waitGatheringComplete = _waitGatheringComplete;
+        this.dc = {}
     }
 
     createPeerConnection() {
@@ -62,7 +63,7 @@ class Peer {
             console.log('Connection state changed to:', pc.connectionState);
         };
         pc.ondatachannel = function(event) {
-            window.dc = self.createDataChannel(event.channel);
+            self.createDataChannel(event.channel);
         };
 
         this.pc = pc;
@@ -71,7 +72,7 @@ class Peer {
 
     createDataChannel(dc) {
         // Create data channel
-        var dc = (typeof dc !== 'undefined') ? dc : this.pc.createDataChannel('example-channel', {
+        dc = (typeof dc !== 'undefined') ? dc : this.pc.createDataChannel('example-channel', {
             ordered: true
         });
 
@@ -94,6 +95,9 @@ class Peer {
             var length = event.data.size || event.data.byteLength || event.data.length;
             console.info('Data channel', dc.label, '(', dc.id, ')', 'message size:', length);
         };
+
+        // Store channel
+        this.dc[dc.label] = dc;
 
         return dc;
     }
@@ -243,7 +247,7 @@ class Peer {
             // SCTP part
             sdp += SDPUtils.writeSctpCapabilities(parameters.sctpParameters);
             sdp += SDPUtils.writeSctpPort(parameters.sctpParameters.port);
-            sdp += 'a=sctpmap:' + parameters.sctpParameters.port + ' webrtc-datachannel 256\r\n'; // (01)
+            sdp += 'a=sctpmap:' + parameters.sctpParameters.port + ' webrtc-datachannel 65535\r\n'; // (01)
 
             // DTLS part
             sdp += SDPUtils.writeDtlsParameters(parameters.dtlsParameters, setupType);

@@ -1289,7 +1289,7 @@ static enum rawrtc_code buffer_message_received_raise_complete(
 
     // Set position & done
     mbuf_set_pos(*buffer_inboundp, 0);
-    DEBUG_PRINTF("Merged incoming message chunks to size %zu\n", mbuf_get_left(*bufferp));
+    DEBUG_PRINTF("Merged incoming message chunks to size %zu\n", mbuf_get_left(*buffer_inboundp));
     error = RAWRTC_CODE_SUCCESS;
 
 out:
@@ -1984,8 +1984,9 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Set no delay option (disable nagle)
+    option_value = 1;
     if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_NODELAY,
-                           &av.assoc_value, sizeof(av.assoc_value))) {
+                           &option_value, sizeof(option_value))) {
         DEBUG_WARNING("Could not set no-delay, reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
