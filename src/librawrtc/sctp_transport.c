@@ -1569,6 +1569,13 @@ read:
                 sock, buffer->buf, buffer->size, NULL, NULL,
                 &info, &info_length, &info_type, &recv_flags);
         if (length < 0) {
+            // Meh...
+            if (errno == EAGAIN) {
+                DEBUG_NOTICE("@ruengeler: usrsctp raised a read event but returned EAGAIN\n");
+                goto write;
+            }
+
+            // Handle error
             DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
             // TODO: What now? Close?
             goto write;

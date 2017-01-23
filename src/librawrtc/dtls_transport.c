@@ -814,7 +814,7 @@ enum rawrtc_code rawrtc_dtls_transport_start(
     }
 
     // Check state
-    // Note: Checking for 'ice_remote_parameters' ensures that 'start' is not called twice
+    // Note: Checking for 'remote_parameters' ensures that 'start' is not called twice
     if (transport->remote_parameters || is_closed(transport)) {
         return RAWRTC_CODE_INVALID_STATE;
     }
