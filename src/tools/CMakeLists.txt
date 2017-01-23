@@ -1,50 +1,65 @@
+# Walk through subdirectories
+add_subdirectory(helper)
+
 # Tool: ice-gatherer
-add_executable(ice-gatherer ice-gatherer.c)
+add_executable(ice-gatherer
+        ice-gatherer.c)
 target_link_libraries(ice-gatherer
         rawrtc
-        ${rawrtc_DEP_LIBRARIES})
+        rawrtc-helper)
 install(TARGETS ice-gatherer
         DESTINATION bin)
 
-# Tool: ice-transport-loopback
-add_executable(ice-transport-loopback ice-transport-loopback.c)
+## Tool: ice-transport-loopback
+add_executable(ice-transport-loopback
+        ice-transport-loopback.c)
 target_link_libraries(ice-transport-loopback
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS ice-transport-loopback
         DESTINATION bin)
 
 # Tool: dtls-transport-loopback
-add_executable(dtls-transport-loopback dtls-transport-loopback.c)
+add_executable(dtls-transport-loopback
+        dtls-transport-loopback.c)
 target_link_libraries(dtls-transport-loopback
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS dtls-transport-loopback
         DESTINATION bin)
 
 # Tool: sctp-redirect-transport
-add_executable(sctp-redirect-transport sctp-redirect-transport.c)
+add_executable(sctp-redirect-transport
+        sctp-redirect-transport.c)
 target_link_libraries(sctp-redirect-transport
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS sctp-redirect-transport
         DESTINATION bin)
 
 # Tool: sctp-transport-loopback
-add_executable(sctp-transport-loopback sctp-transport-loopback.c)
+add_executable(sctp-transport-loopback
+        sctp-transport-loopback.c)
 target_link_libraries(sctp-transport-loopback
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS sctp-transport-loopback
         DESTINATION bin)
 
 # Tool: data-channel-sctp-loopback
-add_executable(data-channel-sctp-loopback data-channel-sctp-loopback.c)
+add_executable(data-channel-sctp-loopback
+        data-channel-sctp-loopback.c)
 target_link_libraries(data-channel-sctp-loopback
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS data-channel-sctp-loopback
         DESTINATION bin)
 
 # Tool: data-channel-sctp
-add_executable(data-channel-sctp data-channel-sctp.c)
+add_executable(data-channel-sctp
+        data-channel-sctp.c)
 target_link_libraries(data-channel-sctp
-        rawrtc)
+        rawrtc
+        rawrtc-helper)
 install(TARGETS data-channel-sctp
         DESTINATION bin)
-

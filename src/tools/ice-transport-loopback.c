@@ -1,130 +1,77 @@
-#include <stdio.h>
 #include <rawrtc.h>
-#include "../librawrtc/utils.h" /* TODO: Replace with <rawrtc_internal/utils.h> */
+#include "helper/utils.h"
+#include "helper/handler.h"
 
-/* TODO: Replace with zf_log */
 #define DEBUG_MODULE "ice-transport-loopback-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
-struct client;
-
-struct client {
+// Note: Shadows struct client
+struct ice_transport_client {
     char* name;
     struct rawrtc_ice_gather_options* gather_options;
-    struct rawrtc_ice_parameters* ice_remote_parameters;
-    enum rawrtc_ice_role const role;
+    struct rawrtc_ice_parameters* ice_parameters;
+    enum rawrtc_ice_role role;
     struct rawrtc_ice_gatherer* gatherer;
     struct rawrtc_ice_transport* ice_transport;
-    struct client* other_client;
+    struct ice_transport_client* other_client;
 };
-
-static void ice_gatherer_state_change_handler(
-        enum rawrtc_ice_gatherer_state const state, // read-only
-        void* const arg
-) {
-    struct client* const client = arg;
-    char const * const state_name = rawrtc_ice_gatherer_state_to_name(state);
-    (void) arg;
-    DEBUG_PRINTF("(%s) ICE gatherer state: %s\n", client->name, state_name);
-}
-
-static void ice_gatherer_error_handler(
-        struct rawrtc_ice_candidate* const host_candidate, // read-only, nullable
-        char const * const url, // read-only
-        uint16_t const error_code, // read-only
-        char const * const error_text, // read-only
-        void* const arg
-) {
-    struct client* const client = arg;
-    (void) host_candidate; (void) error_code; (void) arg;
-    DEBUG_PRINTF("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
-}
 
 static void ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
-    struct client* const client = arg;
-    (void) candidate; (void) arg;
-
-    if (candidate) {
-        DEBUG_PRINTF("(%s) ICE gatherer local candidate, URL: %s\n", client->name, url);
-    } else {
-        DEBUG_PRINTF("(%s) ICE gatherer last local candidate\n", client->name);
-    }
-
+    struct ice_transport_client* const client = arg;
+    
+    // Print local candidate
+    default_ice_gatherer_local_candidate_handler(candidate, url, arg);
+    
     // Add to other client as remote candidate
     EOE(rawrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate));
 }
 
-static void ice_transport_state_change_handler(
-        enum rawrtc_ice_transport_state const state,
-        void* const arg
+static void client_init(
+        struct ice_transport_client* const local
 ) {
-    struct client* const client = arg;
-    char const * const state_name = rawrtc_ice_transport_state_to_name(state);
-    (void) arg;
-    DEBUG_PRINTF("(%s) ICE transport state: %s\n", client->name, state_name);
-}
-
-static void ice_transport_candidate_pair_change_handler(
-        struct rawrtc_ice_candidate* const local, // read-only
-        struct rawrtc_ice_candidate* const remote, // read-only
-        void* const arg
-) {
-    struct client* const client = arg;
-    (void) local; (void) remote;
-    DEBUG_PRINTF("(%s) ICE transport candidate pair change\n", client->name);
-}
-
-static void signal_handler(
-        int sig
-) {
-    DEBUG_INFO("Got signal: %d, terminating...\n", sig);
-    re_cancel();
-}
-
-static struct rawrtc_ice_parameters* client_init(
-        struct client* const client
-) {
-    struct rawrtc_ice_parameters* local_parameters;
-
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
-            &client->gatherer, client->gather_options,
-            ice_gatherer_state_change_handler, ice_gatherer_error_handler,
-            ice_gatherer_local_candidate_handler, client));
+            &local->gatherer, local->gather_options,
+            default_ice_gatherer_state_change_handler, default_ice_gatherer_error_handler,
+            ice_gatherer_local_candidate_handler, local));
 
     // Create ICE transport
     EOE(rawrtc_ice_transport_create(
-            &client->ice_transport, client->gatherer,
-            ice_transport_state_change_handler, ice_transport_candidate_pair_change_handler,
-            client));
-
-    // Get and return local parameters
-    EOE(rawrtc_ice_gatherer_get_local_parameters(&local_parameters, client->gatherer));
-    return local_parameters;
+            &local->ice_transport, local->gatherer,
+            default_ice_transport_state_change_handler,
+            default_ice_transport_candidate_pair_change_handler, local));
 }
 
 static void client_start(
-        struct client* const client
+        struct ice_transport_client* const local,
+        struct ice_transport_client* const remote
 ) {
-    // Start gathering & transport
-    EOE(rawrtc_ice_gatherer_gather(client->gatherer, NULL));
+    // Get & set ICE parameters
+    EOE(rawrtc_ice_gatherer_get_local_parameters(
+            &local->ice_parameters, remote->gatherer));
+
+    // Start gathering
+    EOE(rawrtc_ice_gatherer_gather(local->gatherer, NULL));
+
+    // Start ICE transport
     EOE(rawrtc_ice_transport_start(
-            client->ice_transport, client->gatherer, client->ice_remote_parameters, client->role));
+            local->ice_transport, local->gatherer, local->ice_parameters, local->role));
 }
 
 static void client_stop(
-        struct client* const client
+        struct ice_transport_client* const client
 ) {
     // Stop transport & close gatherer
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
 
     // Dereference & close
+    client->ice_parameters = mem_deref(client->ice_parameters);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
 }
@@ -133,12 +80,13 @@ int main(int argc, char* argv[argc + 1]) {
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    struct ice_transport_client a = {0};
+    struct ice_transport_client b = {0};
 
     // Initialise
     EOE(rawrtc_init());
 
     // Debug
-    // TODO: This should be replaced by our own debugging system
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
 
@@ -155,47 +103,38 @@ int main(int argc, char* argv[argc + 1]) {
             sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
             "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
 
-    // Start clients
-    struct client a = {
-            .name = "A",
-            .gather_options = gather_options,
-            .ice_remote_parameters = NULL,
-            .role = RAWRTC_ICE_ROLE_CONTROLLING,
-            .gatherer = NULL,
-            .ice_transport = NULL,
-            .other_client = NULL,
-    };
-    struct client b = {
-            .name = "B",
-            .gather_options = gather_options,
-            .ice_remote_parameters = NULL,
-            .role = RAWRTC_ICE_ROLE_CONTROLLED,
-            .gatherer = NULL,
-            .ice_transport = NULL,
-            .other_client = NULL,
-    };
+    // Setup client A
+    a.name = "A";
+    a.gather_options = gather_options;
+    a.role = RAWRTC_ICE_ROLE_CONTROLLING;
     a.other_client = &b;
+
+    // Setup client B
+    b.name = "B";
+    b.gather_options = gather_options;
+    b.role = RAWRTC_ICE_ROLE_CONTROLLED;
     b.other_client = &a;
-    b.ice_remote_parameters = client_init(&a);
-    a.ice_remote_parameters = client_init(&b);
-    client_start(&a);
-    client_start(&b);
+
+    // Initialise clients
+    client_init(&a);
+    client_init(&b);
+
+    // Start clients
+    client_start(&a, &b);
+    client_start(&b, &a);
 
     // Start main loop
     // TODO: Wrap re_main?
-    // TODO: Stop main loop once gathering is complete
-    EOE(rawrtc_error_to_code(re_main(signal_handler)));
+    EOR(re_main(default_signal_handler));
 
     // Stop clients
     client_stop(&a);
     client_stop(&b);
 
     // Free
-    mem_deref(a.ice_remote_parameters);
-    mem_deref(b.ice_remote_parameters);
     mem_deref(gather_options);
 
     // Bye
-    rawrtc_before_exit();
+    before_exit();
     return 0;
 }
