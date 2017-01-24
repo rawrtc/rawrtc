@@ -60,15 +60,17 @@ closed.
 ## Run
 
 Because we have used a custom *prefix*, we need to add the prefix to the
-path to run the various binaries.  
+path to run the various binaries. To be able to find the shared library
+when running a binary, the library path has to be set as well.
 Note: We assume that you are in the `build` directory.
 
 ```
+> export LD_LIBRARY_PATH=${PWD}/prefix/lib:${LD_LIBRARY_PATH}
 > export PATH=${PWD}/prefix/bin:${PATH}
 ```
 
-### redirect-sctp
+## data-channel-sctp
 
 ```
-> redirect-sctp <0|1 (offerer)> <redirect-ip>
+> data-channel-sctp <0|1 (ice-role)> [<sctp-port>]
 ```

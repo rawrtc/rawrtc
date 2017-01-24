@@ -6,6 +6,6 @@ set(rawrtc_HELPER
         utils.c)
 
 # Setup helper library for linker
-add_library(rawrtc-helper SHARED ${rawrtc_HELPER})
+add_library(rawrtc-helper STATIC ${rawrtc_HELPER})
 target_link_libraries(rawrtc-helper
         rawrtc)
