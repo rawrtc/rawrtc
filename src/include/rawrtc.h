@@ -718,6 +718,7 @@ struct rawrtc_sctp_transport {
     uint_fast16_t current_channel_sid;
     FILE* trace_handle;
     struct socket* socket;
+    struct tmr event_timer;
     uint_fast8_t flags;
     struct rawrtc_data_transport* data_transport; // referenced
 };

@@ -32,7 +32,7 @@ struct send_context {
 
 // Initialised counter & usrsctp timer
 static uint_fast32_t initialized = 0;
-static struct tmr usrsctp_timer;
+static struct tmr tick_timer;
 static size_t chunk_size;
 
 // Events to subscribe to
@@ -48,6 +48,10 @@ static uint16_t const sctp_events[] = {
     SCTP_SENDER_DRY_EVENT
 };
 static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+
+static void timer_event_handler(
+        void* arg
+);
 
 static enum rawrtc_code channel_context_create(
     struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
@@ -491,6 +495,9 @@ static void set_state(
     // Closed?
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         DEBUG_INFO("SCTP connection closed\n");
+
+        // Cancel event processing
+        tmr_cancel(&transport->event_timer);
 
         // Close all data channels
         close_data_channels(transport);
@@ -1514,29 +1521,25 @@ static void data_receive_handler(
 
 /*
  * Handle usrsctp events.
+ * TODO: Split this function up into read, write and error functions
  * TODO: Handle graceful and non-graceful shutdown (should raise an error event)
  * https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.2
  */
 static void upcall_handler(
-        struct socket* sock,
-        void* arg,
-        int flags
+        struct rawrtc_sctp_transport* const transport,
+        struct socket* const socket,
+        int events
 ) {
-    struct rawrtc_sctp_transport* const transport = arg;
-    int events = usrsctp_get_events(sock);
-    (void) flags; // TODO: What does this indicate?
-
-    // Lock event loop mutex
-    rawrtc_thread_enter();
-
-    // Closed?
-    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        DEBUG_PRINTF("Ignoring SCTP upcall event, transport is closed\n");
-        goto out;
-    }
+    bool ignore_events = false;
 
     // Error?
     if (events & SCTP_EVENT_ERROR) {
+        // Closed?
+        if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+            DEBUG_NOTICE("Ignoring error event, transport is closed\n");
+            return;
+        }
+
         // TODO: What am I supposed to do with this information?
         DEBUG_WARNING("TODO: Handle SCTP error event\n");
     }
@@ -1550,6 +1553,12 @@ read:
         socklen_t info_length = sizeof(info);
         unsigned int info_type = 0;
         int recv_flags = 0;
+
+        // Closed?
+        if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+            DEBUG_NOTICE("Ignoring read event, transport is closed\n");
+            return;
+        }
 
         // TODO: Get next message size
         // TODO: Can we get the COMPLETE message size or just the current message size?
@@ -1566,12 +1575,13 @@ read:
 
         // Receive notification or data
         length = usrsctp_recvv(
-                sock, buffer->buf, buffer->size, NULL, NULL,
+                socket, buffer->buf, buffer->size, NULL, NULL,
                 &info, &info_length, &info_type, &recv_flags);
         if (length < 0) {
             // Meh...
             if (errno == EAGAIN) {
-                DEBUG_NOTICE("@ruengeler: usrsctp raised a read event but returned EAGAIN\n");
+//                DEBUG_NOTICE("@ruengeler: usrsctp raised a read event but returned EAGAIN\n");
+                ignore_events = true;
                 goto write;
             }
 
@@ -1607,6 +1617,12 @@ read:
 
 // Note: Label must be here to ensure that the buffer is being free'd
 write:
+        // Closed?
+        if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+            DEBUG_NOTICE("Ignoring write event, transport is closed\n");
+            return;
+        }
+
         // Dereference
         mem_deref(buffer);
     }
@@ -1624,21 +1640,86 @@ write:
         }
     }
 
-out:
-    // Unlock event loop mutex
-    rawrtc_thread_leave();
+    // Schedule processing events (if needed and if any)
+    events = usrsctp_get_events(socket);
+    // Note: Assuming that upcall events do not occur before transport is CONNECTED
+    // TODO: Out-comment write section if write is consistent
+    if (ignore_events) {
+        return;
+    }
+    if (events & SCTP_EVENT_READ
+            || (events & SCTP_EVENT_WRITE && list_head(&transport->buffered_messages_outgoing))
+            || events & SCTP_EVENT_ERROR) {
+        // Closed?
+        if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+            DEBUG_NOTICE("Aborted scheduling to process events as transport is closed\n");
+            return;
+        }
+
+        // Schedule
+        tmr_start(&transport->event_timer, 0, timer_event_handler, transport);
+    }
 }
 
 /*
- * Handle SCTP timer tick.
+ * usrsctp event handler helper.
  */
-static void timer_handler(
-        void* const arg
+static void upcall_handler_helper(
+        struct socket* socket,
+        void* arg,
+        int flags
+) {
+    struct rawrtc_sctp_transport* const transport = arg;
+    int const events = usrsctp_get_events(socket);
+    (void) flags; // TODO: What does this indicate?
+
+    // Need handling?
+    if (events) {
+        // Lock event loop mutex
+        rawrtc_thread_enter();
+
+        // Cancel any running event timers
+        tmr_cancel(&transport->event_timer);
+
+        // Handle events
+        upcall_handler(transport, socket, events);
+
+        // Unlock event loop mutex
+        rawrtc_thread_leave();
+    }
+}
+
+/*
+ * Handle SCTP event.
+ */
+static void timer_event_handler(
+        void* arg
+) {
+    struct rawrtc_sctp_transport* const transport = arg;
+
+    // Closed?
+    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_NOTICE("Aborted processing events (from timer) as transport is closed\n");
+        return;
+    }
+
+    // Handle events
+    int const events = usrsctp_get_events(transport->socket);
+    if (events) {
+        upcall_handler(transport, transport->socket, events);
+    }
+}
+
+/*
+ * Handle SCTP tick.
+ */
+static void timer_tick_handler(
+        void* arg
 ) {
     (void) arg;
 
     // Restart timer
-    tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+    tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_tick_handler, NULL);
 
     // Pass delta ms to usrsctp
     usrsctp_handle_timers(RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT);
@@ -1748,7 +1829,7 @@ static void rawrtc_sctp_transport_destroy(
     // Close usrsctp (if needed)
     if (initialized == 0) {
         // Cancel timer
-        tmr_cancel(&usrsctp_timer);
+        tmr_cancel(&tick_timer);
 
         // Close
         usrsctp_finish();
@@ -1850,8 +1931,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_default_frag_interleave(2);
 
         // Start timers
-        tmr_init(&usrsctp_timer);
-        tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+        tmr_init(&tick_timer);
+        tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_tick_handler, NULL);
     }
 
     // Allocate
@@ -1927,7 +2008,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Set event callback
-    if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
+    if (usrsctp_set_upcall(transport->socket, upcall_handler_helper, transport)) {
         DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
