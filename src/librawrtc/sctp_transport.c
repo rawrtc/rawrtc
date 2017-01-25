@@ -1771,8 +1771,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     uint_fast16_t n_channels;
     bool have_data_transport;
     struct rawrtc_sctp_transport* transport;
-    char trace_handle_id[8];
-    char* trace_handle_name;
     struct sctp_assoc_value av;
     struct linger linger_option;
     struct sctp_event sctp_event = {0};
@@ -1886,17 +1884,24 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     // Create packet tracer
     // TODO: Debug mode only, filename set by debug options
 #ifdef SCTP_DEBUG
-    rand_str(trace_handle_id, sizeof(trace_handle_id));
-    error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
-    if (error) {
-        DEBUG_WARNING("Could create trace file name, reason: %s\n", rawrtc_code_to_str(error));
-    } else {
-        transport->trace_handle = fopen(trace_handle_name, "w");
-        mem_deref(trace_handle_name);
-        if (!transport->trace_handle) {
-            DEBUG_WARNING("Could not open trace file, reason: %m\n", errno);
+    {
+        char trace_handle_id[8];
+        char* trace_handle_name;
+
+        // Create trace handle ID
+        rand_str(trace_handle_id, sizeof(trace_handle_id));
+        error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
+        if (error) {
+            DEBUG_WARNING("Could create trace file name, reason: %s\n", rawrtc_code_to_str(error));
         } else {
-            DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
+            // Open trace file
+            transport->trace_handle = fopen(trace_handle_name, "w");
+            mem_deref(trace_handle_name);
+            if (!transport->trace_handle) {
+                DEBUG_WARNING("Could not open trace file, reason: %m\n", errno);
+            } else {
+                DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
+            }
         }
     }
 #endif
