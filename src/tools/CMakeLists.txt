@@ -63,3 +63,12 @@ target_link_libraries(data-channel-sctp
         rawrtc-helper)
 install(TARGETS data-channel-sctp
         DESTINATION bin)
+
+# Tool: data-channel-sctp-echo
+add_executable(data-channel-sctp-echo
+        data-channel-sctp-echo.c)
+target_link_libraries(data-channel-sctp-echo
+        rawrtc
+        rawrtc-helper)
+install(TARGETS data-channel-sctp-echo
+        DESTINATION bin)
