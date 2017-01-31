@@ -11,8 +11,9 @@ textarea {
 <body>
     <textarea cols="120" rows="20" id="local-parameters" onclick="this.select();" readonly></textarea>
     <textarea cols="120" rows="20" id="remote-parameters"></textarea><br />
-    <button type="button" onclick="setRemoteParameters();">Start</button>
-
+    <button type="button" onclick="startCopyPaste();">Start (C&P)</button><br />
+    <button type="button" onclick="startWS();">Start (WebSocket)</button>
+    <input type="text" size="50" value="ws://127.0.0.1:9765/shell-o-mat/1" id="ws-url" />
     <script type="text/javascript" src="sdp.js"></script>
     <script type="text/javascript" src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script type="text/javascript" src="webrtc-rawrtc.js"></script>
@@ -31,7 +32,7 @@ textarea {
             document.getElementById('local-parameters').value = JSON.stringify(parameters);
         });
 
-        var setRemoteParameters = () => {
+        var startCopyPaste = () => {
             var parameters = JSON.parse(document.getElementById('remote-parameters').value);
             console.log('Remote parameters:', parameters);
             peer.setRemoteParameters(parameters)
@@ -39,6 +40,42 @@ textarea {
                 console.error(error);
             });
             start();
+        };
+
+        var startWS = () => {
+            // Create WebSocket connection
+            var ws = new WebSocket(document.getElementById('ws-url').value);
+
+            // Bind WebSocket events
+            ws.onopen = function(event) {
+                console.log('WS connection open');
+
+                // Send local parameters
+                peer.getLocalParameters().then((parameters) => {
+                    console.info('Sending local parameters');
+                    ws.send(JSON.stringify(parameters));
+                });
+            };
+            ws.onerror = function(event) {
+                console.log('WS connection error:', event);
+            };
+            ws.onclose = function(event) {
+                console.log('WS connection closed');
+            };
+            ws.onmessage = function(event) {
+                var length = event.data.size || event.data.byteLength || event.data.length;
+                console.log('WS message of', length, 'bytes received');
+                document.getElementById('remote-parameters').value = event.data;
+
+                // Parse remote parameters
+                var parameters = JSON.parse(event.data);
+                console.log('Remote parameters:', parameters);
+                peer.setRemoteParameters(parameters)
+                .catch((error) => {
+                    console.error(error);
+                });
+                start();
+            };
         };
 
         var start = () => {
