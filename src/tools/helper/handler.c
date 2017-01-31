@@ -117,9 +117,9 @@ void default_sctp_transport_state_change_handler(
 }
 
 /*
- * Print the new data channel event.
+ * Print the newly created data channel's parameter.
  */
-struct rawrtc_data_channel_options* default_data_channel_handler(
+void default_data_channel_handler(
         struct rawrtc_data_channel* const channel, // read-only, MUST be referenced when used
         void* const arg // will be casted to `struct client*`
 ) {
@@ -134,18 +134,15 @@ struct rawrtc_data_channel_options* default_data_channel_handler(
     DEBUG_INFO("(%s) New data channel instance: %s\n", client->name, label ? label : "N/A");
     mem_deref(label);
     mem_deref(parameters);
-
-    // Use default options
-    return NULL;
 }
 
 /*
  * Print the data channel open event.
  */
 void default_data_channel_open_handler(
-        void* const arg // will be casted to `struct data_channel*`
+        void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Data channel open: %s\n", client->name, channel->label);
 }
@@ -154,9 +151,9 @@ void default_data_channel_open_handler(
  * Print the data channel buffered amount low event.
  */
 void default_data_channel_buffered_amount_low_handler(
-        void* const arg // will be casted to `struct data_channel*`
+        void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Data channel buffered amount low: %s\n", client->name, channel->label);
 }
@@ -165,9 +162,9 @@ void default_data_channel_buffered_amount_low_handler(
  * Print the data channel error event.
  */
 void default_data_channel_error_handler(
-        void* const arg // will be casted to `struct data_channel*`
+        void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, channel->label);
 }
@@ -176,9 +173,9 @@ void default_data_channel_error_handler(
  * Print the data channel close event.
  */
 void default_data_channel_close_handler(
-        void* const arg // will be casted to `struct data_channel*`
+        void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, channel->label);
 }
@@ -189,9 +186,9 @@ void default_data_channel_close_handler(
 void default_data_channel_message_handler(
         struct mbuf* const buffer,
         enum rawrtc_data_channel_message_flag const flags,
-        void* const arg // will be casted to `struct data_channel*`
+        void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     (void) flags;
     DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",

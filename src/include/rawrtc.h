@@ -391,11 +391,11 @@ typedef void (rawrtc_data_channel_message_handler)(
 /*
  * Data channel handler.
  *
- * You can return a data channel options instance you want to apply on
- * the new channel. Return `NULL` in case you want to apply the default
- * options.
+ * You should call `rawrtc_data_channel_set_options` in this handler
+ * before doing anything else if you want to change behaviour of the
+ * data channel.
  */
-typedef struct rawrtc_data_channel_options* (rawrtc_data_channel_handler)(
+typedef void (rawrtc_data_channel_handler)(
     struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
     void* const arg
 );
@@ -1487,6 +1487,28 @@ enum rawrtc_code rawrtc_data_channel_create(
 );
 
 /*
+ * Set the argument of a data channel that is passed to the various
+ * handlers.
+ */
+enum rawrtc_code rawrtc_data_channel_set_arg(
+    struct rawrtc_data_channel* const channel,
+    void* const arg // nullable
+);
+
+/*
+ * Set options on a data channel.
+ *
+ * Note: This function must be called directly after creation of the
+ * data channel (either by explicitly creating it or implicitly in form
+ * of the data channel handler callback) and before calling any other
+ * data channel function.
+ */
+enum rawrtc_code rawrtc_data_channel_set_options(
+    struct rawrtc_data_channel* const channel,
+    struct rawrtc_data_channel_options* options // nullable, referenced
+);
+
+/*
  * Close the data channel.
  */
 enum rawrtc_code rawrtc_data_channel_close(
@@ -1512,6 +1534,13 @@ enum rawrtc_code rawrtc_data_channel_send(
  */
 
 /*
+ * Unset the handler argument and all handlers of the data channel.
+ */
+enum rawrtc_code rawrtc_data_channel_unset_handlers(
+    struct rawrtc_data_channel* const channel
+);
+
+/*
  * Get the data channel's parameters.
  */
 enum rawrtc_code rawrtc_data_channel_get_parameters(
@@ -1520,12 +1549,44 @@ enum rawrtc_code rawrtc_data_channel_get_parameters(
 );
 
 /*
- * rawrtc_data_channel_set_open_handler
- * rawrtc_data_channel_set_buffered_amount_low_handler
- * rawrtc_data_channel_set_error_handler
- * rawrtc_data_channel_set_close_handler
- * rawrtc_data_channel_set_message_handler
+ * Set the data channel's open handler.
  */
+enum rawrtc_code rawrtc_data_channel_set_open_handler(
+    struct rawrtc_data_channel* const channel,
+    rawrtc_data_channel_open_handler* const open_handler // nullable
+);
+
+/*
+ * Set the data channel's buffered amount low handler.
+ */
+enum rawrtc_code rawrtc_data_channel_set_buffered_amount_low_handler(
+    struct rawrtc_data_channel* const channel,
+    rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler // nullable
+);
+
+/*
+ * Set the data channel's error handler.
+ */
+enum rawrtc_code rawrtc_data_channel_set_error_handler(
+    struct rawrtc_data_channel* const channel,
+    rawrtc_data_channel_error_handler* const error_handler // nullable
+);
+
+/*
+ * Set the data channel's close handler.
+ */
+enum rawrtc_code rawrtc_data_channel_set_close_handler(
+    struct rawrtc_data_channel* const channel,
+    rawrtc_data_channel_close_handler* const close_handler // nullable
+);
+
+/*
+ * Set the data channel's message handler.
+ */
+enum rawrtc_code rawrtc_data_channel_set_message_handler(
+    struct rawrtc_data_channel* const channel,
+    rawrtc_data_channel_message_handler* const message_handler // nullable
+);
 
 
 

@@ -74,39 +74,39 @@ void default_sctp_transport_state_change_handler(
 );
 
 /*
- * Print the new data channel event.
+ * Print the newly created data channel's parameter.
  */
-struct rawrtc_data_channel_options* default_data_channel_handler(
+void default_data_channel_handler(
     struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*
  * Print the data channel open event.
  */
 void default_data_channel_open_handler(
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*
  * Print the data channel buffered amount low event.
  */
 void default_data_channel_buffered_amount_low_handler(
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*
  * Print the data channel error event.
  */
 void default_data_channel_error_handler(
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*
  * Print the data channel close event.
  */
 void default_data_channel_close_handler(
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*
@@ -115,7 +115,7 @@ void default_data_channel_close_handler(
 void default_data_channel_message_handler(
     struct mbuf* const buffer,
     enum rawrtc_data_channel_message_flag const flags,
-    void* const arg // will be casted to `struct data_channel*`
+    void* const arg // will be casted to `struct data_channel_helper*`
 );
 
 /*

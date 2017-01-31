@@ -319,10 +319,13 @@ void exit_with_error(
     exit(1);
 }
 
-static void data_channel_destroy(
+static void data_channel_helper_destroy(
         void* const arg
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
+
+    // Unset handler argument & handlers of the channel
+    EOE(rawrtc_data_channel_unset_handlers(channel->channel));
 
     // Dereference
     mem_deref(channel->label);
@@ -332,13 +335,14 @@ static void data_channel_destroy(
 /*
  * Create a data channel helper instance.
  */
-void data_channel_create(
-        struct data_channel** const channelp, // de-referenced
+void data_channel_helper_create(
+        struct data_channel_helper** const channel_helperp, // de-referenced
         struct client* const client,
         char* const label
 ) {
     // Allocate
-    struct data_channel* const channel = mem_zalloc(sizeof(*channel), data_channel_destroy);
+    struct data_channel_helper* const channel =
+            mem_zalloc(sizeof(*channel), data_channel_helper_destroy);
     if (!channel) {
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
@@ -349,5 +353,53 @@ void data_channel_create(
     EOE(rawrtc_strdup(&channel->label, label));
 
     // Set pointer & done
-    *channelp = channel;
+    *channel_helperp = channel;
+}
+
+/*
+ * Create a data channel helper instance from parameters.
+ */
+void data_channel_helper_create_from_channel(
+        struct data_channel_helper** const channel_helperp, // de-referenced
+        struct rawrtc_data_channel* channel,
+        struct client* const client
+) {
+    enum rawrtc_code error;
+    struct rawrtc_data_channel_parameters* parameters;
+    char* label;
+
+    // Allocate
+    struct data_channel_helper* const channel_helper =
+            mem_zalloc(sizeof(*channel_helper), data_channel_helper_destroy);
+    if (!channel_helper) {
+        EOE(RAWRTC_CODE_NO_MEMORY);
+        return;
+    }
+
+    // Get parameters
+    EOE(rawrtc_data_channel_get_parameters(&parameters, channel));
+
+    // Get & set label
+    error = rawrtc_data_channel_parameters_get_label(&label, parameters);
+    switch (error) {
+        case RAWRTC_CODE_SUCCESS:
+            EOE(rawrtc_strdup(&channel_helper->label, label));
+            mem_deref(label);
+            break;
+        case RAWRTC_CODE_NO_VALUE:
+            EOE(rawrtc_strdup(&channel_helper->label, "N/A"));
+            break;
+        default:
+            EOE(error);
+    }
+
+    // Set fields
+    channel_helper->client = client;
+    channel_helper->channel = channel;
+
+    // Set pointer
+    *channel_helperp = channel_helper;
+
+    // Dereference & done
+    mem_deref(parameters);
 }

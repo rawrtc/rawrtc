@@ -2129,21 +2129,9 @@ static void channel_register(
 
     // Raise data channel event?
     if (raise_event) {
-        if (transport->data_channel_handler) {
-            enum rawrtc_code error;
-
-            // Call data channel handler and retrieve options
-            struct rawrtc_data_channel_options* const options =
-                    transport->data_channel_handler(channel, transport->arg);
-
-            // Apply options
-            error = rawrtc_data_channel_set_options(channel, options);
-            if (error) {
-                DEBUG_WARNING("Unable to late-apply options, reason: %s\n",
-                              rawrtc_code_to_str(error));
-                // TODO: What now? Close?
-            }
-        }
+        // Call data channel handler (if any)
+        rawrtc_data_channel_call_channel_handler(
+                channel, transport->data_channel_handler, transport->arg);
     }
 
     // Update data channel state

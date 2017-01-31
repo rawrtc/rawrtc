@@ -103,8 +103,17 @@ void exit_with_error(
 /*
  * Create a data channel helper instance.
  */
-void data_channel_create(
-    struct data_channel** const channelp, // de-referenced
+void data_channel_helper_create(
+    struct data_channel_helper** const channel_helperp, // de-referenced
     struct client* const client,
     char* const label
+);
+
+/*
+ * Create a data channel helper instance from parameters.
+ */
+void data_channel_helper_create_from_channel(
+    struct data_channel_helper** const channel_helperp, // de-referenced
+    struct rawrtc_data_channel* channel,
+    struct client* const client
 );

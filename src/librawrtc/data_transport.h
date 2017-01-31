@@ -4,7 +4,8 @@
  * Data channel flags.
  */
 enum {
-    RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED = 1 << 0
+    RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED = 1 << 0,
+    RAWRTC_DATA_CHANNEL_FLAGS_CAN_SET_OPTIONS = 1 << 1
 };
 
 void rawrtc_data_channel_set_state(
@@ -21,11 +22,6 @@ enum rawrtc_code rawrtc_data_transport_create(
     rawrtc_data_transport_channel_send_handler* const channel_send_handler
 );
 
-enum rawrtc_code rawrtc_data_channel_set_options(
-    struct rawrtc_data_channel* const channel,
-    struct rawrtc_data_channel_options* options // nullable, referenced
-);
-
 enum rawrtc_code rawrtc_data_channel_create_internal(
     struct rawrtc_data_channel** const channelp, // de-referenced
     struct rawrtc_data_transport* const transport, // referenced
@@ -38,4 +34,10 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
     rawrtc_data_channel_message_handler* const message_handler, // nullable
     void* const arg, // nullable
     bool const call_handler
+);
+
+void rawrtc_data_channel_call_channel_handler(
+    struct rawrtc_data_channel* const channel, // not checked
+    rawrtc_data_channel_handler* const channel_handler, // nullable
+    void* const arg
 );

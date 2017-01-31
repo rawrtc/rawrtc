@@ -27,8 +27,8 @@ struct data_channel_sctp_client {
     struct rawrtc_dtls_transport* dtls_transport;
     struct rawrtc_sctp_transport* sctp_transport;
     struct rawrtc_data_transport* data_transport;
-    struct data_channel* data_channel_negotiated;
-    struct data_channel* data_channel;
+    struct data_channel_helper* data_channel_negotiated;
+    struct data_channel_helper* data_channel;
     struct parameters local_parameters;
     struct parameters remote_parameters;
 };
@@ -42,7 +42,7 @@ static struct tmr timer = {0};
 static void timer_handler(
         void* arg
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct data_channel_sctp_client* const client =
             (struct data_channel_sctp_client*) channel->client;
     struct mbuf* buffer;
@@ -75,7 +75,7 @@ static void timer_handler(
 static void data_channel_open_handler(
         void* const arg
 ) {
-    struct data_channel* const channel = arg;
+    struct data_channel_helper* const channel = arg;
     struct data_channel_sctp_client* const client =
             (struct data_channel_sctp_client*) channel->client;
     struct mbuf* buffer;
@@ -149,7 +149,8 @@ static void dtls_transport_state_change_handler(
             struct rawrtc_data_channel_parameters* channel_parameters;
 
             // Create data channel helper
-            data_channel_create(&client->data_channel, (struct client*) client, "bear-noises");
+            data_channel_helper_create(
+                    &client->data_channel, (struct client *) client, "bear-noises");
 
             // Create data channel parameters
             EOE(rawrtc_data_channel_parameters_create(
@@ -210,7 +211,8 @@ static void client_init(
             &client->data_transport, client->sctp_transport));
 
     // Create data channel helper
-    data_channel_create(&client->data_channel_negotiated, (struct client*) client, "cat-noises");
+    data_channel_helper_create(
+            &client->data_channel_negotiated, (struct client *) client, "cat-noises");
 
     // Create data channel parameters
     EOE(rawrtc_data_channel_parameters_create(
