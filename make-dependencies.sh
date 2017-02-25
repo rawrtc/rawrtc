@@ -42,14 +42,11 @@ MAIN_DIR=${BUILD_PATH}/dependencies
 cd ${MAIN_DIR}
 
 # Check for DTLS 1.2 suppport in openssl
-openssl_version=`openssl version`
-case "$openssl_version" in
-    *"1.0.2"*) have_dtls_1_2=true ;;
-    *) have_dtls_1_2=false ;;
-esac
+pkg-config --atleast-version=1.0.2 openssl
+have_dtls_1_2=$?
 
 # Get openssl
-if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
+if [ ! -d "${OPENSSL_PATH}" ] && [ ${have_dtls_1_2} -ne 0 ]; then
     wget ${OPENSSL_URL}
     tar -xzf ${OPENSSL_TAR}
 fi

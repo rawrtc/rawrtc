@@ -4,7 +4,12 @@ A WebRTC and ORTC library with a small footprint that runs everywhere.
 
 ## Prerequisites
 
-* [cmake](https://cmake.org) >= 3.2 (*zf_log* dependency)
+The following packages are required:
+
+* [git](https://git-scm.com)
+* [cmake](https://cmake.org) >= 3.2
+* pkg-config
+* SSL development libraries (libssl-dev)
 
 ### Meson (Alternative Build System)
 
