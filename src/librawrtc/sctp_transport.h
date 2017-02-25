@@ -1,5 +1,11 @@
 #pragma once
 
+/*
+ * usrsctp event flag extensions for handlers.
+ */
+#define RAWRTC_SCTP_EVENT_NONE (0)
+#define RAWRTC_SCTP_EVENT_ALL (SCTP_EVENT_READ | SCTP_EVENT_WRITE | SCTP_EVENT_ERROR)
+
 enum {
     RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT = 10, // TODO: @ruengeler why 10ms?
     RAWRTC_SCTP_TRANSPORT_DEFAULT_PORT = 5000,

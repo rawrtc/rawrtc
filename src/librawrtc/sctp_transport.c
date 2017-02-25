@@ -32,7 +32,7 @@ struct send_context {
 
 // Initialised counter & usrsctp timer
 static uint_fast32_t initialized = 0;
-static struct tmr usrsctp_timer;
+static struct tmr tick_timer;
 static size_t chunk_size;
 
 // Events to subscribe to
@@ -351,16 +351,12 @@ out:
 /*
  * Send all deferred messages.
  */
-static void sctp_send_deferred_messages(
+static enum rawrtc_code sctp_send_deferred_messages(
         struct rawrtc_sctp_transport* const transport // not checked
 ) {
     // Send buffered outgoing SCTP packets
-    enum rawrtc_code const error = rawrtc_message_buffer_clear(
+    return rawrtc_message_buffer_clear(
             &transport->buffered_messages_outgoing, sctp_send_deferred_message, transport);
-    if (error && error != RAWRTC_CODE_STOP_ITERATION) {
-        DEBUG_WARNING("Could not send deferred messages, reason: %s\n",
-                      rawrtc_code_to_str(error));
-    }
 }
 
 /*
@@ -521,12 +517,17 @@ static void set_state(
     // Note: This needs to be done after the state has been updated because it uses the
     //       send function which checks the state.
     if (state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        enum rawrtc_code error;
         enum rawrtc_data_channel_state const from_channel_state =
                 RAWRTC_DATA_CHANNEL_STATE_CONNECTING;
         DEBUG_INFO("SCTP connection established\n");
 
         // Send deferred messages
-        sctp_send_deferred_messages(transport);
+        error = sctp_send_deferred_messages(transport);
+        if (error && error != RAWRTC_CODE_STOP_ITERATION) {
+            DEBUG_WARNING("Could not send deferred messages, reason: %s\n",
+                          rawrtc_code_to_str(error));
+        }
 
         // Open waiting channels
         // Note: This call must be above calling the state handler to prevent the user from
@@ -1513,118 +1514,191 @@ static void data_receive_handler(
 }
 
 /*
- * Handle usrsctp events.
- * TODO: Handle graceful and non-graceful shutdown (should raise an error event)
- * https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13#section-6.2
+ * Handle usrsctp read event.
  */
-static void upcall_handler(
-        struct socket* sock,
+static int read_event_handler(
+        struct rawrtc_sctp_transport* const transport // not checked
+) {
+    struct mbuf* buffer;
+    ssize_t length;
+    int ignore_events = RAWRTC_SCTP_EVENT_NONE;
+    struct sctp_rcvinfo info = {0};
+    socklen_t info_length = sizeof(info);
+    unsigned int info_type = 0;
+    int flags = 0;
+
+    // Closed?
+    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_NOTICE("Ignoring read event, transport is closed\n");
+        return RAWRTC_SCTP_EVENT_ALL;
+    }
+
+    // TODO: Get next message size
+    // TODO: Can we get the COMPLETE message size or just the current message size?
+
+    // Create buffer
+    buffer = mbuf_alloc(chunk_size);
+    if (!buffer) {
+        DEBUG_WARNING("Cannot allocate buffer, no memory");
+        // TODO: This needs to be handled in a better way, otherwise it's probably going
+        // to cause another read call which calls this handler again resulting in an infinite
+        // loop.
+        return RAWRTC_SCTP_EVENT_NONE;
+    }
+
+    // Receive notification or data
+    length = usrsctp_recvv(
+            transport->socket, buffer->buf, buffer->size, NULL, NULL,
+            &info, &info_length, &info_type, &flags);
+    if (length < 0) {
+        // Meh...
+        if (errno == EAGAIN) {
+//            DEBUG_NOTICE("@ruengeler: usrsctp raised a read event but returned EAGAIN\n");
+            ignore_events = SCTP_EVENT_READ;
+            goto out;
+        }
+
+        // Handle error
+        DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
+        // TODO: What now? Close?
+        goto out;
+    }
+
+    // Update buffer position and end
+    buffer->end = (size_t) length;
+
+    // Handle notification
+    if (flags & MSG_NOTIFICATION) {
+        handle_notification(transport, buffer);
+        goto out;
+    }
+
+    // Check state
+    if (transport->state != RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
+        DEBUG_WARNING("Ignored incoming data before state 'connected'\n");
+        goto out;
+    }
+
+    // Have info?
+    if (info_type != SCTP_RECVV_RCVINFO) {
+        DEBUG_WARNING("Cannot handle incoming data without SCTP rcvfinfo\n");
+        goto out;
+    }
+
+    // Pass data to handler
+    data_receive_handler(transport, buffer, &info, flags);
+
+out:
+    // Dereference
+    mem_deref(buffer);
+
+    // Done
+    return ignore_events;
+}
+
+/*
+ * Handle usrsctp write event.
+ */
+static int write_event_handler(
+        struct rawrtc_sctp_transport* const transport // not checked
+) {
+    // Closed?
+    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_NOTICE("Ignoring write event, transport is closed\n");
+        return RAWRTC_SCTP_EVENT_ALL;
+    }
+
+    // Send all deferred messages (if not already sending)
+    // TODO: Check if this flag is really necessary
+    if (!(transport->flags & RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS)) {
+        enum rawrtc_code error;
+
+        // Send
+        transport->flags |= RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
+        error = sctp_send_deferred_messages(transport);
+        transport->flags &= ~RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
+        switch (error) {
+            case RAWRTC_CODE_SUCCESS:
+            case RAWRTC_CODE_STOP_ITERATION:
+                // We either sent all pending messages or could not send all messages, so there's
+                // no reason to react to further write events in this iteration
+                return SCTP_EVENT_WRITE;
+            default:
+                // TODO: What now? Close?
+                DEBUG_WARNING("Could not send deferred messages, reason: %s\n",
+                              rawrtc_code_to_str(error));
+                return SCTP_EVENT_WRITE;
+        }
+    } else {
+        DEBUG_WARNING("Sending still in progress!\n");
+        // TODO: Is this correct?
+        return SCTP_EVENT_WRITE;
+    }
+}
+
+/*
+ * Handle usrsctp error event.
+ */
+static bool error_event_handler(
+        struct rawrtc_sctp_transport* const transport // not checked
+) {
+    // Closed?
+    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
+        DEBUG_NOTICE("Ignoring error event, transport is closed\n");
+        return RAWRTC_SCTP_EVENT_ALL;
+    }
+
+    // TODO: What am I supposed to do with this information?
+    DEBUG_WARNING("TODO: Handle SCTP error event\n");
+
+    // Continue handling events
+    // TODO: Probably depends on the error, right?
+    return RAWRTC_SCTP_EVENT_NONE;
+}
+
+/*
+ * usrsctp event handler helper.
+ */
+static void upcall_handler_helper(
+        struct socket* socket,
         void* arg,
         int flags
 ) {
+    int events = usrsctp_get_events(socket);
     struct rawrtc_sctp_transport* const transport = arg;
-    int events = usrsctp_get_events(sock);
+    int ignore_events = RAWRTC_SCTP_EVENT_NONE;
     (void) flags; // TODO: What does this indicate?
 
     // Lock event loop mutex
     rawrtc_thread_enter();
 
-    // Closed?
-    if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
-        DEBUG_PRINTF("Ignoring SCTP upcall event, transport is closed\n");
-        goto out;
+    // TODO: This loop may lead to long blocking and is unfair to normal fds.
+    //       It's a compromise because scheduling repetitive timers in re's event loop seems to
+    //       be slow.
+    while (events) {
+        // TODO: This should work but it doesn't because usrsctp keeps switching from read to write
+        //       events endlessly for some reason. So, we need to discard previous events.
+        //ignore_events = RAWRTC_SCTP_EVENT_NONE;
+
+        // Handle error event
+        if (events & SCTP_EVENT_ERROR) {
+            ignore_events |= error_event_handler(transport);
+        }
+
+        // Handle read event
+        if (events & SCTP_EVENT_READ) {
+            ignore_events |= read_event_handler(transport);
+        }
+
+        // Handle write event
+        if (events & SCTP_EVENT_WRITE) {
+            ignore_events |= write_event_handler(transport);
+        }
+
+        // Get upcoming events and remove events that should be ignored
+        events = usrsctp_get_events(socket) & ~ignore_events;
     }
 
-    // Error?
-    if (events & SCTP_EVENT_ERROR) {
-        // TODO: What am I supposed to do with this information?
-        DEBUG_WARNING("TODO: Handle SCTP error event\n");
-    }
-
-read:
-    // Can read?
-    if (events & SCTP_EVENT_READ) {
-        struct mbuf* buffer;
-        ssize_t length;
-        struct sctp_rcvinfo info = {0};
-        socklen_t info_length = sizeof(info);
-        unsigned int info_type = 0;
-        int recv_flags = 0;
-
-        // TODO: Get next message size
-        // TODO: Can we get the COMPLETE message size or just the current message size?
-
-        // Create buffer
-        buffer = mbuf_alloc(chunk_size);
-        if (!buffer) {
-            DEBUG_WARNING("Cannot allocate buffer, no memory");
-            // TODO: This needs to be handled in a better way, otherwise it's probably going
-            // to cause another read call which calls this handler again resulting in an infinite
-            // loop.
-            goto write;
-        }
-
-        // Receive notification or data
-        length = usrsctp_recvv(
-                sock, buffer->buf, buffer->size, NULL, NULL,
-                &info, &info_length, &info_type, &recv_flags);
-        if (length < 0) {
-            // Meh...
-            if (errno == EAGAIN) {
-                DEBUG_NOTICE("@ruengeler: usrsctp raised a read event but returned EAGAIN\n");
-                goto write;
-            }
-
-            // Handle error
-            DEBUG_WARNING("SCTP receive failed, reason: %m\n", errno);
-            // TODO: What now? Close?
-            goto write;
-        }
-
-        // Update buffer position and end
-        buffer->end = (size_t) length;
-
-        // Handle notification
-        if (recv_flags & MSG_NOTIFICATION) {
-            handle_notification(transport, buffer);
-            goto write;
-        }
-
-        // Check state
-        if (transport->state != RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
-            DEBUG_WARNING("Ignored incoming data before state 'connected'\n");
-            goto write;
-        }
-
-        // Have info?
-        if (info_type != SCTP_RECVV_RCVINFO) {
-            DEBUG_WARNING("Cannot handle incoming data without SCTP rcvfinfo\n");
-            goto write;
-        }
-
-        // Pass data to handler
-        data_receive_handler(transport, buffer, &info, recv_flags);
-
-// Note: Label must be here to ensure that the buffer is being free'd
-write:
-        // Dereference
-        mem_deref(buffer);
-    }
-
-    // Can write?
-    if (events & SCTP_EVENT_WRITE) {
-        // Send all deferred messages (if not already sending)
-        // TODO: Check if this flag is really necessary
-        if (!(transport->flags & RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS)) {
-            transport->flags |= RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
-            sctp_send_deferred_messages(transport);
-            transport->flags &= ~RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
-        } else {
-            DEBUG_WARNING("Sending still in progress!\n");
-        }
-    }
-
-out:
     // Unlock event loop mutex
     rawrtc_thread_leave();
 }
@@ -1633,12 +1707,12 @@ out:
  * Handle SCTP timer tick.
  */
 static void timer_handler(
-        void* const arg
+        void* arg
 ) {
     (void) arg;
 
     // Restart timer
-    tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+    tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
 
     // Pass delta ms to usrsctp
     usrsctp_handle_timers(RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT);
@@ -1748,7 +1822,7 @@ static void rawrtc_sctp_transport_destroy(
     // Close usrsctp (if needed)
     if (initialized == 0) {
         // Cancel timer
-        tmr_cancel(&usrsctp_timer);
+        tmr_cancel(&tick_timer);
 
         // Close
         usrsctp_finish();
@@ -1850,8 +1924,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_default_frag_interleave(2);
 
         // Start timers
-        tmr_init(&usrsctp_timer);
-        tmr_start(&usrsctp_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+        tmr_init(&tick_timer);
+        tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
     }
 
     // Allocate
@@ -1927,7 +2001,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Set event callback
-    if (usrsctp_set_upcall(transport->socket, upcall_handler, transport)) {
+    if (usrsctp_set_upcall(transport->socket, upcall_handler_helper, transport)) {
         DEBUG_WARNING("Could not set event callback (upcall), reason: %m\n", errno);
         error = rawrtc_error_to_code(errno);
         goto out;
