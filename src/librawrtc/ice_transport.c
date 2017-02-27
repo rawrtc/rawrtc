@@ -141,6 +141,22 @@ static void ice_established_handler(
 //        return;
 //    }
 
+    // Offer candidate pair to DTLS transport (if any)
+    // TODO: Offer to whatever transport lays above so we are SRTP/QUIC compatible
+    if (transport->dtls_transport) {
+        error = rawrtc_dtls_transport_add_candidate_pair(
+                transport->dtls_transport, candidate_pair);
+        if (error) {
+            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
+                          rawrtc_code_to_str(error));
+
+            // Remove candidate pair
+            mem_deref(candidate_pair);
+        }
+    }
+
+    // TODO: Call candidate_pair_change_handler (?)
+
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
         DEBUG_INFO("Checklist completed:\n%H", trice_debug, transport->gatherer->ice);
@@ -151,19 +167,6 @@ static void ice_established_handler(
 //        //       by both
 //        set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
     }
-
-    // Offer candidate pair to DTLS transport (if any)
-    // TODO: Offer to whatever transport lays above so we are SRTP/QUIC compatible
-    if (transport->dtls_transport) {
-        error = rawrtc_dtls_transport_add_candidate_pair(
-                transport->dtls_transport, candidate_pair);
-        if (error) {
-            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
-                          rawrtc_code_to_str(error));
-        }
-    }
-
-    // TODO: Call candidate_pair_change_handler (?)
 }
 
 /*
@@ -507,7 +510,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
             }
         }
     }
-    if (error != RAWRTC_CODE_NO_VALUE) {
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
         goto out;
     }
 

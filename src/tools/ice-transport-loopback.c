@@ -9,6 +9,8 @@
 // Note: Shadows struct client
 struct ice_transport_client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
     struct rawrtc_ice_gather_options* gather_options;
     struct rawrtc_ice_parameters* ice_parameters;
     enum rawrtc_ice_role role;
@@ -17,18 +19,53 @@ struct ice_transport_client {
     struct ice_transport_client* other_client;
 };
 
+static bool ice_candidate_type_enabled(
+        struct ice_transport_client* const client,
+        enum rawrtc_ice_candidate_type const type
+) {
+    char const* const type_str = rawrtc_ice_candidate_type_to_str(type);
+    size_t i;
+
+    // All enabled?
+    if (client->n_ice_candidate_types == 0) {
+        return true;
+    }
+
+    // Specifically enabled?
+    for (i = 0; i < client->n_ice_candidate_types; ++i) {
+        if (str_cmp(client->ice_candidate_types[i], type_str) == 0) {
+            return true;
+        }
+    }
+
+    // Nope
+    return false;
+}
+
 static void ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
     struct ice_transport_client* const client = arg;
+    enum rawrtc_ice_candidate_type type;
     
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
-    
-    // Add to other client as remote candidate
-    EOE(rawrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate));
+
+    if (candidate) {
+        // Get ICE candidate type
+        EOE(rawrtc_ice_candidate_get_type(&type, candidate));
+
+        // Add to other client as remote candidate (if requested)
+        if (ice_candidate_type_enabled(client, type)) {
+            EOE(rawrtc_ice_transport_add_remote_candidate(
+                    client->other_client->ice_transport, candidate));
+        }
+    } else {
+        EOE(rawrtc_ice_transport_add_remote_candidate(
+                client->other_client->ice_transport, candidate));
+    }
 }
 
 static void client_init(
@@ -76,7 +113,14 @@ static void client_stop(
     client->gatherer = mem_deref(client->gatherer);
 }
 
+static void exit_with_usage(char* program) {
+    DEBUG_WARNING("Usage: %s [<ice-candidate-type> [...]]", program);
+    exit(1);
+}
+
 int main(int argc, char* argv[argc + 1]) {
+    char** ice_candidate_types = NULL;
+    size_t n_ice_candidate_types = 0;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
@@ -89,6 +133,12 @@ int main(int argc, char* argv[argc + 1]) {
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Which ICE candidate types are enabled?
+    if (argc > 1) {
+        ice_candidate_types = &argv[1];
+        n_ice_candidate_types = (size_t) argc - 1;
+    }
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
@@ -105,12 +155,16 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Setup client A
     a.name = "A";
+    a.ice_candidate_types = ice_candidate_types;
+    a.n_ice_candidate_types = n_ice_candidate_types;
     a.gather_options = gather_options;
     a.role = RAWRTC_ICE_ROLE_CONTROLLING;
     a.other_client = &b;
 
     // Setup client B
     b.name = "B";
+    b.ice_candidate_types = ice_candidate_types;
+    b.n_ice_candidate_types = n_ice_candidate_types;
     b.gather_options = gather_options;
     b.role = RAWRTC_ICE_ROLE_CONTROLLED;
     b.other_client = &a;

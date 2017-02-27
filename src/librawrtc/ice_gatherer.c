@@ -610,7 +610,7 @@ static enum rawrtc_code add_candidate(
 
     // Create candidate helper (attaches receive handler)
     error = rawrtc_candidate_helper_create(
-            &candidate, gatherer, re_candidate, udp_receive_handler);
+            &candidate, gatherer, re_candidate, udp_receive_handler, gatherer);
     if (error) {
         DEBUG_WARNING("Could not create candidate helper, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -631,6 +631,7 @@ static enum rawrtc_code add_candidate(
     }
 
     // Check state
+    // TODO: 'gatherer' might be free'd here
     if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }

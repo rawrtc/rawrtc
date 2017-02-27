@@ -773,7 +773,8 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
     }
 
     // Attach this transport's receive handler
-    error = rawrtc_candidate_helper_set_receive_handler(candidate_helper, udp_receive_helper);
+    error = rawrtc_candidate_helper_set_receive_handler(
+            candidate_helper, udp_receive_helper, transport);
     if (error) {
         DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
                       rawrtc_code_to_str(error));

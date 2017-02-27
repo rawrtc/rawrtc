@@ -23,7 +23,8 @@ enum rawrtc_code rawrtc_candidate_helper_create(
         struct rawrtc_candidate_helper** const candidate_helperp, // de-referenced
         struct rawrtc_ice_gatherer* gatherer,
         struct ice_lcand* const candidate,
-        udp_helper_recv_h* const receive_handler
+        udp_helper_recv_h* const receive_handler,
+        void* const arg
 ) {
     struct rawrtc_candidate_helper* candidate_helper;
     enum rawrtc_code error;
@@ -46,7 +47,7 @@ enum rawrtc_code rawrtc_candidate_helper_create(
     candidate_helper->relay_pending_count = 0;
 
     // Set receive handler
-    error = rawrtc_candidate_helper_set_receive_handler(candidate_helper, receive_handler);
+    error = rawrtc_candidate_helper_set_receive_handler(candidate_helper, receive_handler, arg);
     if (error) {
         goto out;
     }
@@ -66,7 +67,8 @@ out:
  */
 enum rawrtc_code rawrtc_candidate_helper_set_receive_handler(
         struct rawrtc_candidate_helper* const candidate_helper,
-        udp_helper_recv_h* const receive_handler
+        udp_helper_recv_h* const receive_handler,
+        void* const arg
 ) {
     enum rawrtc_code error;
     struct udp_helper* udp_helper;
@@ -86,7 +88,7 @@ enum rawrtc_code rawrtc_candidate_helper_set_receive_handler(
     // Create UDP helper
     error = rawrtc_error_to_code(udp_register_helper(
             &udp_helper, udp_socket, RAWRTC_LAYER_DTLS_SRTP_STUN, NULL,
-            receive_handler, candidate_helper->gatherer));
+            receive_handler, arg));
     if (error) {
         return error;
     }
