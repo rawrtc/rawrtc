@@ -4,7 +4,7 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-transport"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -37,7 +37,7 @@ char const * const rawrtc_ice_transport_state_to_name(
  * Destructor for an existing ICE transport.
  */
 static void rawrtc_ice_transport_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_transport* const transport = arg;
 
@@ -112,9 +112,9 @@ static void set_state(
  * ICE connection established callback.
  */
 static void ice_established_handler(
-        struct ice_candpair* const candidate_pair,
-        struct stun_msg const* const message,
-        void* const arg
+        struct ice_candpair* candidate_pair,
+        struct stun_msg const* message,
+        void* arg
 ) {
     struct rawrtc_ice_transport* const transport = arg;
     enum rawrtc_code error;
@@ -146,10 +146,13 @@ static void ice_established_handler(
 
         // At least one candidate pair succeeded, transition to completed
         DEBUG_INFO("ICE connection completed\n");
+        // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been added
+        //       by both
         set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
     }
 
     // Offer candidate pair to DTLS transport (if any)
+    // TODO: Offer to whatever transport lays above so we are SRTP/QUIC compatible
     if (transport->dtls_transport) {
         error = rawrtc_dtls_transport_add_candidate_pair(
                 transport->dtls_transport, candidate_pair);
@@ -168,10 +171,11 @@ static void ice_established_handler(
 static void ice_failed_handler(
         int err,
         uint16_t stun_code,
-        struct ice_candpair* const candidate_pair,
-        void* const arg
+        struct ice_candpair* candidate_pair,
+        void* arg
 ) {
     struct rawrtc_ice_transport* const transport = arg;
+    (void) err; (void) stun_code; (void) candidate_pair;
 
     DEBUG_PRINTF("Candidate pair failed: %H (%m %"PRIu16")\n",
                  trice_candpair_debug, candidate_pair, err, stun_code);
@@ -196,6 +200,8 @@ static void ice_failed_handler(
         if (list_head(trice_validl(transport->gatherer->ice))) {
             // Yes, transition to completed
             DEBUG_INFO("ICE connection completed\n");
+            // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been
+            //       added by both
             set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
         } else {
             // No, transition to failed

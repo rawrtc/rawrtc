@@ -4,7 +4,7 @@
  * Handle buffered messages.
  *
  * Return `true` if the message has been handled successfully and can
- * be unliked, `false` to stop processing messages and keep the current
+ * be unlinked, `false` to stop processing messages and keep the current
  * message in the list.
  */
 typedef bool (rawrtc_message_buffer_handler)(

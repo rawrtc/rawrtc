@@ -6,6 +6,19 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+/*
+ * Print the ICE gatherer's state. Stop once complete.
+ */
+void gatherer_state_change_handler(
+        enum rawrtc_ice_gatherer_state const state, // read-only
+        void* const arg // will be casted to `struct client*`
+) {
+    default_ice_gatherer_state_change_handler(state, arg);
+    if (state == RAWRTC_ICE_GATHERER_COMPLETE) {
+        re_cancel();
+    }
+}
+
 int main(int argc, char* argv[argc + 1]) {
     struct rawrtc_ice_gather_options* gather_options;
     struct rawrtc_ice_gatherer* gatherer;
@@ -39,7 +52,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
             &gatherer, gather_options,
-            default_ice_gatherer_state_change_handler, default_ice_gatherer_error_handler,
+            gatherer_state_change_handler, default_ice_gatherer_error_handler,
             default_ice_gatherer_local_candidate_handler, &client));
 
     // Start gathering

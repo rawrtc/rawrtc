@@ -174,7 +174,7 @@ static bool is_closed(
  */
 static void close_handler(
         int err,
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     enum rawrtc_code error;
@@ -204,8 +204,8 @@ static void close_handler(
  * Handle incoming DTLS messages.
  */
 static void dtls_receive_handler(
-        struct mbuf* const buffer,
-        void* const arg
+        struct mbuf* buffer,
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
 
@@ -341,7 +341,7 @@ out:
  * Handle DTLS connection established event.
  */
 static void establish_handler(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
 
@@ -366,14 +366,14 @@ static void establish_handler(
  * Handle incoming DTLS connection.
  */
 static void connect_handler(
-        const struct sa* const peer,
-        void* const arg
+        const struct sa* peer,
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     bool role_is_server;
     bool have_connection;
-    enum rawrtc_code error;
     int err;
+    (void) peer;
 
     // Check state
     if (is_closed(transport)) {
@@ -417,8 +417,8 @@ static void connect_handler(
  * Initiate a DTLS connect.
  */
 static enum rawrtc_code do_connect(
-        struct rawrtc_dtls_transport *const transport,
-        const struct sa *const peer
+        struct rawrtc_dtls_transport* const transport,
+        const struct sa* const peer
 ) {
     // Connect
     DEBUG_PRINTF("Starting DTLS connection to %J\n", peer);
@@ -431,15 +431,15 @@ static enum rawrtc_code do_connect(
  * Handle outgoing DTLS messages.
  */
 static int send_handler(
-        struct tls_conn* const tc,
-        struct sa const* const original_destination,
-        struct mbuf* const buffer,
-        void* const arg
+        struct tls_conn* tc,
+        struct sa const* original_destination,
+        struct mbuf* buffer,
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct trice* const ice = transport->ice_transport->gatherer->ice;
     bool closed = is_closed(transport);
-    (void) tc;
+    (void) tc; (void) original_destination;
 
     // Note: No need to check if closed as only non-application data may be sent if the
     //       transport is already closed.
@@ -479,8 +479,8 @@ static int send_handler(
  * Handle MTU queries.
  */
 static size_t mtu_handler(
-        struct tls_conn* const tc,
-        void* const arg
+        struct tls_conn* tc,
+        void* arg
 ) {
     (void) tc; (void) arg;
     // TODO: Choose a sane value.
@@ -531,9 +531,9 @@ static bool udp_receive_handler(
  * Handle received UDP messages (UDP receive helper).
  */
 static bool udp_receive_helper(
-        struct sa* const source,
-        struct mbuf* const buffer,
-        void* const arg
+        struct sa* source,
+        struct mbuf* buffer,
+        void* arg
 ) {
     // Receive
     udp_receive_handler(buffer, source, arg);
@@ -546,20 +546,28 @@ static bool udp_receive_helper(
  * Destructor for an existing ICE transport.
  */
 static void rawrtc_dtls_transport_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
+    struct le* le;
 
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_dtls_transport_stop(transport);
+
+    // TODO: Remove once ICE transport and DTLS transport have been separated properly
+    for (le = list_head(&transport->ice_transport->gatherer->local_candidates);
+         le != NULL; le = le->next) {
+        struct rawrtc_candidate_helper* const candidate_helper = le->data;
+        mem_deref(candidate_helper->udp_helper);
+        // TODO: Be aware that UDP packets go to nowhere now...
+    }
 
     // Dereference
     mem_deref(transport->connection);
     mem_deref(transport->socket);
     mem_deref(transport->context);
     list_flush(&transport->fingerprints);
-    list_flush(&transport->candidate_helpers);
     list_flush(&transport->buffered_messages_out);
     list_flush(&transport->buffered_messages_in);
     mem_deref(transport->remote_parameters);
@@ -621,7 +629,6 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     transport->connection_established = false;
     list_init(&transport->buffered_messages_in);
     list_init(&transport->buffered_messages_out);
-    list_init(&transport->candidate_helpers);
     list_init(&transport->fingerprints);
 
     // Append and reference certificates
@@ -705,6 +712,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
         if (error) {
             DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
                           rawrtc_code_to_str(error));
+            goto out;
         }
     }
 
@@ -724,14 +732,13 @@ out:
 
 /*
  * Let the DTLS transport attach itself to a candidate pair.
+ * TODO: Separate ICE transport and DTLS transport properly (like data transport)
  */
 enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
         struct rawrtc_dtls_transport* const transport,
         struct ice_candpair* const candidate_pair
 ) {
     enum rawrtc_code error;
-    struct list* candidate_helpers;
-    struct le* le;
     struct rawrtc_candidate_helper* candidate_helper = NULL;
     
     // Check arguments
@@ -746,31 +753,30 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 
     // TODO: Check if already attached
 
-    // Find temporary UDP helper
-    candidate_helpers = &transport->ice_transport->gatherer->candidate_helpers;
-    for (le = list_head(candidate_helpers); le != NULL; le = le->next) {
-        candidate_helper = le->data;
-
-        // Remove from list and destroy
-        if (candidate_helper->candidate == candidate_pair->lcand) {
-            list_unlink(&candidate_helper->le);
-            mem_deref(candidate_helper);
-            break;
-        }
-    }
-
-    // Receive buffered DTLS packets
-    error = rawrtc_message_buffer_clear(
-            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
+    // Find candidate helper
+    error = rawrtc_candidate_helper_find(
+            &candidate_helper, &transport->ice_transport->gatherer->local_candidates,
+            candidate_pair->lcand);
     if (error) {
+        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
+                      rawrtc_code_to_str(error));
         goto out;
     }
 
-    // Attach final DTLS helper
-    error = rawrtc_candidate_helper_attach(
-            &candidate_helper, transport->ice_transport->gatherer->ice,
-            candidate_pair->lcand, udp_receive_helper, transport);
+    // Receive buffered packets
+    error = rawrtc_message_buffer_clear(
+            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
     if (error) {
+        DEBUG_WARNING("Could not handle buffered packets on candidate pair, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        goto out;
+    }
+
+    // Attach this transport's receive handler
+    error = rawrtc_candidate_helper_set_receive_handler(candidate_helper, udp_receive_helper);
+    if (error) {
+        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
+                      rawrtc_code_to_str(error));
         goto out;
     }
 
@@ -778,16 +784,14 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
     if (transport->role == RAWRTC_DTLS_ROLE_CLIENT && !transport->connection) {
         error = do_connect(transport, &candidate_pair->rcand->attr.addr);
         if (error) {
+            DEBUG_WARNING("Could not start DTLS connection for candidate pair, reason: %s\n",
+                          rawrtc_code_to_str(error));
             goto out;
         }
     }
 
 out:
-    if (error) {
-        mem_deref(candidate_helper);
-    } else {
-        // Add to list
-        list_append(&transport->candidate_helpers, &candidate_helper->le, candidate_helper);
+    if (!error) {
         DEBUG_PRINTF("Attached DTLS transport to candidate pair\n");
     }
     return error;
@@ -927,7 +931,11 @@ static bool intermediate_receive_handler(
     (void) context;
 
     // Pipe into the actual receive handler
-    transport->receive_handler(buffer, transport->receive_handler_arg);
+    if (transport->receive_handler) {
+        transport->receive_handler(buffer, transport->receive_handler_arg);
+    } else {
+        DEBUG_WARNING("No receive handler, discarded %zu bytes\n", mbuf_get_left(buffer));
+    }
 
     // Continue iterating through message queue
     return true;
@@ -958,16 +966,16 @@ enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
         return RAWRTC_CODE_INVALID_STATE;
     }
 
+    // Set handler
+    transport->receive_handler = receive_handler;
+    transport->receive_handler_arg = arg;
+
     // Receive buffered messages
     error = rawrtc_message_buffer_clear(
             &transport->buffered_messages_in, intermediate_receive_handler, transport);
     if (error) {
         return error;
     }
-
-    // Set handler
-    transport->receive_handler = receive_handler;
-    transport->receive_handler_arg = arg;
 
     // Done
     return RAWRTC_CODE_SUCCESS;

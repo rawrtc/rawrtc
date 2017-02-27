@@ -2,19 +2,19 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <string.h> // memcpy
 #include <rawrtc.h>
-#include "utils.h"
 #include "ice_gatherer.h"
+#include "utils.h"
 #include "ice_candidate.h"
 #include "message_buffer.h"
 #include "candidate_helper.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 #define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#define RAWRTC_DEBUG_ICE_GATHERER 1 // TODO: Remove
+#define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include "debug.h"
 
 static void rawrtc_ice_gather_options_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_gather_options* const options = arg;
 
@@ -55,7 +55,7 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
  * Destructor for URLs of the ICE gatherer.
  */
 static void rawrtc_ice_server_url_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_server_url* const url = arg;
 
@@ -108,7 +108,7 @@ out:
  * Destructor for an existing ICE server.
  */
 static void rawrtc_ice_server_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_server* const server = arg;
 
@@ -136,6 +136,11 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     // Check arguments
     if (!options || !urls) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Ensure there are less than 2^8 servers
+    if (list_count(&options->ice_servers) == UINT8_MAX) {
+        return RAWRTC_CODE_INSUFFICIENT_SPACE;
     }
 
     // Allocate
@@ -213,26 +218,6 @@ char const * const rawrtc_ice_gatherer_state_to_name(
 }
 
 /*
- * Destructor for an existing ICE gatherer.
- */
-static void rawrtc_ice_gatherer_destroy(
-        void* const arg
-) {
-    struct rawrtc_ice_gatherer* const gatherer = arg;
-
-    // Close gatherer
-    // TODO: Check effects in case transport has been destroyed due to error in create
-    rawrtc_ice_gatherer_close(gatherer);
-
-    // Dereference
-    mem_deref(gatherer->stun);
-    mem_deref(gatherer->ice);
-    list_flush(&gatherer->candidate_helpers);
-    list_flush(&gatherer->buffered_messages);
-    mem_deref(gatherer->options);
-}
-
-/*
  * STUN indication handler.
  * TODO: Do we need this?
  */
@@ -244,6 +229,25 @@ static void stun_indication_handler(
 
     // TODO: What needs to be done here?
     stun_msg_dump(message);
+}
+
+/*
+ * Destructor for an existing ICE gatherer.
+ */
+static void rawrtc_ice_gatherer_destroy(
+        void* arg
+) {
+    struct rawrtc_ice_gatherer* const gatherer = arg;
+
+    // Close gatherer
+    // TODO: Check effects in case transport has been destroyed due to error in create
+    rawrtc_ice_gatherer_close(gatherer);
+
+    // Dereference
+    mem_deref(gatherer->stun);
+    mem_deref(gatherer->ice);
+    list_flush(&gatherer->buffered_messages);
+    mem_deref(gatherer->options);
 }
 
 /*
@@ -279,7 +283,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     gatherer->local_candidate_handler = local_candidate_handler;
     gatherer->arg = arg;
     list_init(&gatherer->buffered_messages);
-    list_init(&gatherer->candidate_helpers);
+    list_init(&gatherer->local_candidates);
 
     // Generate random username fragment and password for ICE
     rand_str(gatherer->ice_username_fragment, sizeof(gatherer->ice_username_fragment));
@@ -355,6 +359,9 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // Remote candidate helpers
+    list_flush(&gatherer->local_candidates);
+
     // Stop ICE checklist (if running)
     trice_checklist_stop(gatherer->ice);
 
@@ -363,15 +370,16 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
 
     // Set state to closed and return
     set_state(gatherer, RAWRTC_ICE_GATHERER_CLOSED);
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
  * Handle received UDP messages.
  */
 static bool udp_receive_handler(
-        struct sa * const source,
-        struct mbuf* const buffer,
-        void* const arg
+        struct sa * source,
+        struct mbuf* buffer,
+        void* arg
 ) {
     struct rawrtc_ice_gatherer* const gatherer = arg;
     enum rawrtc_code error;
@@ -406,11 +414,179 @@ out:
 }
 
 /*
+ * Announce a local candidate.
+ */
+static enum rawrtc_code announce_candidate(
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        struct ice_lcand* const re_candidate, // nullable
+        char const* const url // nullable
+) {
+    enum rawrtc_code error;
+
+    // Create ICE candidate
+    if (gatherer->local_candidate_handler) {
+        struct rawrtc_ice_candidate* ice_candidate = NULL;
+
+        // Create ICE candidate
+        if (re_candidate) {
+            error = rawrtc_ice_candidate_create_from_local_candidate(&ice_candidate, re_candidate);
+            if (error) {
+                return error;
+            }
+        }
+
+        // Call candidate handler and unreference
+        gatherer->local_candidate_handler(ice_candidate, url, gatherer->arg);
+        mem_deref(ice_candidate);
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Check if the gathering process is complete.
+ */
+static void check_gathering_complete(
+        struct rawrtc_ice_gatherer* const gatherer // not checked
+) {
+    struct le* le;
+    enum rawrtc_code error;
+
+    // Check state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        return;
+    }
+
+    // Ensure every local candidate has no pending srflx/relay candidates
+    for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
+        struct rawrtc_candidate_helper* const candidate = le->data;
+
+        // Check counters
+        if (candidate->srflx_pending_count > 0 || candidate->relay_pending_count > 0) {
+            // Nope
+            DEBUG_PRINTF(
+                    "Gathering still in progress at candidate %j, #srflx=%"PRIuFAST8", #relay=%"
+                    PRIuFAST8"\n", &candidate->candidate->attr.addr,
+                    candidate->srflx_pending_count, candidate->relay_pending_count);
+            return;
+        }
+    }
+
+    // Announce candidate gathering complete
+    error = announce_candidate(gatherer, NULL, NULL);
+    if (error) {
+        DEBUG_WARNING("Could not announce end-of-candidates, reason: %s\n",
+                      rawrtc_code_to_str(error));
+
+        // This should never happen, so close on failure
+        rawrtc_ice_gatherer_close(gatherer);
+        return;
+    }
+
+    // Update state & done
+    DEBUG_PRINTF("Gathering complete\n");
+    set_state(gatherer, RAWRTC_ICE_GATHERER_COMPLETE);
+    DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
+}
+
+/*
+ * Handle gathered server reflexive candidate.
+ */
+static void reflexive_candidate_handler(
+        int err,
+        struct sa const* address, // not checked
+        void* arg // not checked
+) {
+    struct rawrtc_candidate_helper* const candidate = arg;
+    struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
+    struct ice_lcand* const re_candidate = candidate->candidate;
+    uint32_t priority;
+    struct ice_lcand* srflx_candidate;
+    enum rawrtc_code error;
+
+    // Check state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        return;
+    }
+
+    // Error?
+    if (err) {
+        DEBUG_NOTICE("STUN request failed, reason: %m\n", err);
+        goto out;
+    }
+
+    // TODO: Check if already added (?)
+
+    // Add server reflexive candidate
+    // TODO: Using the candidate's protocol, TCP type and component id correct?
+    priority = rawrtc_ice_candidate_calculate_priority(
+            ICE_CAND_TYPE_HOST, re_candidate->attr.proto, re_candidate->attr.tcptype);
+    err = trice_lcand_add(
+            &srflx_candidate, gatherer->ice, re_candidate->attr.compid, re_candidate->attr.proto,
+            priority, address, &re_candidate->attr.addr, ICE_CAND_TYPE_SRFLX,
+            &re_candidate->attr.addr, re_candidate->attr.tcptype, NULL, RAWRTC_LAYER_ICE);
+    if (err) {
+        DEBUG_WARNING("Could not add server reflexive candidate, reason: %m\n", err);
+        goto out;
+    }
+    DEBUG_PRINTF("Added %s server reflexive candidate for interface %j\n",
+                 net_proto2name(re_candidate->attr.proto), address);
+
+    // Announce candidate to handler
+    // TODO: Pass the URL of the server the candidate has been gathered with
+    error = announce_candidate(gatherer, re_candidate, NULL);
+    if (error) {
+        DEBUG_WARNING("Could not announce server reflexive candidate, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        goto out;
+    }
+
+out:
+    // Decrease counter & check if done gathering
+    --candidate->srflx_pending_count;
+    check_gathering_complete(gatherer);
+}
+
+/*
+ * Gather server reflexive candidates of a local candidate.
+ */
+static enum rawrtc_code gather_reflexive_candidate(
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        struct rawrtc_candidate_helper* const candidate // not checked
+) {
+    struct ice_lcand* const re_candidate = candidate->candidate;
+    int err;
+
+    // TODO: Fix hard-coded server, server configuration and keep-alive interval
+    struct sa server_address;
+    struct stun_conf* server_config = NULL;
+    uint32_t server_keepalive_interval = 30;
+    sa_set_str(&server_address, "217.160.182.235", 3478);
+
+    // Create STUN keep-alive session
+    // TODO: We're using the candidate's protocol for STUN, is this correct?
+    err = stun_keepalive_alloc(
+            &candidate->stun_keepalive, re_candidate->attr.proto, re_candidate->us,
+            RAWRTC_LAYER_STUN, &server_address, server_config, reflexive_candidate_handler,
+            candidate);
+    if (err) {
+        DEBUG_WARNING("Could not create STUN request, reason: %m\n", err);
+        return rawrtc_error_to_code(err);
+    }
+
+    // Increase counter, start the session & done
+    ++candidate->srflx_pending_count;
+    stun_keepalive_enable(candidate->stun_keepalive, server_keepalive_interval);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * Add local candidate, gather server reflexive and relay candidates.
  */
-static void add_candidate(
-        struct rawrtc_ice_gatherer* const gatherer,
-        struct sa const* const address,
+static enum rawrtc_code add_candidate(
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        struct sa const* const address, // not checked
         enum rawrtc_ice_protocol const protocol,
         enum ice_tcptype const tcp_type
 ) {
@@ -418,9 +594,8 @@ static void add_candidate(
     int const ipproto = rawrtc_ice_protocol_to_ipproto(protocol);
     struct ice_lcand* re_candidate;
     int err;
-    struct rawrtc_candidate_helper* candidate_helper;
+    struct rawrtc_candidate_helper* candidate;
     enum rawrtc_code error;
-    struct rawrtc_ice_candidate* candidate;
 
     // Add host candidate
     priority = rawrtc_ice_candidate_calculate_priority(
@@ -430,41 +605,50 @@ static void add_candidate(
             &re_candidate, gatherer->ice, 1, ipproto, priority, address,
             NULL, ICE_CAND_TYPE_HOST, NULL, tcp_type, NULL, RAWRTC_LAYER_ICE);
     if (err) {
-        DEBUG_WARNING("Could not add candidate, reason: %m\n", err);
-        return;
+        DEBUG_WARNING("Could not add host candidate, reason: %m\n", err);
+        return rawrtc_error_to_code(err);
     }
-    DEBUG_PRINTF("Added %s candidate for interface %j\n", rawrtc_ice_protocol_to_str(protocol),
+
+    // Create candidate helper (attaches receive handler)
+    error = rawrtc_candidate_helper_create(
+            &candidate, gatherer, re_candidate, udp_receive_handler);
+    if (error) {
+        DEBUG_WARNING("Could not create candidate helper, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        return error;
+    }
+
+    // Add to local candidates list
+    list_append(&gatherer->local_candidates, &candidate->le, candidate);
+    DEBUG_PRINTF("Added %s host candidate for interface %j\n", rawrtc_ice_protocol_to_str(protocol),
                  address);
 
-    // Attach temporary UDP helper
-    error = rawrtc_candidate_helper_attach(
-            &candidate_helper, gatherer->ice, re_candidate, udp_receive_handler, gatherer);
+    // Announce host candidate to handler
+    error = announce_candidate(gatherer, re_candidate, NULL);
     if (error) {
-        DEBUG_WARNING("Could not attach candidate helper, reason: %s\n",
+        DEBUG_WARNING("Could not announce host candidate, reason: %s\n",
                       rawrtc_code_to_str(error));
-    } else {
-        // Add to list
-        list_append(&gatherer->candidate_helpers, &candidate_helper->le, candidate_helper);
+        return error;
     }
 
-    // Create ICE candidate, call local candidate handler, unreference ICE candidate
-    error = rawrtc_ice_candidate_create_from_local_candidate(&candidate, re_candidate);
-    if (error) {
-        DEBUG_WARNING("Could not create local candidate instance: %s\n",
-                      rawrtc_code_to_str(error));
-    } else {
-        if (gatherer->local_candidate_handler) {
-            gatherer->local_candidate_handler(candidate, NULL, gatherer->arg);
-        }
-        mem_deref(candidate);
+    // Check state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        return RAWRTC_CODE_SUCCESS;
     }
 
     // Gather server reflexive candidate
+    error = gather_reflexive_candidate(gatherer, candidate);
+    if (error) {
+        DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s",
+                      rawrtc_code_to_str(error));
+        // Note: Considered non-critical, continuing
+    }
 
-    // TODO: Gather srflx candidates
-    DEBUG_PRINTF("TODO: Gather srflx candidates for %j\n", address);
     // TODO: Gather relay candidates
     DEBUG_PRINTF("TODO: Gather relay candidates for %j\n", address);
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -473,15 +657,19 @@ static void add_candidate(
  * TODO: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-01
   */
 static bool interface_handler(
-        char const* const interface,
-        struct sa const* const address,
-        void* const arg
+        char const* interface, // not checked
+        struct sa const* address, // not checked
+        void* arg // not checked
 ) {
     int af;
     struct rawrtc_ice_gatherer* const gatherer = arg;
-
-    // Unused
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     (void) interface;
+
+    // Check state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        return true; // Don't continue gathering
+    }
 
     // Ignore loopback and linklocal addresses
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
@@ -502,7 +690,16 @@ static bool interface_handler(
 
     // Add UDP candidate
     if (rawrtc_default_config.udp_enable) {
-        add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_UDP, ICE_TCP_ACTIVE);
+        error = add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_UDP, ICE_TCP_ACTIVE);
+        if (error) {
+            DEBUG_WARNING("Could not add candidate, reason: %s", rawrtc_code_to_str(error));
+            goto out;
+        }
+
+        // Check state
+        if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+            return true; // Don't continue gathering
+        }
     }
 
     // Add TCP candidate
@@ -511,8 +708,14 @@ static bool interface_handler(
         //add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_TCP, ICE_TCP_SO);
     }
 
-    // Continue gathering
-    return false;
+out:
+    if (error) {
+        // Close and don't continue gathering
+        rawrtc_ice_gatherer_close(gatherer);
+        return true;
+    } else {
+        return false; // Continue gathering
+    }
 }
 
 /*
@@ -549,11 +752,9 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Gathering complete
-    // TODO: Complete after gathering srflx and relay candidates
-    gatherer->local_candidate_handler(NULL, NULL, gatherer->arg);
-    set_state(gatherer, RAWRTC_ICE_GATHERER_COMPLETE);
+    check_gathering_complete(gatherer);
 
-    // TODO: Debug only
+    // Done
     DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
     return RAWRTC_CODE_SUCCESS;
 }
@@ -584,7 +785,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_local_parameters(
  * Destructor for an existing local candidates array.
  */
 static void rawrtc_ice_gatherer_local_candidates_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;

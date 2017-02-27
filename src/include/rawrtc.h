@@ -463,16 +463,6 @@ struct rawrtc_buffered_message {
 };
 
 /*
- * Local candidate helper.
- * TODO: private
- */
-struct rawrtc_candidate_helper {
-    struct le le;
-    struct ice_lcand* candidate;
-    struct udp_helper* helper;
-};
-
-/*
  * Certificate options.
  * TODO: private
  */
@@ -576,14 +566,14 @@ struct rawrtc_ice_gatherer {
     rawrtc_ice_gatherer_error_handler* error_handler; // nullable
     rawrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
     void* arg; // nullable
-    struct list buffered_messages;
-    struct list candidate_helpers; // TODO: Hash list instead?
+    struct list buffered_messages; // TODO: Can this be added to the candidates list?
+    struct list local_candidates; // TODO: Hash list instead?
     char ice_username_fragment[9];
     char ice_password[33];
     struct trice* ice;
     struct trice_conf ice_config;
-    struct stun* stun;
-    struct stun_conf stun_config;
+    struct stun* stun; // TODO: Do we still need this or should it be in the candidates list?
+    struct stun_conf stun_config; // TODO: See above
 };
 
 /*
@@ -635,7 +625,6 @@ struct rawrtc_dtls_transport {
     bool connection_established;
     struct list buffered_messages_in;
     struct list buffered_messages_out;
-    struct list candidate_helpers; // TODO: Hash list instead?
     struct list fingerprints;
     struct tls* context;
     struct dtls_sock* socket;
