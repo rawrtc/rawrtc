@@ -227,7 +227,7 @@ enum rawrtc_code rawrtc_ice_candidate_create_from_remote_candidate(
 
 /*
  * Get the ICE candidate's foundation.
- * `*foundationp` will be set to a copy of the IP address that must be
+ * `*foundationp` will be set to a copy of the foundation that must be
  * unreferenced.
  */
 enum rawrtc_code rawrtc_ice_candidate_get_foundation(

@@ -485,9 +485,8 @@ static void check_gathering_complete(
     }
 
     // Update state & done
-    DEBUG_PRINTF("Gathering complete\n");
+    DEBUG_PRINTF("Gathering complete:\n%H", trice_debug, gatherer->ice);
     set_state(gatherer, RAWRTC_ICE_GATHERER_COMPLETE);
-    DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
 }
 
 /*
@@ -531,11 +530,11 @@ static void reflexive_candidate_handler(
         goto out;
     }
     DEBUG_PRINTF("Added %s server reflexive candidate for interface %j\n",
-                 net_proto2name(re_candidate->attr.proto), address);
+                 net_proto2name(srflx_candidate->attr.proto), address);
 
     // Announce candidate to handler
     // TODO: Pass the URL of the server the candidate has been gathered with
-    error = announce_candidate(gatherer, re_candidate, NULL);
+    error = announce_candidate(gatherer, srflx_candidate, NULL);
     if (error) {
         DEBUG_WARNING("Could not announce server reflexive candidate, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -706,6 +705,7 @@ static bool interface_handler(
     if (rawrtc_default_config.tcp_enable) {
         // TODO
         //add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_TCP, ICE_TCP_SO);
+        DEBUG_WARNING("TODO: Add TCP host candidate for interface %j\n", address);
     }
 
 out:
@@ -755,7 +755,6 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     check_gathering_complete(gatherer);
 
     // Done
-    DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
     return RAWRTC_CODE_SUCCESS;
 }
 

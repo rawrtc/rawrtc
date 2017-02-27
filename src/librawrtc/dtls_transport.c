@@ -603,7 +603,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // TODO: Check certificates expiration dates
 
     // Check ICE transport state
-    if (ice_transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+    if (ice_transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
@@ -1086,7 +1086,7 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
     }
 
     // Lazy-create fingerprints
-    if (!list_head(&transport->fingerprints)) {
+    if (list_isempty(&transport->fingerprints)) {
         for (le = list_head(&transport->certificates); le != NULL; le = le->next) {
             struct rawrtc_certificate* certificate = le->data;
 

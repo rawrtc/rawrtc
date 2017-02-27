@@ -558,7 +558,7 @@ static enum rawrtc_code reset_outgoing_stream(
     struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
 
     // Check if there are pending outgoing messages
-    if (list_head(&transport->buffered_messages_outgoing)) {
+    if (!list_isempty(&transport->buffered_messages_outgoing)) {
         context->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_PENDING_STREAM_RESET;
         return RAWRTC_CODE_SUCCESS;
     }
@@ -830,7 +830,7 @@ static void handle_sender_dry_event(
     (void) event;
 
     // If there are outstanding messages, don't raise an event
-    if (list_head(&transport->buffered_messages_outgoing)) {
+    if (!list_isempty(&transport->buffered_messages_outgoing)) {
         DEBUG_PRINTF("Pending messages, ignoring sender dry event\n");
         return;
     }
@@ -2764,7 +2764,7 @@ enum rawrtc_code rawrtc_sctp_transport_send(
 
     // Send directly (if connected and no outstanding messages)
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED &&
-            !list_head(&transport->buffered_messages_outgoing)) {
+            list_isempty(&transport->buffered_messages_outgoing)) {
         // Try sending
         DEBUG_PRINTF("Message queue is empty, sending directly\n");
         error = sctp_transport_send(

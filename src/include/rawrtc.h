@@ -137,13 +137,13 @@ enum rawrtc_ice_role {
  * ICE transport state.
  */
  enum rawrtc_ice_transport_state {
-     RAWRTC_ICE_TRANSPORT_NEW,
-     RAWRTC_ICE_TRANSPORT_CHECKING,
-     RAWRTC_ICE_TRANSPORT_CONNECTED,
-     RAWRTC_ICE_TRANSPORT_COMPLETED,
-     RAWRTC_ICE_TRANSPORT_DISCONNECTED,
-     RAWRTC_ICE_TRANSPORT_FAILED,
-     RAWRTC_ICE_TRANSPORT_CLOSED
+     RAWRTC_ICE_TRANSPORT_STATE_NEW,
+     RAWRTC_ICE_TRANSPORT_STATE_CHECKING,
+     RAWRTC_ICE_TRANSPORT_STATE_CONNECTED,
+     RAWRTC_ICE_TRANSPORT_STATE_COMPLETED,
+     RAWRTC_ICE_TRANSPORT_STATE_DISCONNECTED,
+     RAWRTC_ICE_TRANSPORT_STATE_FAILED,
+     RAWRTC_ICE_TRANSPORT_STATE_CLOSED
  };
 
 /*
@@ -1031,7 +1031,6 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
  * TODO (from RTCIceGatherer interface)
  * rawrtc_ice_gatherer_get_component
  * rawrtc_ice_gatherer_get_state
- * rawrtc_ice_gatherer_get_local_parameters
  */
 
 /*

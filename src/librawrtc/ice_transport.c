@@ -14,19 +14,19 @@ char const * const rawrtc_ice_transport_state_to_name(
         enum rawrtc_ice_transport_state const state
 ) {
     switch (state) {
-        case RAWRTC_ICE_TRANSPORT_NEW:
+        case RAWRTC_ICE_TRANSPORT_STATE_NEW:
             return "new";
-        case RAWRTC_ICE_TRANSPORT_CHECKING:
+        case RAWRTC_ICE_TRANSPORT_STATE_CHECKING:
             return "checking";
-        case RAWRTC_ICE_TRANSPORT_CONNECTED:
+        case RAWRTC_ICE_TRANSPORT_STATE_CONNECTED:
             return "connected";
-        case RAWRTC_ICE_TRANSPORT_COMPLETED:
+        case RAWRTC_ICE_TRANSPORT_STATE_COMPLETED:
             return "completed";
-        case RAWRTC_ICE_TRANSPORT_DISCONNECTED:
+        case RAWRTC_ICE_TRANSPORT_STATE_DISCONNECTED:
             return "disconnected";
-        case RAWRTC_ICE_TRANSPORT_FAILED:
+        case RAWRTC_ICE_TRANSPORT_STATE_FAILED:
             return "failed";
-        case RAWRTC_ICE_TRANSPORT_CLOSED:
+        case RAWRTC_ICE_TRANSPORT_STATE_CLOSED:
             return "closed";
         default:
             return "???";
@@ -80,7 +80,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
     }
 
     // Set fields/reference
-    transport->state = RAWRTC_ICE_TRANSPORT_NEW; // TODO: Raise state (delayed)?
+    transport->state = RAWRTC_ICE_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->gatherer = mem_ref(gatherer);
     transport->state_change_handler = state_change_handler;
     transport->candidate_pair_change_handler = candidate_pair_change_handler;
@@ -123,32 +123,33 @@ static void ice_established_handler(
     DEBUG_PRINTF("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
 
     // Ignore if closed
-    if (transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
         return;
     }
 
     // State: checking -> connected
-    if (transport->state == RAWRTC_ICE_TRANSPORT_CHECKING) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CHECKING) {
         DEBUG_INFO("ICE connection established\n");
-        set_state(transport, RAWRTC_ICE_TRANSPORT_CONNECTED);
+        set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_CONNECTED);
     }
 
-    // Ignore if completed
-    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
-    //       a late failed event.
-    if (transport->state == RAWRTC_ICE_TRANSPORT_COMPLETED) {
-        return;
-    }
+    // TODO: Re-enable once 'completed' state has been fixed
+//    // Ignore if completed
+//    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
+//    //       a late failed event.
+//    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
+//        return;
+//    }
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
-        DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+        DEBUG_INFO("Checklist completed:\n%H", trice_debug, transport->gatherer->ice);
 
-        // At least one candidate pair succeeded, transition to completed
-        DEBUG_INFO("ICE connection completed\n");
-        // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been added
-        //       by both
-        set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
+//        // At least one candidate pair succeeded, transition to completed
+//        DEBUG_INFO("ICE connection completed\n");
+//        // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been added
+//        //       by both
+//        set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
     }
 
     // Offer candidate pair to DTLS transport (if any)
@@ -181,32 +182,32 @@ static void ice_failed_handler(
                  trice_candpair_debug, candidate_pair, err, stun_code);
 
     // Ignore if closed
-    if (transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
         return;
     }
 
     // Ignore if completed
     // Note: This case can happen when the checklist is completed but an ICE candidate triggers
     //       a late failed event.
-    if (transport->state == RAWRTC_ICE_TRANSPORT_COMPLETED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
         return;
     }
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
-        DEBUG_PRINTF("%H", trice_debug, transport->gatherer->ice);
+        DEBUG_INFO("Checklist completed:\n%H", trice_debug, transport->gatherer->ice);
 
         // Do we have one candidate pair that succeeded?
-        if (list_head(trice_validl(transport->gatherer->ice))) {
+        if (!list_isempty(trice_validl(transport->gatherer->ice))) {
             // Yes, transition to completed
             DEBUG_INFO("ICE connection completed\n");
             // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been
             //       added by both
-            set_state(transport, RAWRTC_ICE_TRANSPORT_COMPLETED);
+            set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
         } else {
             // No, transition to failed
             DEBUG_INFO("ICE connection failed\n");
-            set_state(transport, RAWRTC_ICE_TRANSPORT_FAILED);
+            set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_FAILED);
         }
     }
 }
@@ -244,14 +245,14 @@ enum rawrtc_code rawrtc_ice_transport_start(
     // TODO: Check that components of ICE gatherer and ICE transport match
 
     // Check state
-    ice_transport_closed = transport->state == RAWRTC_ICE_TRANSPORT_CLOSED;
+    ice_transport_closed = transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED;
     ice_gatherer_closed = gatherer->state == RAWRTC_ICE_GATHERER_CLOSED;
     if (ice_transport_closed || ice_gatherer_closed) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
     // TODO: Handle ICE restart when called again
-    if (transport->state != RAWRTC_ICE_TRANSPORT_NEW) {
+    if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW) {
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
@@ -289,22 +290,24 @@ enum rawrtc_code rawrtc_ice_transport_start(
 
     // Set state to checking
     // TODO: Get more states from trice
-    set_state(transport, RAWRTC_ICE_TRANSPORT_CHECKING);
+    // TODO: Is this actually correct if we don't have any remote candidates?
+    set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_CHECKING);
 
-    // Starting checklist
-    // TODO: Is this the correct place?
-    // TODO: Get config from struct
-    // TODO: Why are there no keep-alive messages?
-    // TODO: Set 'use_cand' properly
-    error = rawrtc_error_to_code(trice_checklist_start(
-            transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
-            ice_established_handler, ice_failed_handler, transport));
-    if (error) {
-        return error;
+    // Start checklist (if remote candidates exist)
+    if (!list_isempty(trice_rcandl(transport->gatherer->ice))) {
+        // TODO: Get config from struct
+        // TODO: Why are there no keep-alive messages?
+        // TODO: Set 'use_cand' properly
+        DEBUG_INFO("Starting checklist due to start event\n");
+        error = rawrtc_error_to_code(trice_checklist_start(
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                ice_established_handler, ice_failed_handler, transport));
+        if (error) {
+            return error;
+        }
     }
 
-    // TODO: Debug only
-    DEBUG_PRINTF("%H", trice_debug, gatherer->ice);
+    // Done
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -320,7 +323,7 @@ enum rawrtc_code rawrtc_ice_transport_stop(
     }
 
     // Already closed?
-    if (transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -404,13 +407,14 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     }
 
     // Check ICE transport state
-    if (transport->state == RAWRTC_ICE_TRANSPORT_CLOSED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Remote site completed gathering?
     if (!candidate) {
         DEBUG_PRINTF("Remote site gathering complete\n%H", trice_debug, transport->gatherer->ice);
+        // TODO: Transition to complete if both have completed gathering
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -507,9 +511,27 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         goto out;
     }
 
+    // TODO: Add TURN permission
+
     // Done
     DEBUG_PRINTF("Added remote candidate: %J\n", &address);
     error = RAWRTC_CODE_SUCCESS;
+
+    // Start checklist (if not started)
+    // TODO: Get config from struct
+    // TODO: Why are there no keep-alive messages?
+    // TODO: Set 'use_cand' properly
+    if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW &&
+            !trice_checklist_isrunning(transport->gatherer->ice)) {
+        DEBUG_INFO("Starting checklist due to new remote candidate\n");
+        error = rawrtc_error_to_code(trice_checklist_start(
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                ice_established_handler, ice_failed_handler, transport));
+        if (error) {
+            DEBUG_WARNING("Could not start checklist, reason: %s\n", rawrtc_code_to_str(error));
+            goto out;
+        }
+    }
 
 out:
     if (error) {
