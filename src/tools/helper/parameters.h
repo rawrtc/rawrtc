@@ -54,10 +54,13 @@ enum rawrtc_code get_ice_parameters(
 
 /*
  * Get ICE candidates from dictionary.
+ * Filter by enabled ICE candidate types if `client` argument is set to
+ * non-NULL.
  */
 enum rawrtc_code get_ice_candidates(
     struct rawrtc_ice_candidates** const candidatesp,
-    struct odict* const dict
+    struct odict* const dict,
+    struct client* const client
 );
 
 /*

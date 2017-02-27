@@ -9,7 +9,7 @@
 #include "candidate_helper.h"
 
 #define DEBUG_MODULE "ice-gatherer"
-#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include "debug.h"
 
@@ -294,7 +294,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     gatherer->ice_config.debug = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.ansi = true;
-    gatherer->ice_config.enable_prflx = true;
+    gatherer->ice_config.enable_prflx = false;
     error = rawrtc_error_to_code(trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password));

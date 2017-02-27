@@ -18,6 +18,8 @@ struct sctp_parameters {
  */
 struct client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
 };
 
 /*
@@ -49,3 +51,55 @@ extern size_t const ignore_success_length;
 #elif defined(__GNUC__)
 #define EWE(args...) exit_with_error(__FILE__, __LINE__, args)
 #endif
+
+/*
+ * Function to be called before exiting.
+ */
+void before_exit();
+
+/*
+ * Exit on error code.
+ */
+void exit_on_error(
+    enum rawrtc_code const code,
+    enum rawrtc_code const ignore[],
+    size_t const n_ignore,
+    char const* const file,
+    uint32_t const line
+);
+
+/*
+* Exit on POSIX error code.
+*/
+void exit_on_posix_error(
+    int code,
+    char const* const file,
+    uint32_t line
+);
+
+/*
+* Exit with a custom error message.
+*/
+void exit_with_error(
+    char const* const file,
+    uint32_t line,
+    char const* const formatter,
+    ...
+);
+
+/*
+* Check if the ICE candidate type is enabled.
+*/
+bool ice_candidate_type_enabled(
+    struct client* const client,
+    enum rawrtc_ice_candidate_type const type
+);
+
+/*
+ * Print ICE candidate information.
+ */
+void print_ice_candidate(
+    struct rawrtc_ice_candidate* const candidate,
+    char const * const url, // read-only
+    struct client* const client
+);

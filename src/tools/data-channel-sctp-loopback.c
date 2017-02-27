@@ -10,6 +10,8 @@
 // Note: Shadows struct client
 struct data_channel_sctp_client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
     struct rawrtc_ice_gather_options* gather_options;
     struct rawrtc_ice_parameters* ice_parameters;
     struct rawrtc_dtls_parameters* dtls_parameters;
@@ -105,8 +107,9 @@ static void ice_gatherer_local_candidate_handler(
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
 
-    // Add to other client as remote candidate
-    EOE(rawrtc_ice_transport_add_remote_candidate(client->other_client->ice_transport, candidate));
+    // Add to other client as remote candidate (if type enabled)
+    add_to_other_if_ice_candidate_type_enabled(
+            arg, candidate, client->other_client->ice_transport);
 }
 
 static void dtls_transport_state_change_handler(
@@ -276,12 +279,21 @@ static void client_stop(
     client->certificate = mem_deref(client->certificate);
 }
 
+static void exit_with_usage(char* program) {
+    DEBUG_WARNING("Usage: %s [<ice-candidate-type> ...]", program);
+    exit(1);
+}
+
 int main(int argc, char* argv[argc + 1]) {
+    char** ice_candidate_types = NULL;
+    size_t n_ice_candidate_types = 0;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
     struct data_channel_sctp_client a = {0};
     struct data_channel_sctp_client b = {0};
+    (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
+    (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
     // Initialise
     EOE(rawrtc_init());
@@ -289,6 +301,12 @@ int main(int argc, char* argv[argc + 1]) {
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Get enabled ICE candidate types to be added (optional)
+    if (argc > 1) {
+        ice_candidate_types = &argv[1];
+        n_ice_candidate_types = (size_t) argc - 1;
+    }
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
@@ -305,6 +323,8 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Setup client A
     a.name = "A";
+    a.ice_candidate_types = ice_candidate_types;
+    a.n_ice_candidate_types = n_ice_candidate_types;
     a.gather_options = gather_options;
     a.role = RAWRTC_ICE_ROLE_CONTROLLING;
     a.sctp_port = 6000;
@@ -312,6 +332,8 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Setup client B
     b.name = "B";
+    b.ice_candidate_types = ice_candidate_types;
+    b.n_ice_candidate_types = n_ice_candidate_types;
     b.gather_options = gather_options;
     b.role = RAWRTC_ICE_ROLE_CONTROLLED;
     b.sctp_port = 5000;

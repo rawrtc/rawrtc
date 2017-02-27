@@ -19,6 +19,8 @@ struct parameters {
 // Note: Shadows struct client
 struct sctp_redirect_transport_client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
     struct rawrtc_ice_gather_options* gather_options;
     char* redirect_ip;
     uint16_t redirect_port;
@@ -184,7 +186,7 @@ static void parse_remote_parameters(
     error |= dict_get_entry(&node, dict, "iceParameters", ODICT_OBJECT, true);
     error |= get_ice_parameters(&ice_parameters, node);
     error |= dict_get_entry(&node, dict, "iceCandidates", ODICT_ARRAY, true);
-    error |= get_ice_candidates(&ice_candidates, node);
+    error |= get_ice_candidates(&ice_candidates, node, arg);
     error |= dict_get_entry(&node, dict, "dtlsParameters", ODICT_OBJECT, true);
     error |= get_dtls_parameters(&dtls_parameters, node);
     error |= dict_get_entry(&node, dict, "sctpParameters", ODICT_OBJECT, true);
@@ -288,11 +290,13 @@ static void print_local_parameters(
 
 static void exit_with_usage(char* program) {
     DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port> [<sctp-port>] "
-                  "[<maximum-message-size>]", program);
+                  "[<maximum-message-size>] [<ice-candidate-type> ...]", program);
     exit(1);
 }
 
 int main(int argc, char* argv[argc + 1]) {
+    char** ice_candidate_types = NULL;
+    size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
     uint16_t redirect_port;
     uint64_t maximum_message_size;
@@ -300,6 +304,7 @@ int main(int argc, char* argv[argc + 1]) {
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
     struct sctp_redirect_transport_client client = {0};
+    (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
     // Initialise
     EOE(rawrtc_init());
@@ -329,11 +334,17 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Get maximum message size (optional)
-    if (argc >= 6 && !str_to_uint64(&maximum_message_size, argv[4])) {
+    if (argc >= 6 && !str_to_uint64(&maximum_message_size, argv[5])) {
         exit_with_usage(argv[0]);
     } else {
         // TODO: Find out what dctt can handle
         maximum_message_size = 0;
+    }
+
+    // Get enabled ICE candidate types to be added (optional)
+    if (argc >= 7) {
+        ice_candidate_types = &argv[6];
+        n_ice_candidate_types = (size_t) argc - 6;
     }
 
     // Create local SCTP capabilities
@@ -355,6 +366,8 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Set client fields
     client.name = "A";
+    client.ice_candidate_types = ice_candidate_types;
+    client.n_ice_candidate_types = n_ice_candidate_types;
     client.gather_options = gather_options;
     client.role = role;
     client.redirect_ip = argv[2];

@@ -19,6 +19,8 @@ struct parameters {
 // Note: Shadows struct client
 struct data_channel_sctp_client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
     struct rawrtc_ice_gather_options* gather_options;
     enum rawrtc_ice_role role;
     struct rawrtc_certificate* certificate;
@@ -332,7 +334,7 @@ static void parse_remote_parameters(
     error |= dict_get_entry(&node, dict, "iceParameters", ODICT_OBJECT, true);
     error |= get_ice_parameters(&ice_parameters, node);
     error |= dict_get_entry(&node, dict, "iceCandidates", ODICT_ARRAY, true);
-    error |= get_ice_candidates(&ice_candidates, node);
+    error |= get_ice_candidates(&ice_candidates, node, arg);
     error |= dict_get_entry(&node, dict, "dtlsParameters", ODICT_OBJECT, true);
     error |= get_dtls_parameters(&dtls_parameters, node);
     error |= dict_get_entry(&node, dict, "sctpParameters", ODICT_OBJECT, true);
@@ -437,16 +439,19 @@ static void print_local_parameters(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port>]", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]", program);
     exit(1);
 }
 
 int main(int argc, char* argv[argc + 1]) {
+    char** ice_candidate_types = NULL;
+    size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
     struct data_channel_sctp_client client = {0};
+    (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
     // Initialise
     EOE(rawrtc_init());
@@ -466,8 +471,14 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Get SCTP port (optional)
-    if (argc == 3 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[2])) {
+    if (argc >= 3 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[2])) {
         exit_with_usage(argv[0]);
+    }
+
+    // Get enabled ICE candidate types to be added (optional)
+    if (argc >= 4) {
+        ice_candidate_types = &argv[3];
+        n_ice_candidate_types = (size_t) argc - 3;
     }
 
     // Create ICE gather options
@@ -485,6 +496,8 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Set client fields
     client.name = "A";
+    client.ice_candidate_types = ice_candidate_types;
+    client.n_ice_candidate_types = n_ice_candidate_types;
     client.gather_options = gather_options;
     client.role = role;
 

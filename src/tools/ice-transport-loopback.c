@@ -19,53 +19,19 @@ struct ice_transport_client {
     struct ice_transport_client* other_client;
 };
 
-static bool ice_candidate_type_enabled(
-        struct ice_transport_client* const client,
-        enum rawrtc_ice_candidate_type const type
-) {
-    char const* const type_str = rawrtc_ice_candidate_type_to_str(type);
-    size_t i;
-
-    // All enabled?
-    if (client->n_ice_candidate_types == 0) {
-        return true;
-    }
-
-    // Specifically enabled?
-    for (i = 0; i < client->n_ice_candidate_types; ++i) {
-        if (str_cmp(client->ice_candidate_types[i], type_str) == 0) {
-            return true;
-        }
-    }
-
-    // Nope
-    return false;
-}
-
 static void ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
     struct ice_transport_client* const client = arg;
-    enum rawrtc_ice_candidate_type type;
     
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
 
-    if (candidate) {
-        // Get ICE candidate type
-        EOE(rawrtc_ice_candidate_get_type(&type, candidate));
-
-        // Add to other client as remote candidate (if requested)
-        if (ice_candidate_type_enabled(client, type)) {
-            EOE(rawrtc_ice_transport_add_remote_candidate(
-                    client->other_client->ice_transport, candidate));
-        }
-    } else {
-        EOE(rawrtc_ice_transport_add_remote_candidate(
-                client->other_client->ice_transport, candidate));
-    }
+    // Add to other client as remote candidate (if type enabled)
+    add_to_other_if_ice_candidate_type_enabled(
+            arg, candidate, client->other_client->ice_transport);
 }
 
 static void client_init(
@@ -114,7 +80,7 @@ static void client_stop(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s [<ice-candidate-type> [...]]", program);
+    DEBUG_WARNING("Usage: %s [<ice-candidate-type> ...]", program);
     exit(1);
 }
 
@@ -126,6 +92,8 @@ int main(int argc, char* argv[argc + 1]) {
     char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
     struct ice_transport_client a = {0};
     struct ice_transport_client b = {0};
+    (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
+    (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
     // Initialise
     EOE(rawrtc_init());
@@ -134,7 +102,7 @@ int main(int argc, char* argv[argc + 1]) {
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
 
-    // Which ICE candidate types are enabled?
+    // Get enabled ICE candidate types to be added (optional)
     if (argc > 1) {
         ice_candidate_types = &argv[1];
         n_ice_candidate_types = (size_t) argc - 1;

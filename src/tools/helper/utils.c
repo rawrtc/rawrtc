@@ -1,5 +1,5 @@
 #include <stdlib.h> // strtol
-#include <string.h> // strerror
+#include <string.h> // strlen
 #include <rawrtc.h>
 #include "common.h"
 #include "utils.h"
@@ -231,96 +231,8 @@ enum rawrtc_code get_ice_role(
     }
 }
 
-/*
- * Function to be called before exiting.
- */
-void before_exit() {
-    // Close
-    rawrtc_close();
-
-    // Check memory leaks
-    tmr_debug();
-    mem_debug();
-}
-
-/*
- * Exit on error code.
- */
-void exit_on_error(
-        enum rawrtc_code const code,
-        enum rawrtc_code const ignore[],
-        size_t const n_ignore,
-        char const* const file,
-        uint32_t const line
-) {
-    size_t i;
-
-    // Ignore?
-    for (i = 0; i < n_ignore; ++i) {
-        if (code == ignore[i]) {
-            return;
-        }
-    }
-
-    // Handle
-    switch (code) {
-        case RAWRTC_CODE_SUCCESS:
-            return;
-        case RAWRTC_CODE_NOT_IMPLEMENTED:
-            DEBUG_WARNING("Not implemented in %s %"PRIu32"\n",
-            file, line);
-            return;
-        default:
-            DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n",
-            file, line, code, rawrtc_code_to_str(code));
-            before_exit();
-            exit((int) code);
-    }
-}
-
-/*
- * Exit on POSIX error code.
- */
-void exit_on_posix_error(
-        int code,
-        char const* const file,
-        uint32_t line
-) {
-    if (code != 0) {
-        DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n", file, line, code, strerror(code));
-        before_exit();
-        exit(code);
-    }
-}
-
-/*
- * Exit with a custom error message.
- */
-void exit_with_error(
-        char const* const file,
-        uint32_t line,
-        char const* const formatter,
-        ...
-) {
-    char* message;
-
-    // Format message
-    va_list ap;
-    va_start(ap, formatter);
-    re_vsdprintf(&message, formatter, ap);
-    va_end(ap);
-
-    // Print message
-    DEBUG_WARNING("%s %"PRIu32": %s\n", file, line, message);
-
-    // Dereference & bye
-    mem_deref(message);
-    before_exit();
-    exit(1);
-}
-
 static void data_channel_helper_destroy(
-        void* const arg
+        void* arg
 ) {
     struct data_channel_helper* const channel = arg;
 
@@ -402,4 +314,29 @@ void data_channel_helper_create_from_channel(
 
     // Dereference & done
     mem_deref(parameters);
+}
+
+/*
+ * Add the ICE candidate to the remote ICE transport if the ICE
+ * candidate type is enabled.
+ */
+void add_to_other_if_ice_candidate_type_enabled(
+        struct client* const client,
+        struct rawrtc_ice_candidate* const candidate,
+        struct rawrtc_ice_transport* const transport
+) {
+    if (candidate) {
+        enum rawrtc_ice_candidate_type type;
+
+        // Get ICE candidate type
+        EOE(rawrtc_ice_candidate_get_type(&type, candidate));
+
+        // Add to other client as remote candidate (if type enabled)
+        if (ice_candidate_type_enabled(client, type)) {
+            EOE(rawrtc_ice_transport_add_remote_candidate(transport, candidate));
+        }
+    } else {
+        // Last candidate is always being added
+        EOE(rawrtc_ice_transport_add_remote_candidate(transport, candidate));
+    }
 }

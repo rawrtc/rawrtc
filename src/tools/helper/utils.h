@@ -66,41 +66,6 @@ enum rawrtc_code get_ice_role(
 );
 
 /*
- * Function to be called before exiting.
- */
-void before_exit();
-
-/*
- * Exit on error code.
- */
-void exit_on_error(
-    enum rawrtc_code const code,
-    enum rawrtc_code const ignore[],
-    size_t const n_ignore,
-    char const* const file,
-    uint32_t const line
-);
-
-/*
- * Exit on POSIX error code.
- */
-void exit_on_posix_error(
-    int code,
-    char const* const file,
-    uint32_t line
-);
-
-/*
- * Exit with a custom error message.
- */
-void exit_with_error(
-    char const* const file,
-    uint32_t line,
-    char const* const formatter,
-    ...
-);
-
-/*
  * Create a data channel helper instance.
  */
 void data_channel_helper_create(
@@ -116,4 +81,14 @@ void data_channel_helper_create_from_channel(
     struct data_channel_helper** const channel_helperp, // de-referenced
     struct rawrtc_data_channel* channel,
     struct client* const client
+);
+
+/*
+ * Add the ICE candidate to the remote ICE transport if the ICE
+ * candidate type is enabled.
+ */
+void add_to_other_if_ice_candidate_type_enabled(
+    struct client* const client,
+    struct rawrtc_ice_candidate* const candidate,
+    struct rawrtc_ice_transport* const transport
 );

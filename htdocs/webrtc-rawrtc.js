@@ -28,10 +28,9 @@ class Peer {
 
         // Create peer connection
         var pc = new RTCPeerConnection({
-            iceServers: []
-            // iceServers: [{
-            //     urls: 'stun:stun.l.google.com:19302'
-            // }]
+            iceServers: [{
+                urls: 'stun:stun.l.google.com:19302'
+            }]
         });
 
         // Bind peer connection events

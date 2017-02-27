@@ -231,7 +231,7 @@ enum rawrtc_code get_ice_parameters(
 }
 
 static void ice_candidates_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;
@@ -244,53 +244,57 @@ static void ice_candidates_destroy(
 
 /*
  * Get ICE candidates from dictionary.
+ * Filter by enabled ICE candidate types if `client` argument is set to
+ * non-NULL.
  */
 enum rawrtc_code get_ice_candidates(
         struct rawrtc_ice_candidates** const candidatesp,
-        struct odict* const dict
+        struct odict* const dict,
+        struct client* const client
 ) {
     size_t n;
     struct rawrtc_ice_candidates* candidates;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     struct le* le;
-    size_t i;
 
     // Get length
     n = list_count(&dict->lst);
 
     // Allocate & set length immediately
+    // Note: We allocate more than we need in case ICE candidate types are being filtered but... meh
     candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct rawrtc_ice_candidate*) * n),
                             ice_candidates_destroy);
     if (!candidates) {
         EWE("No memory to allocate ICE candidates array");
     }
-    candidates->n_candidates = n;
+    candidates->n_candidates = 0;
 
     // Get ICE candidates
-    for (le = list_head(&dict->lst), i = 0; le != NULL; le = le->next, ++i) {
+    for (le = list_head(&dict->lst); le != NULL; le = le->next) {
         struct odict* const node = ((struct odict_entry*) le->data)->u.odict;
+        char const* type_str = NULL;
+        enum rawrtc_ice_candidate_type type;
         char* foundation;
         uint32_t priority;
         char* ip;
         char const* protocol_str = NULL;
         enum rawrtc_ice_protocol protocol;
         uint16_t port;
-        char const* type_str = NULL;
-        enum rawrtc_ice_candidate_type type;
         char const* tcp_type_str = NULL;
         enum rawrtc_ice_tcp_candidate_type tcp_type = RAWRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
         char* related_address = NULL;
         uint16_t related_port = 0;
+        struct rawrtc_ice_candidate* candidate;
 
         // Get ICE candidate
+        error |= dict_get_entry(&type_str, node, "type", ODICT_STRING, true);
+        error |= rawrtc_str_to_ice_candidate_type(&type, type_str);
         error |= dict_get_entry(&foundation, node, "foundation", ODICT_STRING, true);
         error |= dict_get_uint32(&priority, node, "priority", true);
         error |= dict_get_entry(&ip, node, "ip", ODICT_STRING, true);
         error |= dict_get_entry(&protocol_str, node, "protocol", ODICT_STRING, true);
         error |= rawrtc_str_to_ice_protocol(&protocol, protocol_str);
         error |= dict_get_uint16(&port, node, "port", true);
-        error |= dict_get_entry(&type_str, node, "type", ODICT_STRING, true);
-        error |= rawrtc_str_to_ice_candidate_type(&type, type_str);
         if (protocol == RAWRTC_ICE_PROTOCOL_TCP) {
             error |= dict_get_entry(&tcp_type_str, node, "tcpType", ODICT_STRING, true);
             error |= rawrtc_str_to_ice_tcp_candidate_type(&tcp_type, tcp_type_str);
@@ -303,10 +307,20 @@ enum rawrtc_code get_ice_candidates(
 
         // Create and add ICE candidate
         error = rawrtc_ice_candidate_create(
-                &candidates->candidates[i], foundation, priority, ip, protocol, port, type,
+                &candidate, foundation, priority, ip, protocol, port, type,
                 tcp_type, related_address, related_port);
         if (error) {
             goto out;
+        }
+
+        // Print ICE candidate
+        print_ice_candidate(candidate, NULL, client);
+
+        // Store if ICE candidate type enabled
+        if (ice_candidate_type_enabled(client, type)) {
+            candidates->candidates[candidates->n_candidates++] = candidate;
+        } else {
+            mem_deref(candidate);
         }
     }
 
@@ -321,7 +335,7 @@ out:
 }
 
 static void dtls_fingerprints_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
