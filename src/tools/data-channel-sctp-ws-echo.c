@@ -119,6 +119,9 @@ static void ws_receive_handler(
     client_start_transports(client);
 
 out:
+    // Close WS connection
+    EOR(websock_close(client->ws_connection, WEBSOCK_GOING_AWAY, "Cya!"));
+
     // Dereference
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
