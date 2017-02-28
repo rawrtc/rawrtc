@@ -1,5 +1,4 @@
 #include <string.h> // memcpy
-#include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
