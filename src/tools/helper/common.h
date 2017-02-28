@@ -46,6 +46,7 @@ extern size_t const ignore_success_length;
 #define EOEIGN(code, ignore) exit_on_error(code, ignore,\
     ignore_success_length, __FILE__, __LINE__)
 #define EOR(code) exit_on_posix_error(code, __FILE__, __LINE__)
+#define EOP(code) exit_on_posix_error((code == -1) ? errno : 0, __FILE__, __LINE__)
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (__GNUC__ >= 3)
 #define EWE(...) exit_with_error(__FILE__, __LINE__, __VA_ARGS__)
 #elif defined(__GNUC__)

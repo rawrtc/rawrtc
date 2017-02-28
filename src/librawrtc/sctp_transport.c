@@ -1566,7 +1566,7 @@ static int read_event_handler(
     }
 
     // Update buffer position and end
-    buffer->end = (size_t) length;
+    mbuf_set_end(buffer, (size_t) length);
 
     // Handle notification
     if (flags & MSG_NOTIFICATION) {
@@ -2396,12 +2396,13 @@ static enum rawrtc_code channel_close_handler(
  */
 static enum rawrtc_code channel_send_handler(
         struct rawrtc_data_channel* const channel,
-        struct mbuf* const buffer, // nullable (if size 0), referenced
+        struct mbuf* buffer, // nullable (if size 0), referenced
         bool const is_binary
 ) {
     struct rawrtc_sctp_transport* transport;
+    size_t length;
     uint_fast32_t ppid;
-    struct mbuf* buffer_empty = NULL;
+    struct mbuf* empty = NULL;
     enum rawrtc_code error;
 
     // Check arguments
@@ -2412,8 +2413,15 @@ static enum rawrtc_code channel_send_handler(
     // Get SCTP transport
     transport = channel->transport->transport;
 
-    // Empty message?
+    // We accept both a NULL buffer and a buffer of length 0
     if (!buffer) {
+        length = 0;
+    } else {
+        length = mbuf_get_left(buffer);
+    }
+
+    // Empty message?
+    if (length == 0) {
         // Set PPID
         if (is_binary) {
             ppid = RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY;
@@ -2422,20 +2430,24 @@ static enum rawrtc_code channel_send_handler(
         }
 
         // Create helper message as SCTP is unable to send messages of size 0
-        buffer_empty = mbuf_alloc(RAWRTC_SCTP_TRANSPORT_EMPTY_MESSAGE_SIZE);
-        if (!buffer_empty) {
+        empty = mbuf_alloc(RAWRTC_SCTP_TRANSPORT_EMPTY_MESSAGE_SIZE);
+        if (!empty) {
             return RAWRTC_CODE_NO_MEMORY;
         }
 
         // Note: The content is being ignored
-        error = rawrtc_error_to_code(mbuf_write_u8(buffer_empty, 0));
+        error = rawrtc_error_to_code(mbuf_write_u8(empty, 0));
         if (error) {
             goto out;
         }
+
+        // Set position & pointer
+        mbuf_set_pos(empty, 0);
+        buffer = empty;
     } else {
         // Check size
         if (transport->remote_maximum_message_size != 0 &&
-            mbuf_get_left(buffer) > transport->remote_maximum_message_size) {
+            length > transport->remote_maximum_message_size) {
             return RAWRTC_CODE_MESSAGE_TOO_LONG;
         }
 
@@ -2456,7 +2468,7 @@ static enum rawrtc_code channel_send_handler(
 
 out:
     // Dereference
-    mem_deref(buffer_empty);
+    mem_deref(empty);
 
     // Done
     return error;
