@@ -79,6 +79,7 @@ void data_channel_helper_create(
  */
 void data_channel_helper_create_from_channel(
     struct data_channel_helper** const channel_helperp, // de-referenced
+    size_t const size, // zeroable
     struct rawrtc_data_channel* channel,
     struct client* const client
 );

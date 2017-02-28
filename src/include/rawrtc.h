@@ -433,7 +433,7 @@ typedef enum rawrtc_code (rawrtc_data_transport_channel_close_handler)(
  */
 typedef enum rawrtc_code (rawrtc_data_transport_channel_send_handler)(
     struct rawrtc_data_channel* const channel,
-    struct mbuf* const buffer, // nullable (if size 0), referenced
+    struct mbuf* buffer, // nullable (if size 0), referenced
     bool const is_binary
 );
 

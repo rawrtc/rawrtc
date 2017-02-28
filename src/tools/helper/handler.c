@@ -186,7 +186,7 @@ void default_data_channel_message_handler(
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
     (void) flags;
-    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %"PRIu32" bytes\n",
+    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes\n",
                  client->name, channel->label, mbuf_get_left(buffer));
 }
 

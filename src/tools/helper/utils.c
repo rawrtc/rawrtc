@@ -242,6 +242,7 @@ static void data_channel_helper_destroy(
     // Dereference
     mem_deref(channel->label);
     mem_deref(channel->channel);
+    list_unlink(&channel->le);
 }
 
 /*
@@ -273,6 +274,7 @@ void data_channel_helper_create(
  */
 void data_channel_helper_create_from_channel(
         struct data_channel_helper** const channel_helperp, // de-referenced
+        size_t const size, // zeroable
         struct rawrtc_data_channel* channel,
         struct client* const client
 ) {
@@ -282,7 +284,7 @@ void data_channel_helper_create_from_channel(
 
     // Allocate
     struct data_channel_helper* const channel_helper =
-            mem_zalloc(sizeof(*channel_helper), data_channel_helper_destroy);
+            mem_zalloc(size > 0 ? size : sizeof(*channel_helper), data_channel_helper_destroy);
     if (!channel_helper) {
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
