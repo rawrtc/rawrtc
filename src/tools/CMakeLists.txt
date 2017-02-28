@@ -81,3 +81,12 @@ target_link_libraries(data-channel-sctp-ws-echo
         rawrtc-helper)
 install(TARGETS data-channel-sctp-ws-echo
         DESTINATION bin)
+
+# Tool: data-channel-sctp-ws-echo
+add_executable(data-channel-sctp-ws-process
+        data-channel-sctp-ws-process.c)
+target_link_libraries(data-channel-sctp-ws-process
+        rawrtc
+        rawrtc-helper)
+install(TARGETS data-channel-sctp-ws-process
+        DESTINATION bin)

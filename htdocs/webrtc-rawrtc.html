@@ -13,38 +13,42 @@ textarea {
     <textarea cols="120" rows="20" id="remote-parameters"></textarea><br />
     <button type="button" onclick="startCopyPaste();">Start (C&P)</button><br />
     <button type="button" onclick="startWS();">Start (WebSocket)</button>
-    <input type="text" size="50" value="ws://127.0.0.1:9765/shell-o-mat/1" id="ws-url" />
+    <input type="text" size="50" value="ws://217.160.182.235:9765/shell-o-mat/1" id="ws-url" />
     <script type="text/javascript" src="sdp.js"></script>
     <script type="text/javascript" src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script type="text/javascript" src="webrtc-rawrtc.js"></script>
     <script type="text/javascript">
-        var peer = new ControllingPeer();
+        // Create instance
+        let peer = new ControllingPeer();
         peer.createPeerConnection();
-        var cat = peer.createDataChannel(peer.pc.createDataChannel('cat-noises', {
-            ordered: true,
-            negotiated: true,
-            id: 0
-        }));
         peer.createDataChannel();
-        peer.getLocalParameters()
-        .then((parameters) => {
-            console.log('Local parameters:', parameters);
-            document.getElementById('local-parameters').value = JSON.stringify(parameters);
-        });
 
-        var startCopyPaste = () => {
-            var parameters = JSON.parse(document.getElementById('remote-parameters').value);
+        // Apply local parameters
+        peer.getLocalParameters()
+            .then((parameters) => {
+                console.log('Local parameters:', parameters);
+                document.getElementById('local-parameters').value = JSON.stringify(parameters);
+            });
+
+        // Make peer globally available
+        window.peer = peer;
+
+        let startCopyPaste = () => {
+            // Parse and set parameters
+            let parameters = JSON.parse(document.getElementById('remote-parameters').value);
             console.log('Remote parameters:', parameters);
             peer.setRemoteParameters(parameters)
             .catch((error) => {
                 console.error(error);
             });
+
+            // Start
             start();
         };
 
-        var startWS = () => {
+        let startWS = () => {
             // Create WebSocket connection
-            var ws = new WebSocket(document.getElementById('ws-url').value);
+            let ws = new WebSocket(document.getElementById('ws-url').value);
 
             // Bind WebSocket events
             ws.onopen = function(event) {
@@ -63,23 +67,28 @@ textarea {
                 console.log('WS connection closed');
             };
             ws.onmessage = function(event) {
-                var length = event.data.size || event.data.byteLength || event.data.length;
+                let length = event.data.size || event.data.byteLength || event.data.length;
                 console.log('WS message of', length, 'bytes received');
                 document.getElementById('remote-parameters').value = event.data;
 
                 // Parse remote parameters
-                var parameters = JSON.parse(event.data);
+                let parameters = JSON.parse(event.data);
                 console.log('Remote parameters:', parameters);
                 peer.setRemoteParameters(parameters)
                 .catch((error) => {
                     console.error(error);
                 });
+
+                // Close WebSocket connection
+                ws.close();
+
+                // Start
                 start();
             };
         };
 
-        var start = () => {
-            var parameters = JSON.parse(document.getElementById('local-parameters').value);
+        let start = () => {
+            let parameters = JSON.parse(document.getElementById('local-parameters').value);
             document.getElementById('local-parameters').value = JSON.stringify(parameters, null, 2);
             parameters = JSON.parse(document.getElementById('remote-parameters').value);
             document.getElementById('remote-parameters').value = JSON.stringify(parameters, null, 2);

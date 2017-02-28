@@ -78,8 +78,6 @@ class Peer {
         // Bind data channel events
         dc.onopen = function(event) {
             console.log('Data channel', dc.label, '(', dc.id, ')', 'open');
-            // Send 'hello'
-            dc.send('Hello from WebRTC on', navigator.userAgent);
         };
         dc.onbufferedamountlow = function(event) {
             console.log('Data channel', dc.label, '(', dc.id, ')', 'buffered amount low');
@@ -92,7 +90,8 @@ class Peer {
         };
         dc.onmessage = function(event) {
             var length = event.data.size || event.data.byteLength || event.data.length;
-            console.info('Data channel', dc.label, '(', dc.id, ')', 'message size:', length);
+            console.info('Data channel', dc.label, '(', dc.id, ')', 'message size:', length,
+                'content:\n' + event.data);
         };
 
         // Store channel

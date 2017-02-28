@@ -1,4 +1,6 @@
 #include <string.h> // memcpy
+#include <unistd.h> // STDIN_FILENO, STDOUT_FILENO, pipe, fork, dup2, close, execvp, read, write
+#include <signal.h> // SIGTERM, kill
 #include <rawrtc.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
@@ -7,6 +9,17 @@
 #define DEBUG_MODULE "data-channel-sctp-echo-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
+
+enum {
+    PIPE_READ_BUFFER = 4096
+};
+
+char const NL[] = "\n";
+
+struct pipe {
+    int read;
+    int write;
+};
 
 struct parameters {
     struct rawrtc_ice_parameters* ice_parameters;
@@ -36,6 +49,16 @@ struct data_channel_sctp_client {
     struct list data_channels;
     struct parameters local_parameters;
     struct parameters remote_parameters;
+};
+
+// Note: Shwadows struct data_channel_helper
+struct data_channel_sctp_client_data_channel_helper {
+    struct rawrtc_data_channel* channel;
+    char* label;
+    struct client* client;
+    struct le le;
+    pid_t pid;
+    struct pipe pipe;
 };
 
 static void client_start_transports(
@@ -199,28 +222,197 @@ static void ice_gatherer_local_candidate_handler(
  * Print the data channel's received message's size and echo the
  * message back.
  */
-static void data_channel_message_handler(
+void data_channel_message_handler(
         struct mbuf* const buffer,
         enum rawrtc_data_channel_message_flag const flags,
         void* const arg // will be casted to `struct data_channel_helper*`
 ) {
-    struct data_channel_helper* const channel = arg;
+    struct data_channel_sctp_client_data_channel_helper* const channel = arg;
     struct data_channel_sctp_client* const client =
-            (struct data_channel_sctp_client*) channel->client;
-    enum rawrtc_code error;
+            (struct data_channel_sctp_client* const) channel->client;
+    size_t const length = mbuf_get_left(buffer);
+    (void) flags;
+    DEBUG_PRINTF("(%s.%s) Received %zu bytes\n", client->name, channel->label, length);
+
+    // Pipe into forked process's stdin
+    // TODO: Blocking? EAGAIN?
+    DEBUG_PRINTF("(%s.%s) Piping %zu bytes into process...\n",
+                 client->name, channel->label, length);
+    EOP(write(channel->pipe.write, mbuf_buf(buffer), length));
+    EOP(write(channel->pipe.write, NL, sizeof(NL)));
+    DEBUG_PRINTF("(%s.%s) ... completed!\n", client->name, channel->label);
+}
+
+/*
+ * Stop the forked process.
+ */
+static void stop_process(
+        struct data_channel_sctp_client_data_channel_helper* const channel
+) {
+    // Close read pipe (if not already closed)
+    if (channel->pipe.read != -1) {
+        // Stop listening on pipe
+        fd_close(channel->pipe.read);
+        EOP(close(channel->pipe.read));
+
+        // Invalidate pipe
+        channel->pipe.read = -1;
+    }
+
+    // Close write pipe (if not already closed)
+    if (channel->pipe.write != -1) {
+        // Stop listening on pipe
+        EOP(close(channel->pipe.write));
+
+        // Invalidate pipe
+        channel->pipe.write = -1;
+    }
+
+    // Stop process (if not already stopped)
+    if (channel->pid != -1) {
+        DEBUG_INFO("(%s.%s) Stopping process\n", channel->client->name, channel->label);
+
+        // Terminate process
+        EOP(kill(channel->pid, SIGTERM));
+
+        // Invalidate process
+        channel->pid = -1;
+    }
+}
+
+/*
+ * Stop the forked process on error event.
+ */
+static void data_channel_error_handler(
+        void* const arg // will be casted to `struct data_channel_helper*`
+) {
+    struct data_channel_sctp_client_data_channel_helper* const channel = arg;
+
+    // Print error event
+    default_data_channel_error_handler(arg);
+
+    // Stop forked process
+    stop_process(channel);
+}
+
+/*
+ * Stop the forked process on close event.
+ */
+void data_channel_close_handler(
+        void* const arg // will be casted to `struct data_channel_helper*`
+) {
+    struct data_channel_sctp_client_data_channel_helper* const channel = arg;
+
+    // Print close event
+    default_data_channel_close_handler(arg);
+
+    // Stop forked process
+    stop_process(channel);
+}
+
+/*
+ * Send the forked processes's stdout data on the data channel.
+ */
+static void pipe_read_handler(
+        int flags,
+        void* arg
+) {
+    struct data_channel_sctp_client_data_channel_helper* const channel = arg;
+    struct data_channel_sctp_client* const client =
+            (struct data_channel_sctp_client* const) channel->client;
+    ssize_t length;
     (void) flags;
 
-    // Print message size
-    default_data_channel_message_handler(buffer, flags, arg);
+    // Create buffer
+    struct mbuf* const buffer = mbuf_alloc(PIPE_READ_BUFFER);
 
-    // Send message
-    DEBUG_PRINTF("(%s) Sending %zu bytes\n", client->name, mbuf_get_left(buffer));
-    error = rawrtc_data_channel_send(
-            channel->channel, buffer,
-            flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY ? true : false);
-    if (error) {
-        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+    // Read from pipe into buffer
+    // TODO: Blocking? EAGAIN?
+    DEBUG_PRINTF("(%s.%s) Reading from process...\n", client->name, channel->label);
+    length = read(channel->pipe.read, mbuf_buf(buffer), mbuf_get_space(buffer));
+    EOP(length);
+    mbuf_set_end(buffer, (size_t) length);
+    DEBUG_PRINTF("(%s.%s) ... read %zu bytes\n",
+                 client->name, channel->label, mbuf_get_left(buffer));
+
+    // Process terminated?
+    if (length == 0) {
+        // Stop listening
+        stop_process(channel);
+
+        // Close data channel
+        EOE(rawrtc_data_channel_close(channel->channel));
+
+        // Unreference helper
+        mem_deref(channel);
+    } else {
+        // Send the buffer
+        DEBUG_PRINTF("(%s.%s) Sending %zu bytes\n", client->name, channel->label, length);
+        EOE(rawrtc_data_channel_send(channel->channel, buffer, false));
     }
+
+    // Clean up
+    mem_deref(buffer);
+}
+
+/*
+ * Fork and start the process on open event.
+ */
+static void data_channel_open_handler(
+        void* const arg // will be casted to `struct data_channel_helper*`
+) {
+    struct data_channel_sctp_client_data_channel_helper* const channel = arg;
+    pid_t pid;
+    int parent_write_pipe[2];
+    int parent_read_pipe[2];
+
+    // Print open event
+    default_data_channel_open_handler(arg);
+
+    // Create pipes (where 0 is read and 1 is write)
+    EOP(pipe(parent_write_pipe));
+    EOP(pipe(parent_read_pipe));
+
+    // Fork process
+    // TODO: Fix leaking FDs
+    pid = fork();
+    EOP(pid);
+
+    // Child process
+    if (pid == 0) {
+        // TODO: Get child arguments and file from parent arguments
+        char* const args[] = {"bash", NULL};
+
+        // Map stdin to read end of the parent's write pipe
+        EOP(dup2(parent_write_pipe[0], STDIN_FILENO));
+
+        // Map stdout to write end of the parent's read pipe
+        EOP(dup2(parent_read_pipe[1], STDOUT_FILENO));
+
+        // Close inherited pipes
+        EOP(close(parent_write_pipe[0]));
+        EOP(close(parent_write_pipe[1]));
+        EOP(close(parent_read_pipe[0]));
+        EOP(close(parent_read_pipe[1]));
+
+        // Run process
+        DEBUG_INFO("(%s) Starting process for data channel %s\n",
+                   channel->client->name, channel->label);
+        EOP(execvp(args[0], args));
+        EWE("Child process returned!\n");
+    }
+
+    // Close pipe ends used by the child
+    EOP(close(parent_write_pipe[0]));
+    EOP(close(parent_read_pipe[1]));
+
+    // Set fields
+    channel->pid = pid;
+    channel->pipe.read = parent_read_pipe[0];
+    channel->pipe.write = parent_write_pipe[1];
+
+    // Listen on pipe
+    EOR(fd_listen(channel->pipe.read, FD_READ, pipe_read_handler, channel));
 }
 
 /*
@@ -231,23 +423,30 @@ static void data_channel_handler(
         void* const arg // will be casted to `struct client*`
 ) {
     struct data_channel_sctp_client* const client = arg;
-    struct data_channel_helper* channel_helper;
+    struct data_channel_sctp_client_data_channel_helper* channel_helper;
 
     // Print channel
     default_data_channel_handler(channel, arg);
 
-    // Create data channel helper instance & add to list
+    // Create data channel helper instance
     // Note: In this case we need to reference the channel because we have not created it
-    data_channel_helper_create_from_channel(&channel_helper, 0, mem_ref(channel), arg);
+    data_channel_helper_create_from_channel(
+            (struct data_channel_helper**) &channel_helper, sizeof(*channel_helper),
+            mem_ref(channel), arg);
+
+    // Set PID to invalid
+    channel_helper->pid = -1;
+
+    // Add to list
     list_append(&client->data_channels, &channel_helper->le, channel_helper);
 
     // Set handler argument & handlers
     EOE(rawrtc_data_channel_set_arg(channel, channel_helper));
-    EOE(rawrtc_data_channel_set_open_handler(channel, default_data_channel_open_handler));
+    EOE(rawrtc_data_channel_set_open_handler(channel, data_channel_open_handler));
     EOE(rawrtc_data_channel_set_buffered_amount_low_handler(
             channel, default_data_channel_buffered_amount_low_handler));
-    EOE(rawrtc_data_channel_set_error_handler(channel, default_data_channel_error_handler));
-    EOE(rawrtc_data_channel_set_close_handler(channel, default_data_channel_close_handler));
+    EOE(rawrtc_data_channel_set_error_handler(channel, data_channel_error_handler));
+    EOE(rawrtc_data_channel_set_close_handler(channel, data_channel_close_handler));
     EOE(rawrtc_data_channel_set_message_handler(channel, data_channel_message_handler));
 }
 
