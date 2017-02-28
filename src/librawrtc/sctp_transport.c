@@ -810,6 +810,7 @@ static void raise_buffered_amount_low_event(
     if (channel->buffered_amount_low_handler) {
         // Get context
         struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
+        (void) context;
 
         // Raise event
         DEBUG_PRINTF("Raising buffered amount low event on channel with SID %"PRIu16"\n",
@@ -1748,7 +1749,7 @@ static void dtls_receive_handler(
  * Destructor for an existing SCTP data channel array.
  */
 static void data_channels_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
     uint_fast16_t i;
@@ -1802,7 +1803,7 @@ enum rawrtc_code data_channels_alloc(
  * Destructor for an existing ICE transport.
  */
 static void rawrtc_sctp_transport_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
 
@@ -1914,10 +1915,10 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_pr_enable(1);
 
         // Set amount of incoming streams
-        usrsctp_sysctl_set_sctp_nr_incoming_streams_default(n_channels);
+        usrsctp_sysctl_set_sctp_nr_incoming_streams_default((uint32_t) n_channels);
 
         // Set amount of outgoing streams
-        usrsctp_sysctl_set_sctp_nr_outgoing_streams_default(n_channels);
+        usrsctp_sysctl_set_sctp_nr_outgoing_streams_default((uint32_t) n_channels);
 
         // Enable interleaving messages for different streams (incoming)
         // See: https://tools.ietf.org/html/rfc6458#section-8.1.20
@@ -2135,7 +2136,7 @@ out:
  * Destructor for an existing data channel context.
  */
 static void channel_context_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_sctp_data_channel_context* const context = arg;
 
