@@ -19,6 +19,8 @@ struct parameters {
 // Note: Shadows struct client
 struct data_channel_sctp_client {
     char* name;
+    char** ice_candidate_types;
+    size_t n_ice_candidate_types;
     char* ws_url;
     struct rawrtc_ice_gather_options* gather_options;
     enum rawrtc_ice_role role;
@@ -92,7 +94,7 @@ static void ws_receive_handler(
     error |= dict_get_entry(&node, dict, "iceParameters", ODICT_OBJECT, true);
     error |= get_ice_parameters(&ice_parameters, node);
     error |= dict_get_entry(&node, dict, "iceCandidates", ODICT_ARRAY, true);
-    error |= get_ice_candidates(&ice_candidates, node);
+    error |= get_ice_candidates(&ice_candidates, node, arg);
     error |= dict_get_entry(&node, dict, "dtlsParameters", ODICT_OBJECT, true);
     error |= get_dtls_parameters(&dtls_parameters, node);
     error |= dict_get_entry(&node, dict, "sctpParameters", ODICT_OBJECT, true);
@@ -400,11 +402,14 @@ static void client_get_parameters(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port> [<ws-url>]]", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port>] [<ws-url>] [<ice-candidate-type> ...]",
+                  program);
     exit(1);
 }
 
 int main(int argc, char* argv[argc + 1]) {
+    char** ice_candidate_types = NULL;
+    size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
     struct rawrtc_ice_gather_options* gather_options;
     char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
@@ -440,6 +445,12 @@ int main(int argc, char* argv[argc + 1]) {
         EOE(rawrtc_sdprintf(&client.ws_url, "ws://127.0.0.1:9765/shell-o-mat/0"));
     }
 
+    // Get enabled ICE candidate types to be added (optional)
+    if (argc >= 5) {
+        ice_candidate_types = &argv[4];
+        n_ice_candidate_types = (size_t) argc - 4;
+    }
+
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
 
@@ -455,6 +466,8 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Set client fields
     client.name = "A";
+    client.ice_candidate_types = ice_candidate_types;
+    client.n_ice_candidate_types = n_ice_candidate_types;
     client.gather_options = gather_options;
     client.role = role;
     list_init(&client.data_channels);
