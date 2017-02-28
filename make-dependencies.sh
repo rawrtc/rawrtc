@@ -13,9 +13,9 @@ if [ -z "$BUILD_PATH" ]; then
 fi
 
 # Dependencies
-OPENSSL_URL="https://www.openssl.org/source/openssl-1.1.0c.tar.gz"
-OPENSSL_TAR="openssl-1.1.0c.tar.gz"
-OPENSSL_PATH="openssl-1.1.0c"
+OPENSSL_URL="https://www.openssl.org/source/openssl-1.1.0e.tar.gz"
+OPENSSL_TAR="openssl-1.1.0e.tar.gz"
+OPENSSL_PATH="openssl-1.1.0e"
 #ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
 #ZF_LOG_BRANCH="master"
 #ZF_LOG_PATH="zf_log"
@@ -42,11 +42,11 @@ MAIN_DIR=${BUILD_PATH}/dependencies
 cd ${MAIN_DIR}
 
 # Check for DTLS 1.2 suppport in openssl
-pkg-config --atleast-version=1.0.2 openssl
-have_dtls_1_2=$?
+have_dtls_1_2=true
+pkg-config --atleast-version=1.0.2 openssl || have_dtls_1_2=false
 
 # Get openssl
-if [ ! -d "${OPENSSL_PATH}" ] && [ ${have_dtls_1_2} -ne 0 ]; then
+if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
     wget ${OPENSSL_URL}
     tar -xzf ${OPENSSL_TAR}
 fi

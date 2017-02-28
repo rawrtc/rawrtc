@@ -72,7 +72,7 @@ void rawrtc_data_channel_set_state(
  * Destructor for an existing data channel.
  */
 static void rawrtc_data_channel_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_data_channel* const channel = arg;
 
