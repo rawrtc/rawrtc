@@ -256,6 +256,7 @@ if [ ! -d "build" ]; then
 fi
 cd build
 CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
+make clean
 make install -j${THREADS}
 # Note: It's important that we use the static library, otherwise a naming conflict for
 #       'mbuf_init' causes really messy allocation errors.
@@ -266,6 +267,7 @@ cd ${MAIN_DIR}
 
 # Build libre
 cd ${LIBRE_PATH}
+make clean
 if [ "$have_dtls_1_2" = false ]; then
     OPENSSL_SYSROOT=${PREFIX} EXTRA_CFLAGS=-Werror make install
 else
