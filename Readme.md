@@ -13,8 +13,8 @@ The following packages are required:
 
 ### Meson (Alternative Build System)
 
-If you want to use Meson instead of CMake, you have to install both the Meson
-build system and Ninja.
+~~If you want to use Meson instead of CMake, you have to install both the Meson
+build system and Ninja.~~ Use CMake for now. Meson will be updated later.
 
 * [meson](https://github.com/mesonbuild/meson)
 * [ninja](https://ninja-build.org)
