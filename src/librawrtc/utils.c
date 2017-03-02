@@ -171,8 +171,7 @@ char const * const map_str_ice_protocol[] = {
     "tcp",
 };
 
-size_t const map_ice_protocol_length =
-        sizeof(map_enum_ice_protocol) / sizeof(map_enum_ice_protocol[0]);
+size_t const map_ice_protocol_length = ARRAY_SIZE(map_enum_ice_protocol);
 
 /*
  * Translate an ICE protocol to str.
@@ -270,8 +269,7 @@ char const * const map_str_ice_candidate_type[] = {
     "relay",
 };
 
-size_t const map_ice_candidate_type_length =
-        sizeof(map_enum_ice_candidate_type) / sizeof(map_enum_ice_candidate_type[0]);
+size_t const map_ice_candidate_type_length = ARRAY_SIZE(map_enum_ice_candidate_type);
 
 /*
  * Translate an ICE candidate type to str.
@@ -364,8 +362,7 @@ char const * const map_str_ice_tcp_candidate_type[] = {
     "so",
 };
 
-size_t const map_ice_tcp_candidate_type_length =
-        sizeof(map_enum_ice_tcp_candidate_type) / sizeof(map_enum_ice_tcp_candidate_type[0]);
+size_t const map_ice_tcp_candidate_type_length = ARRAY_SIZE(map_enum_ice_tcp_candidate_type);
 
 /*
  * Translate an ICE TCP candidate type to str.
@@ -456,8 +453,7 @@ char const * const map_str_ice_role[] = {
     "controlled",
 };
 
-size_t const map_ice_role_length =
-        sizeof(map_enum_ice_role) / sizeof(map_enum_ice_role[0]);
+size_t const map_ice_role_length = ARRAY_SIZE(map_enum_ice_role);
 
 /*
  * Translate an ICE role to str.
@@ -522,8 +518,7 @@ char const * const map_str_dtls_role[] = {
     "server",
 };
 
-size_t const map_dtls_role_length =
-        sizeof(map_enum_dtls_role) / sizeof(map_enum_dtls_role[0]);
+size_t const map_dtls_role_length = ARRAY_SIZE(map_enum_dtls_role);
 
 /*
  * Translate a DTLS role to str.
@@ -655,7 +650,7 @@ char const * const map_str_certificate_sign_algorithm[] = {
 };
 
 size_t const map_certificate_sign_algorithm_length =
-        sizeof(map_enum_certificate_sign_algorithm) / sizeof(map_enum_certificate_sign_algorithm[0]);
+        ARRAY_SIZE(map_enum_certificate_sign_algorithm);
 
 /*
  * Translate a certificate sign algorithm to str.
@@ -706,8 +701,7 @@ char const * const map_str_data_transport_type[] = {
     "SCTP",
 };
 
-size_t const map_data_transport_type_length =
-        sizeof(map_enum_data_transport_type) / sizeof(map_enum_data_transport_type[0]);
+size_t const map_data_transport_type_length = ARRAY_SIZE(map_enum_data_transport_type);
 
 /*
  * Translate a data transport type to str.

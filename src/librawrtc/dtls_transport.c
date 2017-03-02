@@ -39,8 +39,7 @@ uint8_t const rawrtc_default_dh_parameters[] = {
     0x42, 0x2e, 0x17, 0xc9, 0x95, 0x30, 0xda, 0x16, 0xb7, 0x9a, 0x7c, 0xf4,
     0x83, 0x02, 0x01, 0x02
 };
-size_t const rawrtc_default_dh_parameters_length =
-        sizeof(rawrtc_default_dh_parameters) / sizeof(*rawrtc_default_dh_parameters);
+size_t const rawrtc_default_dh_parameters_length = ARRAY_SIZE(rawrtc_default_dh_parameters);
 
 /*
  * List of default DTLS cipher suites.
@@ -68,7 +67,7 @@ char const* rawrtc_default_dtls_cipher_suites[] = {
     "DHE-RSA-AES256-SHA"
 };
 size_t const rawrtc_default_dtls_cipher_suites_length =
-        sizeof(rawrtc_default_dtls_cipher_suites) / sizeof(*rawrtc_default_dtls_cipher_suites);
+        ARRAY_SIZE(rawrtc_default_dtls_cipher_suites);
 
 /*
  * Get the corresponding name for an ICE transport state.

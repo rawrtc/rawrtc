@@ -38,12 +38,10 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls,
-            sizeof(stun_google_com_urls) / sizeof(stun_google_com_urls[0]),
+            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_urls,
-            sizeof(turn_zwuenf_org_urls) / sizeof(turn_zwuenf_org_urls[0]),
+            gather_options, turn_zwuenf_org_urls, ARRAY_SIZE(turn_zwuenf_org_urls),
             "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
 
     // Setup client
