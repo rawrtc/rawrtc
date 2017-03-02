@@ -242,6 +242,8 @@ static void data_channel_helper_destroy(
     // Dereference
     mem_deref(channel->label);
     mem_deref(channel->channel);
+
+    // Remove from list
     list_unlink(&channel->le);
 }
 

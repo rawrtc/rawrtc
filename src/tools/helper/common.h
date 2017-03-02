@@ -41,10 +41,8 @@ extern size_t const ignore_success_length;
 /*
  * Helper macros for exiting with error messages.
  */
-#define EOE(code) exit_on_error(code, ignore_success,\
-    sizeof(enum rawrtc_code) / sizeof(enum rawrtc_code), __FILE__, __LINE__)
-#define EOEIGN(code, ignore) exit_on_error(code, ignore,\
-    ignore_success_length, __FILE__, __LINE__)
+#define EOE(code) exit_on_error(code, ignore_success, ignore_success_length, __FILE__, __LINE__)
+#define EOEIGN(code, ignore) exit_on_error(code, ignore, ARRAY_SIZE(ignore), __FILE__, __LINE__)
 #define EOR(code) exit_on_posix_error(code, __FILE__, __LINE__)
 #define EOP(code) exit_on_posix_error((code == -1) ? errno : 0, __FILE__, __LINE__)
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (__GNUC__ >= 3)

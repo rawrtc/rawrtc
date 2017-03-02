@@ -47,7 +47,7 @@ static uint16_t const sctp_events[] = {
     SCTP_STREAM_CHANGE_EVENT,
     SCTP_SENDER_DRY_EVENT
 };
-static size_t const sctp_events_length = sizeof(sctp_events) / sizeof(sctp_events[0]);
+static size_t const sctp_events_length = ARRAY_SIZE(sctp_events);
 
 static enum rawrtc_code channel_context_create(
     struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked
