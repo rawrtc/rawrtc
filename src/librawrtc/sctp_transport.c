@@ -1827,7 +1827,7 @@ static void rawrtc_sctp_transport_destroy(
 
         // Close
         usrsctp_finish();
-        DEBUG_NOTICE("Closed usrsctp\n");
+        DEBUG_PRINTF("Closed usrsctp\n");
     }
 }
 
