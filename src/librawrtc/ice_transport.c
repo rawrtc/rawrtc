@@ -4,7 +4,7 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-transport"
-#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -45,7 +45,7 @@ static void rawrtc_ice_transport_destroy(
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_ice_transport_stop(transport);
 
-    // Dereference
+    // Un-reference
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
 }

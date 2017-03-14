@@ -90,18 +90,18 @@ enum rawrtc_ice_candidate_storage {
  * ICE gather policy.
  */
 enum rawrtc_ice_gather_policy {
-    RAWRTC_ICE_GATHER_ALL,
-    RAWRTC_ICE_GATHER_NOHOST,
-    RAWRTC_ICE_GATHER_RELAY
+    RAWRTC_ICE_GATHER_POLICY_ALL,
+    RAWRTC_ICE_GATHER_POLICY_NOHOST,
+    RAWRTC_ICE_GATHER_POLICY_RELAY
 };
 
 /*
  * ICE credential type
  */
 enum rawrtc_ice_credential_type {
-    RAWRTC_ICE_CREDENTIAL_NONE,
-    RAWRTC_ICE_CREDENTIAL_PASSWORD,
-    RAWRTC_ICE_CREDENTIAL_TOKEN
+    RAWRTC_ICE_CREDENTIAL_TYPE_NONE,
+    RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD,
+    RAWRTC_ICE_CREDENTIAL_TYPE_TOKEN
 };
 
 /*
@@ -264,9 +264,32 @@ enum rawrtc_data_transport_type {
 };
 
 /*
+ * ICE server type.
+ * Note: Update `ice_server_schemes` if changed.
+ * TODO: private -> ice_gatherer.h
+ */
+enum rawrtc_ice_server_type {
+    RAWRTC_ICE_SERVER_TYPE_STUN,
+    RAWRTC_ICE_SERVER_TYPE_TURN
+};
+
+/*
+ * ICE server transport protocol.
+ * TODO: private -> ice_gatherer.h
+ */
+enum rawrtc_ice_server_transport {
+    RAWRTC_ICE_SERVER_TRANSPORT_UDP,
+    RAWRTC_ICE_SERVER_TRANSPORT_TCP,
+    RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
+    RAWRTC_ICE_SERVER_TRANSPORT_TLS
+};
+
+
+/*
  * Struct prototypes.
  * TODO: Remove
  */
+struct rawrtc_ice_server_url_context;
 struct rawrtc_ice_candidate;
 struct rawrtc_data_channel;
 struct rawrtc_dtls_transport;
@@ -450,6 +473,10 @@ struct rawrtc_config {
     bool udp_enable;
     bool tcp_enable;
     enum rawrtc_certificate_sign_algorithm sign_algorithm;
+    enum rawrtc_ice_server_transport ice_server_normal_transport;
+    enum rawrtc_ice_server_transport ice_server_secure_transport;
+    uint32_t stun_keepalive_interval;
+    struct stun_conf stun_config;
 };
 
 /*
@@ -513,7 +540,25 @@ struct rawrtc_ice_server {
  */
 struct rawrtc_ice_server_url {
     struct le le;
-    char* url;
+    char* url; // copied
+    struct pl host; // points inside `url`
+    enum rawrtc_ice_server_type type;
+    enum rawrtc_ice_server_transport transport;
+    struct sa ipv4_address;
+    struct rawrtc_ice_server_url_dns_context* dns_a_context;
+    struct sa ipv6_address;
+    struct rawrtc_ice_server_url_dns_context* dns_aaaa_context;
+};
+
+/*
+ * ICE server URL DNS resolve context.
+ * TODO: private -> ice_gatherer.h
+ */
+struct rawrtc_ice_server_url_dns_context {
+    uint_fast16_t dns_type;
+    struct rawrtc_ice_server_url* url;
+    struct rawrtc_ice_gatherer* gatherer;
+    struct dns_query* dns_query;
 };
 
 /*
@@ -572,8 +617,7 @@ struct rawrtc_ice_gatherer {
     char ice_password[33];
     struct trice* ice;
     struct trice_conf ice_config;
-    struct stun* stun; // TODO: Do we still need this or should it be in the candidates list?
-    struct stun_conf stun_config; // TODO: See above
+    struct dnsc* dns_client;
 };
 
 /*
@@ -1590,6 +1634,21 @@ char const* rawrtc_code_to_str(
  */
 enum rawrtc_code rawrtc_error_to_code(
     const int code
+);
+
+/*
+ * Translate an ICE gather policy to str.
+ */
+char const * rawrtc_ice_gather_policy_to_str(
+    enum rawrtc_ice_gather_policy const policy
+);
+
+/*
+ * Translate a str to an ICE gather policy (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_gather_policy(
+    enum rawrtc_ice_gather_policy* const policyp, // de-referenced
+    char const* const str
 );
 
 /*

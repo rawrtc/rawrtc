@@ -9,7 +9,7 @@ static void rawrtc_data_channel_parameters_destroy(
 ) {
     struct rawrtc_data_channel_parameters* const parameters = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(parameters->label);
     mem_deref(parameters->protocol);
 }
@@ -136,7 +136,7 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
             negotiated, id);
 
     if (error) {
-        // Dereference
+        // Un-reference
         mem_deref(copied_label);
         mem_deref(copied_protocol);
     }

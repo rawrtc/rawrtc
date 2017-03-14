@@ -14,7 +14,7 @@ static void rawrtc_sctp_transport_destroy(
 ) {
     struct rawrtc_data_transport* const transport = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(transport->transport);
 }
 

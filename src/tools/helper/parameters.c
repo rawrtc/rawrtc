@@ -29,7 +29,7 @@ void set_ice_parameters(
     EOR(odict_entry_add(dict, "password", ODICT_STRING, password));
     EOR(odict_entry_add(dict, "iceLite", ODICT_BOOL, ice_lite));
 
-    // Dereference values
+    // Un-reference values
     mem_deref(password);
     mem_deref(username_fragment);
 }
@@ -98,7 +98,7 @@ void set_ice_candidates(
         EOE(rawrtc_sdprintf(&key, "%zu", i));
         EOR(odict_entry_add(array, key, ODICT_OBJECT, node));
 
-        // Dereference values
+        // Un-reference values
         mem_deref(key);
         mem_deref(related_address);
         mem_deref(ip);
@@ -152,13 +152,13 @@ void set_dtls_parameters(
         EOE(rawrtc_sdprintf(&key, "%zu", i));
         EOR(odict_entry_add(array, key, ODICT_OBJECT, node));
 
-        // Dereference values
+        // Un-reference values
         mem_deref(key);
         mem_deref(value);
         mem_deref(node);
     }
 
-    // Dereference fingerprints
+    // Un-reference fingerprints
     mem_deref(fingerprints);
 
     // Add array to object
@@ -236,7 +236,7 @@ static void ice_candidates_destroy(
     struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;
 
-    // Dereference each item
+    // Un-reference each item
     for (i = 0; i < candidates->n_candidates; ++i) {
         mem_deref(candidates->candidates[i]);
     }
@@ -340,7 +340,7 @@ static void dtls_fingerprints_destroy(
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
 
-    // Dereference each item
+    // Un-reference each item
     for (i = 0; i < fingerprints->n_fingerprints; ++i) {
         mem_deref(fingerprints->fingerprints[i]);
     }

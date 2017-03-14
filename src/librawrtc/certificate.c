@@ -303,7 +303,7 @@ static void rawrtc_certificate_options_destroy(
 ) {
     struct rawrtc_certificate_options* const options = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(options->named_curve);
     mem_deref(options->common_name);
 }

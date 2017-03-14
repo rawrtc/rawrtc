@@ -15,31 +15,41 @@
  * Default rawrtc options.
  */
 struct rawrtc_config rawrtc_default_config = {
-        .pacing_interval = 20,
-        .ipv4_enable = true,
-        .ipv6_enable = false, // TODO: true by default
-        .udp_enable = true,
-        .tcp_enable = false, // TODO: true by default
-        .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    .pacing_interval = 20,
+    .ipv4_enable = true,
+    .ipv6_enable = true,
+    .udp_enable = true,
+    .tcp_enable = false, // TODO: true by default
+    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    .ice_server_normal_transport = RAWRTC_ICE_SERVER_TRANSPORT_UDP,
+    .ice_server_secure_transport = RAWRTC_ICE_SERVER_TRANSPORT_TLS,
+    .stun_keepalive_interval = 25,
+    .stun_config = {
+        STUN_DEFAULT_RTO,
+        STUN_DEFAULT_RC,
+        STUN_DEFAULT_RM,
+        STUN_DEFAULT_TI,
+        0x00
+    }
 };
 
 /*
  * Default certificate options.
  */
 struct rawrtc_certificate_options rawrtc_default_certificate_options = {
-        .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
-        .common_name = "anonymous@rawrtc.org",
-        .valid_until = 3600 * 24 * 30, // 30 days
-        .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
-        .named_curve = "prime256v1",
-        .modulus_length = 2048
+    .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
+    .common_name = "anonymous@rawrtc.org",
+    .valid_until = 3600 * 24 * 30, // 30 days
+    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    .named_curve = "prime256v1",
+    .modulus_length = 2048
 };
 
 /*
  * Default data channel options.
  */
 struct rawrtc_data_channel_options rawrtc_default_data_channel_options = {
-        .deliver_partially = false
+    .deliver_partially = false
 };
 
 /*
@@ -126,6 +136,61 @@ enum rawrtc_code rawrtc_error_to_code(
     }
 }
 
+static enum rawrtc_ice_gather_policy const map_enum_ice_gather_policy[] = {
+    RAWRTC_ICE_GATHER_POLICY_ALL,
+    RAWRTC_ICE_GATHER_POLICY_NOHOST,
+    RAWRTC_ICE_GATHER_POLICY_RELAY
+};
+
+static char const * const map_str_ice_gather_policy[] = {
+    "all",
+    "nohost",
+    "relay"
+};
+
+static size_t const map_ice_gather_policy_length = ARRAY_SIZE(map_enum_ice_gather_policy);
+
+/*
+ * Translate an ICE gather policy to str.
+ */
+char const * rawrtc_ice_gather_policy_to_str(
+        enum rawrtc_ice_gather_policy const policy
+) {
+    size_t i;
+
+    for (i = 0; i < map_ice_gather_policy_length; ++i) {
+        if (map_enum_ice_gather_policy[i] == policy) {
+            return map_str_ice_gather_policy[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an ICE gather policy (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_gather_policy(
+        enum rawrtc_ice_gather_policy* const policyp, // de-referenced
+        char const* const str
+) {
+    size_t i;
+
+    // Check arguments
+    if (!policyp || !str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < map_ice_gather_policy_length; ++i) {
+        if (str_casecmp(map_str_ice_gather_policy[i], str) == 0) {
+            *policyp = map_enum_ice_gather_policy[i];
+            return RAWRTC_CODE_SUCCESS;
+        }
+    }
+
+    return RAWRTC_CODE_NO_VALUE;
+}
+
 /*
  * Translate a protocol to the corresponding IPPROTO_*.
  */
@@ -161,17 +226,17 @@ enum rawrtc_code rawrtc_ipproto_to_ice_protocol(
     }
 }
 
-enum rawrtc_ice_protocol const map_enum_ice_protocol[] = {
+static enum rawrtc_ice_protocol const map_enum_ice_protocol[] = {
     RAWRTC_ICE_PROTOCOL_UDP,
     RAWRTC_ICE_PROTOCOL_TCP,
 };
 
-char const * const map_str_ice_protocol[] = {
+static char const * const map_str_ice_protocol[] = {
     "udp",
     "tcp",
 };
 
-size_t const map_ice_protocol_length = ARRAY_SIZE(map_enum_ice_protocol);
+static size_t const map_ice_protocol_length = ARRAY_SIZE(map_enum_ice_protocol);
 
 /*
  * Translate an ICE protocol to str.
@@ -255,21 +320,21 @@ enum rawrtc_code rawrtc_ice_cand_type_to_ice_candidate_type(
     }
 }
 
-enum rawrtc_ice_candidate_type const map_enum_ice_candidate_type[] = {
+static enum rawrtc_ice_candidate_type const map_enum_ice_candidate_type[] = {
     RAWRTC_ICE_CANDIDATE_TYPE_HOST,
     RAWRTC_ICE_CANDIDATE_TYPE_SRFLX,
     RAWRTC_ICE_CANDIDATE_TYPE_PRFLX,
     RAWRTC_ICE_CANDIDATE_TYPE_RELAY,
 };
 
-char const * const map_str_ice_candidate_type[] = {
+static char const * const map_str_ice_candidate_type[] = {
     "host",
     "srflx",
     "prflx",
     "relay",
 };
 
-size_t const map_ice_candidate_type_length = ARRAY_SIZE(map_enum_ice_candidate_type);
+static size_t const map_ice_candidate_type_length = ARRAY_SIZE(map_enum_ice_candidate_type);
 
 /*
  * Translate an ICE candidate type to str.
@@ -350,19 +415,19 @@ enum rawrtc_code rawrtc_ice_tcptype_to_ice_tcp_candidate_type(
     }
 }
 
-enum rawrtc_ice_tcp_candidate_type const map_enum_ice_tcp_candidate_type[] = {
+static enum rawrtc_ice_tcp_candidate_type const map_enum_ice_tcp_candidate_type[] = {
     RAWRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE,
     RAWRTC_ICE_TCP_CANDIDATE_TYPE_PASSIVE,
     RAWRTC_ICE_TCP_CANDIDATE_TYPE_SO,
 };
 
-char const * const map_str_ice_tcp_candidate_type[] = {
+static char const * const map_str_ice_tcp_candidate_type[] = {
     "active",
     "passive",
     "so",
 };
 
-size_t const map_ice_tcp_candidate_type_length = ARRAY_SIZE(map_enum_ice_tcp_candidate_type);
+static size_t const map_ice_tcp_candidate_type_length = ARRAY_SIZE(map_enum_ice_tcp_candidate_type);
 
 /*
  * Translate an ICE TCP candidate type to str.
@@ -443,17 +508,17 @@ enum rawrtc_code rawrtc_trice_role_to_ice_role(
     }
 }
 
-enum rawrtc_ice_role const map_enum_ice_role[] = {
+static enum rawrtc_ice_role const map_enum_ice_role[] = {
     RAWRTC_ICE_ROLE_CONTROLLING,
     RAWRTC_ICE_ROLE_CONTROLLED,
 };
 
-char const * const map_str_ice_role[] = {
+static char const * const map_str_ice_role[] = {
     "controlling",
     "controlled",
 };
 
-size_t const map_ice_role_length = ARRAY_SIZE(map_enum_ice_role);
+static size_t const map_ice_role_length = ARRAY_SIZE(map_enum_ice_role);
 
 /*
  * Translate an ICE role to str.
@@ -506,19 +571,19 @@ enum tls_keytype rawrtc_certificate_key_type_to_tls_keytype(
     return (enum tls_keytype) type;
 }
 
-enum rawrtc_dtls_role const map_enum_dtls_role[] = {
+static enum rawrtc_dtls_role const map_enum_dtls_role[] = {
     RAWRTC_DTLS_ROLE_AUTO,
     RAWRTC_DTLS_ROLE_CLIENT,
     RAWRTC_DTLS_ROLE_SERVER,
 };
 
-char const * const map_str_dtls_role[] = {
+static char const * const map_str_dtls_role[] = {
     "auto",
     "client",
     "server",
 };
 
-size_t const map_dtls_role_length = ARRAY_SIZE(map_enum_dtls_role);
+static size_t const map_dtls_role_length = ARRAY_SIZE(map_enum_dtls_role);
 
 /*
  * Translate a DTLS role to str.
@@ -635,21 +700,21 @@ enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
     }
 }
 
-enum rawrtc_certificate_sign_algorithm const map_enum_certificate_sign_algorithm[] = {
+static enum rawrtc_certificate_sign_algorithm const map_enum_certificate_sign_algorithm[] = {
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512,
 };
 
-char const * const map_str_certificate_sign_algorithm[] = {
+static char const * const map_str_certificate_sign_algorithm[] = {
     "sha-1",
     "sha-256",
     "sha-384",
     "sha-512",
 };
 
-size_t const map_certificate_sign_algorithm_length =
+static size_t const map_certificate_sign_algorithm_length =
         ARRAY_SIZE(map_enum_certificate_sign_algorithm);
 
 /*
@@ -693,15 +758,15 @@ enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
     return RAWRTC_CODE_NO_VALUE;
 }
 
-enum rawrtc_data_transport_type const map_enum_data_transport_type[] = {
+static enum rawrtc_data_transport_type const map_enum_data_transport_type[] = {
     RAWRTC_DATA_TRANSPORT_TYPE_SCTP,
 };
 
-char const * const map_str_data_transport_type[] = {
+static char const * const map_str_data_transport_type[] = {
     "SCTP",
 };
 
-size_t const map_data_transport_type_length = ARRAY_SIZE(map_enum_data_transport_type);
+static size_t const map_data_transport_type_length = ARRAY_SIZE(map_enum_data_transport_type);
 
 /*
  * Translate a data transport type to str.

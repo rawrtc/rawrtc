@@ -168,7 +168,7 @@ static void dtls_transport_state_change_handler(
                     default_data_channel_error_handler, default_data_channel_close_handler,
                     default_data_channel_message_handler, client->data_channel));
 
-            // Dereference
+            // Un-reference
             mem_deref(channel_parameters);
         }
     }
@@ -228,7 +228,7 @@ static void client_init(
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
 
-    // Dereference
+    // Un-reference
     mem_deref(channel_parameters);
 }
 
@@ -262,7 +262,7 @@ static void client_start_transports(
 static void parameters_destroy(
         struct parameters* const parameters
 ) {
-    // Dereference
+    // Un-reference
     parameters->ice_parameters = mem_deref(parameters->ice_parameters);
     parameters->ice_candidates = mem_deref(parameters->ice_candidates);
     parameters->dtls_parameters = mem_deref(parameters->dtls_parameters);
@@ -280,7 +280,7 @@ static void client_stop(
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
 
-    // Dereference & close
+    // Un-reference & close
     parameters_destroy(&client->remote_parameters);
     parameters_destroy(&client->local_parameters);
     client->data_channel = mem_deref(client->data_channel);
@@ -358,7 +358,7 @@ static void parse_remote_parameters(
     client_start_transports(client);
     
 out:
-    // Dereference
+    // Un-reference
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
@@ -433,7 +433,7 @@ static void print_local_parameters(
     // Print JSON
     DEBUG_INFO("Local Parameters:\n%H\n", json_encode_odict, dict);
 
-    // Dereference
+    // Un-reference
     mem_deref(dict);
 }
 
@@ -447,8 +447,9 @@ int main(int argc, char* argv[argc + 1]) {
     size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
     struct rawrtc_ice_gather_options* gather_options;
-    char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
-    char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    char* const stun_google_com_urls[] = {"stun:stun.l.google.com:19302",
+                                          "stun:stun1.l.google.com:19302"};
+    char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct data_channel_sctp_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
@@ -481,15 +482,16 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Create ICE gather options
-    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
+    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_NONE));
+            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_urls, ARRAY_SIZE(turn_zwuenf_org_urls),
-            "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
+            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
+            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Set client fields
     client.name = "A";

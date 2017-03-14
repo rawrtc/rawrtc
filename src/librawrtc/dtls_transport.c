@@ -562,7 +562,7 @@ static void rawrtc_dtls_transport_destroy(
         // TODO: Be aware that UDP packets go to nowhere now...
     }
 
-    // Dereference
+    // Un-reference
     mem_deref(transport->connection);
     mem_deref(transport->socket);
     mem_deref(transport->context);

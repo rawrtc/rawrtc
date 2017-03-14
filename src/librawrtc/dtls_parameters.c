@@ -9,7 +9,7 @@ static void rawrtc_dtls_fingerprint_destroy(
 ) {
     struct rawrtc_dtls_fingerprint* const fingerprint = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(fingerprint->value);
 }
 
@@ -80,7 +80,7 @@ static void rawrtc_dtls_parameters_fingerprints_destroy(
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
 
-    // Dereference each item
+    // Un-reference each item
     for (i = 0; i < fingerprints->n_fingerprints; ++i) {
         mem_deref(fingerprints->fingerprints[i]);
     }
@@ -94,7 +94,7 @@ static void rawrtc_dtls_parameters_destroy(
 ) {
     struct rawrtc_dtls_parameters* const parameters = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(parameters->fingerprints);
 }
 

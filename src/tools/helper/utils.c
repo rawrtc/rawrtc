@@ -239,10 +239,12 @@ static void data_channel_helper_destroy(
     // Unset handler argument & handlers of the channel
     EOE(rawrtc_data_channel_unset_handlers(channel->channel));
 
-    // Dereference
+    // Remove from list
+    list_unlink(&channel->le);
+
+    // Un-reference
     mem_deref(channel->label);
     mem_deref(channel->channel);
-    list_unlink(&channel->le);
 }
 
 /*
@@ -314,7 +316,7 @@ void data_channel_helper_create_from_channel(
     // Set pointer
     *channel_helperp = channel_helper;
 
-    // Dereference & done
+    // Un-reference & done
     mem_deref(parameters);
 }
 

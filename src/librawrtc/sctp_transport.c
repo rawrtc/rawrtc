@@ -154,7 +154,7 @@ static enum rawrtc_code data_channel_open_message_parse(
     }
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(label);
     mem_deref(protocol);
 
@@ -470,7 +470,7 @@ static void close_data_channels(
         DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", i);
         rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
 
-        // Dereference
+        // Un-reference
         transport->channels[i] = mem_deref(channel);
     }
 }
@@ -590,7 +590,7 @@ static enum rawrtc_code reset_outgoing_stream(
     error = RAWRTC_CODE_SUCCESS;
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(reset_streams);
 
     if (error) {
@@ -1420,7 +1420,7 @@ out:
         // TODO: Reset stream with SID
     }
 
-    // Dereference
+    // Un-reference
     if (context) {
         context->buffer_inbound = mem_deref(context->buffer_inbound);
     }
@@ -1488,7 +1488,7 @@ out:
         // TODO: Close channel?
     }
 
-    // Dereference
+    // Un-reference
     transport->buffer_dcep_inbound = mem_deref(transport->buffer_dcep_inbound);
 }
 
@@ -1590,7 +1590,7 @@ static int read_event_handler(
     data_receive_handler(transport, buffer, &info, flags);
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(buffer);
 
     // Done
@@ -1754,7 +1754,7 @@ static void data_channels_destroy(
     struct rawrtc_sctp_transport* const transport = arg;
     uint_fast16_t i;
 
-    // Dereference all members
+    // Un-reference all members
     for (i = 0; i < transport->n_channels; ++i) {
         mem_deref(transport->channels[i]);
     }
@@ -1811,7 +1811,7 @@ static void rawrtc_sctp_transport_destroy(
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_sctp_transport_stop(transport);
 
-    // Dereference
+    // Un-reference
     mem_deref(transport->channels);
     mem_deref(transport->buffer_dcep_inbound);
     list_flush(&transport->buffered_messages_outgoing);
@@ -2140,7 +2140,7 @@ static void channel_context_destroy(
 ) {
     struct rawrtc_sctp_data_channel_context* const context = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(context->buffer_inbound);
 }
 
@@ -2300,7 +2300,7 @@ static enum rawrtc_code channel_create_inband(
     }
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(buffer);
 
     if (error) {
@@ -2346,7 +2346,7 @@ static enum rawrtc_code channel_create_handler(
     // Register data channel
     channel_register(sctp_transport, channel, context, false);
 
-    // Dereference & done
+    // Un-reference & done
     mem_deref(context);
     return RAWRTC_CODE_SUCCESS;
 }
@@ -2369,7 +2369,7 @@ static enum rawrtc_code channel_close_handler(
     transport = channel->transport->transport;
     context = channel->transport_arg;
 
-    // Dereference channel and clear pointer (if channel was registered before)
+    // Un-reference channel and clear pointer (if channel was registered before)
     // Note: The context will be NULL if the channel was not registered before
     if (context) {
         DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", context->sid);
@@ -2467,7 +2467,7 @@ static enum rawrtc_code channel_send_handler(
     }
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(empty);
 
     // Done
@@ -2811,7 +2811,7 @@ enum rawrtc_code rawrtc_sctp_transport_send(
     DEBUG_PRINTF("Buffered outgoing message of size %zu\n", mbuf_get_left(buffer));
 
 out:
-    // Dereference
+    // Un-reference
     mem_deref(context);
 
     return error;

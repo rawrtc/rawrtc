@@ -208,7 +208,7 @@ static void rawrtc_sctp_redirect_transport_destroy(
     // Stop transport
     rawrtc_sctp_redirect_transport_stop(transport);
 
-    // Dereference
+    // Un-reference
     mem_deref(transport->dtls_transport);
     mem_deref(transport->buffer);
 }
