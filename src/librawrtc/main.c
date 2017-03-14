@@ -6,17 +6,11 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
-struct rawrtc_global {
-    pthread_mutex_t mutex;
-    pthread_t mutex_main_thread;
-    uint_fast16_t mutex_counter;
-};
-
-static struct rawrtc_global global;
+struct rawrtc_global rawrtc_global;
 
 /*
  * Initialise rawrtc. Must be called before making a call to any other
- * function
+ * function.
  */
 enum rawrtc_code rawrtc_init() {
     int err;
@@ -41,15 +35,18 @@ enum rawrtc_code rawrtc_init() {
     }
 
     // Initialise mutex
-    err = pthread_mutex_init(&global.mutex, &mutex_attribute);
+    err = pthread_mutex_init(&rawrtc_global.mutex, &mutex_attribute);
     if (err) {
         DEBUG_WARNING("Failed to initialise mutex, reason: %m\n", err);
         return rawrtc_error_to_code(err);
     }
 
     // Set main thread and counter
-    global.mutex_main_thread = pthread_self();
-    global.mutex_counter = 0;
+    rawrtc_global.mutex_main_thread = pthread_self();
+    rawrtc_global.mutex_counter = 0;
+
+    // Set usrsctp initialised counter
+    rawrtc_global.usrsctp_initialized = 0;
 
     // Done
     return RAWRTC_CODE_SUCCESS;
@@ -64,7 +61,7 @@ enum rawrtc_code rawrtc_close() {
     // TODO: Close usrsctp if initialised
 
     // Destroy mutex
-    err = pthread_mutex_destroy(&global.mutex);
+    err = pthread_mutex_destroy(&rawrtc_global.mutex);
     if (err) {
         DEBUG_WARNING("Failed to destroy mutex, reason: %m\n", err);
     }
@@ -83,26 +80,26 @@ void rawrtc_thread_enter() {
     int err;
 
     // Need locking?
-    if (pthread_equal(global.mutex_main_thread, pthread_self())) {
+    if (pthread_equal(rawrtc_global.mutex_main_thread, pthread_self())) {
         DEBUG_PRINTF("Already on event loop thread, no locking required\n");
         return;
     }
 
     // Lock mutex
-    err = pthread_mutex_lock(&global.mutex);
+    err = pthread_mutex_lock(&rawrtc_global.mutex);
     if (err) {
         DEBUG_WARNING("Unable to lock mutex, reason: %m\n", err);
     }
     DEBUG_PRINTF("Locked reentrant mutex\n");
 
     // Lock event loop mutex
-    if (global.mutex_counter == 0) {
+    if (rawrtc_global.mutex_counter == 0) {
         re_thread_enter();
         DEBUG_PRINTF("Locked event loop mutex\n");
     }
 
     // Increase counter
-    ++global.mutex_counter;
+    ++rawrtc_global.mutex_counter;
 }
 
 /*
@@ -112,23 +109,23 @@ void rawrtc_thread_leave() {
     int err;
 
     // Need unlocking?
-    if (pthread_equal(global.mutex_main_thread, pthread_self())) {
+    if (pthread_equal(rawrtc_global.mutex_main_thread, pthread_self())) {
         DEBUG_PRINTF("Already on event loop thread, no unlocking required\n");
         return;
     }
 
     // Decrease counter
-    --global.mutex_counter;
+    --rawrtc_global.mutex_counter;
 
     // Unlock event loop mutex
-    if (global.mutex_counter == 0) {
+    if (rawrtc_global.mutex_counter == 0) {
         DEBUG_PRINTF("Unlocking event loop mutex\n");
         re_thread_leave();
     }
 
     // Unlock mutex
     DEBUG_PRINTF("Unlocking reentrant mutex\n");
-    err = pthread_mutex_unlock(&global.mutex);
+    err = pthread_mutex_unlock(&rawrtc_global.mutex);
     if (err) {
         DEBUG_WARNING("Unable to unlock mutex, reason: %m\n", err);
     }

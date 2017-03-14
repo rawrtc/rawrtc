@@ -819,7 +819,7 @@ struct rawrtc_dtls_fingerprints {
 
 /*
  * Initialise rawrtc. Must be called before making a call to any other
- * function
+ * function.
  */
 enum rawrtc_code rawrtc_init();
 

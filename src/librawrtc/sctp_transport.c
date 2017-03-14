@@ -30,11 +30,6 @@ struct send_context {
     int flags;
 };
 
-// Initialised counter & usrsctp timer
-static uint_fast32_t initialized = 0;
-static struct tmr tick_timer;
-static size_t chunk_size;
-
 // Events to subscribe to
 static uint16_t const sctp_events[] = {
     SCTP_ASSOC_CHANGE,
@@ -1538,7 +1533,7 @@ static int read_event_handler(
     // TODO: Can we get the COMPLETE message size or just the current message size?
 
     // Create buffer
-    buffer = mbuf_alloc(chunk_size);
+    buffer = mbuf_alloc(rawrtc_global.usrsctp_chunk_size);
     if (!buffer) {
         DEBUG_WARNING("Cannot allocate buffer, no memory");
         // TODO: This needs to be handled in a better way, otherwise it's probably going
@@ -1713,7 +1708,8 @@ static void timer_handler(
     (void) arg;
 
     // Restart timer
-    tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+    tmr_start(&rawrtc_global.usrsctp_tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT,
+              timer_handler, NULL);
 
     // Pass delta ms to usrsctp
     usrsctp_handle_timers(RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT);
@@ -1818,12 +1814,12 @@ static void rawrtc_sctp_transport_destroy(
     mem_deref(transport->dtls_transport);
 
     // Decrease in-use counter
-    --initialized;
+    --rawrtc_global.usrsctp_initialized;
 
     // Close usrsctp (if needed)
-    if (initialized == 0) {
+    if (rawrtc_global.usrsctp_initialized == 0) {
         // Cancel timer
-        tmr_cancel(&tick_timer);
+        tmr_cancel(&rawrtc_global.usrsctp_tick_timer);
 
         // Close
         usrsctp_finish();
@@ -1883,7 +1879,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Initialise usrsctp (if needed)
-    if (initialized == 0) {
+    if (rawrtc_global.usrsctp_initialized == 0) {
         DEBUG_PRINTF("Initialising usrsctp\n");
         usrsctp_init(0, sctp_packet_handler, dbg_info);
 
@@ -1925,8 +1921,9 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         usrsctp_sysctl_set_sctp_default_frag_interleave(2);
 
         // Start timers
-        tmr_init(&tick_timer);
-        tmr_start(&tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT, timer_handler, NULL);
+        tmr_init(&rawrtc_global.usrsctp_tick_timer);
+        tmr_start(&rawrtc_global.usrsctp_tick_timer, RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT,
+                  timer_handler, NULL);
     }
 
     // Allocate
@@ -1937,7 +1934,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Increase in-use counter
     // Note: This needs to be below allocation to ensure the counter is decreased properly on error
-    ++initialized;
+    ++rawrtc_global.usrsctp_initialized;
 
     // Set fields/reference
     transport->state = RAWRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
@@ -2009,7 +2006,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Determine chunk size
-    if (initialized == 1) {
+    if (rawrtc_global.usrsctp_initialized == 1) {
         socklen_t option_size = sizeof(int); // PD point is int according to spec
         if (usrsctp_getsockopt(
                 transport->socket, IPPROTO_SCTP, SCTP_PARTIAL_DELIVERY_POINT,
@@ -2027,8 +2024,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         }
 
         // Store value
-        chunk_size = (size_t) option_value;
-        DEBUG_PRINTF("Chunk size: %zu\n", chunk_size);
+        rawrtc_global.usrsctp_chunk_size = (size_t) option_value;
+        DEBUG_PRINTF("Chunk size: %zu\n", rawrtc_global.usrsctp_chunk_size);
     }
 
     // Enable the Stream Reconfiguration extension
@@ -2689,8 +2686,8 @@ enum rawrtc_code sctp_transport_send(
         size_t const left = mbuf_get_left(buffer);
 
         // Carefully chunk the buffer
-        if (left > chunk_size) {
-            length = chunk_size;
+        if (left > rawrtc_global.usrsctp_chunk_size) {
+            length = rawrtc_global.usrsctp_chunk_size;
 
             // Unset EOR flag
             send_info->snd_flags &= ~SCTP_EOR;
