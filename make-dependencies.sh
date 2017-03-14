@@ -16,9 +16,6 @@ fi
 OPENSSL_URL="https://www.openssl.org/source/openssl-1.1.0e.tar.gz"
 OPENSSL_TAR="openssl-1.1.0e.tar.gz"
 OPENSSL_PATH="openssl-1.1.0e"
-#ZF_LOG_GIT="https://github.com/wonder-mice/zf_log.git"
-#ZF_LOG_BRANCH="master"
-#ZF_LOG_PATH="zf_log"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
 LIBRE_PATH="re"
@@ -50,15 +47,6 @@ if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
     wget ${OPENSSL_URL}
     tar -xzf ${OPENSSL_TAR}
 fi
-
-## Get zf_log
-#if [ ! -d "${ZF_LOG_PATH}" ]; then
-#    git clone --depth=1 -b ${ZF_LOG_BRANCH} ${ZF_LOG_GIT} ${ZF_LOG_PATH}
-#else
-#    cd ${ZF_LOG_PATH}
-#    git pull
-#    cd ${MAIN_DIR}
-#fi
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
@@ -238,16 +226,6 @@ if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
     make install
     cd ${MAIN_DIR}
 fi
-
-## Build zf_log
-#cd ${ZF_LOG_PATH}
-#if [ ! -d "build" ]; then
-#    mkdir build
-#fi
-#cd build
-#CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DZF_LOG_LIBRARY_PREFIX=${LIB_PREFIX} ..
-#make install -j${THREADS}
-#cd ${MAIN_DIR}
 
 # Build usrsctp
 cd ${USRSCTP_PATH}
