@@ -9,8 +9,8 @@ static void rawrtc_candidate_helper_destroy(
 ) {
     struct rawrtc_candidate_helper* const local_candidate = arg;
 
-    // Dereference
-    mem_deref(local_candidate->stun_keepalive);
+    // Un-reference
+    list_flush(&local_candidate->stun_sessions);
     mem_deref(local_candidate->udp_helper);
     mem_deref(local_candidate->candidate);
     mem_deref(local_candidate->gatherer);
@@ -130,4 +130,86 @@ enum rawrtc_code rawrtc_candidate_helper_find(
 
     // Not found
     return RAWRTC_CODE_NO_VALUE;
+}
+
+static void rawrtc_candidate_helper_stun_session_destroy(
+        void* arg
+) {
+    struct rawrtc_candidate_helper_stun_session* const session = arg;
+
+    // Remove from list
+    list_unlink(&session->le);
+
+    // Un-reference
+    mem_deref(session->url);
+    mem_deref(session->stun_keepalive);
+    mem_deref(session->candidate_helper);
+}
+
+/*
+ * Create a STUN session.
+ */
+enum rawrtc_code rawrtc_candidate_helper_stun_session_create(
+        struct rawrtc_candidate_helper_stun_session** const sessionp, // de-referenced
+        struct rawrtc_ice_server_url* const url
+) {
+    struct rawrtc_candidate_helper_stun_session* session;
+
+    // Check arguments
+    if (!sessionp || !url) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    session = mem_zalloc(sizeof(*session), rawrtc_candidate_helper_stun_session_destroy);
+    if (!session) {
+        return RAWRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields/reference
+    session->url = mem_ref(url);
+
+    // Set pointer & done
+    *sessionp = session;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Add a STUN session to a candidate helper.
+ */
+enum rawrtc_code rawrtc_candidate_helper_stun_session_add(
+        struct rawrtc_candidate_helper_stun_session* const session,
+        struct rawrtc_candidate_helper* const candidate_helper,
+        struct stun_keepalive* const stun_keepalive
+) {
+    // Check arguments
+    if (!session || !candidate_helper || !stun_keepalive) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set fields/reference
+    session->candidate_helper = mem_ref(candidate_helper);
+    session->stun_keepalive = mem_ref(stun_keepalive);
+
+    // Append to STUN sessions
+    list_append(&candidate_helper->stun_sessions, &session->le, session);
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Remove STUN sessions list handler (for candidate helper lists).
+ */
+bool rawrtc_candidate_helper_remove_stun_sessions_handler(
+        struct le* le,
+        void* arg
+) {
+    struct rawrtc_candidate_helper* const candidate_helper = le->data;
+    (void) arg;
+
+    // Flush STUN sessions
+    list_flush(&candidate_helper->stun_sessions);
+
+    return false; // continue traversing
 }

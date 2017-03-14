@@ -94,7 +94,7 @@ void exit_with_error(
     // Print message
     DEBUG_WARNING("%s %"PRIu32": %s\n", file, line, message);
 
-    // Dereference & bye
+    // Un-reference & bye
     mem_deref(message);
     before_exit();
     exit(1);

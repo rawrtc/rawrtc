@@ -152,7 +152,7 @@ static void client_stop(
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
 
-    // Dereference & close
+    // Un-reference & close
     client->sctp_capabilities = mem_deref(client->sctp_capabilities);
     client->dtls_parameters = mem_deref(client->dtls_parameters);
     client->ice_parameters = mem_deref(client->ice_parameters);
@@ -172,8 +172,9 @@ int main(int argc, char* argv[argc + 1]) {
     char** ice_candidate_types = NULL;
     size_t n_ice_candidate_types = 0;
     struct rawrtc_ice_gather_options* gather_options;
-    char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
-    char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    char* const stun_google_com_urls[] = {"stun:stun.l.google.com:19302",
+                                          "stun:stun1.l.google.com:19302"};
+    char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct sctp_transport_client a = {0};
     struct sctp_transport_client b = {0};
     (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
@@ -193,15 +194,16 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Create ICE gather options
-    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
+    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_NONE));
+            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_urls, ARRAY_SIZE(turn_zwuenf_org_urls),
-            "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
+            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
+            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Setup client A
     a.name = "A";

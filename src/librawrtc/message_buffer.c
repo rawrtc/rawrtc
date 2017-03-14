@@ -32,7 +32,7 @@ static void rawrtc_message_buffer_destroy(
 ) {
     struct rawrtc_buffered_message* const buffered_message = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(buffered_message->context);
     mem_deref(buffered_message->buffer);
 }
@@ -217,7 +217,7 @@ out:
         *bufferp = mem_ref(buffer);
         *contextp = mem_ref(context);
 
-        // Dereference all messages
+        // Un-reference all messages
         list_flush(message_buffer);
         DEBUG_PRINTF("Merging complete\n");
     }

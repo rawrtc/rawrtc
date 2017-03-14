@@ -83,12 +83,12 @@ static void rawrtc_data_channel_destroy(
     // Note: The function will ensure that the channel is not closed before it's initialised
     rawrtc_data_channel_close(channel);
 
-    // Dereference
+    // Un-reference
     mem_deref(channel->transport);
     mem_deref(channel->transport_arg);
     mem_deref(channel->parameters);
 
-    // Dereference options
+    // Un-reference options
     if (channel->options != &rawrtc_default_data_channel_options) {
         mem_deref(channel->options);
     }

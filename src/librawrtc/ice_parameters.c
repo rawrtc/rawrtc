@@ -9,7 +9,7 @@ static void rawrtc_ice_parameters_destroy(
 ) {
     struct rawrtc_ice_parameters* const parameters = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(parameters->username_fragment);
     mem_deref(parameters->password);
 }

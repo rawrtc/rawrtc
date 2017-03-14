@@ -15,6 +15,7 @@
 uint32_t rawrtc_ice_candidate_calculate_priority(
         enum ice_cand_type const candidate_type,
         int const protocol,
+        int const address_family,
         enum ice_tcptype const tcp_type
 ) {
     return 1;
@@ -24,11 +25,11 @@ uint32_t rawrtc_ice_candidate_calculate_priority(
  * Destructor for an existing ICE candidate.
  */
 static void rawrtc_ice_candidate_raw_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_candidate_raw* const candidate = arg;
 
-    // Dereference
+    // Un-reference
     mem_deref(candidate->related_address);
     mem_deref(candidate->ip);
     mem_deref(candidate->foundation);
@@ -95,11 +96,11 @@ out:
  * Destructor for an existing ICE candidate.
  */
 static void rawrtc_ice_candidate_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_candidate* const candidate = arg;
 
-    // Dereference
+    // Un-reference
     switch (candidate->storage_type) {
         case RAWRTC_ICE_CANDIDATE_STORAGE_RAW:
             mem_deref(candidate->candidate.raw_candidate);

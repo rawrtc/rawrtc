@@ -157,7 +157,7 @@ static void dtls_transport_state_change_handler(
                     default_data_channel_error_handler, default_data_channel_close_handler,
                     default_data_channel_message_handler, client->data_channel));
 
-            // Dereference
+            // Un-reference
             mem_deref(channel_parameters);
         }
     }
@@ -219,7 +219,7 @@ static void client_init(
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, local->data_channel_negotiated));
 
-    // Dereference
+    // Un-reference
     mem_deref(channel_parameters);
 }
 
@@ -264,7 +264,7 @@ static void client_stop(
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
     EOE(rawrtc_ice_gatherer_close(client->gatherer));
 
-    // Dereference & close
+    // Un-reference & close
     client->data_channel = mem_deref(client->data_channel);
     client->data_channel_negotiated = mem_deref(client->data_channel_negotiated);
     client->sctp_capabilities = mem_deref(client->sctp_capabilities);
@@ -287,8 +287,9 @@ int main(int argc, char* argv[argc + 1]) {
     char** ice_candidate_types = NULL;
     size_t n_ice_candidate_types = 0;
     struct rawrtc_ice_gather_options* gather_options;
-    char* const stun_google_com_urls[] = {"stun.l.google.com:19302", "stun1.l.google.com:19302"};
-    char* const turn_zwuenf_org_urls[] = {"turn.zwuenf.org"};
+    char* const stun_google_com_urls[] = {"stun:stun.l.google.com:19302",
+                                          "stun:stun1.l.google.com:19302"};
+    char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct data_channel_sctp_client a = {0};
     struct data_channel_sctp_client b = {0};
     (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
@@ -308,15 +309,16 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Create ICE gather options
-    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_ALL));
+    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
             gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_NONE));
+            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_urls, ARRAY_SIZE(turn_zwuenf_org_urls),
-            "bruno", "onurb", RAWRTC_ICE_CREDENTIAL_PASSWORD));
+            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
+            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Setup client A
     a.name = "A";
