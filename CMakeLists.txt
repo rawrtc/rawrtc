@@ -11,6 +11,8 @@ set(PROJECT_URL
 set(OPENSSL_VERSION "openssl >= 1.0.2")
 set(LIB_RE_VERSION "libre >= 0.5.0")
 set(LIB_REW_VERISON "librew >= 0.4.0")
+# Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
+set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")
 
 # Debug build type as default
 if (NOT CMAKE_BUILD_TYPE)
@@ -61,7 +63,7 @@ set(rawrtc_DEP_LIBRARIES
 
 # Dependency versions
 set(PKG_CONFIG_REQUIRES "")
-set(PKG_CONFIG_REQUIRES_PRIVATE "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")
+set(PKG_CONFIG_REQUIRES_PRIVATE "${DEPENDENCY_VERSIONS}")
 
 # Linker flags (includes libs that have no pkg-config files)
 set(PKG_CONFIG_LIB_DIRS "-L\${libdir}")

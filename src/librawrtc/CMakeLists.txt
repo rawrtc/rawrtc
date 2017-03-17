@@ -30,6 +30,8 @@ target_link_libraries(rawrtc-static
 install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
 
-# Generate pkg-config file
+# Generate pkg-config file & install it
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pkg-config.pc.cmakein
-        ${CMAKE_CURRENT_BINARY_DIR}/pkgconfig/${PROJECT_NAME}.pc @ONLY)
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
+        DESTINATION lib/pkgconfig)
