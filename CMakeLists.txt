@@ -76,5 +76,11 @@ set(PKG_CONFIG_LIBS_PRIVATE "${PKG_CONFIG_LIB_DIRS_PRIVATE} ${PKG_CONFIG_LIBRARI
 # Cflags (includes includes that have no pkg-config files)
 set(PKG_CONFIG_CFLAGS "-I\${includedir} -I${LIB_USRSCTP_INCLUDE_DIRS}")
 
+# Add custom target to install the library
+add_custom_target(install-${PROJECT_NAME}
+        $(MAKE) install
+        DEPENDS ${PROJECT_NAME}
+        COMMENT "Installing ${PROJECT_NAME}")
+
 # Walk through subdirectories
 add_subdirectory(src)
