@@ -5,8 +5,8 @@ libdir=${prefix}/lib
 
 Name: @PROJECT_NAME@
 Description: @PROJECT_DESCRIPTION@
-URL: @PROJECT_URL@
 Version: @PROJECT_VERSION@
+URL: @PROJECT_URL@
 Requires: @PKG_CONFIG_REQUIRES@
 Requires.private: @PKG_CONFIG_REQUIRES_PRIVATE@
 Cflags: @PKG_CONFIG_CFLAGS@

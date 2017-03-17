@@ -8,9 +8,9 @@ set(PROJECT_URL
         "https://github.com/rawrtc/rawrtc")
 
 # Dependency versions
-set(OPENSSL_VERSION openssl>=1.0.2)
-set(LIB_RE_VERSION libre>=0.5.0)
-set(LIB_REW_VERISON librew>=0.4.0)
+set(OPENSSL_VERSION "openssl >= 1.0.2")
+set(LIB_RE_VERSION "libre >= 0.5.0")
+set(LIB_REW_VERISON "librew >= 0.4.0")
 
 # Debug build type as default
 if (NOT CMAKE_BUILD_TYPE)
@@ -44,7 +44,7 @@ include_directories(${LIB_REW_INCLUDE_DIRS})
 link_directories(${LIB_REW_LIBRARY_DIRS})
 
 # Dependency: usrsctp
-# TODO: Add a pkg-config file to usrsctp
+# TODO: Use the pkg-config file of usrsctp once it has been added
 find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a)
 find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
