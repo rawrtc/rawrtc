@@ -16,15 +16,23 @@ cache:
 
 # Build matrix
 language: c
-matrix:
-  include:
-  - compiler: gcc
-  - compiler: clang
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - gcc
+  - clang
+
+dist:
+  - trusty
+  - precise
+
 # TODO: Re-enable once Travis upgraded to OpenSSL >= 1.0.2
-#  - compiler: gcc
-#    env: ENFORCE_OPENSSL=1
-#  - compiler: clang
-#    env: ENFORCE_OPENSSL=1
+#env:
+#  - ENFORCE_OPENSSL=0
+#  - ENFORCE_OPENSSL=1
 
 # Make dependencies
 install:

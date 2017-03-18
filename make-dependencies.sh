@@ -51,7 +51,7 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 
 # Check if we need to fetch & install openssl
 need_openssl=false
-if [ ! -z "$ENFORCE_OPENSSL" ] || [ "$have_dtls_1_2" = false ]; then
+if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_dtls_1_2" = false ]; then
     need_openssl=true
 fi
 echo "Need to fetch OpenSSL: $need_openssl"
