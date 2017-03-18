@@ -1,4 +1,6 @@
-# rawrtc
+# RAWRTC
+
+[![Build Status][travis-ci-badge]][travis-ci-url]
 
 A WebRTC and ORTC library with a small footprint that runs everywhere.
 
@@ -79,3 +81,6 @@ Note: We assume that you are in the `build` directory.
 ```
 > data-channel-sctp <0|1 (ice-role)> [<sctp-port>]
 ```
+
+[travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
+[travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
