@@ -272,7 +272,7 @@ echo "Building & installing usrsctp"
 make install -j${THREADS}
 # Note: It's important that we use the static library, otherwise a naming conflict for
 #       'mbuf_init' causes really messy allocation errors.
-rm ${PREFIX}/lib/libusrsctp.so*
+rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
 # We have a name conflict for 'mbuf_init'
 objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a
 cd ${MAIN_DIR}
@@ -289,7 +289,7 @@ if [ "$have_dtls_1_2" = false ]; then
 else
     make install
 fi
-rm ${PREFIX}/lib/libre.so
+rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
 
 # Build librew
