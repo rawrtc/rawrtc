@@ -269,6 +269,10 @@ if [ "$need_openssl" = true ]; then
     cd ${MAIN_DIR}
 fi
 
+# Set openssl sysroot
+openssl_sysroot=`pkg-config --variable=prefix openssl`
+echo "Using OpenSSL sysroot: $openssl_sysroot"
+
 # Build usrsctp
 cd ${USRSCTP_PATH}
 if [ ! -d "build" ]; then
@@ -281,6 +285,7 @@ cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 echo "Cleaning usrsctp"
 make clean
 echo "Building & installing usrsctp"
+# TODO: Treat warnings as errors
 make install -j${THREADS}
 # Note: It's important that we use the static library, otherwise a naming conflict for
 #       'mbuf_init' causes really messy allocation errors.
@@ -293,7 +298,7 @@ echo "Cleaning libre"
 make clean
 echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
-    OPENSSL_SYSROOT=${PREFIX} \
+    OPENSSL_SYSROOT=$openssl_sysroot \
     EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
     make install
 else

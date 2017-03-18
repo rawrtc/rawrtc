@@ -51,15 +51,15 @@ matrix:
     - os: osx
       compiler: gcc
       env: ENFORCE_OPENSSL=0
-#    - os: osx
-#      compiler: gcc
-#      env: ENFORCE_OPENSSL=1
+    - os: osx
+      compiler: gcc
+      env: ENFORCE_OPENSSL=1
     - os: osx
       compiler: clang
       env: ENFORCE_OPENSSL=0
-#    - os: osx
-#      compiler: clang
-#      env: ENFORCE_OPENSSL=1
+    - os: osx
+      compiler: clang
+      env: ENFORCE_OPENSSL=1
 
 # Linux dependencies
 addons:
@@ -76,19 +76,9 @@ before_install:
       brew update;
       brew install --force openssl;
       export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
-      find /usr/local/Cellar -name 'pkgconfig' -type d
-      find /usr/local/Cellar -name 'libcrypto*' -type f
-      find /usr/local/Cellar -name 'libssl*' -type f
-      echo $PKG_CONFIG_PATH
-      pkg-config --modversion openssl
-      pkg-config --libs openssl
-      ls -l /usr/local/opt/
-      ls -l /usr/local/opt/openssl
-      ls -l /usr/local/opt/openssl/lib
-      ls -l /usr/local/opt/openssl/lib/pkgconfig
     fi
 
-# Make dependencies
+# Make library dependencies
 install:
   - ./make-dependencies.sh
 
@@ -98,13 +88,9 @@ before_script:
   - export PKG_CONFIG_PATH=${BUILD_PATH}/prefix/lib/pkgconfig:${PKG_CONFIG_PATH}
   - export LD_LIBRARY_PATH=${BUILD_PATH}/prefix/lib:${LD_LIBRARY_PATH}
   - export PATH=${BUILD_PATH}/prefix/bin:${PATH}
-  - echo $PKG_CONFIG_PATH
-  - ls -l ${BUILD_PATH}/prefix/lib
-  - ls -l ${BUILD_PATH}/prefix/lib/pkgconfig
-  - pkg-config --modversion openssl
-  - pkg-config --libs openssl
 
 # Install library and run tests
+# TODO: Treat warnings as errors
 script:
   - cd build
   - cmake -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix .. && make install
