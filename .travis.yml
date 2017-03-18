@@ -20,14 +20,14 @@ matrix:
   include:
   - compiler: gcc
   - compiler: clang
-  - compiler: gcc
-    env: ENFORCE_OPENSSL=1
-  - compiler: clang
-    env: ENFORCE_OPENSSL=1
+# TODO: Re-enable once Travis upgraded to OpenSSL >= 1.0.2
+#  - compiler: gcc
+#    env: ENFORCE_OPENSSL=1
+#  - compiler: clang
+#    env: ENFORCE_OPENSSL=1
 
 # Make dependencies
 install:
-  - export SKIP_OPENSSL=1  # will only be skipped if the dependency exists
   - ./make-dependencies.sh
 
 # Set environment vars
