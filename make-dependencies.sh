@@ -76,7 +76,7 @@ if [ "$need_openssl" = true ]; then
     echo "Fetching OpenSSL"
     wget ${OPENSSL_URL}
     tar -xzf openssl-${OPENSSL_VERSION}.tar.gz
-    mv openssl-${OPENSSL_VERSION}.tar.gz ${OPENSSL_PATH}
+    mv openssl-${OPENSSL_VERSION} ${OPENSSL_PATH}
 fi
 
 # Get usrsctp
