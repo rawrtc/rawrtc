@@ -13,9 +13,9 @@ if [ -z "$BUILD_PATH" ]; then
 fi
 
 # Dependencies
-OPENSSL_URL="https://www.openssl.org/source/openssl-1.1.0e.tar.gz"
-OPENSSL_TAR="openssl-1.1.0e.tar.gz"
-OPENSSL_PATH="openssl-1.1.0e"
+OPENSSL_VERSION="1.1.0e"
+OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
+OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
 LIBRE_PATH="re"
@@ -44,6 +44,12 @@ mkdir -p ${BUILD_PATH}/dependencies
 MAIN_DIR=${BUILD_PATH}/dependencies
 cd ${MAIN_DIR}
 
+# Extra cflags when using clang
+clang_extra_cflags=""
+if [ "${CC}" = "clang" ]; then
+    clang_extra_cflags=" -Wno-error=unused-command-line-argument"
+fi
+
 # Check for DTLS 1.2 suppport in openssl
 echo "OpenSSL version: `pkg-config --short-errors --modversion openssl`"
 have_dtls_1_2=true
@@ -53,19 +59,25 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 # Check if we need to fetch & install openssl
 need_openssl=false
 if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_dtls_1_2" = false ]; then
-    need_openssl=true
+    # Already installed? Check version
+    if [ -d "${OPENSSL_PATH}" ]; then
+        # Outdated?
+        pkg-config --atleast-version=${OPENSSL_VERSION} openssl || need_openssl=true
+    else
+        # Not downloaded
+        need_openssl=true
+    fi
 fi
 echo "Need to fetch OpenSSL: $need_openssl"
 
 # Get openssl
-need_openssl_make=false
-if [ "$need_openssl" = true ] && [ ! -d "${OPENSSL_PATH}" ]; then
+if [ "$need_openssl" = true ]; then
+    rm -rf ${OPENSSL_PATH}
     echo "Fetching OpenSSL"
     wget ${OPENSSL_URL}
-    tar -xzf ${OPENSSL_TAR}
-    need_openssl_make=true
+    tar -xzf openssl-${OPENSSL_VERSION}.tar.gz
+    mv openssl-${OPENSSL_VERSION}.tar.gz ${OPENSSL_PATH}
 fi
-echo "Need to build OpenSSL: $need_openssl_make"
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
@@ -246,7 +258,7 @@ else
 fi
 
 # Build openssl
-if [ "$need_openssl_make" = true ]; then
+if [ "$need_openssl" = true ]; then
     cd ${OPENSSL_PATH}
     echo "Configuring OpenSSL"
     ./config shared --prefix=${PREFIX}
@@ -282,7 +294,7 @@ make clean
 echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
     OPENSSL_SYSROOT=${PREFIX} \
-    EXTRA_CFLAGS="-Werror -Wno-error=unused-command-line-argument" \
+    EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
     make install
 else
     make install
@@ -296,6 +308,6 @@ echo "Cleaning librew"
 make clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
-EXTRA_CFLAGS="-Werror -Wno-error=unused-command-line-argument" \
+EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 make install-static
 cd ${MAIN_DIR}
