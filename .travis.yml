@@ -1,14 +1,6 @@
 # Use container system
 sudo: false
 
-# Add APT dependencies
-addons:
-  apt:
-    packages:
-    - git
-    - pkg-config
-    - libssl-dev
-
 # Cache OpenSSL build
 cache:
   directories:
@@ -25,14 +17,27 @@ compiler:
   - gcc
   - clang
 
-dist:
-  - trusty
-  - precise
+matrix:
+  include:
+    - os: linux
+      dist: trusty
 
-# TODO: Re-enable once Travis upgraded to OpenSSL >= 1.0.2
-#env:
-#  - ENFORCE_OPENSSL=0
-#  - ENFORCE_OPENSSL=1
+env:
+  - ENFORCE_OPENSSL=0
+  - ENFORCE_OPENSSL=1
+
+# Linux dependencies
+addons:
+  apt:
+    packages:
+    - git
+    - pkg-config
+    - libssl-dev
+
+# OSX dependencies
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install git pkg-config openssl; fi
 
 # Make dependencies
 install:
