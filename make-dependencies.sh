@@ -28,7 +28,7 @@ USRSCTP_PATH="usrsctp"
 
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
-export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
+export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
 export CFLAGS="${CFLAGS} -I${PREFIX}/include"
 export CPPFLAGS="${CFLAGS}"
 export LDFLAGS="${LDFLAGS} -L${PREFIX}/lib"
