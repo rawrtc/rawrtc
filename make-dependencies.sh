@@ -264,7 +264,8 @@ if [ ! -d "build" ]; then
 fi
 cd build
 echo "Configuring usrsctp"
-CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
+CFLAGS=-fPIC \
+cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 echo "Cleaning usrsctp"
 make clean
 echo "Building & installing usrsctp"
@@ -282,7 +283,9 @@ echo "Cleaning libre"
 make clean
 echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
-    OPENSSL_SYSROOT=${PREFIX} EXTRA_CFLAGS=-Werror make install
+    OPENSSL_SYSROOT=${PREFIX} \
+    EXTRA_CFLAGS=-Werror -Wno-error=unused-command-line-argument \
+    make install
 else
     make install
 fi
@@ -294,5 +297,7 @@ cd ${LIBREW_PATH}
 echo "Cleaning librew"
 make clean
 echo "Building librew"
-LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include EXTRA_CFLAGS=-Werror make install-static
+LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
+EXTRA_CFLAGS=-Werror -Wno-error=unused-command-line-argument \
+make install-static
 cd ${MAIN_DIR}
