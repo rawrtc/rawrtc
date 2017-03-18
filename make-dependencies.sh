@@ -29,10 +29,16 @@ USRSCTP_PATH="usrsctp"
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
 export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
-
 export CFLAGS="${CFLAGS} -I${PREFIX}/include"
 export CPPFLAGS="${CFLAGS}"
 export LDFLAGS="${LDFLAGS} -L${PREFIX}/lib"
+echo "Environment vars:"
+echo "PREFIX: ${PREFIX}"
+echo "PKG_CONFIG_PATH: ${PKG_CONFIG_PATH}"
+echo "CFLAGS: ${CFLAGS}"
+echo "CPPFLAGS: ${CPPFLAGS}"
+echo "LDFLAGS: ${LDFLAGS}"
+echo ""
 
 mkdir -p ${BUILD_PATH}/dependencies
 MAIN_DIR=${BUILD_PATH}/dependencies
@@ -41,26 +47,42 @@ cd ${MAIN_DIR}
 # Check for DTLS 1.2 suppport in openssl
 have_dtls_1_2=true
 pkg-config --atleast-version=1.0.2 openssl || have_dtls_1_2=false
+echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
+
+# Check if we need to fetch & install openssl
+need_openssl=false
+if [ ! -z "$ENFORCE_OPENSSL" ] || [ "$have_dtls_1_2" = false ]; then
+    need_openssl=true
+fi
+echo "Need to fetch OpenSSL: $need_openssl"
 
 # Get openssl
-if [ ! -d "${OPENSSL_PATH}" ] && [ "$have_dtls_1_2" = false ]; then
+need_openssl_make=false
+if [ "$need_openssl" = true ] && [ ! -d "${OPENSSL_PATH}" ]; then
+    echo "Fetching OpenSSL"
     wget ${OPENSSL_URL}
     tar -xzf ${OPENSSL_TAR}
+    need_openssl_make=true
 fi
+echo "Need to build OpenSSL: $need_openssl_make"
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
+    echo "Cloning usrsctp"
     git clone --depth=1 -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
 else
     cd ${USRSCTP_PATH}
+    echo "Pulling usrsctp"
     git pull
     cd ${MAIN_DIR}
 fi
 
 # Get libre
 if [ ! -d "${LIBRE_PATH}" ]; then
+    echo "Cloning libre"
     git clone --depth=1 -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
     cd ${LIBRE_PATH}
+    echo "Patching libre"
     patch << "EOF"
 --- Makefile
 +++ Makefile
@@ -129,14 +151,17 @@ EOF
     cd ${MAIN_DIR}
 else
     cd ${LIBRE_PATH}
+    echo "Pulling libre"
     git pull
     cd ${MAIN_DIR}
 fi
 
 # Get librew
 if [ ! -d "${LIBREW_PATH}" ]; then
+    echo "Cloning librew"
     git clone --depth=1 -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
     cd ${LIBREW_PATH}
+    echo "Patching librew"
     patch << "EOF"
 --- Makefile
 +++ Makefile
@@ -214,15 +239,19 @@ EOF
     cd ${MAIN_DIR}
 else
     cd ${LIBREW_PATH}
+    echo "Pulling librew"
     git pull
     cd ${MAIN_DIR}
 fi
 
 # Build openssl
-if [ "$have_dtls_1_2" = false ] && [ -z "$SKIP_OPENSSL" ]; then
+if [ "$need_openssl_make" = true ]; then
     cd ${OPENSSL_PATH}
+    echo "Configuring OpenSSL"
     ./config shared --prefix=${PREFIX}
+    echo "Building OpenSSL"
     make
+    echo "Installing OpenSSL"
     make install
     cd ${MAIN_DIR}
 fi
@@ -233,8 +262,11 @@ if [ ! -d "build" ]; then
     mkdir build
 fi
 cd build
+echo "Configuring usrsctp"
 CFLAGS=-fPIC cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
+echo "Cleaning usrsctp"
 make clean
+echo "Building & installing usrsctp"
 make install -j${THREADS}
 # Note: It's important that we use the static library, otherwise a naming conflict for
 #       'mbuf_init' causes really messy allocation errors.
@@ -245,7 +277,9 @@ cd ${MAIN_DIR}
 
 # Build libre
 cd ${LIBRE_PATH}
+echo "Cleaning libre"
 make clean
+echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
     OPENSSL_SYSROOT=${PREFIX} EXTRA_CFLAGS=-Werror make install
 else
@@ -256,5 +290,8 @@ cd ${MAIN_DIR}
 
 # Build librew
 cd ${LIBREW_PATH}
+echo "Cleaning librew"
+make clean
+echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include EXTRA_CFLAGS=-Werror make install-static
 cd ${MAIN_DIR}

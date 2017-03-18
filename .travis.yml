@@ -1,0 +1,45 @@
+# Use container system
+sudo: false
+
+# Add APT dependencies
+addons:
+  apt:
+    packages:
+    - git
+    - pkg-config
+    - libssl-dev
+
+# Cache OpenSSL build
+cache:
+  directories:
+  - $HOME/build/dependencies/openssl-*
+
+# Build matrix
+language: c
+matrix:
+  include:
+  - compiler: gcc
+  - compiler: clang
+  - compiler: gcc
+    env: ENFORCE_OPENSSL=1
+  - compiler: clang
+    env: ENFORCE_OPENSSL=1
+
+# Make dependencies
+install:
+  - export SKIP_OPENSSL=1  # will only be skipped if the dependency exists
+  - ./make-dependencies.sh
+
+# Set environment vars
+before_script:
+  - export PKG_CONFIG_PATH=${HOME}/build/prefix/lib/pkgconfig:${PKG_CONFIG_PATH}
+  - export LD_LIBRARY_PATH=${HOME}/build/prefix/lib:${LD_LIBRARY_PATH}
+  - export PATH=${HOME}/build/prefix/bin:${PATH}
+
+# Install library and run tests
+script:
+  - cd build
+  - cmake -DCMAKE_INSTALL_PREFIX=${HOME}/build/prefix ..
+  - make install
+  - echo TODO: make test
+#  - make test
