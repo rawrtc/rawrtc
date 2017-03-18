@@ -29,19 +29,20 @@ matrix:
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
 # TODO: Re-enable once https://github.com/NEAT-project/usrsctp-neat/issues/6 has been resolved
-    - os: linux
-      dist: precise
-      compiler: gcc
-      env: ENFORCE_OPENSSL=0
+#    - os: linux
+#      dist: precise
+#      compiler: gcc
+#      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
 #      compiler: gcc
 #      env: ENFORCE_OPENSSL=1
-    - os: linux
-      dist: precise
-      compiler: clang
-      env: ENFORCE_OPENSSL=0
+# TODO: Re-enable once https://github.com/NEAT-project/usrsctp-neat/issues/6 has been resolved
+#    - os: linux
+#      dist: precise
+#      compiler: clang
+#      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
@@ -72,11 +73,14 @@ addons:
 before_install:
   - >
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      brew ls --versions openssl;
+      which openssl
+      echo $PATH
       brew update;
-      brew ls --versions openssl;
       brew install --force openssl;
-      brew link --force openssl;
+      export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
+      find /usr/local/Cellar -name 'pkgconfig' -type d
+      find /usr/local/Cellar -name 'libcrypto*' -type f
+      find /usr/local/Cellar -name 'libssl*' -type f
     fi
 
 # Make dependencies

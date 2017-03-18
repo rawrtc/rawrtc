@@ -23,7 +23,7 @@ LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="gather_without_role"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
-USRSCTP_BRANCH="usrsctpForNeat"
+USRSCTP_BRANCH="usrsctp-for-rawrtc"
 USRSCTP_PATH="usrsctp"
 
 # Prefix
@@ -273,8 +273,6 @@ make install -j${THREADS}
 # Note: It's important that we use the static library, otherwise a naming conflict for
 #       'mbuf_init' causes really messy allocation errors.
 rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
-# We have a name conflict for 'mbuf_init'
-objcopy --redefine-sym mbuf_init=usrsctp_mbuf_init ${PREFIX}/lib/libusrsctp.a
 cd ${MAIN_DIR}
 
 # Build libre
@@ -284,7 +282,7 @@ make clean
 echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
     OPENSSL_SYSROOT=${PREFIX} \
-    EXTRA_CFLAGS=-Werror -Wno-error=unused-command-line-argument \
+    EXTRA_CFLAGS="-Werror -Wno-error=unused-command-line-argument" \
     make install
 else
     make install
@@ -298,6 +296,6 @@ echo "Cleaning librew"
 make clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
-EXTRA_CFLAGS=-Werror -Wno-error=unused-command-line-argument \
+EXTRA_CFLAGS="-Werror -Wno-error=unused-command-line-argument" \
 make install-static
 cd ${MAIN_DIR}
