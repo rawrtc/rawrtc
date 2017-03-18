@@ -5,7 +5,7 @@ sudo: false
 cache:
   directories:
   - $HOME/build/rawrtc/rawrtc/build/dependencies/openssl
-  - $home/build/rawrtc/rawrtc/build/prefix/lib
+  - $HOME/build/rawrtc/rawrtc/build/prefix/lib
 
 # Build matrix
 language: c
