@@ -45,6 +45,7 @@ MAIN_DIR=${BUILD_PATH}/dependencies
 cd ${MAIN_DIR}
 
 # Check for DTLS 1.2 suppport in openssl
+echo "OpenSSL version: `pkg-config --short-errors --modversion openssl`"
 have_dtls_1_2=true
 pkg-config --atleast-version=1.0.2 openssl || have_dtls_1_2=false
 echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
