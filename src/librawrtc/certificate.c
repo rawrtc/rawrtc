@@ -24,9 +24,9 @@
  * Print and flush the OpenSSL error queue.
  */
 static int print_openssl_error(
-        char const * const message,
-        size_t const length,
-        void* const arg
+        char const * message,
+        size_t length,
+        void* arg
 ) {
     (void) arg;
     DEBUG_WARNING("%b", message, length);
@@ -41,7 +41,7 @@ static int print_openssl_error(
  */
 static enum rawrtc_code generate_key_rsa(
         EVP_PKEY** const keyp, // de-referenced
-        uint_least32_t const modulus_length
+        uint_fast32_t const modulus_length
 ) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
     EVP_PKEY* key = NULL;
@@ -49,9 +49,14 @@ static enum rawrtc_code generate_key_rsa(
     BIGNUM* bn = NULL;
 
     // Check arguments
-    if (!keyp || modulus_length > INT_MAX) {
+    if (!keyp) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+#if (UINT_FAST32_MAX > INT_MAX)
+    if (modulus_length > INT_MAX) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+#endif
 
     // Create an empty EVP_PKEY structure
     key = EVP_PKEY_new();
@@ -80,7 +85,7 @@ static enum rawrtc_code generate_key_rsa(
 
     // Generate RSA key pair and store it in the RSA structure
     BN_set_word(bn, RSA_F4);
-    if (!RSA_generate_key_ex(rsa, modulus_length, bn, NULL)) {
+    if (!RSA_generate_key_ex(rsa, (int) modulus_length, bn, NULL)) {
         DEBUG_WARNING("Could not generate RSA key pair\n");
         goto out;
     }
@@ -192,7 +197,7 @@ static enum rawrtc_code generate_self_signed_certificate(
         X509** const certificatep, // de-referenced
         EVP_PKEY* const key,
         char* const common_name,
-        uint_least32_t const valid_until,
+        uint_fast32_t const valid_until,
         enum rawrtc_certificate_sign_algorithm const sign_algorithm
 ) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
@@ -201,9 +206,14 @@ static enum rawrtc_code generate_self_signed_certificate(
     EVP_MD const* sign_function;
 
     // Check arguments
-    if (!certificatep || !key || !common_name || valid_until > LONG_MAX) {
+    if (!certificatep || !key || !common_name) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+#if (UINT_FAST32_MAX > LONG_MAX)
+    if (valid_until > LONG_MAX) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+#endif
 
     // SHA-1? Nope!
     if (sign_algorithm == RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1) {
@@ -299,7 +309,7 @@ out:
  * Destructor for existing certificate options.
  */
 static void rawrtc_certificate_options_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_certificate_options* const options = arg;
 
@@ -327,18 +337,28 @@ enum rawrtc_code rawrtc_certificate_options_create(
         struct rawrtc_certificate_options** const optionsp, // de-referenced
         enum rawrtc_certificate_key_type const key_type,
         char* common_name, // nullable, copied
-        uint32_t valid_until,
+        uint_fast32_t valid_until,
         enum rawrtc_certificate_sign_algorithm sign_algorithm,
         char* named_curve, // nullable, copied, ignored for RSA
-        uint_least32_t modulus_length // ignored for ECC
+        uint_fast32_t modulus_length // ignored for ECC
 ) {
     struct rawrtc_certificate_options* options;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
 
     // Check arguments
-    if (!optionsp || valid_until > LONG_MAX || modulus_length > INT_MAX) {
+    if (!optionsp) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+#if (UINT_FAST32_MAX > LONG_MAX)
+    if (valid_until > LONG_MAX) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+#endif
+#if (UINT_FAST32_MAX > INT_MAX)
+    if (modulus_length > INT_MAX) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+#endif
 
     // Set defaults
     if (!common_name) {
@@ -427,7 +447,7 @@ out:
  * Destructor for existing certificate.
  */
 static void rawrtc_certificate_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_certificate* const certificate = arg;
 
@@ -640,9 +660,12 @@ enum rawrtc_code rawrtc_certificate_get_pem(
 
     // Allocate buffer
     length = BIO_number_written(bio);
+#if (UINT64_MAX > INT_MAX)
     if (length > INT_MAX) {
         error = RAWRTC_CODE_UNKNOWN_ERROR;
+        goto out;
     }
+#endif
     pem = mem_alloc(length, NULL);
     if (!pem) {
         error = RAWRTC_CODE_NO_MEMORY;

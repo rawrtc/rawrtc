@@ -117,7 +117,12 @@ static enum rawrtc_code data_channel_open_message_parse(
     }
 
     // Get label
-    if (label_length > SIZE_MAX || mbuf_get_left(buffer) < label_length) {
+#if (UINT_FAST16_MAX > SIZE_MAX)
+    if (label_length > SIZE_MAX) {
+        return RAWRTC_CODE_INVALID_MESSAGE;
+    }
+#endif
+    if (mbuf_get_left(buffer) < label_length) {
         return RAWRTC_CODE_INVALID_MESSAGE;
     }
     if (label_length > 0) {
@@ -129,7 +134,12 @@ static enum rawrtc_code data_channel_open_message_parse(
     }
 
     // Get protocol
-    if (protocol_length > SIZE_MAX || mbuf_get_left(buffer) < protocol_length) {
+#if (UINT_FAST16_MAX > SIZE_MAX)
+    if (protocol_length > SIZE_MAX) {
+        return RAWRTC_CODE_INVALID_MESSAGE;
+    }
+#endif
+    if (mbuf_get_left(buffer) < protocol_length) {
         return RAWRTC_CODE_INVALID_MESSAGE;
     }
     if (protocol_length > 0) {
@@ -177,9 +187,11 @@ static enum rawrtc_code data_channel_open_message_create(
     protocol_length = parameters->protocol ? strlen(parameters->protocol) : 0;
 
     // Check string length
+#if (SIZE_MAX > UINT16_MAX)
     if (label_length > UINT16_MAX || protocol_length > UINT16_MAX) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+#endif
 
     // Allocate
     buffer = mbuf_alloc(RAWRTC_DCEP_MESSAGE_OPEN_BASE_SIZE + label_length + protocol_length);
@@ -961,9 +973,17 @@ static void handle_notification(
     union sctp_notification* const notification = (union sctp_notification*) buffer->buf;
 
     // TODO: Are all of these checks necessary or can we reduce that?
-    if (buffer->end > UINT32_MAX ||
-            notification->sn_header.sn_length > SIZE_MAX ||
-            notification->sn_header.sn_length != buffer->end) {
+#if (SIZE_MAX > UINT32_MAX)
+    if (buffer->end > UINT32_MAX) {
+        return;
+    }
+#endif
+#if (UINT32_MAX > SIZE_MAX)
+    if (notification->sn_header.sn_length > SIZE_MAX) {
+        return;
+    }
+#endif
+    if (notification->sn_header.sn_length != buffer->end) {
         return;
     }
 

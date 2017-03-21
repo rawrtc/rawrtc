@@ -847,10 +847,10 @@ enum rawrtc_code rawrtc_certificate_options_create(
     struct rawrtc_certificate_options** const optionsp, // de-referenced
     enum rawrtc_certificate_key_type const key_type,
     char* common_name, // nullable, copied
-    uint32_t valid_until,
+    uint_fast32_t valid_until,
     enum rawrtc_certificate_sign_algorithm sign_algorithm,
     char* named_curve, // nullable, copied, ignored for RSA
-    uint_least32_t modulus_length // ignored for ECC
+    uint_fast32_t modulus_length // ignored for ECC
 );
 
 /*
