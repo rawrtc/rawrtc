@@ -48,7 +48,7 @@ cd ${MAIN_DIR}
 platform=`uname`
 echo "Platform: $platform"
 re_make="make"
-if [[ "$platform" == 'FreeBSD' ]]; then
+if [ "$platform" = 'FreeBSD' ]; then
     re_make="gmake"
 fi
 
