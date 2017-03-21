@@ -4,8 +4,10 @@ sudo: false
 # Cache OpenSSL build
 cache:
   directories:
-  - $HOME/build/rawrtc/rawrtc/build/dependencies/openssl
-  - $HOME/build/rawrtc/rawrtc/build/prefix/lib
+# TODO: Re-enable once we figured out why this happens:
+#       https://s3.amazonaws.com/archive.travis-ci.org/jobs/213620911/log.txt
+#  - $HOME/build/rawrtc/rawrtc/build/dependencies/openssl
+#  - $HOME/build/rawrtc/rawrtc/build/prefix/lib
 
 # Build matrix
 language: c
