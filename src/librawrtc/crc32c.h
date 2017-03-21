@@ -1,5 +1,5 @@
 #pragma once
-#include <inttypes.h>
+#include <re/re_types.h>
 #include <stdlib.h>
 
 /*

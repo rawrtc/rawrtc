@@ -2,7 +2,6 @@
 // TODO: Move this section into meson build
 #define RAWRTC_DEBUG 1
 
-#include <inttypes.h> // uint8_t, UINT8_MAX, ...
 #include <stdlib.h> // TODO: Why?
 #include <stdbool.h> // bool
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, ...
