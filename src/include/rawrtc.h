@@ -17,6 +17,7 @@
 
 #define RAWRTC_DEBUG_LEVEL 5
 
+#define HAVE_INTTYPES_H
 #include <re.h>
 #include <rew.h>
 #include <usrsctp.h>
