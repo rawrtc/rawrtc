@@ -14,7 +14,6 @@ matrix:
     - os: linux
       dist: trusty
       compiler: gcc
-      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
@@ -23,7 +22,6 @@ matrix:
     - os: linux
       dist: trusty
       compiler: clang
-      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
@@ -33,7 +31,6 @@ matrix:
 #    - os: linux
 #      dist: precise
 #      compiler: gcc
-#      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
@@ -43,7 +40,6 @@ matrix:
 #    - os: linux
 #      dist: precise
 #      compiler: clang
-#      env: ENFORCE_OPENSSL=0
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
@@ -51,13 +47,11 @@ matrix:
 #      env: ENFORCE_OPENSSL=1
     - os: osx
       compiler: gcc
-      env: ENFORCE_OPENSSL=0
     - os: osx
       compiler: gcc
       env: ENFORCE_OPENSSL=1
     - os: osx
       compiler: clang
-      env: ENFORCE_OPENSSL=0
     - os: osx
       compiler: clang
       env: ENFORCE_OPENSSL=1

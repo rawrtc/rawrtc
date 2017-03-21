@@ -287,8 +287,6 @@ make clean
 echo "Building & installing usrsctp"
 # TODO: Treat warnings as errors
 make install -j${THREADS}
-# Note: It's important that we use the static library, otherwise a naming conflict for
-#       'mbuf_init' causes really messy allocation errors.
 rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
 cd ${MAIN_DIR}
 
