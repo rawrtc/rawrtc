@@ -44,6 +44,14 @@ mkdir -p ${BUILD_PATH}/dependencies
 MAIN_DIR=${BUILD_PATH}/dependencies
 cd ${MAIN_DIR}
 
+# Get platform
+platform=`uname`
+echo "Platform: $platform"
+re_make="make"
+if [[ "$platform" == 'FreeBSD' ]]; then
+    re_make="gmake"
+fi
+
 # Extra cflags when using clang
 clang_extra_cflags=""
 if [ "${CC}" = "clang" ]; then
@@ -285,7 +293,6 @@ cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 echo "Cleaning usrsctp"
 make clean
 echo "Building & installing usrsctp"
-# TODO: Treat warnings as errors
 make install -j${THREADS}
 rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
 cd ${MAIN_DIR}
@@ -293,14 +300,14 @@ cd ${MAIN_DIR}
 # Build libre
 cd ${LIBRE_PATH}
 echo "Cleaning libre"
-make clean
+eval ${re_make} clean
 echo "Building libre"
 if [ "$have_dtls_1_2" = false ]; then
-    OPENSSL_SYSROOT=$openssl_sysroot \
+    OPENSSL_SYSROOT=${openssl_sysroot} \
     EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-    make install
+    eval ${re_make} install
 else
-    make install
+    eval ${re_make} install
 fi
 rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
@@ -308,9 +315,9 @@ cd ${MAIN_DIR}
 # Build librew
 cd ${LIBREW_PATH}
 echo "Cleaning librew"
-make clean
+eval ${re_make} clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-make install-static
+eval ${re_make} install-static
 cd ${MAIN_DIR}
