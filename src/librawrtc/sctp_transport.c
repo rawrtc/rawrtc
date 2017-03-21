@@ -1946,6 +1946,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     list_init(&transport->buffered_messages_outgoing);
 
     // Allocate channel array
+    // TODO: Valgrind complains about uninitialised values here
     error = data_channels_alloc(&transport->channels, n_channels, 0);
     if (error) {
         goto out;
@@ -2321,11 +2322,12 @@ static enum rawrtc_code channel_create_handler(
     enum rawrtc_code error;
     struct rawrtc_sctp_data_channel_context* context;
 
-
     // Check arguments
     if (!transport || !channel || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+
+    // TODO: Check if closed?
 
     // Get SCTP transport
     sctp_transport = transport->transport;
@@ -2361,6 +2363,8 @@ static enum rawrtc_code channel_close_handler(
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+
+    // TODO: Check if closed?
 
     // Get SCTP transport & context
     transport = channel->transport->transport;
@@ -2406,6 +2410,8 @@ static enum rawrtc_code channel_send_handler(
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+
+    // TODO: Check if closed?
 
     // Get SCTP transport
     transport = channel->transport->transport;
