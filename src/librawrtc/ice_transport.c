@@ -373,7 +373,7 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
     }
 
     // Unknown?
-    if (re_role == RAWRTC_ICE_ROLE_UNKNOWN) {
+    if (re_role == ROLE_UNKNOWN) {
         return RAWRTC_CODE_NO_VALUE;
     } else {
         // Set pointer
@@ -438,8 +438,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     // Skip IPv4, IPv6 if requested
     // TODO: Get config from struct
     af = sa_af(&address);
-    if (!rawrtc_default_config.ipv6_enable && af == AF_INET6
-            || !rawrtc_default_config.ipv4_enable && af == AF_INET) {
+    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
+            || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
         DEBUG_PRINTF("Skipping remote candidate due to IP version: %J\n", &address);
         goto out;
     }
@@ -452,8 +452,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
 
     // Skip UDP/TCP if requested
     // TODO: Get config from struct
-    if (!rawrtc_default_config.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP
-            || !rawrtc_default_config.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP) {
+    if ((!rawrtc_default_config.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP)
+            || (!rawrtc_default_config.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP)) {
         DEBUG_PRINTF("Skipping remote candidate due to protocol: %J\n", &address);
         goto out;
     }

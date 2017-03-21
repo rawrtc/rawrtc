@@ -62,7 +62,7 @@ static void patch_sctp_header(
  */
 static void redirect_from_raw(
         int flags,
-        void *const arg
+        void* arg
 ) {
     struct rawrtc_sctp_redirect_transport* const transport = arg;
     struct mbuf* buffer;
@@ -106,7 +106,7 @@ static void redirect_from_raw(
         }
 
         // Skip IPv4 header
-        header_length = (mbuf_read_u8(buffer) & 0xf);
+        header_length = (size_t) (mbuf_read_u8(buffer) & 0xf);
         mbuf_advance(buffer, -1);
         DEBUG_PRINTF("RAW IPv4 header length: %zu\n", header_length);
         mbuf_advance(buffer, header_length * 4);
@@ -115,6 +115,7 @@ static void redirect_from_raw(
         source = ntohs(mbuf_read_u16(buffer));
         destination = ntohs(mbuf_read_u16(buffer));
         sa_set_port(&from, source);
+        (void) destination;
         DEBUG_PRINTF("RAW from %J to %"PRIu16"\n", &from, destination);
         mbuf_advance(buffer, -4);
 
@@ -201,7 +202,7 @@ static void set_state(
  * Destructor for an existing SCTP redirect transport.
  */
 static void rawrtc_sctp_redirect_transport_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_sctp_redirect_transport* const transport = arg;
 

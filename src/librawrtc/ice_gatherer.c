@@ -1453,8 +1453,8 @@ static bool interface_handler(
     // Skip IPv4, IPv6?
     // TODO: Get config from struct
     af = sa_af(address);
-    if (!rawrtc_default_config.ipv6_enable && af == AF_INET6
-            || !rawrtc_default_config.ipv4_enable && af == AF_INET) {
+    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
+            || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
         return false; // Continue gathering
     }
 

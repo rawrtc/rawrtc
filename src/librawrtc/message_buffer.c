@@ -162,7 +162,7 @@ enum rawrtc_code rawrtc_message_buffer_merge(
     DEBUG_PRINTF("Merging %zu buffered messages\n", list_count(message_buffer));
 
     // Handle each message
-    for (le; le != NULL; le = le->next) {
+    for (; le != NULL; le = le->next) {
         buffered_message = le->data;
 
         // Get buffer (if not already set)

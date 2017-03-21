@@ -2287,7 +2287,7 @@ static enum rawrtc_code channel_create_inband(
 
     // Find free SID
     context = NULL;
-    for (i; i < transport->n_channels; i += 2) {
+    for (; i < transport->n_channels; i += 2) {
         if (!transport->channels[i]) {
             // Allocate context to be used as an argument for the data channel handlers
             error = channel_context_create(&context, (uint16_t) i, false);

@@ -898,7 +898,7 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     size_t i;
 
     // Check arguments
-    if (!bytes_written, !buffer || !source) {
+    if (!bytes_written || !buffer || !source) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 

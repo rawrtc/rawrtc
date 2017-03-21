@@ -29,7 +29,7 @@ struct data_channel_sctp_client {
     struct data_channel_sctp_client* other_client;
 };
 
-static struct tmr timer = {0};
+static struct tmr timer = {{0}};
 
 static void timer_handler(
         void* arg

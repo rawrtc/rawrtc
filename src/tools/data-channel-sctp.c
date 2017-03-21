@@ -39,7 +39,7 @@ static void print_local_parameters(
     struct data_channel_sctp_client *client
 );
 
-static struct tmr timer = {0};
+static struct tmr timer = {{0}};
 
 static void timer_handler(
         void* arg

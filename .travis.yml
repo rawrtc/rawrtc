@@ -88,6 +88,10 @@ before_script:
 # TODO: Treat warnings as errors
 script:
   - cd build
-  - cmake -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix .. && make install
+  - >
+    cmake
+    -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix
+    -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
+    .. && make install
   - "echo TODO: make test"
 #  - make test
