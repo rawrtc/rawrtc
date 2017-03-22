@@ -13,17 +13,17 @@ cache:
 language: c
 matrix:
   include:
-    - os: linux
-      dist: trusty
-      compiler: gcc
+#    - os: linux
+#      dist: trusty
+#      compiler: gcc
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
 #      compiler: gcc
 #      env: ENFORCE_OPENSSL=1
-    - os: linux
-      dist: trusty
-      compiler: clang
+#    - os: linux
+#      dist: trusty
+#      compiler: clang
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
@@ -48,8 +48,8 @@ matrix:
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
 # TODO: Re-enable once OSX errors have been resolved:
-#    - os: osx
-#      compiler: gcc
+    - os: osx
+      compiler: gcc
 #    - os: osx
 #      compiler: gcc
 #      env: ENFORCE_OPENSSL=1

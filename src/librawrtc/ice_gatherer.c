@@ -280,7 +280,7 @@ static enum rawrtc_code decode_ice_server_url(
     struct pl query;
     bool secure;
     struct pl port_pl;
-    uint_fast32_t port;
+    uint_fast16_t port;
 
     // Decode URL
     error = rawrtc_error_to_code(re_regex(
@@ -322,17 +322,20 @@ static enum rawrtc_code decode_ice_server_url(
 
     // Decode port (if any)
     if (pl_isset(&port_pl)) {
-        port = pl_u32(&port_pl);
-        if (port == 0 || port > UINT16_MAX) {
+        uint_fast32_t port_u32;
+
+        // Get port
+        port_u32 = pl_u32(&port_pl);
+        if (port_u32 == 0 || port_u32 > UINT16_MAX) {
             DEBUG_WARNING("Invalid port number in ICE server URL (%s): %"PRIu32"\n",
-                          url->url, port);
+                          url->url, port_u32);
             error = RAWRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }
 
         // Set port
-        sa_set_port(&url->ipv4_address, (uint16_t) port);
-        sa_set_port(&url->ipv6_address, (uint16_t) port);
+        sa_set_port(&url->ipv4_address, (uint16_t) port_u32);
+        sa_set_port(&url->ipv6_address, (uint16_t) port_u32);
     }
 
     // Translate transport (if any) & secure flag to ICE server transport
