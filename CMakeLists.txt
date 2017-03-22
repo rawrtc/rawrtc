@@ -18,13 +18,13 @@ set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISO
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "No build type selected, using DEBUG")
     set(CMAKE_BUILD_TYPE "DEBUG")
-endif()
+endif ()
 
 # Enable verbose output in DEBUG mode
 if (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
     message(STATUS "enabling verbose outout")
     set(CMAKE_VERBOSE_MAKEFILE on)
-endif()
+endif ()
 
 # Use pkg-config
 find_package(PkgConfig REQUIRED)

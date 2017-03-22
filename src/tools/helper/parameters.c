@@ -83,7 +83,7 @@ void set_ice_candidates(
         EOR(odict_entry_add(node, "protocol", ODICT_STRING, rawrtc_ice_protocol_to_str(protocol)));
         EOR(odict_entry_add(node, "port", ODICT_INT, port));
         EOR(odict_entry_add(node, "type", ODICT_STRING, rawrtc_ice_candidate_type_to_str(type)));
-        if (type == RAWRTC_ICE_PROTOCOL_TCP) {
+        if (protocol == RAWRTC_ICE_PROTOCOL_TCP) {
             EOR(odict_entry_add(node, "tcpType", ODICT_STRING,
                                 rawrtc_ice_tcp_candidate_type_to_str(tcp_type)));
         }

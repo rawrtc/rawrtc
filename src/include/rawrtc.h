@@ -2,7 +2,6 @@
 // TODO: Move this section into meson build
 #define RAWRTC_DEBUG 1
 
-#include <inttypes.h> // uint8_t, UINT8_MAX, ...
 #include <stdlib.h> // TODO: Why?
 #include <stdbool.h> // bool
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, ...
@@ -18,6 +17,7 @@
 
 #define RAWRTC_DEBUG_LEVEL 5
 
+#define HAVE_INTTYPES_H
 #include <re.h>
 #include <rew.h>
 #include <usrsctp.h>
@@ -847,10 +847,10 @@ enum rawrtc_code rawrtc_certificate_options_create(
     struct rawrtc_certificate_options** const optionsp, // de-referenced
     enum rawrtc_certificate_key_type const key_type,
     char* common_name, // nullable, copied
-    uint32_t valid_until,
+    uint_fast32_t valid_until,
     enum rawrtc_certificate_sign_algorithm sign_algorithm,
     char* named_curve, // nullable, copied, ignored for RSA
-    uint_least32_t modulus_length // ignored for ECC
+    uint_fast32_t modulus_length // ignored for ECC
 );
 
 /*

@@ -1,4 +1,6 @@
-# rawrtc
+# RAWRTC
+
+[![Build Status][travis-ci-badge]][travis-ci-url]
 
 A WebRTC and ORTC library with a small footprint that runs everywhere.
 
@@ -8,8 +10,9 @@ The following packages are required:
 
 * [git](https://git-scm.com)
 * [cmake](https://cmake.org) >= 3.2
-* pkg-config
-* SSL development libraries (libssl-dev)
+* pkg-config (`pkgconf` for newer FreeBSD versions)
+* SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and FreeBSD)
+* GNU make (`gmake` on FreeBSD for `re` and `rew` dependencies)
 
 ### Meson (Alternative Build System)
 
@@ -37,7 +40,7 @@ The following environment variable is required for both Meson and CMake to find
 the previously built dependencies:
 
 ```
-> export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig:${PWD}/build/prefix/lib/x86_64-linux-gnu/pkgconfig
+> export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig
 ```
 
 Note that this command will need to be repeated once the terminal has been
@@ -79,3 +82,6 @@ Note: We assume that you are in the `build` directory.
 ```
 > data-channel-sctp <0|1 (ice-role)> [<sctp-port>]
 ```
+
+[travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
+[travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc

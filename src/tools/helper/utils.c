@@ -24,9 +24,11 @@ bool str_to_uint16(
     }
 
     // Check bounds
+#if (ULONG_MAX > UINT16_MAX)
     if (number > UINT16_MAX) {
         return false;
     }
+#endif
 
     // Done
     *numberp = (uint16_t) number;
@@ -49,9 +51,11 @@ bool str_to_uint64(
     }
 
     // Check bounds
+#if (ULONG_MAX > UINT64_MAX)
     if (number > UINT64_MAX) {
         return false;
     }
+#endif
 
     // Done
     *numberp = (uint64_t) number;
@@ -132,14 +136,14 @@ enum rawrtc_code dict_get_uint32(
         char* const key,
         bool required
 ) {
-    int_least32_t value;
+    int64_t value;
 
     // Check arguments
     if (!valuep || !parent || !key) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get int_least32_t
+    // Get int64_t
     enum rawrtc_code error = dict_get_entry(&value, parent, key, ODICT_INT, required);
     if (error) {
         return error;
@@ -148,10 +152,11 @@ enum rawrtc_code dict_get_uint32(
     // Check bounds
     if (value < 0 || value > UINT32_MAX) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
-    } else {
-        *valuep = (uint32_t) value;
-        return RAWRTC_CODE_SUCCESS;
     }
+
+    // Set value & done
+    *valuep = (uint32_t) value;
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -179,10 +184,11 @@ enum rawrtc_code dict_get_uint16(
     // Check bounds
     if (value < 0 || value > UINT16_MAX) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
-    } else {
-        *valuep = (uint16_t) value;
-        return RAWRTC_CODE_SUCCESS;
     }
+
+    // Set value & done
+    *valuep = (uint16_t) value;
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
