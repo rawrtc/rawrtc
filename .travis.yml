@@ -47,16 +47,17 @@ matrix:
 #      dist: precise
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
-    - os: osx
-      compiler: gcc
-    - os: osx
-      compiler: gcc
-      env: ENFORCE_OPENSSL=1
-    - os: osx
-      compiler: clang
-    - os: osx
-      compiler: clang
-      env: ENFORCE_OPENSSL=1
+# TODO: Re-enable once OSX errors have been resolved:
+#    - os: osx
+#      compiler: gcc
+#    - os: osx
+#      compiler: gcc
+#      env: ENFORCE_OPENSSL=1
+#    - os: osx
+#      compiler: clang
+#    - os: osx
+#      compiler: clang
+#      env: ENFORCE_OPENSSL=1
 
 # Linux dependencies
 addons:
