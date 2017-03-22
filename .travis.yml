@@ -78,13 +78,7 @@ before_install:
 
 # Make library dependencies
 install:
-  - ls -l /usr/local/Cellar/openssl/1.0.2k
-  - ls -l /usr/local/Cellar/openssl/1.0.2k/include
-  - ls -l /usr/local/Cellar/openssl/1.0.2k/include/openssl
   - ./make-dependencies.sh
-  - cd build/dependencies/re
-  - make info
-  - exit 1
 
 # Set environment vars
 before_script:
