@@ -227,7 +227,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
 ) {
     bool ice_transport_closed;
     bool ice_gatherer_closed;
-    enum trice_role translated_role;
+    enum ice_role translated_role;
     enum rawrtc_code error;
 
     // Check arguments
@@ -266,7 +266,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
     }
 
     // Set role (abort if unknown or something entirely weird)
-    translated_role = rawrtc_ice_role_to_trice_role(role);
+    translated_role = rawrtc_ice_role_to_re_ice_role(role);
     error = rawrtc_error_to_code(trice_set_role(transport->gatherer->ice, translated_role));
     if (error) {
         return error;
@@ -351,7 +351,7 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
         enum rawrtc_ice_role* const rolep, // de-referenced
         struct rawrtc_ice_transport* const transport
 ) {
-    enum trice_role re_role;
+    enum ice_role re_role;
     enum rawrtc_code error;
     enum rawrtc_ice_role role;
 
@@ -367,13 +367,13 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
     }
 
     // Translate role
-    error = rawrtc_trice_role_to_ice_role(&role, re_role);
+    error = rawrtc_re_ice_role_to_ice_role(&role, re_role);
     if (error) {
         return error;
     }
 
     // Unknown?
-    if (re_role == ROLE_UNKNOWN) {
+    if (re_role == ICE_ROLE_UNKNOWN) {
         return RAWRTC_CODE_NO_VALUE;
     } else {
         // Set pointer

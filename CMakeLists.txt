@@ -9,7 +9,7 @@ set(PROJECT_URL
 
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
-set(LIB_RE_VERSION "libre >= 0.5.0")
+set(LIB_RE_VERSION "libre >= 0.5.1")
 set(LIB_REW_VERISON "librew >= 0.4.0")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")
@@ -55,15 +55,15 @@ list(APPEND rawrtc_DEP_LIBRARIES ${LIB_OPENSSL_LIBRARIES})
 
 # Dependency: libre
 pkg_check_modules(LIB_RE REQUIRED ${LIB_RE_VERSION})
-include_directories(${LIB_RE_INCLUDE_DIRS})
-link_directories(${LIB_RE_LIBRARY_DIRS})
-list(APPEND rawrtc_DEP_LIBRARIES ${LIB_RE_LIBRARIES})
+include_directories(${LIB_RE_STATIC_INCLUDE_DIRS})
+link_directories(${LIB_RE_STATIC_LIBRARY_DIRS})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_RE_STATIC_LIBRARIES})
 
 # Dependency: librew
 pkg_check_modules(LIB_REW REQUIRED ${LIB_REW_VERISON})
-include_directories(${LIB_REW_INCLUDE_DIRS})
-link_directories(${LIB_REW_LIBRARY_DIRS})
-list(APPEND rawrtc_DEP_LIBRARIES ${LIB_REW_LIBRARIES})
+include_directories(${LIB_REW_STATIC_INCLUDE_DIRS})
+link_directories(${LIB_REW_STATIC_LIBRARY_DIRS})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_REW_STATIC_LIBRARIES})
 
 # Dependency: usrsctp
 # TODO: Use the pkg-config file of usrsctp once it has been added
