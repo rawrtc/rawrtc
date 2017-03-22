@@ -153,6 +153,10 @@ cd ${MAIN_DIR}
 cd ${LIBRE_PATH}
 echo "Cleaning libre"
 eval ${re_make} clean
+echo "Build information for libre:"
+OPENSSL_SYSROOT=${openssl_sysroot} \
+EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+eval ${re_make} info
 echo "Building libre"
 OPENSSL_SYSROOT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \

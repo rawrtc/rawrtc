@@ -79,9 +79,6 @@ before_install:
 # Make library dependencies
 install:
   - ./make-dependencies.sh
-  - cd build/dependencies/re
-  - make info
-  - exit 1
 
 # Set environment vars
 before_script:
