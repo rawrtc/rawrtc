@@ -302,13 +302,9 @@ cd ${LIBRE_PATH}
 echo "Cleaning libre"
 eval ${re_make} clean
 echo "Building libre"
-if [ "$have_dtls_1_2" = false ]; then
-    OPENSSL_SYSROOT=${openssl_sysroot} \
-    EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-    eval ${re_make} install
-else
-    eval ${re_make} install
-fi
+OPENSSL_SYSROOT=${openssl_sysroot} \
+EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+eval ${re_make} install
 rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
 
