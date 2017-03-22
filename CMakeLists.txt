@@ -30,12 +30,15 @@ endif ()
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
+# Dependency list
+set(rawrtc_DEP_LIBRARIES)
+
 # Dependency: Threads
-set(rawrtc_DEP_LIBRARIES
+list(APPEND rawrtc_DEP_LIBRARIES
         Threads::Threads)
 
 # Apple-specific dependencies
-# TODO: This should probably be in libre's pkg-config file
+# TODO: This should probably be in libre's pkg-config file in Libs.private
 if (APPLE)
     find_library(LIB_SYSTEM_CONFIGURATION_LIBRARIES NAMES SystemConfiguration)
     find_library(LIB_CORE_FOUNDATION_LIBRARIES NAMES CoreFoundation)
