@@ -18,7 +18,7 @@ OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
-LIBRE_COMMIT="df950db68010ab2e8e80b9cb87d149727b534c36"
+LIBRE_COMMIT="adbe6a67bcd68f2cea30cc693d1076fb06853b16"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="rawrtc-patched"
@@ -154,11 +154,11 @@ cd ${LIBRE_PATH}
 echo "Cleaning libre"
 eval ${re_make} clean
 echo "Build information for libre:"
-OPENSSL_SYSROOT=${openssl_sysroot} \
+SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 eval ${re_make} info
 echo "Building libre"
-OPENSSL_SYSROOT=${openssl_sysroot} \
+SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 eval ${re_make} install-static
 cd ${MAIN_DIR}
