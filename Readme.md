@@ -20,7 +20,7 @@ Features with a check mark are already implemented.
   - [ ] TCP
   - [ ] TLS over TCP
   - [ ] DTLS over UDP [[RFC 7350]][stun-turn-dtls]
-* TURN [[RFC 5928]][turn]
+* TURN [[RFC 5766]][turn]
   - [ ] UDP
   - [ ] TCP
   - [ ] TLS over TCP
@@ -122,7 +122,7 @@ Note: We assume that you are in the `build` directory.
 [ice]: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-08
 [trickle-ice]: https://tools.ietf.org/html/draft-ietf-ice-trickle-07
 [stun]: https://tools.ietf.org/html/rfc5389
-[turn]: https://tools.ietf.org/html/rfc5928
+[turn]: https://tools.ietf.org/html/rfc5766
 [stun-turn-dtls]: https://tools.ietf.org/html/rfc7350
 [dcep]: https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09
 [sctp-dc]: https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13
