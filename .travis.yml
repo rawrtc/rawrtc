@@ -74,15 +74,15 @@ before_install:
 install:
   - ./make-dependencies.sh
 
-# Set environment vars
+# Set environment vars & enable core dumps
 before_script:
   - export BUILD_PATH=$HOME/build/rawrtc/rawrtc/build
   - export PKG_CONFIG_PATH=${BUILD_PATH}/prefix/lib/pkgconfig:${PKG_CONFIG_PATH}
   - export LD_LIBRARY_PATH=${BUILD_PATH}/prefix/lib:${LD_LIBRARY_PATH}
   - export PATH=${BUILD_PATH}/prefix/bin:${PATH}
+  - ulimit -c unlimited -S
 
 # Install library and run tests
-# TODO: Treat warnings as errors
 script:
   - cd build
   - >
@@ -93,3 +93,11 @@ script:
   - ice-gatherer
   - "echo TODO: make test"
 #  - make test
+
+# Find core dump and print traceback on failure
+after_failure:
+- COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1)
+- >
+  if [[ -f "$COREFILE" ]];
+    then gdb -c "$COREFILE" example -ex "thread apply all bt" -ex "set pagination 0" -batch;
+  fi
