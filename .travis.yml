@@ -32,6 +32,13 @@ matrix:
     - os: linux
       dist: precise
       compiler: gcc
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backport
+          packages:
+            - cmake
+            - cmake-data
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
@@ -40,6 +47,13 @@ matrix:
     - os: linux
       dist: precise
       compiler: clang
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backport
+          packages:
+            - cmake
+            - cmake-data
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
@@ -63,21 +77,17 @@ matrix:
 # Linux dependencies
 addons:
   apt:
-    sources:
-    - george-edison55-precise-backport
     packages:
-    - cmake
-    - cmake-data
-    - git
-    - pkg-config
-    - libssl-dev
+      - git
+      - pkg-config
+      - libssl-dev
 
 # OSX dependencies
 before_install:
   - >
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       brew update || travis_terminate 1;
-      brew install cmake || travis_terminate 1;
+      cmake --version || brew install cmake || travis_terminate 1;
       brew install --force openssl || travis_terminate 1;
       export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
     fi
@@ -108,11 +118,11 @@ script:
 
 # Find core dump and print traceback on failure
 after_failure:
-- >
-  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    ls -l ~/Library/Logs/DiagnosticReports/;
-  else
-    for i in $(find ./ -maxdepth 1 -name 'core*' -print);
-      do gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
-    done;
-  fi;
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      ls -l ~/Library/Logs/DiagnosticReports/;
+    else
+      for i in $(find ./ -maxdepth 1 -name 'core*' -print);
+        do gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
+      done;
+    fi;
