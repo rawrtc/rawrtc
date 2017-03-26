@@ -113,16 +113,17 @@ script:
     -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
     .. && make install
   - ice-gatherer
-  - "echo TODO: make test"
 #  - make test
 
 # Find core dump and print traceback on failure
 after_failure:
   - >
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      ls -l ~/Library/Logs/DiagnosticReports/;
+      for i in $(find /cores -maxdepth 1 -name 'core.*' -print); do
+        lldb --core /cores/core.$pid --batch --one-line "bt"
+      done;
     else
-      for i in $(find ./ -maxdepth 1 -name 'core*' -print);
-        do gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
+      for i in $(find ./ -maxdepth 1 -name 'core*' -print); do
+        gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
       done;
     fi;
