@@ -46,8 +46,17 @@ matrix:
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
     - os: osx
+      osx_image: xcode7.3
       compiler: clang
     - os: osx
+      osx_image: xcode7.3
+      compiler: clang
+      env: ENFORCE_OPENSSL=1
+    - os: osx
+      osx_image: xcode8.1
+      compiler: clang
+    - os: osx
+      osx_image: xcode8.1
       compiler: clang
       env: ENFORCE_OPENSSL=1
 
@@ -91,14 +100,18 @@ script:
     -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix
     -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
     .. && make install
+  - ls -l ${BUILD_PATH}/prefix/bin
   - ice-gatherer
   - "echo TODO: make test"
 #  - make test
 
 # Find core dump and print traceback on failure
 after_failure:
-- COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1)
 - >
-  if [[ -f "$COREFILE" ]];
-    then gdb -c "$COREFILE" example -ex "thread apply all bt" -ex "set pagination 0" -batch;
-  fi
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    cat ~/Library/Logs/DiagnosticReports/;
+  else
+    for i in $(find ./ -maxdepth 1 -name 'core*' -print);
+      do gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
+    done;
+  fi;
