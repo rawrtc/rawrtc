@@ -13,46 +13,38 @@ cache:
 language: c
 matrix:
   include:
-#    - os: linux
-#      dist: trusty
-#      compiler: gcc
+    - os: linux
+      dist: trusty
+      compiler: gcc
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
 #      compiler: gcc
 #      env: ENFORCE_OPENSSL=1
-#    - os: linux
-#      dist: trusty
-#      compiler: clang
+    - os: linux
+      dist: trusty
+      compiler: clang
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
-# TODO: Re-enable once https://github.com/NEAT-project/usrsctp-neat/issues/6 has been resolved
-#    - os: linux
-#      dist: precise
-#      compiler: gcc
+    - os: linux
+      dist: precise
+      compiler: gcc
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
 #      compiler: gcc
 #      env: ENFORCE_OPENSSL=1
-# TODO: Re-enable once https://github.com/NEAT-project/usrsctp-neat/issues/6 has been resolved
-#    - os: linux
-#      dist: precise
-#      compiler: clang
+    - os: linux
+      dist: precise
+      compiler: clang
 # TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: precise
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
-# TODO: Re-enable once OSX errors have been resolved:
-    - os: osx
-      compiler: gcc
-    - os: osx
-      compiler: gcc
-      env: ENFORCE_OPENSSL=1
     - os: osx
       compiler: clang
     - os: osx
@@ -96,5 +88,6 @@ script:
     -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix
     -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
     .. && make install
+  - ice-gatherer
   - "echo TODO: make test"
 #  - make test

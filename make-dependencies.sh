@@ -129,6 +129,12 @@ if [ "$need_openssl" = true ]; then
     cd ${MAIN_DIR}
 fi
 
+# Print openssl information
+echo "OpenSSL version: `pkg-config --short-errors --modversion openssl`"
+have_dtls_1_2=true
+pkg-config --atleast-version=1.0.2 openssl || have_dtls_1_2=false
+echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
+
 # Set openssl sysroot
 openssl_sysroot=`pkg-config --variable=prefix openssl`
 echo "Using OpenSSL sysroot: $openssl_sysroot"
