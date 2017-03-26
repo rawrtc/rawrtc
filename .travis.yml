@@ -55,9 +55,10 @@ matrix:
 addons:
   apt:
     sources:
-    - sourceline: "ppa:george-edison55/precise-backports"
+    - george-edison55-precise-backport
     packages:
     - git
+    - cmake
     - pkg-config
     - libssl-dev
 
