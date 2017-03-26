@@ -109,7 +109,7 @@ script:
 after_failure:
 - >
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    cat ~/Library/Logs/DiagnosticReports/;
+    ls -l ~/Library/Logs/DiagnosticReports/;
   else
     for i in $(find ./ -maxdepth 1 -name 'core*' -print);
       do gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
