@@ -473,19 +473,19 @@ enum rawrtc_code rawrtc_str_to_ice_tcp_candidate_type(
 /*
  * Translate an ICE role to the corresponding re type.
  */
-enum trice_role rawrtc_ice_role_to_trice_role(
+enum ice_role rawrtc_ice_role_to_re_ice_role(
         enum rawrtc_ice_role const role
 ) {
     // No conversion needed
-    return (enum trice_role) role;
+    return (enum ice_role) role;
 }
 
 /*
  * Translate a re ICE role to the corresponding rawrtc role.
  */
-enum rawrtc_code rawrtc_trice_role_to_ice_role(
+enum rawrtc_code rawrtc_re_ice_role_to_ice_role(
         enum rawrtc_ice_role* const rolep, // de-referenced
-        enum trice_role const re_role
+        enum ice_role const re_role
 ) {
     // Check arguments
     if (!rolep) {
@@ -494,13 +494,13 @@ enum rawrtc_code rawrtc_trice_role_to_ice_role(
 
     // Translate role
     switch (re_role) {
-        case ROLE_CONTROLLING:
+        case ICE_ROLE_CONTROLLING:
             *rolep = RAWRTC_ICE_ROLE_CONTROLLING;
             return RAWRTC_CODE_SUCCESS;
-        case ROLE_CONTROLLED:
+        case ICE_ROLE_CONTROLLED:
             *rolep = RAWRTC_ICE_ROLE_CONTROLLED;
             return RAWRTC_CODE_SUCCESS;
-        case ROLE_UNKNOWN:
+        case ICE_ROLE_UNKNOWN:
             *rolep = RAWRTC_ICE_ROLE_UNKNOWN;
             return RAWRTC_CODE_SUCCESS;
         default:

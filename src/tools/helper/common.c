@@ -175,8 +175,8 @@ void print_ice_candidate(
         dbg_printf(
                 is_enabled ? DBG_INFO : DBG_DEBUG,
                 "(%s) ICE gatherer local candidate: foundation=%s, protocol=%s, priority=%"PRIu32""
-                        ", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s, related-address=%s, related-port=%"
-                        PRIu16"; URL: %s; %s\n",
+                        ", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s, related-address=%s,"
+                        "related-port=%"PRIu16"; URL: %s; %s\n",
                 client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority, ip, port,
                 rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
                 related_address ? related_address : "N/A", related_port, url ? url : "N/A",

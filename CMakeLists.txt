@@ -9,7 +9,7 @@ set(PROJECT_URL
 
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
-set(LIB_RE_VERSION "libre >= 0.5.0")
+set(LIB_RE_VERSION "libre >= 0.5.1")
 set(LIB_REW_VERISON "librew >= 0.4.0")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")
@@ -30,20 +30,40 @@ endif ()
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
+# Dependency list
+set(rawrtc_DEP_LIBRARIES)
+
+# Dependency: Threads
+list(APPEND rawrtc_DEP_LIBRARIES
+        Threads::Threads)
+
+# Apple-specific dependencies
+# TODO: This should probably be in libre's pkg-config file in Libs.private
+if (APPLE)
+    find_library(LIB_SYSTEM_CONFIGURATION_LIBRARIES NAMES SystemConfiguration)
+    find_library(LIB_CORE_FOUNDATION_LIBRARIES NAMES CoreFoundation)
+    list(APPEND rawrtc_DEP_LIBRARIES
+            ${LIB_SYSTEM_CONFIGURATION_LIBRARIES}
+            ${LIB_CORE_FOUNDATION_LIBRARIES})
+endif ()
+
 # Dependency: OpenSSL
 pkg_check_modules(LIB_OPENSSL REQUIRED ${OPENSSL_VERSION})
 include_directories(${LIB_OPENSSL_INCLUDE_DIRS})
 link_directories(${LIB_OPENSSL_LIBRARY_DIRS})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_OPENSSL_LIBRARIES})
 
 # Dependency: libre
 pkg_check_modules(LIB_RE REQUIRED ${LIB_RE_VERSION})
-include_directories(${LIB_RE_INCLUDE_DIRS})
-link_directories(${LIB_RE_LIBRARY_DIRS})
+include_directories(${LIB_RE_STATIC_INCLUDE_DIRS})
+link_directories(${LIB_RE_STATIC_LIBRARY_DIRS})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_RE_STATIC_LIBRARIES})
 
 # Dependency: librew
 pkg_check_modules(LIB_REW REQUIRED ${LIB_REW_VERISON})
-include_directories(${LIB_REW_INCLUDE_DIRS})
-link_directories(${LIB_REW_LIBRARY_DIRS})
+include_directories(${LIB_REW_STATIC_INCLUDE_DIRS})
+link_directories(${LIB_REW_STATIC_LIBRARY_DIRS})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_REW_STATIC_LIBRARIES})
 
 # Dependency: usrsctp
 # TODO: Use the pkg-config file of usrsctp once it has been added
@@ -52,14 +72,7 @@ find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
 include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
 link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
-
-# Dependencies library list
-set(rawrtc_DEP_LIBRARIES
-        Threads::Threads
-        ${LIB_RE_LIBRARIES}
-        ${LIB_REW_LIBRARIES}
-        ${LIB_OPENSSL_LIBRARIES}
-        ${LIB_USRSCTP_LIBRARIES})
+list(APPEND rawrtc_DEP_LIBRARIES ${LIB_USRSCTP_LIBRARIES})
 
 # Dependency versions
 set(PKG_CONFIG_REQUIRES "")
