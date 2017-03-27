@@ -119,11 +119,12 @@ script:
 after_failure:
   - >
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      for i in $(find /cores -maxdepth 1 -name 'core.*' -print); do
-        lldb --core /cores/core.$pid --batch --one-line "bt"
+      pip install six  # OSX with xcode7.3 needs six
+      for f in $(find /cores -maxdepth 1 -name 'core.*' -print); do
+        lldb --core $f --batch --one-line "bt"
       done;
     else
-      for i in $(find ./ -maxdepth 1 -name 'core*' -print); do
-        gdb ${PWD}/test core* -ex "thread apply all bt" -ex "set pagination 0" --batch;
+      for f in $(find ./ -maxdepth 1 -name 'core*' -print); do
+        gdb ${PWD}/ice-gatherer $f -ex "thread apply all bt" -ex "set pagination 0" --batch;
       done;
     fi;
