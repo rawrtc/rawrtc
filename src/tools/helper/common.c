@@ -1,4 +1,5 @@
 #include <string.h> // strerror
+#include <stdio.h>
 #include <rawrtc.h>
 #include "common.h"
 
@@ -174,6 +175,9 @@ void print_ice_candidate(
         is_enabled = ice_candidate_type_enabled(client, type);
 
         // Print candidate
+        DEBUG_INFO("WTF ARE U DOING OSX: PRIu16=%s, PRIu32=%s, PRIuFAST16=%s, PRIuFAST32=%s\n",
+                   PRIu16, PRIu32, PRIuFAST16, PRIuFAST32);
+        printf("WTF! %"PRIu16" == %"PRIu32"\n", port, (uint32_t) port);
         DEBUG_INFO("WTF! %"PRIu16" == %"PRIu32"\n", port, (uint32_t) port);
         DEBUG_INFO("(%s) ICE gatherer local candidate\n", client->name);
         DEBUG_INFO("foundation=%s\n", foundation);
