@@ -304,6 +304,13 @@ However, the browser tool behaves a bit differently. Check the log output of
 the tool instances (console output in the browser) to see what data has been
 sent and whether it has been received successfully.
 
+In the browser, you can use the created data channels by accessing
+`peer.dc['<channel-name>']`, for example:
+
+```js
+peer.dc['example-channel'].send('RAWR!')
+```
+
 Usage:
 
     data-channel-sctp <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
