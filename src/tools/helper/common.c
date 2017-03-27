@@ -1,5 +1,4 @@
 #include <string.h> // strerror
-#include <stdio.h>
 #include <rawrtc.h>
 #include "common.h"
 
@@ -149,8 +148,6 @@ void print_ice_candidate(
         char* related_address = NULL;
         uint16_t related_port = 0;
         bool is_enabled;
-        uint16_t test = 12345;
-        DEBUG_INFO("WTF! %"PRIu16" == %"PRIu32"\n", test, (uint32_t) test);
 
         // Get candidate information
         EOE(rawrtc_ice_candidate_get_foundation(&foundation, candidate));
@@ -175,24 +172,6 @@ void print_ice_candidate(
         is_enabled = ice_candidate_type_enabled(client, type);
 
         // Print candidate
-        DEBUG_INFO("Compile time: PRIu16="PRIu16", PRIu32="PRIu32", "
-                   "PRIuFAST16="PRIuFAST16", PRIuFAST32="PRIuFAST32"\n");
-        DEBUG_INFO("Runtime: PRIu16=%s, PRIu32=%s, PRIuFAST16=%s, PRIuFAST32=%s\n",
-                   PRIu16, PRIu32, PRIuFAST16, PRIuFAST32);
-        printf("WTF! %"PRIu16" == %"PRIu32"\n", port, (uint32_t) port);
-        DEBUG_INFO("WTF! %"PRIu16" == %"PRIu32"\n", port, (uint32_t) port);
-        DEBUG_INFO("(%s) ICE gatherer local candidate\n", client->name);
-        DEBUG_INFO("foundation=%s\n", foundation);
-        DEBUG_INFO("protocol=%s\n", rawrtc_ice_protocol_to_str(protocol));
-        DEBUG_INFO("priority=%"PRIu32"\n", priority);
-        DEBUG_INFO("ip=%s\n", ip);
-        DEBUG_INFO("port=%"PRIu16"\n", port);
-        DEBUG_INFO("type=%s\n", rawrtc_ice_candidate_type_to_str(type));
-        DEBUG_INFO("tcp-type=%s\n", tcp_type_str);
-        DEBUG_INFO("related-address=%s\n", related_address ? related_address : "N/A");
-        DEBUG_INFO("related-port=%"PRIu16"\n", related_port);
-        DEBUG_INFO("URL: %s\n", url ? url : "N/A");
-        DEBUG_INFO("%s\n", is_enabled ? "enabled" : "disabled");
         dbg_printf(
                 is_enabled ? DBG_INFO : DBG_DEBUG,
                 "(%s) ICE gatherer local candidate: foundation=%s, protocol=%s, priority=%"PRIu32""
