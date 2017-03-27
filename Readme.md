@@ -33,7 +33,7 @@ Features with a check mark are already implemented.
     [[draft-ietf-rtcweb-jsep-19]][jsep]
   - [X] ORTC C-API based on the [W3C CG ORTC API][w3c-ortc]
 * Other
-  - [ ] SDP for WebRTC [[draft-ietf-rtcweb-sdp-03]][sdp]
+  - [ ] SDP for WebRTC [[draft-ietf-rtcweb-sdp-04]][sdp]
   - [ ] IP Address Handling [[draft-ietf-rtcweb-ip-handling-03]][ip-handling]
   - [ ] DNS-based STUN/TURN server discovery
 
@@ -129,5 +129,5 @@ Note: We assume that you are in the `build` directory.
 [jsep]: https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-19
 [w3c-webrtc]: https://www.w3.org/TR/webrtc/
 [w3c-ortc]: http://draft.ortc.org
-[sdp]: https://tools.ietf.org/html/draft-ietf-rtcweb-sdp-03
+[sdp]: https://tools.ietf.org/html/draft-ietf-rtcweb-sdp-04
 [ip-handling]: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-03
