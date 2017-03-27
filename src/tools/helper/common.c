@@ -148,6 +148,8 @@ void print_ice_candidate(
         char* related_address = NULL;
         uint16_t related_port = 0;
         bool is_enabled;
+        uint16_t test = 12345;
+        DEBUG_INFO("WTF! %"PRIu16" == %"PRIu32"\n", test, (uint32_t) test);
 
         // Get candidate information
         EOE(rawrtc_ice_candidate_get_foundation(&foundation, candidate));
@@ -172,6 +174,7 @@ void print_ice_candidate(
         is_enabled = ice_candidate_type_enabled(client, type);
 
         // Print candidate
+        DEBUG_INFO("WTF! %"PRIu16" == %"PRIu32"\n", port, (uint32_t) port);
         DEBUG_INFO("(%s) ICE gatherer local candidate\n", client->name);
         DEBUG_INFO("foundation=%s\n", foundation);
         DEBUG_INFO("protocol=%s\n", rawrtc_ice_protocol_to_str(protocol));
