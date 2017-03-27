@@ -252,7 +252,7 @@ the ICE role. We are able to do this because RAWRTC handles data channel
 messages correctly and does not have a maximum message size limitation compared
 to most other implementations (check out
 [this article](https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html)
-for a detailed explanations).
+for a detailed explanation).
 
 Usage:
 
