@@ -172,6 +172,18 @@ void print_ice_candidate(
         is_enabled = ice_candidate_type_enabled(client, type);
 
         // Print candidate
+        DEBUG_INFO("(%s) ICE gatherer local candidate\n", client->name);
+        DEBUG_INFO("foundation=%s\n", foundation);
+        DEBUG_INFO("protocol=%s\n", rawrtc_ice_protocol_to_str(protocol));
+        DEBUG_INFO("priority=%"PRIu32"\n", priority);
+        DEBUG_INFO("ip=%s\n", ip);
+        DEBUG_INFO("port=%"PRIu16"\n", port);
+        DEBUG_INFO("type=%s\n", rawrtc_ice_candidate_type_to_str(type));
+        DEBUG_INFO("tcp-type=%s\n", tcp_type_str);
+        DEBUG_INFO("related-address=%s\n", related_address ? related_address : "N/A");
+        DEBUG_INFO("related-port=%"PRIu16"\n", related_port);
+        DEBUG_INFO("URL: %s\n", url ? url : "N/A");
+        DEBUG_INFO("%s\n", is_enabled ? "enabled" : "disabled");
         dbg_printf(
                 is_enabled ? DBG_INFO : DBG_DEBUG,
                 "(%s) ICE gatherer local candidate: foundation=%s, protocol=%s, priority=%"PRIu32""
