@@ -313,10 +313,9 @@ static void parse_remote_parameters(
         void* arg
 ) {
     struct data_channel_sctp_client* const client = arg;
-    bool do_exit;
+    enum rawrtc_code error;
     struct odict* dict = NULL;
     struct odict* node = NULL;
-    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     struct rawrtc_ice_parameters* ice_parameters = NULL;
     struct rawrtc_ice_candidates* ice_candidates = NULL;
     struct rawrtc_dtls_parameters* dtls_parameters = NULL;
@@ -324,8 +323,8 @@ static void parse_remote_parameters(
     (void) flags;
 
     // Get dict from JSON
-    do_exit = get_json_stdin(&dict);
-    if (do_exit) {
+    error = get_json_stdin(&dict);
+    if (error) {
         goto out;
     }
 
@@ -365,7 +364,7 @@ out:
     mem_deref(dict);
     
     // Exit?
-    if (do_exit) {
+    if (error == RAWRTC_CODE_NO_VALUE) {
         DEBUG_NOTICE("Exiting\n");
 
         // Stop client & bye

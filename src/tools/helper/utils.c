@@ -193,9 +193,8 @@ enum rawrtc_code dict_get_uint16(
 
 /*
  * Get JSON from stdin and parse it to a dictionary.
- * If no data has been entered, return `true`, otherwise `false`.
  */
-bool get_json_stdin(
+enum rawrtc_code get_json_stdin(
         struct odict** const dictp // de-referenced
 ) {
     char buffer[PARAMETERS_MAX_LENGTH];
@@ -209,12 +208,12 @@ bool get_json_stdin(
 
     // Exit?
     if (length == 1 && buffer[0] == '\n') {
-        return true;
+        return RAWRTC_CODE_NO_VALUE;
     }
 
     // Decode JSON
     EOR(json_decode_odict(dictp, 16, buffer, length, 3));
-    return false;
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*

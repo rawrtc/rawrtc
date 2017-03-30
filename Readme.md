@@ -41,8 +41,8 @@ Features with a check mark are already implemented.
 
 The following packages are required:
 
-* [git](https://git-scm.com)
-* [cmake](https://cmake.org) >= 3.2
+* [git][git]
+* [cmake][cmake] >= 3.2
 * pkg-config (`pkgconf` for newer FreeBSD versions)
 * SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and FreeBSD)
 * GNU make (`gmake` on FreeBSD for `re` and `rew` dependencies)
@@ -52,15 +52,15 @@ The following packages are required:
 ~~If you want to use Meson instead of CMake, you have to install both the Meson
 build system and Ninja.~~ Use CMake for now. Meson will be updated later.
 
-* [meson](https://github.com/mesonbuild/meson)
-* [ninja](https://ninja-build.org)
+* [meson][meson]
+* [ninja][ninja]
 
 ## Build
 
 The following instruction will use a custom *prefix* to avoid installing
 the necessary dependencies and this library system-wide.
 
-### Dependencies & Meson Configuration
+### Dependencies
 
     cd <path-to-rawrtc>
     ./make-dependencies.sh
@@ -227,8 +227,7 @@ The SCTP redirect transport tool starts an SCTP redirect transport on top of an
 established DTLS transport to relay SCTP messages from and to a third party.
 This tool has been developed to be able to test data channel implementations
 without having to write the required DTLS and ICE stacks. An example of such a
-testing tool is [dctt](https://github.com/nplab/dctt) which uses the kernel
-SCTP stack of FreeBSD.
+testing tool is [dctt][dctt] which uses the kernel SCTP stack of FreeBSD.
 
 Usage:
 
@@ -251,8 +250,7 @@ The tool will send some large (16 MiB) test data to the other peer depending on
 the ICE role. We are able to do this because RAWRTC handles data channel
 messages correctly and does not have a maximum message size limitation compared
 to most other implementations (check out
-[this article](https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html)
-for a detailed explanation).
+[this article][demystifying-webrtc-dc-size-limit] for a detailed explanation).
 
 Usage:
 
@@ -343,4 +341,11 @@ Usage:
 [sdp]: https://tools.ietf.org/html/draft-ietf-rtcweb-sdp-04
 [ip-handling]: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-03
 
+[git]: (https://git-scm.com)
+[cmake]: https://cmake.org
+[meson]: https://github.com/mesonbuild/meson
+[ninja]: https://ninja-build.org
+
 [webrtc-rawrtc]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/webrtc-rawrtc.html
+[dctt]: https://github.com/nplab/dctt
+[demystifying-webrtc-dc-size-limit]: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html

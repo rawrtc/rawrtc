@@ -22,7 +22,7 @@ LIBRE_COMMIT="d52e2df8512d98f869601adcdac742502331c997"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="rawrtc-patched"
-LIBREW_COMMIT="07d3eb0230ff6bf6362d7d3bd01fdb82e30247e9"
+LIBREW_COMMIT="66817f584131b353313a681a6cdc9bfacc1a09ae"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
@@ -94,28 +94,40 @@ fi
 if [ ! -d "${USRSCTP_PATH}" ]; then
     echo "Cloning usrsctp"
     git clone -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
-    cd ${USRSCTP_PATH}
-    git reset --hard ${USRSCTP_COMMIT}
-    cd ${MAIN_DIR}
+else
+    echo "Pulling usrsctp"
+    git pull
 fi
+cd ${USRSCTP_PATH}
+git checkout ${USRSCTP_BRANCH}
+git reset --hard ${USRSCTP_COMMIT}
+cd ${MAIN_DIR}
 
 # Get libre
 if [ ! -d "${LIBRE_PATH}" ]; then
     echo "Cloning libre"
     git clone -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
-    cd ${LIBRE_PATH}
-    git reset --hard ${LIBRE_COMMIT}
-    cd ${MAIN_DIR}
+else
+    echo "Pulling libre"
+    git pull
 fi
+cd ${LIBRE_PATH}
+git checkout ${LIBRE_BRANCH}
+git reset --hard ${LIBRE_COMMIT}
+cd ${MAIN_DIR}
 
 # Get librew
 if [ ! -d "${LIBREW_PATH}" ]; then
     echo "Cloning librew"
     git clone -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
-    cd ${LIBREW_PATH}
-    git reset --hard ${LIBREW_COMMIT}
-    cd ${MAIN_DIR}
+else
+    echo "Pulling librew"
+    git pull
 fi
+cd ${LIBREW_PATH}
+git checkout ${LIBREW_BRANCH}
+git reset --hard ${LIBREW_COMMIT}
+cd ${MAIN_DIR}
 
 # Build openssl
 if [ "$need_openssl" = true ]; then

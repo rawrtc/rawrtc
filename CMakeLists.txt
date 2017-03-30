@@ -10,7 +10,7 @@ set(PROJECT_URL
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
 set(LIB_RE_VERSION "libre >= 0.5.1")
-set(LIB_REW_VERISON "librew >= 0.4.0")
+set(LIB_REW_VERISON "librew >= 0.5.0")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")
 
@@ -92,7 +92,6 @@ set(PKG_CONFIG_CFLAGS "-I\${includedir} -I${LIB_USRSCTP_INCLUDE_DIRS}")
 # Add custom target to install the library
 add_custom_target(install-${PROJECT_NAME}
         $(MAKE) install
-        DEPENDS ${PROJECT_NAME}
         COMMENT "Installing ${PROJECT_NAME}")
 
 # Walk through subdirectories

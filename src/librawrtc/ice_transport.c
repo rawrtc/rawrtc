@@ -361,10 +361,7 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
     }
 
     // Get libre role from ICE instance
-    error = rawrtc_error_to_code(trice_get_role(transport->gatherer->ice, &re_role));
-    if (error) {
-        return error;
-    }
+    re_role = trice_local_role(transport->gatherer->ice);
 
     // Translate role
     error = rawrtc_re_ice_role_to_ice_role(&role, re_role);

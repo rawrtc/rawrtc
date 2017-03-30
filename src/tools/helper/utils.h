@@ -51,9 +51,8 @@ enum rawrtc_code dict_get_uint16(
 
 /*
  * Get JSON from stdin and parse it to a dictionary.
- * If no data has been entered, return `true`, otherwise `false`.
  */
-bool get_json_stdin(
+enum rawrtc_code get_json_stdin(
     struct odict** const dictp // de-referenced
 );
 
