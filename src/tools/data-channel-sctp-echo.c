@@ -97,7 +97,7 @@ void data_channel_handler(
 
     // Create data channel helper instance & add to list
     // Note: In this case we need to reference the channel because we have not created it
-    data_channel_helper_create_from_channel(&channel_helper, 0, mem_ref(channel), arg);
+    data_channel_helper_create_from_channel(&channel_helper, mem_ref(channel), arg, NULL);
     list_append(&client->data_channels, &channel_helper->le, channel_helper);
 
     // Set handler argument & handlers

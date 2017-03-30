@@ -26,10 +26,11 @@ struct client {
  * Data channel helper structure. Can be extended.
  */
 struct data_channel_helper {
+    struct le le;
     struct rawrtc_data_channel* channel;
     char* label;
     struct client* client;
-    struct le le;
+    void* arg;
 };
 
 /*
