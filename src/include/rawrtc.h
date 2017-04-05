@@ -503,10 +503,10 @@ struct rawrtc_buffered_message {
 struct rawrtc_certificate_options {
     enum rawrtc_certificate_key_type key_type;
     char* common_name; // copied
-    uint32_t valid_until;
+    uint_fast32_t valid_until;
     enum rawrtc_certificate_sign_algorithm sign_algorithm;
     char* named_curve; // nullable, copied, ignored for RSA
-    uint_least32_t modulus_length; // ignored for ECC
+    uint_fast32_t modulus_length; // ignored for ECC
 };
 
 /*
@@ -792,6 +792,33 @@ struct rawrtc_data_channel {
     rawrtc_data_channel_close_handler* close_handler; // nullable
     rawrtc_data_channel_message_handler* message_handler; // nullable
     void* arg; // nullable
+};
+
+/*
+ * Peer connection context.
+ * TODO: private
+ */
+struct rawrtc_peer_connection_context {
+    struct rawrtc_ice_gatherer* ice_gatherer;
+    struct rawrtc_ice_transport* ice_transport;
+    struct list certificates;
+    struct rawrtc_dtls_transport* dtls_transport;
+    struct rawrtc_data_transport* data_transport;
+};
+
+/*
+ * Peer connection.
+ * TODO: private
+ */
+struct rawrtc_peer_connection {
+    uint_fast8_t flags; // TODO: Still needed?
+    struct sdp_session* sdp_session;
+    struct mbuf* local_description;
+    struct mbuf* remote_description;
+    struct rawrtc_ice_gather_options* gather_options;
+    struct rawrtc_peer_connection_context context;
+    enum rawrtc_data_transport_type data_transport_type;
+    rawrtc_data_channel_handler* data_channel_handler; // nullable
 };
 
 /*
@@ -1629,6 +1656,36 @@ enum rawrtc_code rawrtc_data_channel_set_close_handler(
 enum rawrtc_code rawrtc_data_channel_set_message_handler(
     struct rawrtc_data_channel* const channel,
     rawrtc_data_channel_message_handler* const message_handler // nullable
+);
+
+/*
+ * Create a new peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_create(
+    struct rawrtc_peer_connection** const connectionp // de-referenced
+);
+
+/*
+* Create an offer.
+*/
+enum rawrtc_code rawrtc_peer_connection_create_offer(
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+* Create a data channel on a peer connection.
+*/
+enum rawrtc_code rawrtc_peer_connection_create_data_channel(
+    struct rawrtc_data_channel** const channelp, // de-referenced
+    struct rawrtc_peer_connection* const connection,
+    struct rawrtc_data_channel_parameters* const parameters, // referenced
+    struct rawrtc_data_channel_options* const options, // nullable, referenced
+    rawrtc_data_channel_open_handler* const open_handler, // nullable
+    rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
+    rawrtc_data_channel_error_handler* const error_handler, // nullable
+    rawrtc_data_channel_close_handler* const close_handler, // nullable
+    rawrtc_data_channel_message_handler* const message_handler, // nullable
+    void* const arg // nullable
 );
 
 

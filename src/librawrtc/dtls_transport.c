@@ -577,27 +577,25 @@ static void rawrtc_dtls_transport_destroy(
 }
 
 /*
- * Create a new DTLS transport.
+ * Create a new DTLS transport (internal)
  */
-enum rawrtc_code rawrtc_dtls_transport_create(
+enum rawrtc_code rawrtc_dtls_transport_create_internal(
         struct rawrtc_dtls_transport** const transportp, // de-referenced
         struct rawrtc_ice_transport* const ice_transport, // referenced
-        struct rawrtc_certificate* const certificates[], // copied (each item)
-        size_t const n_certificates,
+        struct list* certificates, // de-referenced, copied (shallow)
         rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
         rawrtc_dtls_transport_error_handler* const error_handler, // nullable
         void* const arg // nullable
 ) {
     struct rawrtc_dtls_transport* transport;
-    size_t i;
-    struct rawrtc_certificate* certificate;
     enum rawrtc_code error;
     struct le* le;
+    struct rawrtc_certificate* certificate;
     uint8_t* certificate_der;
     size_t certificate_der_length;
 
     // Check arguments
-    if (!transportp || !ice_transport || !certificates || !n_certificates) {
+    if (!transportp || !ice_transport || !certificates) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -622,7 +620,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // Set fields/reference
     transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);
-    list_init(&transport->certificates);
+    transport->certificates = *certificates;
     transport->state_change_handler = state_change_handler;
     transport->error_handler = error_handler;
     transport->arg = arg;
@@ -631,25 +629,6 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     list_init(&transport->buffered_messages_in);
     list_init(&transport->buffered_messages_out);
     list_init(&transport->fingerprints);
-
-    // Append and reference certificates
-    for (i = 0; i < n_certificates; ++i) {
-        // Null?
-        if (certificates[i] == NULL) {
-            error = RAWRTC_CODE_INVALID_ARGUMENT;
-            goto out;
-        }
-
-        // Copy certificate
-        // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
-        error = rawrtc_certificate_copy(&certificate, certificates[i]);
-        if (error) {
-            goto out;
-        }
-
-        // Append to list
-        list_append(&transport->certificates, &certificate->le, certificate);
-    }
 
     // Create (D)TLS context
     DEBUG_PRINTF("Creating DTLS context\n");
@@ -680,8 +659,8 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // Set Diffie-Hellman parameters
     // TODO: Get DH params from config
     DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
-    error = rawrtc_error_to_code(tls_set_dh_params_der(transport->context,
-            rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length));
+    error = rawrtc_error_to_code(tls_set_dh_params_der(
+            transport->context, rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length));
     if (error) {
         goto out;
     }
@@ -689,8 +668,9 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // Set cipher suites
     // TODO: Get cipher suites from config
     DEBUG_PRINTF("Setting cipher suites on DTLS context\n");
-    error = rawrtc_error_to_code(tls_set_ciphers(transport->context,
-            rawrtc_default_dtls_cipher_suites, rawrtc_default_dtls_cipher_suites_length));
+    error = rawrtc_error_to_code(tls_set_ciphers(
+            transport->context, rawrtc_default_dtls_cipher_suites,
+            rawrtc_default_dtls_cipher_suites_length));
     if (error) {
         goto out;
     }
@@ -721,7 +701,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // Note: We cannot reference ourselves here as that would introduce a cyclic reference
     ice_transport->dtls_transport = transport;
 
-out:
+    out:
     if (error) {
         mem_deref(transport);
     } else {
@@ -729,6 +709,33 @@ out:
         *transportp = transport;
     }
     return error;
+}
+
+/*
+ * Create a new DTLS transport.
+ */
+enum rawrtc_code rawrtc_dtls_transport_create(
+        struct rawrtc_dtls_transport** const transportp, // de-referenced
+        struct rawrtc_ice_transport* const ice_transport, // referenced
+        struct rawrtc_certificate* const certificates[], // copied (each item)
+        size_t const n_certificates,
+        rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
+        rawrtc_dtls_transport_error_handler* const error_handler, // nullable
+        void* const arg // nullable
+) {
+    enum rawrtc_code error;
+    struct list certificates_list = LIST_INIT;
+
+    // Append and reference certificates
+    error = rawrtc_certificate_array_to_list(&certificates_list, certificates, n_certificates);
+    if (error) {
+        return error;
+    }
+
+    // Create DTLS transport
+    return rawrtc_dtls_transport_create_internal(
+            transportp, ice_transport, &certificates_list, state_change_handler, error_handler,
+            arg);
 }
 
 /*

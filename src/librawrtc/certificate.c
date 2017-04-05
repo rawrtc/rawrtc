@@ -808,3 +808,94 @@ enum rawrtc_code rawrtc_certificate_get_fingerprint(
     // Convert bytes to hex
     return rawrtc_bin_to_colon_hex(fingerprint, bytes_buffer, (size_t) length);
 }
+
+/*
+ * Copy and append a certificate to a list.
+ */
+enum rawrtc_code copy_and_append_certificate(
+        struct list* const certificate_list, // de-referenced, not checked
+        struct rawrtc_certificate* const certificate // copied, not checked
+) {
+    enum rawrtc_code error;
+    struct rawrtc_certificate* copied_certificate;
+
+    // Null?
+    if (certificate == NULL) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Copy certificate
+    // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
+    error = rawrtc_certificate_copy(&copied_certificate, certificate);
+    if (error) {
+        return error;
+    }
+
+    // Append to list
+    list_append(certificate_list, &copied_certificate->le, copied_certificate);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Copy an array of certificates to a list.
+ * Warning: The list will be flushed on error.
+ */
+enum rawrtc_code rawrtc_certificate_array_to_list(
+        struct list* const certificate_list, // de-referenced, copied into
+        struct rawrtc_certificate* const certificates[], // copied (each item)
+        size_t const n_certificates
+) {
+    size_t i;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!certificate_list || !certificates) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Append and reference certificates
+    for (i = 0; i < n_certificates; ++i) {
+        error = copy_and_append_certificate(certificate_list, certificates[i]);
+        if (error) {
+            goto out;
+        }
+    }
+
+out:
+    if (error) {
+        list_flush(certificate_list);
+    }
+    return error;
+}
+
+/*
+ * Copy a certificate list.
+ * Warning: The destination list will be flushed on error.
+ */
+enum rawrtc_code rawrtc_certificate_list_copy(
+        struct list* const destination_list, // de-referenced, copied into
+        struct list* const source_list // de-referenced, copied (each item)
+) {
+    struct le* le;
+    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
+
+    // Check arguments
+    if (!destination_list || !source_list) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Append and reference certificates
+    for (le = list_head(source_list); le != NULL; le = le->next) {
+        struct rawrtc_certificate* const certificate = le->data;
+        error = copy_and_append_certificate(destination_list, certificate);
+        if (error) {
+            goto out;
+        }
+    }
+
+out:
+    if (error) {
+        list_flush(destination_list);
+    }
+    return error;
+}
