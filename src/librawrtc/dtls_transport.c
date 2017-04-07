@@ -214,8 +214,10 @@ static void dtls_receive_handler(
         return;
     }
 
-    // Handle (if receive handler exists)
-    if (transport->receive_handler) {
+    // Handle (if receive handler exists and connected)
+    // Note: Checking for 'connected' state ensures that no data will be received before the
+    //       fingerprints have been verified.
+    if (transport->receive_handler && transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         transport->receive_handler(buffer, transport->receive_handler_arg);
         return;
     }
