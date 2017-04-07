@@ -9,6 +9,30 @@
 #include "debug.h"
 
 /*
+ * Get the corresponding name for a peer connection state.
+ */
+char const * const rawrtc_peer_connection_state_to_name(
+        enum rawrtc_peer_connection_state const state
+) {
+    switch (state) {
+        case RAWRTC_PEER_CONNECTION_STATE_NEW:
+            return "new";
+        case RAWRTC_PEER_CONNECTION_STATE_CONNECTING:
+            return "connecting";
+        case RAWRTC_PEER_CONNECTION_STATE_CONNECTED:
+            return "connected";
+        case RAWRTC_PEER_CONNECTION_STATE_DISCONNECTED:
+            return "disconnected";
+        case RAWRTC_PEER_CONNECTION_STATE_CLOSED:
+            return "closed";
+        case RAWRTC_PEER_CONNECTION_STATE_FAILED:
+            return "failed";
+        default:
+            return "???";
+    }
+}
+
+/*
  * Remove all instances that have been created which are not
  * associated to the peer connection.
  */
@@ -31,6 +55,17 @@ static void revert_context(
     if (new->ice_gatherer != current->ice_gatherer) {
         mem_deref(new->ice_gatherer);
     }
+}
+
+/*
+ * Apply all instances on a peer connection.
+ */
+static void apply_context(
+        struct rawrtc_peer_connection* connection, // not checked
+        struct rawrtc_peer_connection_context* const context // de-referenced, not checked
+) {
+    // Store new context
+    connection->context = *context;
 }
 
 void ice_gatherer_local_candidate_handler(
@@ -162,8 +197,23 @@ static void dtls_transport_state_change_handler(
         enum rawrtc_dtls_transport_state const state,
         void* const arg
 ) {
-    // TODO
-    (void) arg;
+    struct rawrtc_peer_connection* connection = arg;
+
+    // Update connection state
+    // TODO: Handle correctly
+    switch (state) {
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING:
+            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTING;
+            break;
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED:
+            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTED;
+            break;
+        case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
+            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_FAILED;
+            break;
+        default:
+            break;
+    }
     DEBUG_WARNING("HANDLE DTLS transport state: %s\n",
                   rawrtc_dtls_transport_state_to_name(state));
 }
@@ -288,15 +338,23 @@ static void rawrtc_peer_connection_destroy(
     list_flush(&connection->context.certificates);
     mem_deref(connection->context.ice_transport);
     mem_deref(connection->context.ice_gatherer);
-    mem_deref(connection->gather_options);
     mem_deref(connection->sdp_session);
+    mem_deref(connection->gather_options);
 }
 
 /*
  * Create a new peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_create(
-        struct rawrtc_peer_connection** const connectionp // de-referenced
+        struct rawrtc_peer_connection** const connectionp, // de-referenced
+//        rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
+//        rawrtc_peer_connection_ice_candidate_handler* const ice_candidate_handler, // nullable
+//        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
+//        rawrtc_peer_connection_signaling_state_change_handler* const signaling_state_change_handler, // nullable
+//        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
+//        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
+        rawrtc_peer_connection_state_change_handler* const connection_state_change_handler //nullable
+//        rawrtc_peer_connection_fingerprint_failure_handler* const fingerprint_failure_handler // nullable
 ) {
     struct rawrtc_peer_connection* connection;
     enum rawrtc_code error;
@@ -313,18 +371,6 @@ enum rawrtc_code rawrtc_peer_connection_create(
         return RAWRTC_CODE_NO_MEMORY;
     }
 
-    // Use IPv6 unspecified as SDP session address
-    error = rawrtc_error_to_code(sa_set_str(&address, "::", 0));
-    if (error) {
-        goto out;
-    }
-
-    // Create SDP session
-    error = rawrtc_error_to_code(sdp_session_alloc(&connection->sdp_session, &address));
-    if (error) {
-        goto out;
-    }
-
     // Create ICE gather options
     // TODO: Get from arguments
     error = rawrtc_ice_gather_options_create(
@@ -333,7 +379,16 @@ enum rawrtc_code rawrtc_peer_connection_create(
         goto out;
     }
 
+    // Create SDP session (use IPv4 unspecified as session address)
+    sa_set_in(&address, INADDR_ANY, 0);
+    error = rawrtc_error_to_code(sdp_session_alloc(&connection->sdp_session, &address));
+    if (error) {
+        goto out;
+    }
+
     // Set fields/reference
+    connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
+    connection->connection_state_change_handler = connection_state_change_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
 
 out:
@@ -347,47 +402,166 @@ out:
 }
 
 /*
- * Add SCTP transport media line to SDP session.
+ * Add DTLS transport attributes to SDP media line.
  */
-static enum rawrtc_code add_sctp_transport(
-        struct sdp_session* session, // not checked
-        struct rawrtc_sctp_transport* transport // not checked
+static enum rawrtc_code add_dtls_attributes(
+        struct sdp_media* const media, // not checked
+        struct rawrtc_dtls_transport* const transport // not checked
 ) {
     enum rawrtc_code error;
-    uint16_t port;
-    char* fmt;
-    struct sdp_media* media = NULL;
+    struct rawrtc_dtls_parameters* parameters;
+    enum rawrtc_dtls_role role;
+    char const* setup_str;
 
-    // Get SCTP port
-    error = rawrtc_sctp_transport_get_port(&port, transport);
+    // Get DTLS parameters
+    error = rawrtc_dtls_transport_get_local_parameters(&parameters, transport);
+    if (error) {
+        return error;
+    }
+
+    // Get DTLS role
+    error = rawrtc_dtls_parameters_get_role(&role, parameters);
     if (error) {
         goto out;
     }
 
-    // Prepare media line
-    error = rawrtc_sdprintf(&fmt, "DTLS/SCTP %"PRIu16, transport->port);
+    // Add setup attribute
+    switch (role) {
+        case RAWRTC_DTLS_ROLE_AUTO:
+            setup_str = "actpass";
+            break;
+        case RAWRTC_DTLS_ROLE_CLIENT:
+            setup_str = "active";
+            break;
+        case RAWRTC_DTLS_ROLE_SERVER:
+            setup_str = "passive";
+            break;
+        default:
+            error = RAWRTC_CODE_INVALID_STATE;
+            goto out;
+            break;
+    }
+    error = rawrtc_error_to_code(sdp_media_set_lattr(media, false, "setup", setup_str));
+    if (error) {
+        goto out;
+    }
+
+    // TODO: Add DTLS attributes
+    // TODO: Check if 06 is compatible with >= 06 regarding 'setup' and 'connection' attribute
+    //       (and if we need to care about 'connection').
+    // https://tools.ietf.org/html/draft-ietf-mmusic-4572-update-13
+    // https://tools.ietf.org/html/draft-ietf-mmusic-dtls-sdp-18
+
+out:
+    mem_deref(parameters);
+    return error;
+}
+
+/*
+ * Add SCTP transport media line to SDP session.
+ */
+static enum rawrtc_code add_sctp_transport(
+        struct sdp_session* const session, // not checked
+        struct rawrtc_dtls_transport* const dtls_transport, // not checked
+        struct rawrtc_sctp_transport* const sctp_transport, // not checked
+        char const* const mid,
+        bool const sctp_sdp_06
+) {
+    uint16_t const port = 9;
+    char const* const application = "webrtc-datachannel";
+    enum rawrtc_code error;
+    uint16_t sctp_port;
+    char const* protocol_str;
+    struct sdp_media* media = NULL;
+    char* format_str = NULL;
+    struct sdp_format* format = NULL;
+    struct sa address;
+
+    // Get SCTP port
+    error = rawrtc_sctp_transport_get_port(&sctp_port, sctp_transport);
     if (error) {
         goto out;
     }
     
     // Media section
-    // Note: Well, browsers are stuck in 2014 and thus we cannot use the current format...
-    // TODO: Use 'UDP|TCP/DTLS/SCTP' instead of 'DTLS/SCTP'
-    // TODO: Use 'webrtc-datachannel' as format instead of the SCTP port
-    error = rawrtc_error_to_code(sdp_media_add(&media, session, "application", 9, fmt));
-    mem_deref(fmt);
+    // Note: We choose UDP here although communication may still happen over ICE-TCP candidates.
+    // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
+    protocol_str = sctp_sdp_06 ? "DTLS/SCTP" : "UDP/DTLS/SCTP";
+    error = rawrtc_error_to_code(sdp_media_add(&media, session, "application", port, protocol_str));
     if (error) {
         goto out;
     }
 
-    // Set dummy address
-//    error = rawrtc_error_to_code(sdp_media))
+    // Don't set direction attribute
+    sdp_media_ldir_exclude(media, true);
 
-    // Set SCTP port
+    // Prepare format string
+    if (sctp_sdp_06) {
+        error = rawrtc_sdprintf(&format_str, "%"PRIu16, sctp_port);
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Add format
+    error = rawrtc_error_to_code(sdp_format_add(
+            &format, media, false, format_str ? format_str : application,
+            NULL, 0, 0, NULL, NULL, NULL, false, ""));
+    mem_deref(format_str);
+    if (error) {
+        goto out;
+    }
+
+    // Use IPv4 unspecified as media address
+    sa_set_in(&address, INADDR_ANY, port);
+    sdp_media_set_laddr(media, &address);
+
+    // Add identification tag attribute (if required)
+    if (mid) {
+        error = rawrtc_error_to_code(sdp_media_set_lattr(
+                media, false, "mid", "%s", mid));
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Set attributes
+    if (!sctp_sdp_06) {
+        // Set SCTP port
+        error = rawrtc_error_to_code(sdp_media_set_lattr(
+                media, false, "sctp-port", "%"PRIu16, sctp_port));
+
+        // Set maximum message size
+        error |= rawrtc_error_to_code(sdp_media_set_lattr(
+                media, false, "maximum-message-size", "0"));
+
+        // Handle error
+        if (error) {
+            goto out;
+        }
+    } else {
+        // Set SCTP port and maximum message size
+        // Note: We don't set the #streams as the newest DCEP spec says it MUST be set to the
+        //       maximum amount of streams, so this is not negotiable.
+        error = rawrtc_error_to_code(sdp_media_set_lattr(
+                media, false, "sctpmap", "%"PRIu16" %s 0", sctp_port, application));
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Add DTLS attributes
+    error = add_dtls_attributes(media, dtls_transport);
+    if (error) {
+        goto out;
+    }
 
 out:
-    // Un-reference & done
-    mem_deref(media);
+    if (error) {
+        mem_deref(format);
+        mem_deref(media);
+    }
+    // TODO: Set media on some kind of offer context
     return error;
 }
 
@@ -395,18 +569,19 @@ out:
  * Set session attributes on SDP.
  */
 static enum rawrtc_code set_session_attributes(
-        struct sdp_session* session // not checked
+        struct sdp_session* const session, // not checked
+        char const* const mids // not checked
 ) {
     int err;
 
     // Trickle ICE
-    err = sdp_session_set_lattr(session, true, "ice-options", "trickle");
+    err = sdp_session_set_lattr(session, false, "ice-options", "trickle");
     
     // WebRTC Identity
     // (N/A)
 
     // Bundle media (we currently only support a single SCTP transport)
-    err |= sdp_session_set_lattr(session, true, "group", "BUNDLE", "data-1");
+    err |= sdp_session_set_lattr(session, false, "group", "BUNDLE %s", mids);
     
     // Done
     return rawrtc_error_to_code(err);
@@ -416,10 +591,12 @@ static enum rawrtc_code set_session_attributes(
  * Create an offer.
  */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
-        struct rawrtc_peer_connection* const connection
+        struct mbuf** const descriptionp,
+        struct rawrtc_peer_connection* const connection,
+        bool const sctp_sdp_06
 ) {
+    char const* const mid = "rawrtc-sctp-dc";
     enum rawrtc_code error;
-    struct mbuf* description = NULL;
 
     // TODO
     struct sdp_session* session = connection->sdp_session;
@@ -431,22 +608,27 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
 
     // Check if already created
     // TODO: Do ICE restart (?)
-    if (connection->local_description) {
+//    if (connection->local_description) {
+//        return RAWRTC_CODE_NOT_IMPLEMENTED;
+//    }
+    if (connection->context.ice_gatherer &&
+            connection->context.ice_gatherer->state != RAWRTC_ICE_GATHERER_STATE_NEW) {
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
     // Session attributes
-    error = set_session_attributes(session);
+    error = set_session_attributes(session, mid);
     if (error) {
         goto out;
     }
     
     // Add data transport (if any)
-    if (connection->context.data_transport) {
+    if (connection->context.dtls_transport && connection->context.data_transport) {
         switch (connection->context.data_transport->type) {
             case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
                 error = add_sctp_transport(
-                        session, connection->context.data_transport->transport);
+                        session, connection->context.dtls_transport,
+                        connection->context.data_transport->transport, mid, sctp_sdp_06);
                 break;
             default:
                 error = RAWRTC_CODE_UNKNOWN_ERROR;
@@ -458,18 +640,41 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
     }
 
     // Encode SDP
-    error = rawrtc_error_to_code(sdp_encode(&description, session, true));
+    error = rawrtc_error_to_code(sdp_encode(descriptionp, session, true));
     if (error) {
         goto out;
     }
 
     // Debug
-    DEBUG_PRINTF("Local description:\n%b", mbuf_buf(description), mbuf_get_left(description));
-    DEBUG_PRINTF("SDP session: %H\n", sdp_session_debug, connection->sdp_session);
+    DEBUG_PRINTF("Local description:\n%b", mbuf_buf(*descriptionp), mbuf_get_left(*descriptionp));
+    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
 
 out:
-    mem_deref(description);
     return error;
+}
+
+/*
+ * Create an answer.
+ */
+enum rawrtc_code rawrtc_peer_connection_create_answer(
+        struct rawrtc_peer_connection* const connection
+) {
+    // Check arguments
+    if (!connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check if already created
+    // TODO: Do ICE restart (?)
+//    if (connection->local_description) {
+//        return RAWRTC_CODE_NOT_IMPLEMENTED;
+//    }
+    if (connection->context.ice_gatherer &&
+        connection->context.ice_gatherer->state != RAWRTC_ICE_GATHERER_STATE_NEW) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    return RAWRTC_CODE_NOT_IMPLEMENTED;
 }
 
 /*
@@ -488,6 +693,34 @@ out:
 enum rawrtc_code rawrtc_peer_connection_set_local_description(
 
 ) {
+    return RAWRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Set the remote description.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_remote_description(
+        struct rawrtc_peer_connection* const connection,
+        struct mbuf* const description
+) {
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!connection || !description) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Decode SDP
+    error = rawrtc_error_to_code(sdp_decode(connection->sdp_session, description, true));
+    if (error) {
+        goto out;
+    }
+
+    // Debug
+    DEBUG_PRINTF("Remote description:\n%b", mbuf_buf(description), mbuf_get_left(description));
+    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
+
+out:
     return RAWRTC_CODE_NOT_IMPLEMENTED;
 }
 
@@ -554,7 +787,7 @@ out:
         revert_context(&context, &connection->context);
     } else {
         // Apply context
-        connection->context = context;
+        apply_context(connection, &context);
     }
     return error;
 }

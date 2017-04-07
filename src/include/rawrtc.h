@@ -108,10 +108,10 @@ enum rawrtc_ice_credential_type {
  * ICE gatherer state.
  */
 enum rawrtc_ice_gatherer_state {
-    RAWRTC_ICE_GATHERER_NEW,
-    RAWRTC_ICE_GATHERER_GATHERING,
-    RAWRTC_ICE_GATHERER_COMPLETE,
-    RAWRTC_ICE_GATHERER_CLOSED
+    RAWRTC_ICE_GATHERER_STATE_NEW,
+    RAWRTC_ICE_GATHERER_STATE_GATHERING,
+    RAWRTC_ICE_GATHERER_STATE_COMPLETE,
+    RAWRTC_ICE_GATHERER_STATE_CLOSED
 };
 
 /*
@@ -242,6 +242,18 @@ enum rawrtc_data_channel_state {
     RAWRTC_DATA_CHANNEL_STATE_OPEN,
     RAWRTC_DATA_CHANNEL_STATE_CLOSING,
     RAWRTC_DATA_CHANNEL_STATE_CLOSED
+};
+
+/*
+ * Peer connection state.
+ */
+enum rawrtc_peer_connection_state {
+    RAWRTC_PEER_CONNECTION_STATE_NEW,
+    RAWRTC_PEER_CONNECTION_STATE_CONNECTING,
+    RAWRTC_PEER_CONNECTION_STATE_CONNECTED,
+    RAWRTC_PEER_CONNECTION_STATE_DISCONNECTED,
+    RAWRTC_PEER_CONNECTION_STATE_FAILED,
+    RAWRTC_PEER_CONNECTION_STATE_CLOSED,
 };
 
 
@@ -427,6 +439,14 @@ typedef void (rawrtc_data_channel_message_handler)(
  */
 typedef void (rawrtc_data_channel_handler)(
     struct rawrtc_data_channel* const data_channel, // read-only, MUST be referenced when used
+    void* const arg
+);
+
+/*
+ * Peer connection state change handler.
+ */
+typedef void (rawrtc_peer_connection_state_change_handler)(
+    enum rawrtc_peer_connection_state const state, // read-only
     void* const arg
 );
 
@@ -811,13 +831,16 @@ struct rawrtc_peer_connection_context {
  * TODO: private
  */
 struct rawrtc_peer_connection {
-    uint_fast8_t flags; // TODO: Still needed?
-    struct sdp_session* sdp_session;
-    struct mbuf* local_description;
-    struct mbuf* remote_description;
+    uint_fast8_t local_flags;
+    uint_fast8_t remote_flags;
+    enum rawrtc_peer_connection_state connection_state;
     struct rawrtc_ice_gather_options* gather_options;
-    struct rawrtc_peer_connection_context context;
+    rawrtc_peer_connection_state_change_handler* connection_state_change_handler;
     enum rawrtc_data_transport_type data_transport_type;
+    struct sdp_session* sdp_session;
+//    struct mbuf* local_description;
+//    struct mbuf* remote_description;
+    struct rawrtc_peer_connection_context context;
     rawrtc_data_channel_handler* data_channel_handler; // nullable
 };
 
@@ -1659,17 +1682,35 @@ enum rawrtc_code rawrtc_data_channel_set_message_handler(
 );
 
 /*
+ * Get the corresponding name for a peer connection state.
+ */
+char const * const rawrtc_peer_connection_state_to_name(
+    enum rawrtc_peer_connection_state const state
+);
+
+/*
  * Create a new peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_create(
-    struct rawrtc_peer_connection** const connectionp // de-referenced
+    struct rawrtc_peer_connection** const connectionp, // de-referenced
+    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler //nullable
 );
 
 /*
 * Create an offer.
 */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
-    struct rawrtc_peer_connection* const connection
+    struct mbuf** const descriptionp,
+    struct rawrtc_peer_connection* const connection,
+    bool const sctp_sdp_06
+);
+
+/*
+ * Set the remote description.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_remote_description(
+    struct rawrtc_peer_connection* const connection,
+    struct mbuf* const description
 );
 
 /*

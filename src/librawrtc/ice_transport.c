@@ -69,7 +69,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
 
     // Check ICE gatherer state
     // TODO: Check if gatherer.component is RTCP -> invalid state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
@@ -249,7 +249,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
 
     // Check state
     ice_transport_closed = transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED;
-    ice_gatherer_closed = gatherer->state == RAWRTC_ICE_GATHERER_CLOSED;
+    ice_gatherer_closed = gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED;
     if (ice_transport_closed || ice_gatherer_closed) {
         return RAWRTC_CODE_INVALID_STATE;
     }

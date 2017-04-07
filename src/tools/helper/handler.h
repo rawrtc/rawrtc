@@ -118,6 +118,11 @@ void default_data_channel_message_handler(
     void* const arg // will be casted to `struct data_channel_helper*`
 );
 
+void default_peer_connection_state_change_handler(
+    enum rawrtc_peer_connection_state const state, // read-only
+    void* const arg // will be casted to `struct client*`
+);
+
 /*
  * Stop the main loop.
  */

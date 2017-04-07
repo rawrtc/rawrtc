@@ -82,13 +82,49 @@ static void data_channel_open_handler(
     mem_deref(buffer);
 }
 
+static void peer_connection_state_change_handler(
+        enum rawrtc_peer_connection_state const state, // read-only
+        void* const arg
+) {
+    struct peer_connection_client* const client = arg;
+
+    // Print state
+    default_peer_connection_state_change_handler(state, arg);
+
+    // Open? Create new channel (if answerer)
+    // TODO: Move this once we can create data channels earlier
+    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED && !client->offerer) {
+        struct rawrtc_data_channel_parameters* channel_parameters;
+
+        // Create data channel helper for in-band negotiated data channel
+        data_channel_helper_create(
+                &client->data_channel, (struct client *) client, "bear-noises");
+
+        // Create data channel parameters
+        EOE(rawrtc_data_channel_parameters_create(
+                &channel_parameters, client->data_channel->label,
+                RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
+
+        // Create data channel
+        EOE(rawrtc_peer_connection_create_data_channel(
+                &client->data_channel->channel, client->connection, channel_parameters, NULL,
+                data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
+                default_data_channel_error_handler, default_data_channel_close_handler,
+                default_data_channel_message_handler, client->data_channel));
+
+        // Un-reference data channel parameters
+        mem_deref(channel_parameters);
+    }
+}
+
 static void client_init(
         struct peer_connection_client* const client
 ) {
+    struct mbuf* description;
     struct rawrtc_data_channel_parameters* channel_parameters;
 
     // Create peer connection
-    EOE(rawrtc_peer_connection_create(&client->connection));
+    EOE(rawrtc_peer_connection_create(&client->connection, peer_connection_state_change_handler));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(
@@ -109,32 +145,12 @@ static void client_init(
     // Un-reference data channel parameters
     mem_deref(channel_parameters);
 
-    // Answerer? Create data channel
-    if (!client->offerer) {
-        // Create data channel helper for in-band negotiated data channel
-        data_channel_helper_create(
-                &client->data_channel, (struct client *) client, "bear-noises");
-
-        // Create data channel parameters
-        EOE(rawrtc_data_channel_parameters_create(
-                &channel_parameters, client->data_channel->label,
-                RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
-
-        // Create data channel
-        EOE(rawrtc_peer_connection_create_data_channel(
-                &client->data_channel->channel, client->connection, channel_parameters, NULL,
-                data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
-                default_data_channel_error_handler, default_data_channel_close_handler,
-                default_data_channel_message_handler, client->data_channel));
-
-        // Un-reference data channel parameters
-        mem_deref(channel_parameters);
-    }
-
     // Create offer
-    EOE(rawrtc_peer_connection_create_offer(client->connection));
+    EOE(rawrtc_peer_connection_create_offer(&description, client->connection, true));
+    EOE(rawrtc_peer_connection_create_offer(&description, client->connection, false));
 
     // TODO: ...
+//    EOE(rawrtc_peer_connection_set_remote_description(client->connection, description));
 }
 
 static void client_stop(
@@ -209,7 +225,7 @@ int main(int argc, char* argv[argc + 1]) {
     client.ice_candidate_types = ice_candidate_types;
     client.n_ice_candidate_types = n_ice_candidate_types;
     client.gather_options = gather_options;
-    client.offerer = role == ICE_ROLE_CONTROLLING ? true : false;
+    client.offerer = role == RAWRTC_ICE_ROLE_CONTROLLING ? true : false;
 
     // Setup client
     client_init(&client);
@@ -219,7 +235,7 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Start main loop
     // TODO: Wrap re_main?
-//    EOR(re_main(default_signal_handler));
+    EOR(re_main(default_signal_handler));
 
     // Stop client & bye
     client_stop(&client);

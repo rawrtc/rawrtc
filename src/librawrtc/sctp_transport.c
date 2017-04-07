@@ -2344,7 +2344,7 @@ static enum rawrtc_code channel_create_negotiated(
 }
 
 /*
- * Create a SCTP data channel that needs negotiation.
+ * Create an SCTP data channel that needs negotiation.
  */
 static enum rawrtc_code channel_create_inband(
         struct rawrtc_sctp_data_channel_context** const contextp, // de-referenced, not checked

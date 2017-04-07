@@ -191,6 +191,18 @@ void default_data_channel_message_handler(
 }
 
 /*
+ * Print the peer connection's state.
+ */
+void default_peer_connection_state_change_handler(
+        enum rawrtc_peer_connection_state const state, // read-only
+        void* const arg // will be casted to `struct client*`
+) {
+    struct client* const client = arg;
+    char const * const state_name = rawrtc_peer_connection_state_to_name(state);
+    DEBUG_PRINTF("(%s) Peer connection state change: %s\n", client->name, state_name);
+}
+
+/*
  * Stop the main loop.
  */
 void default_signal_handler(

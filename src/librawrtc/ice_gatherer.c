@@ -726,13 +726,13 @@ char const * const rawrtc_ice_gatherer_state_to_name(
         enum rawrtc_ice_gatherer_state const state
 ) {
     switch (state) {
-        case RAWRTC_ICE_GATHERER_NEW:
+        case RAWRTC_ICE_GATHERER_STATE_NEW:
             return "new";
-        case RAWRTC_ICE_GATHERER_GATHERING:
+        case RAWRTC_ICE_GATHERER_STATE_GATHERING:
             return "gathering";
-        case RAWRTC_ICE_GATHERER_COMPLETE:
+        case RAWRTC_ICE_GATHERER_STATE_COMPLETE:
             return "complete";
-        case RAWRTC_ICE_GATHERER_CLOSED:
+        case RAWRTC_ICE_GATHERER_STATE_CLOSED:
             return "closed";
         default:
             return "???";
@@ -788,7 +788,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     }
 
     // Set fields/reference
-    gatherer->state = RAWRTC_ICE_GATHERER_NEW; // TODO: Raise state (delayed)?
+    gatherer->state = RAWRTC_ICE_GATHERER_STATE_NEW; // TODO: Raise state (delayed)?
     gatherer->options = mem_ref(options);
     gatherer->state_change_handler = state_change_handler;
     gatherer->error_handler = error_handler;
@@ -880,7 +880,7 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
     }
 
     // Already closed?
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -905,7 +905,7 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
     gatherer->ice = mem_deref(gatherer->ice);
 
     // Set state to closed and return
-    set_state(gatherer, RAWRTC_ICE_GATHERER_CLOSED);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_CLOSED);
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -990,7 +990,7 @@ static void check_gathering_complete(
     enum rawrtc_code error;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return;
     }
 
@@ -1036,7 +1036,7 @@ static void check_gathering_complete(
 
     // Update state & done
     DEBUG_PRINTF("Gathering complete:\n%H", trice_debug, gatherer->ice);
-    set_state(gatherer, RAWRTC_ICE_GATHERER_COMPLETE);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_COMPLETE);
 }
 
 /*
@@ -1139,7 +1139,7 @@ static void reflexive_candidate_handler(
     enum rawrtc_code error;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return;
     }
 
@@ -1417,7 +1417,7 @@ static enum rawrtc_code add_candidate(
 
     // Check state
     // TODO: 'gatherer' might be free'd here
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1444,7 +1444,7 @@ static bool interface_handler(
     (void) interface;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return true; // Don't continue gathering
     }
 
@@ -1475,7 +1475,7 @@ static bool interface_handler(
         }
 
         // Check state
-        if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
             return true; // Don't continue gathering
         }
     }
@@ -1713,12 +1713,12 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Already gathering?
-    if (gatherer->state == RAWRTC_ICE_GATHERER_GATHERING) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_GATHERING) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1729,7 +1729,7 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Update state
-    set_state(gatherer, RAWRTC_ICE_GATHERER_GATHERING);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_GATHERING);
 
     // Start gathering host candidates
     if (options->gather_policy != RAWRTC_ICE_GATHER_POLICY_NOHOST) {
@@ -1756,7 +1756,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_local_parameters(
     }
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
