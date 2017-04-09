@@ -297,6 +297,16 @@ enum rawrtc_ice_server_transport {
     RAWRTC_ICE_SERVER_TRANSPORT_TLS
 };
 
+/*
+ * Length of various arrays.
+ * TODO: private
+ */
+enum {
+    ICE_USERNAME_FRAGMENT_LENGTH = 32,
+    ICE_PASSWORD_LENGTH = 32,
+    DTLS_ID_LENGTH = 32,
+};
+
 
 /*
  * Struct prototypes.
@@ -639,8 +649,8 @@ struct rawrtc_ice_gatherer {
     void* arg; // nullable
     struct list buffered_messages; // TODO: Can this be added to the candidates list?
     struct list local_candidates; // TODO: Hash list instead?
-    char ice_username_fragment[9];
-    char ice_password[33];
+    char ice_username_fragment[ICE_USERNAME_FRAGMENT_LENGTH + 1];
+    char ice_password[ICE_PASSWORD_LENGTH + 1];
     struct trice* ice;
     struct trice_conf ice_config;
     struct dnsc* dns_client;
@@ -821,7 +831,7 @@ struct rawrtc_peer_connection_context {
     struct rawrtc_ice_gatherer* ice_gatherer;
     struct rawrtc_ice_transport* ice_transport;
     struct list certificates;
-    char dtls_id[9];
+    char dtls_id[DTLS_ID_LENGTH + 1];
     struct rawrtc_dtls_transport* dtls_transport;
     struct rawrtc_data_transport* data_transport;
 };
