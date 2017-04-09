@@ -61,7 +61,6 @@ enum rawrtc_certificate_key_type {
  */
 enum rawrtc_certificate_sign_algorithm {
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_NONE = 0,
-    RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1 = TLS_FINGERPRINT_SHA1,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256 = TLS_FINGERPRINT_SHA256,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512
@@ -822,6 +821,7 @@ struct rawrtc_peer_connection_context {
     struct rawrtc_ice_gatherer* ice_gatherer;
     struct rawrtc_ice_transport* ice_transport;
     struct list certificates;
+    char dtls_id[9];
     struct rawrtc_dtls_transport* dtls_transport;
     struct rawrtc_data_transport* data_transport;
 };

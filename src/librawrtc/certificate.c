@@ -215,11 +215,6 @@ static enum rawrtc_code generate_self_signed_certificate(
     }
 #endif
 
-    // SHA-1? Nope!
-    if (sign_algorithm == RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
     // Get sign function
     sign_function = rawrtc_get_sign_function(sign_algorithm);
     if (!sign_function) {

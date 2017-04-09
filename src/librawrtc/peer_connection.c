@@ -251,6 +251,9 @@ static enum rawrtc_code get_dtls_transport(
         return error;
     }
 
+    // Generate random DTLS ID
+    rand_str(context->dtls_id, sizeof(context->dtls_id));
+
     // Create DTLS transport
     return rawrtc_dtls_transport_create_internal(
             &context->dtls_transport, context->ice_transport, &certificates,
@@ -402,11 +405,59 @@ out:
 }
 
 /*
+ * Add DTLS fingerprint attributes to SDP media line.
+ */
+static enum rawrtc_code add_dtls_fingerprints(
+        struct sdp_media* const media, // not checked
+        struct rawrtc_dtls_parameters* const parameters // not checked
+) {
+    enum rawrtc_code error;
+    struct rawrtc_dtls_fingerprints* fingerprints;
+    size_t i;
+
+    // Get fingerprints
+    error = rawrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters);
+    if (error) {
+        return error;
+    }
+
+    // Add fingerprints
+    for (i = 0; i < fingerprints->n_fingerprints; ++i) {
+        struct rawrtc_dtls_fingerprint* const fingerprint = fingerprints->fingerprints[i];
+        enum rawrtc_certificate_sign_algorithm sign_algorithm;
+        char* value;
+
+        // Get sign algorithm and fingerprint value
+        error = rawrtc_dtls_parameters_fingerprint_get_sign_algorithm(&sign_algorithm, fingerprint);
+        error |= rawrtc_dtls_parameters_fingerprint_get_value(&value, fingerprint);
+        if (error) {
+            goto out;
+        }
+
+        // Add fingerprint attribute
+        error = rawrtc_error_to_code(sdp_media_set_lattr(
+                media, false, "fingerprint", "%s %s",
+                rawrtc_certificate_sign_algorithm_to_str(sign_algorithm), value));
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Done
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    mem_deref(fingerprints);
+    return error;
+}
+
+/*
  * Add DTLS transport attributes to SDP media line.
  */
 static enum rawrtc_code add_dtls_attributes(
         struct sdp_media* const media, // not checked
-        struct rawrtc_dtls_transport* const transport // not checked
+        struct rawrtc_dtls_transport* const transport, // not checked
+        char const* const id // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_dtls_parameters* parameters;
@@ -446,6 +497,18 @@ static enum rawrtc_code add_dtls_attributes(
         goto out;
     }
 
+    // Add fingerprints
+    error = add_dtls_fingerprints(media, parameters);
+    if (error) {
+        goto out;
+    }
+
+    // Add DTLS ID
+    error = rawrtc_error_to_code(sdp_media_set_lattr(media, false, "dtls-id", "%s", id));
+    if (error) {
+        goto out;
+    }
+
     // TODO: Add DTLS attributes
     // TODO: Check if 06 is compatible with >= 06 regarding 'setup' and 'connection' attribute
     //       (and if we need to care about 'connection').
@@ -463,12 +526,14 @@ out:
 static enum rawrtc_code add_sctp_transport(
         struct sdp_session* const session, // not checked
         struct rawrtc_dtls_transport* const dtls_transport, // not checked
+        char const* const dtls_id, // not checked
         struct rawrtc_sctp_transport* const sctp_transport, // not checked
         char const* const mid,
         bool const sctp_sdp_06
 ) {
     uint16_t const port = 9;
     char const* const application = "webrtc-datachannel";
+    uint_fast8_t const maximum_message_size = 0;
     enum rawrtc_code error;
     uint16_t sctp_port;
     char const* protocol_str;
@@ -533,7 +598,7 @@ static enum rawrtc_code add_sctp_transport(
 
         // Set maximum message size
         error |= rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "maximum-message-size", "0"));
+                media, false, "maximum-message-size", "%"PRIuFAST8, maximum_message_size));
 
         // Handle error
         if (error) {
@@ -544,14 +609,15 @@ static enum rawrtc_code add_sctp_transport(
         // Note: We don't set the #streams as the newest DCEP spec says it MUST be set to the
         //       maximum amount of streams, so this is not negotiable.
         error = rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "sctpmap", "%"PRIu16" %s 0", sctp_port, application));
+                media, false, "sctpmap", "%"PRIu16" %s %"PRIuFAST8, sctp_port, application,
+                maximum_message_size));
         if (error) {
             goto out;
         }
     }
 
     // Add DTLS attributes
-    error = add_dtls_attributes(media, dtls_transport);
+    error = add_dtls_attributes(media, dtls_transport, dtls_id);
     if (error) {
         goto out;
     }
@@ -627,7 +693,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
         switch (connection->context.data_transport->type) {
             case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
                 error = add_sctp_transport(
-                        session, connection->context.dtls_transport,
+                        session, connection->context.dtls_transport, connection->context.dtls_id,
                         connection->context.data_transport->transport, mid, sctp_sdp_06);
                 break;
             default:
