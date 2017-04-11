@@ -824,6 +824,16 @@ struct rawrtc_data_channel {
 };
 
 /*
+ * Peer connection description.
+ * TODO: private
+ */
+struct rawrtc_peer_connection_description {
+    struct sdp_session* session;
+    struct list media;
+    struct mbuf* encoded_sdp;
+};
+
+/*
  * Peer connection context.
  * TODO: private
  */

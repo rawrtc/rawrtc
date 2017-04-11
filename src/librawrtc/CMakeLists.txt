@@ -15,6 +15,7 @@ set(rawrtc_SOURCES
         main.c
         message_buffer.c
         peer_connection.c
+        peer_connection_description.c
         sctp_capabilities.c
         sctp_transport.c
         utils.c)
