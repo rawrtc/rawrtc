@@ -5,7 +5,7 @@
  * Destructor for an existing DTLS fingerprint instance.
  */
 static void rawrtc_dtls_fingerprint_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_fingerprint* const fingerprint = arg;
 
@@ -75,7 +75,7 @@ enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
  * Destructor for an existing DTLS parameter's fingerprints instance.
  */
 static void rawrtc_dtls_parameters_fingerprints_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
@@ -90,7 +90,7 @@ static void rawrtc_dtls_parameters_fingerprints_destroy(
  * Destructor for an existing DTLS parameters instance.
  */
 static void rawrtc_dtls_parameters_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_parameters* const parameters = arg;
 

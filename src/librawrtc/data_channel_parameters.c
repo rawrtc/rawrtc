@@ -5,7 +5,7 @@
  * Destructor for existing data channel parameters.
  */
 static void rawrtc_data_channel_parameters_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_data_channel_parameters* const parameters = arg;
 

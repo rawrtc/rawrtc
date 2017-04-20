@@ -460,7 +460,6 @@ enum rawrtc_code rawrtc_ice_server_copy(
         struct rawrtc_ice_server** const serverp, // de-referenced
         struct rawrtc_ice_server* const source_server
 ) {
-    struct rawrtc_ice_server* server;
     size_t n_urls;
     char** urls = NULL;
     struct le* le;

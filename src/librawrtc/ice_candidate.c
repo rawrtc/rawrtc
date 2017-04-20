@@ -18,6 +18,7 @@ uint32_t rawrtc_ice_candidate_calculate_priority(
         int const address_family,
         enum ice_tcptype const tcp_type
 ) {
+    (void) candidate_type; (void) protocol; (void) address_family; (void) tcp_type;
     return 1;
 }
 

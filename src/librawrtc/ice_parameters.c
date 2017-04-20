@@ -5,7 +5,7 @@
  * Destructor for an existing ICE parameters instance.
  */
 static void rawrtc_ice_parameters_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_ice_parameters* const parameters = arg;
 

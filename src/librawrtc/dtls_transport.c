@@ -701,7 +701,7 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // Note: We cannot reference ourselves here as that would introduce a cyclic reference
     ice_transport->dtls_transport = transport;
 
-    out:
+out:
     if (error) {
         mem_deref(transport);
     } else {

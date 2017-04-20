@@ -44,7 +44,7 @@ static enum rawrtc_code add_ice_attributes(
 
     // TODO: Continue here
 
-    out:
+out:
     mem_deref(password);
     mem_deref(username_fragment);
     mem_deref(parameters);
@@ -93,7 +93,7 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
     // Done
     error = RAWRTC_CODE_SUCCESS;
 
-    out:
+out:
     mem_deref(fingerprints);
     return error;
 }
@@ -164,7 +164,7 @@ static enum rawrtc_code add_dtls_attributes(
         goto out;
     }
 
-    out:
+out:
     mem_deref(parameters);
     return error;
 }
@@ -319,7 +319,7 @@ enum rawrtc_code add_sctp_data_channel(
         }
     }
 
-    out:
+out:
     if (error) {
         mem_deref(format);
         mem_deref(media);
