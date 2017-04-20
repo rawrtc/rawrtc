@@ -9,6 +9,11 @@ enum rawrtc_code rawrtc_ice_server_create(
     enum rawrtc_ice_credential_type const credential_type
 );
 
+enum rawrtc_code rawrtc_ice_server_copy(
+    struct rawrtc_ice_server** const serverp, // de-referenced
+    struct rawrtc_ice_server* const source_server
+);
+
 enum rawrtc_code rawrtc_ice_server_url_destroy_dns_contexts(
     struct rawrtc_ice_server_url* const url
 );

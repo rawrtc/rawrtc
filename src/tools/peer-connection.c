@@ -11,8 +11,8 @@ struct peer_connection_client {
     char* name;
     char** ice_candidate_types;
     size_t n_ice_candidate_types;
-    struct rawrtc_ice_gather_options* gather_options;
     bool offerer;
+    struct rawrtc_peer_connection_configuration* configuration;
     struct rawrtc_peer_connection* connection;
     struct data_channel_helper* data_channel_negotiated;
     struct data_channel_helper* data_channel;
@@ -120,11 +120,12 @@ static void peer_connection_state_change_handler(
 static void client_init(
         struct peer_connection_client* const client
 ) {
-    struct mbuf* description;
+    struct rawrtc_peer_connection_description* description;
     struct rawrtc_data_channel_parameters* channel_parameters;
 
     // Create peer connection
-    EOE(rawrtc_peer_connection_create(&client->connection, peer_connection_state_change_handler));
+    EOE(rawrtc_peer_connection_create(
+            &client->connection, client->configuration, peer_connection_state_change_handler));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(
@@ -146,8 +147,8 @@ static void client_init(
     mem_deref(channel_parameters);
 
     // Create offer
-    EOE(rawrtc_peer_connection_create_offer(&description, client->connection, true));
-    EOE(rawrtc_peer_connection_create_offer(&description, client->connection, false));
+    EOE(rawrtc_peer_connection_create_offer(&description, client->connection));
+    mem_deref(description);
 
     // TODO: ...
 //    EOE(rawrtc_peer_connection_set_remote_description(client->connection, description));
@@ -162,7 +163,7 @@ static void client_stop(
     client->data_channel = mem_deref(client->data_channel);
     client->data_channel_negotiated = mem_deref(client->data_channel_negotiated);
     client->connection = mem_deref(client->connection);
-    client->gather_options = mem_deref(client->gather_options);
+    client->configuration = mem_deref(client->configuration);
 
     // Stop listening on STDIN
 //    fd_close(STDIN_FILENO);
@@ -177,7 +178,7 @@ int main(int argc, char* argv[argc + 1]) {
     char** ice_candidate_types = NULL;
     size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
-    struct rawrtc_ice_gather_options* gather_options;
+    struct rawrtc_peer_connection_configuration* configuration;
     char* const stun_google_com_urls[] = {"stun:stun.l.google.com:19302",
                                           "stun:stun1.l.google.com:19302"};
     char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
@@ -208,15 +209,16 @@ int main(int argc, char* argv[argc + 1]) {
         n_ice_candidate_types = (size_t) argc - 2;
     }
 
-    // Create ICE gather options
-    EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
+    // Create peer connection configuration
+    EOE(rawrtc_peer_connection_configuration_create(
+            &configuration, RAWRTC_ICE_GATHER_POLICY_ALL));
 
-    // Add ICE servers to ICE gather options
-    EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
+    // Add ICE servers to configuration
+    EOE(rawrtc_peer_connection_configuration_add_server(
+            configuration, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
-    EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
+    EOE(rawrtc_peer_connection_configuration_add_server(
+            configuration, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
             "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
             RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
@@ -224,7 +226,7 @@ int main(int argc, char* argv[argc + 1]) {
     client.name = "A";
     client.ice_candidate_types = ice_candidate_types;
     client.n_ice_candidate_types = n_ice_candidate_types;
-    client.gather_options = gather_options;
+    client.configuration = configuration;
     client.offerer = role == RAWRTC_ICE_ROLE_CONTROLLING ? true : false;
 
     // Setup client

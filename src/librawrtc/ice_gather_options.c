@@ -48,6 +48,23 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
 }
 
 /*
+ * Add an ICE server instance to the gather options.
+ */
+enum rawrtc_code rawrtc_ice_gather_options_add_server_internal(
+        struct rawrtc_ice_gather_options* const options,
+        struct rawrtc_ice_server* const server
+) {
+    // Check arguments
+    if (!options || !server) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Add to options
+    list_append(&options->ice_servers, &server->le, server);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * Add an ICE server to the gather options.
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(
@@ -67,6 +84,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     }
 
     // Ensure there are less than 2^8 servers
+    // TODO: This check should be in some common location
     if (list_count(&options->ice_servers) == UINT8_MAX) {
         return RAWRTC_CODE_INSUFFICIENT_SPACE;
     }
@@ -78,8 +96,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     }
 
     // Add to options
-    list_append(&options->ice_servers, &server->le, server);
-    return error;
+    return rawrtc_ice_gather_options_add_server_internal(options, server);
 }
 
 /*

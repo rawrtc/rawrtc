@@ -157,9 +157,9 @@ static enum rawrtc_code add_dtls_attributes(
         goto out;
     }
 
-    // Add DTLS ID
+    // Add (D)TLS ID
     error = rawrtc_error_to_code(sdp_media_set_lattr(
-            media, false, "dtls-id", "%s", context->dtls_id));
+            media, false, "tls-id", "%s", context->dtls_id));
     if (error) {
         goto out;
     }

@@ -454,6 +454,54 @@ out:
 }
 
 /*
+ * Copy an ICE server.
+ */
+enum rawrtc_code rawrtc_ice_server_copy(
+        struct rawrtc_ice_server** const serverp, // de-referenced
+        struct rawrtc_ice_server* const source_server
+) {
+    struct rawrtc_ice_server* server;
+    size_t n_urls;
+    char** urls = NULL;
+    struct le* le;
+    size_t i;
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!serverp || !source_server) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Create temporary ICE server URL array
+    n_urls = list_count(&source_server->urls);
+    if (n_urls > 0) {
+        urls = mem_alloc(sizeof(char *) * n_urls, NULL);
+        if (!urls) {
+            return RAWRTC_CODE_NO_MEMORY;
+        }
+    }
+
+    // Copy ICE server URL (str) pointers
+    for (le = list_head(&source_server->urls), i = 0; le != NULL; le = le->next, ++i) {
+        struct rawrtc_ice_server_url* const url = le->data;
+        urls[i] = url->url;
+    }
+
+    // Copy
+    error = rawrtc_ice_server_create(
+            serverp, urls, n_urls, source_server->username, source_server->credential,
+            source_server->credential_type);
+    if (error) {
+        goto out;
+    }
+
+out:
+    // Un-reference
+    mem_deref(urls);
+    return error;
+}
+
+/*
  * Destroy both ICE server URL DNS contexts (IPv4 and IPv6).
  */
 enum rawrtc_code rawrtc_ice_server_url_destroy_dns_contexts(

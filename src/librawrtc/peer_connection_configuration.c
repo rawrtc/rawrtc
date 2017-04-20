@@ -1,4 +1,5 @@
 #include <rawrtc.h>
+#include "ice_server.h"
 #include "peer_connection_configuration.h"
 
 #define DEBUG_MODULE "peer-connection-configuration"
@@ -48,6 +49,58 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
     // Set pointer and return
     *configurationp = configuration;
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Add an ICE server instance to the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_add_server_internal(
+        struct rawrtc_peer_connection_configuration* const configuration,
+        struct rawrtc_ice_server* const server
+) {
+    // Check arguments
+    if (!configuration || !server) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Add to configuration
+    list_append(&configuration->ice_servers, &server->le, server);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Add an ICE server to the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
+        struct rawrtc_peer_connection_configuration* const configuration,
+        char* const * const urls, // copied
+        size_t const n_urls,
+        char* const username, // nullable, copied
+        char* const credential, // nullable, copied
+        enum rawrtc_ice_credential_type const credential_type
+) {
+    struct rawrtc_ice_server* server;
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Ensure there are less than 2^8 servers
+    // TODO: This check should be in some common location
+    if (list_count(&configuration->ice_servers) == UINT8_MAX) {
+        return RAWRTC_CODE_INSUFFICIENT_SPACE;
+    }
+
+    // Create ICE server
+    error = rawrtc_ice_server_create(&server, urls, n_urls, username, credential, credential_type);
+    if (error) {
+        return error;
+    }
+
+    // Add to configuration
+    return rawrtc_peer_connection_configuration_add_server_internal(configuration, server);
 }
 
 /*

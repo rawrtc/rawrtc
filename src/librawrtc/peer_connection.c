@@ -1,5 +1,7 @@
 #include <string.h> // memcpy
 #include <rawrtc.h>
+#include "ice_server.h"
+#include "ice_gather_options.h"
 #include "certificate.h"
 #include "dtls_transport.h"
 #include "peer_connection_description.h"
@@ -108,15 +110,61 @@ static enum rawrtc_code get_ice_gatherer(
         struct rawrtc_peer_connection_context* const context, // not checked
         struct rawrtc_peer_connection* const connection // not checked
 ) {
+    enum rawrtc_code error;
+    struct rawrtc_ice_gather_options* options;
+    struct rawrtc_ice_gatherer* gatherer = NULL;
+    struct le* le;
+
     // Already created?
     if (context->ice_gatherer) {
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // Create ICE gather options
+    error = rawrtc_ice_gather_options_create(
+            &options, connection->configuration->gather_policy);
+    if (error) {
+        return error;
+    }
+
+    // Add ICE servers to gather options
+    for (le = list_head(&connection->configuration->ice_servers); le != NULL; le = le->next) {
+        struct rawrtc_ice_server* const source_server = le->data;
+        struct rawrtc_ice_server* server;
+
+        // Copy ICE server
+        error = rawrtc_ice_server_copy(&server, source_server);
+        if (error) {
+            goto out;
+        }
+
+        // Add ICE server to gather options
+        error = rawrtc_ice_gather_options_add_server_internal(options, server);
+        if (error) {
+            mem_deref(server);
+            goto out;
+        }
+    }
+
     // Create ICE gatherer
-    return rawrtc_ice_gatherer_create(
-            &context->ice_gatherer, connection->gather_options, ice_gatherer_state_change_handler,
+    error = rawrtc_ice_gatherer_create(
+            &gatherer, options, ice_gatherer_state_change_handler,
             ice_gatherer_error_handler, ice_gatherer_local_candidate_handler, connection);
+    if (error) {
+        goto out;
+    }
+
+out:
+    if (error) {
+        mem_deref(gatherer);
+        mem_deref(options);
+    } else {
+        // Set pointers & done
+        context->gather_options = options;
+        context->ice_gatherer = gatherer;
+    }
+
+    return error;
 }
 
 static void ice_transport_candidate_pair_change_handler(
@@ -341,13 +389,14 @@ static void rawrtc_peer_connection_destroy(
 //    rawrtc_peer_connection_close(connection);
 
     // Un-reference
+    mem_deref(connection->sdp_session);
     mem_deref(connection->context.data_transport);
     mem_deref(connection->context.dtls_transport);
     list_flush(&connection->context.certificates);
     mem_deref(connection->context.ice_transport);
     mem_deref(connection->context.ice_gatherer);
-    mem_deref(connection->sdp_session);
-    mem_deref(connection->gather_options);
+    mem_deref(connection->context.gather_options);
+    mem_deref(connection->configuration);
 }
 
 /*
@@ -366,7 +415,6 @@ enum rawrtc_code rawrtc_peer_connection_create(
 //        rawrtc_peer_connection_fingerprint_failure_handler* const fingerprint_failure_handler // nullable
 ) {
     struct rawrtc_peer_connection* connection;
-    enum rawrtc_code error;
 
     // Check arguments
     if (!connectionp) {
@@ -379,27 +427,15 @@ enum rawrtc_code rawrtc_peer_connection_create(
         return RAWRTC_CODE_NO_MEMORY;
     }
 
-    // Create ICE gather options
-    // TODO: Get from arguments
-    error = rawrtc_ice_gather_options_create(
-            &connection->gather_options, RAWRTC_ICE_GATHER_POLICY_ALL);
-    if (error) {
-        goto out;
-    }
-
     // Set fields/reference
     connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
+    connection->configuration = mem_ref(configuration);
     connection->connection_state_change_handler = connection_state_change_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
 
-out:
-    if (error) {
-        mem_deref(connection);
-    } else {
-        // Set pointer & done
-        *connectionp = connection;
-    }
-    return error;
+    // Set pointer & done
+    *connectionp = connection;
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
