@@ -461,7 +461,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
     }
 
     // Create description
-    return rawrtc_peer_connection_description_create(descriptionp, &connection->context);
+    return rawrtc_peer_connection_description_create(descriptionp, connection);
 }
 
 /*

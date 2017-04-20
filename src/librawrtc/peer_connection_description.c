@@ -374,19 +374,22 @@ static void rawrtc_peer_connection_description_destroy(
  */
 enum rawrtc_code rawrtc_peer_connection_description_create(
         struct rawrtc_peer_connection_description** const descriptionp,
-        struct rawrtc_peer_connection_context* const context
+        struct rawrtc_peer_connection* const connection
 ) {
+    struct rawrtc_peer_connection_context* context;
     struct rawrtc_peer_connection_description* description;
     struct sa address;
     enum rawrtc_code error;
     char const* const mid = "rawrtc-sctp-dc";
     bool bundle_only = false;
-    bool const sctp_sdp_06 = true; // TODO: Get from config
 
     // Check arguments
-    if (!descriptionp || !context) {
+    if (!descriptionp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
+
+    // Get context
+    context = &connection->context;
 
     // Allocate
     description = mem_zalloc(sizeof(*description), rawrtc_peer_connection_description_destroy);
@@ -408,12 +411,13 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Add data transport (if any)
-    if (context->dtls_transport && context->data_transport) {
+    if (context->data_transport) {
         switch (context->data_transport->type) {
             case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
                 // Add SCTP transport
                 error = add_sctp_data_channel(
-                        description->session, context, mid, true, bundle_only, sctp_sdp_06);
+                        description->session, context, mid, true, bundle_only,
+                        connection->configuration->sctp_sdp_06);
                 if (error) {
                     goto out;
                 }
