@@ -10,11 +10,14 @@ set(rawrtc_SOURCES
         dtls_transport.c
         ice_candidate.c
         ice_gatherer.c
+        ice_gather_options.c
         ice_parameters.c
+        ice_server.c
         ice_transport.c
         main.c
         message_buffer.c
         peer_connection.c
+        peer_connection_configuration.c
         peer_connection_description.c
         sctp_capabilities.c
         sctp_transport.c

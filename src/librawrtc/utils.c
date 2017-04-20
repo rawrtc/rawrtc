@@ -925,6 +925,22 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
 }
 
 /*
+ * Get the corresponding address family name for an DNS type.
+ */
+char const * const rawrtc_dns_type_to_address_family_name(
+        uint_fast16_t const dns_type
+) {
+    switch (dns_type) {
+        case DNS_TYPE_A:
+            return "IPv4";
+        case DNS_TYPE_AAAA:
+            return "IPv6";
+        default:
+            return "???";
+    }
+}
+
+/*
  * Duplicate a string.
  */
 enum rawrtc_code rawrtc_strdup(

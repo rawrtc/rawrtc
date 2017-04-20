@@ -824,13 +824,23 @@ struct rawrtc_data_channel {
 };
 
 /*
+ * Peer connection configuration.
+ */
+struct rawrtc_peer_connection_configuration {
+    enum rawrtc_ice_gather_policy gather_policy;
+    struct list ice_servers;
+    struct list certificates;
+    bool sctp_sdp_06;
+};
+
+/*
  * Peer connection description.
  * TODO: private
  */
 struct rawrtc_peer_connection_description {
     struct sdp_session* session;
     struct list media;
-    struct mbuf* encoded_sdp;
+    struct mbuf* sdp;
 };
 
 /*
@@ -1085,7 +1095,7 @@ enum rawrtc_code rawrtc_ice_parameters_get_ice_lite(
 );
 
 /*
- * Create a new ICE gather options.
+ * Create a new ICE gather options instance.
  */
 enum rawrtc_code rawrtc_ice_gather_options_create(
     struct rawrtc_ice_gather_options** const optionsp, // de-referenced
@@ -1709,10 +1719,28 @@ char const * const rawrtc_peer_connection_state_to_name(
 );
 
 /*
+ * Create a new peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_create(
+    struct rawrtc_peer_connection_configuration** const configurationp, // de-referenced
+    enum rawrtc_ice_gather_policy const gather_policy
+);
+
+/*
+ * Set whether to use legacy SDP for data channel parameter encoding.
+ * Note: Currently, legacy SDP for data channels is on by default.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
+    struct rawrtc_peer_connection_configuration* configuration,
+    bool const on
+);
+
+/*
  * Create a new peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection** const connectionp, // de-referenced
+    struct rawrtc_peer_connection_configuration* configuration, // referenced
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler //nullable
 );
 
@@ -1720,9 +1748,8 @@ enum rawrtc_code rawrtc_peer_connection_create(
 * Create an offer.
 */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
-    struct mbuf** const descriptionp,
-    struct rawrtc_peer_connection* const connection,
-    bool const sctp_sdp_06
+    struct rawrtc_peer_connection_description** const descriptionp,
+    struct rawrtc_peer_connection* const connection
 );
 
 /*

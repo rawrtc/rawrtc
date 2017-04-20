@@ -1,4 +1,3 @@
-#include <string.h> // memcpy
 #include <rawrtc.h>
 #include "peer_connection_description.h"
 
@@ -7,8 +6,8 @@
 #include "debug.h"
 
 // Constants
-uint16_t const port_bundle_only = 0;
-uint16_t const port_unspecified = 9;
+static uint16_t const port_bundle_only = 0;
+static uint16_t const port_unspecified = 9;
 
 /*
  * Add ICE attributes to SDP media line.
@@ -365,7 +364,7 @@ static void rawrtc_peer_connection_description_destroy(
     struct rawrtc_peer_connection_description* const description = arg;
 
     // Un-reference
-    mem_deref(description->encoded_sdp);
+    mem_deref(description->sdp);
     list_flush(&description->media);
     mem_deref(description->session);
 }
@@ -380,6 +379,9 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     struct rawrtc_peer_connection_description* description;
     struct sa address;
     enum rawrtc_code error;
+    char const* const mid = "rawrtc-sctp-dc";
+    bool bundle_only = false;
+    bool const sctp_sdp_06 = true; // TODO: Get from config
 
     // Check arguments
     if (!descriptionp || !context) {
@@ -406,12 +408,12 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Add data transport (if any)
-    if (connection->context.dtls_transport && connection->context.data_transport) {
-        switch (connection->context.data_transport->type) {
+    if (context->dtls_transport && context->data_transport) {
+        switch (context->data_transport->type) {
             case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
                 // Add SCTP transport
                 error = add_sctp_data_channel(
-                        session, &connection->context, mid, true, bundle_only, sctp_sdp_06);
+                        description->session, context, mid, true, bundle_only, sctp_sdp_06);
                 if (error) {
                     goto out;
                 }
@@ -427,15 +429,15 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Encode SDP
-    error = rawrtc_error_to_code(sdp_encode(descriptionp, description->session, true));
+    error = rawrtc_error_to_code(sdp_encode(&description->sdp, description->session, true));
     if (error) {
         goto out;
     }
 
     // Debug
     (void) bundle_only;
-    DEBUG_PRINTF("Description:\n%b", mbuf_buf(*descriptionp), mbuf_get_left(*descriptionp));
-    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
+    DEBUG_PRINTF("Description:\n%b", mbuf_buf(description->sdp), mbuf_get_left(description->sdp));
+    DEBUG_PRINTF("%H\n", sdp_session_debug, description->session);
 
     // Set fields/reference
     // TODO

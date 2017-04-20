@@ -78,3 +78,7 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     size_t const buffer_size,
     char* source
 );
+
+char const * const rawrtc_dns_type_to_address_family_name(
+    uint_fast16_t const dns_type
+);

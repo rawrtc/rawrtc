@@ -2,6 +2,7 @@
 #include <rawrtc.h>
 #include "certificate.h"
 #include "dtls_transport.h"
+#include "peer_connection_description.h"
 #include "peer_connection.h"
 
 #define DEBUG_MODULE "peer-connection"
@@ -354,6 +355,7 @@ static void rawrtc_peer_connection_destroy(
  */
 enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection** const connectionp, // de-referenced
+        struct rawrtc_peer_connection_configuration* configuration, // referenced
 //        rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
 //        rawrtc_peer_connection_ice_candidate_handler* const ice_candidate_handler, // nullable
 //        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
@@ -405,14 +407,8 @@ out:
  */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
         struct rawrtc_peer_connection_description** const descriptionp,
-        struct rawrtc_peer_connection* const connection,
-        bool const sctp_sdp_06
+        struct rawrtc_peer_connection* const connection
 ) {
-    struct rawrtc_peer_connection_description* description;
-    char const* const mid = "rawrtc-sctp-dc";
-    bool bundle_only = false;
-    enum rawrtc_code error;
-
     // Check arguments
     if (!connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -428,10 +424,8 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
-
-
-out:
-    return error;
+    // Create description
+    return rawrtc_peer_connection_description_create(descriptionp, &connection->context);
 }
 
 /*
