@@ -12,6 +12,12 @@ if [ -z "$BUILD_PATH" ]; then
     export BUILD_PATH=${PWD}/build
 fi
 
+# Offline?
+offline=false
+if [ ! -z "$OFFLINE" ]; then
+    offline=true
+fi
+
 # Dependencies
 OPENSSL_VERSION="1.1.0e"
 OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
@@ -83,6 +89,10 @@ echo "Need to fetch OpenSSL: $need_openssl"
 
 # Get openssl
 if [ "$need_openssl" = true ]; then
+    if [ "$offline" = true ]; then
+        echo "Cannot fetch OpenSSL as we are offline"
+        exit 1
+    fi
     rm -rf ${OPENSSL_PATH}
     echo "Fetching OpenSSL"
     wget ${OPENSSL_URL}
@@ -94,11 +104,12 @@ fi
 if [ ! -d "${USRSCTP_PATH}" ]; then
     echo "Cloning usrsctp"
     git clone -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
-else
+    cd ${USRSCTP_PATH}
+elif [ "$offline" = false ]; then
+    cd ${USRSCTP_PATH}
     echo "Pulling usrsctp"
     git pull
 fi
-cd ${USRSCTP_PATH}
 git checkout ${USRSCTP_BRANCH}
 git reset --hard ${USRSCTP_COMMIT}
 cd ${MAIN_DIR}
@@ -107,11 +118,12 @@ cd ${MAIN_DIR}
 if [ ! -d "${LIBRE_PATH}" ]; then
     echo "Cloning libre"
     git clone -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
-else
+    cd ${LIBRE_PATH}
+elif [ "$offline" = false ]; then
+    cd ${LIBRE_PATH}
     echo "Pulling libre"
     git pull
 fi
-cd ${LIBRE_PATH}
 git checkout ${LIBRE_BRANCH}
 git reset --hard ${LIBRE_COMMIT}
 cd ${MAIN_DIR}
@@ -120,11 +132,12 @@ cd ${MAIN_DIR}
 if [ ! -d "${LIBREW_PATH}" ]; then
     echo "Cloning librew"
     git clone -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
-else
+    cd ${LIBREW_PATH}
+elif [ "$offline" = false ]; then
+    cd ${LIBREW_PATH}
     echo "Pulling librew"
     git pull
 fi
-cd ${LIBREW_PATH}
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
 cd ${MAIN_DIR}
