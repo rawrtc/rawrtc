@@ -24,11 +24,11 @@ OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
-LIBRE_COMMIT="d52e2df8512d98f869601adcdac742502331c997"
+LIBRE_COMMIT="f01cf0c84f8fe43f7eda1bfd328525f06fe9d6f4"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
-LIBREW_BRANCH="rawrtc-patched"
-LIBREW_COMMIT="66817f584131b353313a681a6cdc9bfacc1a09ae"
+LIBREW_BRANCH="master"
+LIBREW_COMMIT="e5903f9f742db41aaafb16e98335a8addfe5d559"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
@@ -191,7 +191,8 @@ eval ${re_make} info
 echo "Building libre"
 SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-eval ${re_make} install-static
+eval ${re_make} install
+rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
 
 # Build librew
