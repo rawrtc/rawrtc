@@ -238,7 +238,7 @@ SDPUtils.getSctpCapabilities = function(mediaSection, sessionpart) {
   var maxMessageSize = lines.filter(function(line) {
     return line.indexOf('a=max-message-size:') === 0;
   });
-  // TODO: Use 65536 once browsers have fixed their implementations,
+  // TODO: Use 65536 once Firefox has disabled PPID-based fragmentation
   //       see: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html
   maxMessageSize = maxMessageSize.length ? maxMessageSize[0].substr(19) : 16384;
   return {
