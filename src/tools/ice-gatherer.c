@@ -1,4 +1,4 @@
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 

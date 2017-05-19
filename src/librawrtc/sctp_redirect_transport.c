@@ -4,7 +4,7 @@
 #include <netinet/in.h> // IPPROTO_RAW, ntohs, htons
 #include <unistd.h> // close
 #include <errno.h>
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "crc32c.h"
 #include "dtls_transport.h"
 #include "sctp_redirect_transport.h"

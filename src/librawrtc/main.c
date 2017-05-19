@@ -1,5 +1,5 @@
 #include <pthread.h> // pthread_*
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "main.h"
 
 #define DEBUG_MODULE "rawrtc-main"

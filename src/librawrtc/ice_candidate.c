@@ -1,5 +1,5 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "ice_candidate.h"
 #include "utils.h"
 

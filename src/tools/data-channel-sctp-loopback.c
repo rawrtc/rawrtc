@@ -1,5 +1,5 @@
 #include <unistd.h> // STDIN_FILENO
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 
@@ -138,7 +138,7 @@ static void dtls_transport_state_change_handler(
         // Client? Create data channel
         if (role == RAWRTC_DTLS_ROLE_CLIENT) {
             struct rawrtc_data_channel_parameters* channel_parameters;
-            
+
             // Create data channel helper
             data_channel_helper_create(
                     &client->data_channel, (struct client *) client, "bear-noises");

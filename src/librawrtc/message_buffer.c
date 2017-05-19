@@ -1,4 +1,4 @@
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "message_buffer.h"
 
 #define DEBUG_MODULE "message-buffer"

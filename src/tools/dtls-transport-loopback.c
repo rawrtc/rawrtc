@@ -1,4 +1,4 @@
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "../librawrtc/dtls_transport.h" /* TODO: Replace with <rawrtc_internal/dtls_transport.h> */
 #include "helper/utils.h"
 #include "helper/handler.h"

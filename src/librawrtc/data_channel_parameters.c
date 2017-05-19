@@ -1,4 +1,4 @@
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "data_channel_parameters.h"
 
 /*

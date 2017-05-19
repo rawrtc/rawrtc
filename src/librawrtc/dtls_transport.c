@@ -1,5 +1,5 @@
 #include <string.h> // memcmp
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "dtls_transport.h"
 #include "dtls_parameters.h"
 #include "message_buffer.h"
@@ -387,7 +387,7 @@ static void connect_handler(
         DEBUG_PRINTF("Switching role 'auto' -> 'server'\n");
         transport->role = RAWRTC_DTLS_ROLE_SERVER;
     }
-    
+
     // Accept?
     role_is_server = transport->role == RAWRTC_DTLS_ROLE_SERVER;
     have_connection = transport->connection != NULL;
@@ -741,7 +741,7 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 ) {
     enum rawrtc_code error;
     struct rawrtc_candidate_helper* candidate_helper = NULL;
-    
+
     // Check arguments
     if (!transport || !candidate_pair) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

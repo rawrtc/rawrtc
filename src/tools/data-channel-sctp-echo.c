@@ -1,6 +1,6 @@
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 #include "helper/parameters.h"

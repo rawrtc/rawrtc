@@ -1,5 +1,5 @@
 #pragma once
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "common.h"
 
 /*

@@ -18,10 +18,9 @@
 #define RAWRTC_DEBUG_LEVEL 5
 
 #define HAVE_INTTYPES_H
-//#include <re.h>
-//#include <rew.h>
+#include <re.h>
+#include <rew.h>
 #include <usrsctp.h>
-#include "/usr/local/include/uv.h"
 
 /*
  * Return codes.
@@ -48,17 +47,6 @@ enum rawrtc_code {
     RAWRTC_CODE_STOP_ITERATION,
     RAWRTC_CODE_NOT_PERMITTED,
 }; // IMPORTANT: Add translations for new return codes in `utils.c`!
-
-/* tls_keytype and tls_fingerprint taken from re_tls.h */
-enum tls_keytype {
-	TLS_KEYTYPE_RSA,
-	TLS_KEYTYPE_EC,
-};
-
-enum tls_fingerprint {
-	TLS_FINGERPRINT_SHA1,
-	TLS_FINGERPRINT_SHA256,
-};
 
 /*
  * Certificate private key types.
@@ -92,27 +80,6 @@ enum rawrtc_certificate_encode {
  * ICE candidate type (internal).
  * TODO: Private
  */
-
-/** ICE Role and ICE Candidate type AND ICE TCP protocol type taken from re_ice.h */
-enum ice_role {
-	ICE_ROLE_UNKNOWN = 0,
-	ICE_ROLE_CONTROLLING,
-	ICE_ROLE_CONTROLLED
-};
-
-enum ice_cand_type {
-	ICE_CAND_TYPE_HOST,   /**< Host candidate             */
-	ICE_CAND_TYPE_SRFLX,  /**< Server Reflexive candidate */
-	ICE_CAND_TYPE_PRFLX,  /**< Peer Reflexive candidate   */
-	ICE_CAND_TYPE_RELAY   /**< Relayed candidate          */
-};
-
-enum ice_tcptype {
-	ICE_TCP_ACTIVE,   /**< Active TCP client                   */
-	ICE_TCP_PASSIVE,  /**< Passive TCP server                  */
-	ICE_TCP_SO        /**< Simultaneous-open TCP client/server */
-};
-
 enum rawrtc_ice_candidate_storage {
     RAWRTC_ICE_CANDIDATE_STORAGE_RAW,
     RAWRTC_ICE_CANDIDATE_STORAGE_LCAND,
@@ -434,14 +401,6 @@ typedef void (rawrtc_data_channel_close_handler)(
     void* const arg
 );
 
-/** Defines a memory buffer */
-struct mbuf {
-	uint8_t *buf;   /**< Buffer memory      */
-	size_t size;    /**< Size of buffer     */
-	size_t pos;     /**< Position in buffer */
-	size_t end;     /**< End of buffer      */
-};
-
 /*
  * Data channel message handler.
  * TODO: ORTC is really unclear about that handler. Consider improving it with a PR.
@@ -501,14 +460,7 @@ typedef enum rawrtc_code (rawrtc_data_transport_channel_send_handler)(
     bool const is_binary
 );
 
-/** STUN Configuration */
-struct stun_conf {
-	uint32_t rto;  /**< RTO Retransmission TimeOut [ms]        */
-	uint32_t rc;   /**< Rc Retransmission count (default 7)    */
-	uint32_t rm;   /**< Rm Max retransmissions (default 16)    */
-	uint32_t ti;   /**< Ti Timeout for reliable transport [ms] */
-	uint8_t tos;   /**< Type-of-service field                  */
-};
+
 
 /*
  * Configuration.
@@ -525,20 +477,6 @@ struct rawrtc_config {
     enum rawrtc_ice_server_transport ice_server_secure_transport;
     uint32_t stun_keepalive_interval;
     struct stun_conf stun_config;
-};
-
-/** Linked-list element from re_list.h */
-struct le {
-	struct le *prev;    /**< Previous element                    */
-	struct le *next;    /**< Next element                        */
-	struct list *list;  /**< Parent list (NULL if not linked-in) */
-	void *data;         /**< User-data                           */
-};
-
-/** Defines a linked list from re_list.h */
-struct list {
-	struct le *head;  /**< First list element */
-	struct le *tail;  /**< Last list element  */
 };
 
 /*
@@ -561,7 +499,7 @@ struct rawrtc_certificate_options {
     uint32_t valid_until;
     enum rawrtc_certificate_sign_algorithm sign_algorithm;
     char* named_curve; // nullable, copied, ignored for RSA
-    uint32_t modulus_length; // ignored for ECC
+    uint_least32_t modulus_length; // ignored for ECC
 };
 
 /*
@@ -596,33 +534,6 @@ struct rawrtc_ice_server {
     enum rawrtc_ice_credential_type credential_type;
 };
 
-/** Defines a pointer-length string type from re_fmt.h */
-struct pl {
-	const char *p;  /**< Pointer to string */
-	size_t l;       /**< Length of string  */
-};
-
-/** Defines a Socket Address from re_sa.h */
-struct sa {
-	union {
-		struct sockaddr sa;
-		struct sockaddr_in in;
-#ifdef HAVE_INET6
-		struct sockaddr_in6 in6;
-#endif
-		uint8_t padding[28];
-	} u;
-	socklen_t len;
-};
-
-/** ICE Configuration from raw re_trice.h*/
-struct trice_conf {
-	bool debug;             /**< Enable ICE debugging                  */
-	bool trace;             /**< Enable tracing of Connectivity checks */
-	bool ansi;              /**< Enable ANSI colors for debug output   */
-	bool enable_prflx;      /**< Enable Peer-Reflexive candidates      */
-};
-
 /*
  * ICE server URL. (list element)
  * TODO: private
@@ -644,7 +555,7 @@ struct rawrtc_ice_server_url {
  * TODO: private -> ice_gatherer.h
  */
 struct rawrtc_ice_server_url_dns_context {
-    uint16_t dns_type;
+    uint_fast16_t dns_type;
     struct rawrtc_ice_server_url* url;
     struct rawrtc_ice_gatherer* gatherer;
     struct dns_query* dns_query;
@@ -836,11 +747,11 @@ struct rawrtc_sctp_transport {
     struct mbuf* buffer_dcep_inbound;
     struct sctp_rcvinfo info_dcep_inbound;
     struct rawrtc_data_channel** channels;
-    uint16_t n_channels;
-    uint16_t current_channel_sid;
+    uint_fast16_t n_channels;
+    uint_fast16_t current_channel_sid;
     FILE* trace_handle;
     struct socket* socket;
-    uint8_t flags;
+    uint_fast8_t flags;
     struct rawrtc_data_transport* data_transport; // referenced
 };
 
@@ -850,7 +761,7 @@ struct rawrtc_sctp_transport {
  */
 struct rawrtc_sctp_data_channel_context {
     uint16_t sid;
-    uint8_t flags;
+    uint_fast8_t flags;
     struct mbuf* buffer_inbound;
     struct sctp_rcvinfo info_inbound;
 };
@@ -860,7 +771,7 @@ struct rawrtc_sctp_data_channel_context {
  * TODO: private
  */
 struct rawrtc_data_channel {
-    uint8_t flags;
+    uint_fast8_t flags;
     enum rawrtc_data_channel_state state;
     struct rawrtc_data_transport* transport; // referenced
     void* transport_arg; // referenced
@@ -936,10 +847,10 @@ enum rawrtc_code rawrtc_certificate_options_create(
     struct rawrtc_certificate_options** const optionsp, // de-referenced
     enum rawrtc_certificate_key_type const key_type,
     char* common_name, // nullable, copied
-    uint32_t valid_until,
+    uint_fast32_t valid_until,
     enum rawrtc_certificate_sign_algorithm sign_algorithm,
     char* named_curve, // nullable, copied, ignored for RSA
-    uint32_t modulus_length // ignored for ECC
+    uint_fast32_t modulus_length // ignored for ECC
 );
 
 /*
@@ -1129,7 +1040,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
 /*
  * Get the corresponding name for an ICE gatherer state.
  */
-char const * rawrtc_ice_gatherer_state_to_name(
+char const * const rawrtc_ice_gatherer_state_to_name(
     enum rawrtc_ice_gatherer_state const state
 );
 
@@ -1193,7 +1104,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_local_candidates(
 /*
  * Get the corresponding name for an ICE transport state.
  */
-char const * rawrtc_ice_transport_state_to_name(
+char const * const rawrtc_ice_transport_state_to_name(
     enum rawrtc_ice_transport_state const state
 );
 
@@ -1335,7 +1246,7 @@ enum rawrtc_code rawrtc_dtls_parameters_fingerprint_get_value(
 /*
 * Get the corresponding name for an ICE transport state.
 */
-char const * rawrtc_dtls_transport_state_to_name(
+char const * const rawrtc_dtls_transport_state_to_name(
     enum rawrtc_dtls_transport_state const state
 );
 
@@ -1445,7 +1356,7 @@ enum rawrtc_code rawrtc_sctp_capabilities_get_max_message_size(
 /*
  * Get the corresponding name for an SCTP transport state.
  */
-char const * rawrtc_sctp_transport_state_to_name(
+char const * const rawrtc_sctp_transport_state_to_name(
     enum rawrtc_sctp_transport_state const state
 );
 
@@ -1587,7 +1498,7 @@ enum rawrtc_code rawrtc_data_channel_options_create(
 /*
  * Get the corresponding name for a data channel state.
  */
-char const * rawrtc_data_channel_state_to_name(
+char const * const rawrtc_data_channel_state_to_name(
     enum rawrtc_data_channel_state const state
 );
 
@@ -1873,32 +1784,3 @@ enum rawrtc_code rawrtc_sdprintf(
     char* const formatter,
     ...
 );
-
-/** Debug levels */
-enum {
-	DBG_EMERG       = 0,       /**< System is unusable               */
-	DBG_ALERT       = 1,       /**< Action must be taken immediately */
-	DBG_CRIT        = 2,       /**< Critical conditions              */
-	DBG_ERR         = 3,       /**< Error conditions                 */
-	DBG_WARNING     = 4,       /**< Warning conditions               */
-	DBG_NOTICE      = 5,       /**< Normal but significant condition */
-	DBG_INFO        = 6,       /**< Informational                    */
-	DBG_DEBUG       = 7        /**< Debug-level messages             */
-};
-
-/** Debug flags */
-enum dbg_flags {
-	DBG_NONE = 0,                 /**< No debug flags         */
-	DBG_TIME = 1<<0,              /**< Print timestamp flag   */
-	DBG_ANSI = 1<<1,              /**< Print ANSI color codes */
-	DBG_ALL  = DBG_TIME|DBG_ANSI  /**< All flags enabled      */
-};
-
-/* Wrapper functions for NEAT */
-void *rawrtc_mem_deref(void *data);
-
-void rawrtc_dbg_init(int level, enum dbg_flags flags);
-
-int rawrtc_alloc_fds(int maxfds);
-
-void rawrtc_set_uv_loop(uv_loop_t *loop);

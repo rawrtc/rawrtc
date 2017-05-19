@@ -18,7 +18,8 @@ set(rawrtc_SOURCES
         sctp_redirect_transport.c
         sctp_capabilities.c
         sctp_transport.c
-        utils.c)
+        utils.c
+        uv_support.c)
 
 # Setup library (link & install)
 add_library(rawrtc SHARED ${rawrtc_SOURCES})

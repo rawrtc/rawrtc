@@ -74,6 +74,10 @@ include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
 link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
 list(APPEND rawrtc_DEP_LIBRARIES ${LIB_USRSCTP_LIBRARIES})
 
+# Dependency: libuv
+find_library(UV_LIB uv)
+list(APPEND rawrtc_DEP_LIBRARIES ${UV_LIB})
+
 # Dependency versions
 set(PKG_CONFIG_REQUIRES "")
 set(PKG_CONFIG_REQUIRES_PRIVATE "${DEPENDENCY_VERSIONS}")

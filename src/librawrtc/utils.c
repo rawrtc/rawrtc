@@ -3,7 +3,7 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <stdarg.h>
 #include <openssl/evp.h> // EVP_MD, evp_*
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "utils.h"
 
 #define DEBUG_MODULE "utils"

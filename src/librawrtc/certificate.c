@@ -12,7 +12,7 @@
 #include <openssl/pem.h>
 #include <string.h>
 #include <limits.h>
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "certificate.h"
 #include "utils.h"
 

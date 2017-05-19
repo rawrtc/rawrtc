@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "common.h"
 #include "utils.h"
 #include "parameters.h"

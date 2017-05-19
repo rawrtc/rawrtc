@@ -85,8 +85,11 @@ if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_d
         need_openssl=true
     fi
 fi
+need_openssl=false
 echo "Need to fetch OpenSSL: $need_openssl"
 
+fetch_repos=false
+if [ "$fetch_repos" = true ]; then
 # Get openssl
 if [ "$need_openssl" = true ]; then
     if [ "$offline" = true ]; then
@@ -142,11 +145,13 @@ git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
 cd ${MAIN_DIR}
 
+
+
 # Build openssl
 if [ "$need_openssl" = true ]; then
     cd ${OPENSSL_PATH}
     echo "Configuring OpenSSL"
-    ./config shared --prefix=${PREFIX}
+    ./config sctp shared --prefix=${PREFIX}
     echo "Building OpenSSL"
     make
     echo "Installing OpenSSL"
@@ -163,6 +168,8 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 # Set openssl sysroot
 openssl_sysroot=`pkg-config --variable=prefix openssl`
 echo "Using OpenSSL sysroot: $openssl_sysroot"
+fi
+# End of fetch_repos
 
 # Build usrsctp
 cd ${USRSCTP_PATH}
@@ -173,8 +180,8 @@ cd build
 echo "Configuring usrsctp"
 CFLAGS=-fPIC \
 cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
-echo "Cleaning usrsctp"
-make clean
+#echo "Cleaning usrsctp"
+#make clean
 echo "Building & installing usrsctp"
 make install -j${THREADS}
 rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
@@ -182,22 +189,23 @@ cd ${MAIN_DIR}
 
 # Build libre
 cd ${LIBRE_PATH}
-echo "Cleaning libre"
-eval ${re_make} clean
+#echo "Cleaning libre"
+#eval ${re_make} clean
 echo "Build information for libre:"
-SYSROOT_ALT=${openssl_sysroot} \
+#SYSROOT_ALT=${openssl_sysroot} \
+SYSROOT_ALT=/usr/home/ruengeler/install
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 eval ${re_make} info
 echo "Building libre"
-SYSROOT_ALT=${openssl_sysroot} \
+#SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 eval ${re_make} install-static
 cd ${MAIN_DIR}
 
 # Build librew
 cd ${LIBREW_PATH}
-echo "Cleaning librew"
-eval ${re_make} clean
+#echo "Cleaning librew"
+#eval ${re_make} clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \

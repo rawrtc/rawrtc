@@ -1,7 +1,7 @@
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <string.h> // memcpy
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "ice_gatherer.h"
 #include "utils.h"
 #include "ice_candidate.h"
@@ -469,7 +469,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     if (!server) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("init list server->urls\n");
     // Copy URLs to list
     list_init(&server->urls);
     for (i = 0; i < n_urls; ++i) {
@@ -486,7 +486,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
         if (error) {
             goto out;
         }
-
+printf("add url to server->urls\n");
         // Append URL to list
         list_append(&server->urls, &url->le, url);
     }
@@ -507,7 +507,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
         }
     }
     server->credential_type = credential_type; // TODO: Validation needed in case TOKEN is used?
-
+printf("add server to ice_servers list\n");
     // Add to options
     list_append(&options->ice_servers, &server->le, server);
 
@@ -1196,7 +1196,7 @@ out:
 
     // Remove session if requested
     if (remove_session) {
-        mem_deref(session);
+      //  mem_deref(session);
     }
 }
 

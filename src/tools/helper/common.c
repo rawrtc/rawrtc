@@ -1,5 +1,5 @@
 #include <string.h> // strerror
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "common.h"
 
 #define DEBUG_MODULE "helper-common"

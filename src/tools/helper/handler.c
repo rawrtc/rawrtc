@@ -1,5 +1,5 @@
 #include <string.h> // strlen
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "common.h"
 #include "utils.h"
 #include "handler.h"

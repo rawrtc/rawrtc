@@ -7,7 +7,7 @@
     #define SCTP_DEBUG
 #endif
 #include <usrsctp.h> // usrsctp*
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "main.h"
 #include "utils.h"
 #include "message_buffer.h"

@@ -1,4 +1,4 @@
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 
@@ -25,7 +25,7 @@ static void ice_gatherer_local_candidate_handler(
         void* const arg
 ) {
     struct ice_transport_client* const client = arg;
-    
+
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
 

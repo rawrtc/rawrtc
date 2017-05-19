@@ -1,6 +1,6 @@
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
-#include <rawrtc.h>
+#include <rawrtc_internal.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 #include "helper/parameters.h"
@@ -355,14 +355,14 @@ static void parse_remote_parameters(
     DEBUG_INFO("Applying remote parameters\n");
     client_set_parameters(client);
     client_start_transports(client);
-    
+
 out:
     // Un-reference
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
     mem_deref(dict);
-    
+
     // Exit?
     if (error == RAWRTC_CODE_NO_VALUE) {
         DEBUG_NOTICE("Exiting\n");
