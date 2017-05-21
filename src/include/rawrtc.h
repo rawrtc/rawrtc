@@ -332,7 +332,13 @@ struct rawrtc_data_transport;
 struct rawrtc_sctp_transport;
 struct rawrtc_sctp_capabilities;
 
-
+/** Defines a memory buffer */
+struct mbuf {
+	uint8_t *buf;   /**< Buffer memory      */
+	size_t size;    /**< Size of buffer     */
+	size_t pos;     /**< Position in buffer */
+	size_t end;     /**< End of buffer      */
+};
 
 /*
  * ICE gatherer state change handler.
@@ -433,14 +439,6 @@ typedef void (rawrtc_data_channel_error_handler)(
 typedef void (rawrtc_data_channel_close_handler)(
     void* const arg
 );
-
-/** Defines a memory buffer */
-struct mbuf {
-	uint8_t *buf;   /**< Buffer memory      */
-	size_t size;    /**< Size of buffer     */
-	size_t pos;     /**< Position in buffer */
-	size_t end;     /**< End of buffer      */
-};
 
 /*
  * Data channel message handler.
@@ -813,6 +811,28 @@ struct rawrtc_data_channel_options {
 };
 
 /*
+ * DCEP payload protocol identifiers.
+ */
+enum {
+    RAWRTC_SCTP_TRANSPORT_PPID_DCEP = 50,
+    RAWRTC_SCTP_TRANSPORT_PPID_UTF16 = 51,
+    RAWRTC_SCTP_TRANSPORT_PPID_UTF16_EMPTY = 56,
+    RAWRTC_SCTP_TRANSPORT_PPID_UTF16_PARTIAL = 54, // deprecated
+    RAWRTC_SCTP_TRANSPORT_PPID_BINARY = 53,
+    RAWRTC_SCTP_TRANSPORT_PPID_BINARY_EMPTY = 57,
+    RAWRTC_SCTP_TRANSPORT_PPID_BINARY_PARTIAL = 52 // deprecated
+};
+
+enum rawrtc_code rawrtc_sctp_transport_send(
+    struct rawrtc_sctp_transport* const transport,
+    struct mbuf* const buffer,
+    void* const info,
+    socklen_t const info_size,
+    unsigned int const info_type,
+    int const flags
+);
+
+/*
  * SCTP capabilities.
  * TODO: private
  */
@@ -872,6 +892,17 @@ struct rawrtc_data_channel {
     rawrtc_data_channel_close_handler* close_handler; // nullable
     rawrtc_data_channel_message_handler* message_handler; // nullable
     void* arg; // nullable
+};
+
+/*
+ * Data channel helper structure. Can be extended.
+ */
+struct data_channel_helper {
+    struct le le;
+    struct rawrtc_data_channel* channel;
+    char* label;
+    struct client* client;
+    void* arg;
 };
 
 /*
@@ -1894,11 +1925,38 @@ enum dbg_flags {
 	DBG_ALL  = DBG_TIME|DBG_ANSI  /**< All flags enabled      */
 };
 
+enum rawrtc_code rawrtc_dtls_transport_send(
+    struct rawrtc_dtls_transport* const transport,
+    struct mbuf* const buffer
+);
+
+
 /* Wrapper functions for NEAT */
+
+struct mbuf *rawrtc_mbuf_alloc(size_t size);
+
+int rawrtc_mbuf_printf(struct mbuf *mb, const char *fmt, ...);
+
+void rawrtc_mbuf_set_pos(struct mbuf *mb, size_t pos);
+
+size_t rawrtc_mbuf_get_left(const struct mbuf *mb);
+
+uint8_t *rawrtc_mbuf_buf(const struct mbuf *mb);
+
+int rawrtc_mbuf_fill(struct mbuf *mb, uint8_t c, size_t n);
+
+size_t rawrtc_mbuf_get_space(const struct mbuf *mb);
+
 void *rawrtc_mem_deref(void *data);
+
+typedef void (rawrtc_mem_destroy_h)(void *data);
+
+void *rawrtc_mem_zalloc(size_t size, rawrtc_mem_destroy_h *dh);
 
 void rawrtc_dbg_init(int level, enum dbg_flags flags);
 
 int rawrtc_alloc_fds(int maxfds);
 
 void rawrtc_set_uv_loop(uv_loop_t *loop);
+
+void rawrtc_list_unlink(struct le *le);

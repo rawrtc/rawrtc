@@ -22,6 +22,8 @@
 #include <rew.h>
 #include <usrsctp.h>
 
+typedef void (rawrtc_mem_destroy_h)(void *data);
+
 /*
  * Return codes.
  */
