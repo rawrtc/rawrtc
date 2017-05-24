@@ -1079,7 +1079,7 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
     struct le* le;
     struct rawrtc_dtls_fingerprint* fingerprint;
     enum rawrtc_code error;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!parametersp || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

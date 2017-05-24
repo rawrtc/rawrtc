@@ -119,6 +119,7 @@ static void ice_gatherer_local_candidate_handler(
 
     // Print local parameters (if last candidate)
     if (!candidate) {
+    printf("ice_gatherer_local_candidate_handler: call print_local_parameters\n");
         print_local_parameters(client);
     }
 }
@@ -205,7 +206,7 @@ static void client_init(
     EOE(rawrtc_sctp_transport_create(
             &client->sctp_transport, client->dtls_transport,
             client->local_parameters.sctp_parameters.port,
-            default_data_channel_handler, default_sctp_transport_state_change_handler, client));
+            default_data_channel_handler, default_sctp_transport_state_change_handler, NULL, client));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(

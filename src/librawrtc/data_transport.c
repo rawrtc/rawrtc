@@ -3,7 +3,7 @@
 #include "data_transport.h"
 
 #define DEBUG_MODULE "data-transport"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -30,7 +30,7 @@ enum rawrtc_code rawrtc_data_transport_create(
         rawrtc_data_transport_channel_send_handler* const channel_send_handler
 ) {
     struct rawrtc_data_transport* transport;
-
+printf("%s\n", __func__);
     // Check arguments
     if (!transportp || !internal_transport || !channel_create_handler) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

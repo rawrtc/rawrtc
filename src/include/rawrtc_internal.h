@@ -301,8 +301,6 @@ struct rawrtc_data_transport;
 struct rawrtc_sctp_transport;
 struct rawrtc_sctp_capabilities;
 
-
-
 /*
  * ICE gatherer state change handler.
  */
@@ -372,6 +370,17 @@ typedef void (rawrtc_dtls_transport_error_handler)(
 typedef void (rawrtc_sctp_transport_state_change_handler)(
     enum rawrtc_sctp_transport_state const state,
     void* const arg
+);
+
+struct socket;
+
+/*
+ * SCTP transport upcall handler.
+ */
+typedef void (rawrtc_sctp_transport_upcall_handler)(
+    struct socket* socket,
+    void* arg,
+    int flags
 );
 
 /*
@@ -1371,6 +1380,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     uint16_t port, // zeroable
     rawrtc_data_channel_handler* const data_channel_handler, // nullable
     rawrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
+    rawrtc_sctp_transport_upcall_handler* sctp_upcall_handler, //nullable
     void* const arg // nullable
 );
 

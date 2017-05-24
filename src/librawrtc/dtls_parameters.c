@@ -208,37 +208,42 @@ enum rawrtc_code rawrtc_dtls_parameters_create_internal(
 
     // Check arguments
     if (!parametersp || !fingerprints) {
+    printf("%s:%d\n", __func__, __LINE__);
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Get fingerprints length
     n_fingerprints = list_count(fingerprints);
-
+printf("%s:%d\n", __func__, __LINE__);
     // Create parameters
     error = rawrtc_dtls_parameters_allocate(&parameters, role, n_fingerprints);
     if (error) {
+    printf("%s:%d\n", __func__, __LINE__);
         goto out;
     }
-
+printf("%s:%d\n", __func__, __LINE__);
     // Reference and set each fingerprint
     for (le = list_head(fingerprints), i = 0; le != NULL; le = le->next, ++i) {
         struct rawrtc_dtls_fingerprint* const fingerprint = le->data;
-
+printf("%s:%d\n", __func__, __LINE__);
         // Check algorithm
         if (fingerprint->algorithm == RAWRTC_CERTIFICATE_SIGN_ALGORITHM_NONE) {
             error = RAWRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }
-
+printf("%s:%d\n", __func__, __LINE__);
         // Reference and set fingerprint
         parameters->fingerprints->fingerprints[i] = mem_ref(fingerprint);
+        printf("%s:%d\n", __func__, __LINE__);
     }
 
 out:
     if (error) {
+    printf("%s:%d\n", __func__, __LINE__);
         mem_deref(parameters);
     } else {
         // Set pointer
+        printf("%s:%d\n", __func__, __LINE__);
         *parametersp = parameters;
     }
     return error;

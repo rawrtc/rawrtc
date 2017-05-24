@@ -109,7 +109,7 @@ static void client_init(
     // Create SCTP transport
     EOE(rawrtc_sctp_transport_create(
             &local->sctp_transport, local->dtls_transport, local->sctp_port,
-            default_data_channel_handler, sctp_transport_state_change_handler, local));
+            default_data_channel_handler, sctp_transport_state_change_handler, NULL, local));
 
     // Get SCTP capabilities
     EOE(rawrtc_sctp_transport_get_capabilities(&local->sctp_capabilities));

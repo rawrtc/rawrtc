@@ -91,7 +91,7 @@ void data_channel_handler(
 ) {
     struct data_channel_sctp_client* const client = arg;
     struct data_channel_helper* channel_helper;
-
+DEBUG_PRINTF("(%s) Handle the newly created data channel\n", __func__);
     // Print channel
     default_data_channel_handler(channel, arg);
 
@@ -141,7 +141,7 @@ static void client_init(
     EOE(rawrtc_sctp_transport_create(
             &client->sctp_transport, client->dtls_transport,
             client->local_parameters.sctp_parameters.port,
-            data_channel_handler, default_sctp_transport_state_change_handler, client));
+            data_channel_handler, default_sctp_transport_state_change_handler, NULL, client));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(

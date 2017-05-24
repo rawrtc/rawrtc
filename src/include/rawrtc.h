@@ -15,13 +15,23 @@
 //#endif
 //#include <zf_log.h>
 
-#define RAWRTC_DEBUG_LEVEL 5
+#define RAWRTC_DEBUG_LEVEL 7
+
+#define AF_CONN 123
 
 #define HAVE_INTTYPES_H
-//#include <re.h>
-//#include <rew.h>
-#include <usrsctp.h>
 #include "/usr/local/include/uv.h"
+
+struct rawrtc_sctp_rcvinfo {
+	uint16_t rcv_sid;
+	uint16_t rcv_ssn;
+	uint16_t rcv_flags;
+	uint32_t rcv_ppid;
+	uint32_t rcv_tsn;
+	uint32_t rcv_cumtsn;
+	uint32_t rcv_context;
+	uint32_t rcv_assoc_id;
+};
 
 /*
  * Return codes.
@@ -331,6 +341,7 @@ struct rawrtc_data_channel_parameters;
 struct rawrtc_data_transport;
 struct rawrtc_sctp_transport;
 struct rawrtc_sctp_capabilities;
+struct socket;
 
 /** Defines a memory buffer */
 struct mbuf {
@@ -412,6 +423,15 @@ typedef void (rawrtc_sctp_transport_state_change_handler)(
 );
 
 /*
+ * SCTP transport upcall handler.
+ */
+typedef void (rawrtc_sctp_transport_upcall_handler)(
+    struct socket* socket,
+    void* arg,
+    int flags
+);
+
+/*
  * Data channel open handler.
  */
 typedef void (rawrtc_data_channel_open_handler)(
@@ -448,6 +468,12 @@ typedef void (rawrtc_data_channel_message_handler)(
     struct mbuf* const buffer,
     enum rawrtc_data_channel_message_flag const flags,
     void* const arg
+);
+
+void upcall_handler_helper(
+        struct socket* socket,
+        void* arg,
+        int flags
 );
 
 /*
@@ -529,12 +555,12 @@ struct rawrtc_config {
 struct le {
 	struct le *prev;    /**< Previous element                    */
 	struct le *next;    /**< Next element                        */
-	struct list *list;  /**< Parent list (NULL if not linked-in) */
+	struct rawrtc_list *list;  /**< Parent list (NULL if not linked-in) */
 	void *data;         /**< User-data                           */
 };
 
 /** Defines a linked list from re_list.h */
-struct list {
+struct rawrtc_list {
 	struct le *head;  /**< First list element */
 	struct le *tail;  /**< Last list element  */
 };
@@ -579,7 +605,7 @@ struct rawrtc_certificate {
  */
 struct rawrtc_ice_gather_options {
     enum rawrtc_ice_gather_policy gather_policy;
-    struct list ice_servers;
+    struct rawrtc_list ice_servers;
 };
 
 /*
@@ -588,7 +614,7 @@ struct rawrtc_ice_gather_options {
  */
 struct rawrtc_ice_server {
     struct le le;
-    struct list urls; // deep-copied
+    struct rawrtc_list urls; // deep-copied
     char* username; // copied
     char* credential; // copied
     enum rawrtc_ice_credential_type credential_type;
@@ -698,8 +724,8 @@ struct rawrtc_ice_gatherer {
     rawrtc_ice_gatherer_error_handler* error_handler; // nullable
     rawrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
     void* arg; // nullable
-    struct list buffered_messages; // TODO: Can this be added to the candidates list?
-    struct list local_candidates; // TODO: Hash list instead?
+    struct rawrtc_list buffered_messages; // TODO: Can this be added to the candidates list?
+    struct rawrtc_list local_candidates; // TODO: Hash list instead?
     char ice_username_fragment[9];
     char ice_password[33];
     struct trice* ice;
@@ -747,16 +773,16 @@ struct rawrtc_dtls_parameters {
 struct rawrtc_dtls_transport {
     enum rawrtc_dtls_transport_state state;
     struct rawrtc_ice_transport* ice_transport; // referenced
-    struct list certificates; // deep-copied
+    struct rawrtc_list certificates; // deep-copied
     rawrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
     rawrtc_dtls_transport_error_handler* error_handler; // nullable
     void* arg; // nullable
     struct rawrtc_dtls_parameters* remote_parameters; // referenced
     enum rawrtc_dtls_role role;
     bool connection_established;
-    struct list buffered_messages_in;
-    struct list buffered_messages_out;
-    struct list fingerprints;
+    struct rawrtc_list buffered_messages_in;
+    struct rawrtc_list buffered_messages_out;
+    struct rawrtc_list fingerprints;
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
@@ -852,9 +878,9 @@ struct rawrtc_sctp_transport {
     rawrtc_data_channel_handler* data_channel_handler; // nullable
     rawrtc_sctp_transport_state_change_handler* state_change_handler; // nullable
     void* arg; // nullable
-    struct list buffered_messages_outgoing;
+    struct rawrtc_list buffered_messages_outgoing;
     struct mbuf* buffer_dcep_inbound;
-    struct sctp_rcvinfo info_dcep_inbound;
+    struct rawrtc_sctp_rcvinfo info_dcep_inbound;
     struct rawrtc_data_channel** channels;
     uint16_t n_channels;
     uint16_t current_channel_sid;
@@ -872,7 +898,7 @@ struct rawrtc_sctp_data_channel_context {
     uint16_t sid;
     uint8_t flags;
     struct mbuf* buffer_inbound;
-    struct sctp_rcvinfo info_inbound;
+    struct rawrtc_sctp_rcvinfo info_inbound;
 };
 
 /*
@@ -1489,6 +1515,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     uint16_t port, // zeroable
     rawrtc_data_channel_handler* const data_channel_handler, // nullable
     rawrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
+    rawrtc_sctp_transport_upcall_handler* sctp_upcall_handler, //nullable
     void* const arg // nullable
 );
 
@@ -1930,6 +1957,42 @@ enum rawrtc_code rawrtc_dtls_transport_send(
     struct mbuf* const buffer
 );
 
+enum odict_type {
+	ODICT_OBJECT,
+	ODICT_ARRAY,
+	ODICT_STRING,
+	ODICT_INT,
+	ODICT_DOUBLE,
+	ODICT_BOOL,
+	ODICT_NULL,
+};
+
+struct odict {
+	struct rawrtc_list lst;
+	struct hash *ht;
+};
+
+struct odict_entry {
+	struct le le, he;
+	char *key;
+	union {
+		struct odict *odict;   /* ODICT_OBJECT / ODICT_ARRAY */
+		char *str;             /* ODICT_STRING */
+		int64_t integer;       /* ODICT_INT    */
+		double dbl;            /* ODICT_DOUBLE */
+		bool boolean;          /* ODICT_BOOL   */
+	} u;
+	enum odict_type type;
+};
+
+typedef int(rawrtc_vprintf_h)(const char *p, size_t size, void *arg);
+
+/** Defines a print backend */
+struct re_printf {
+	rawrtc_vprintf_h *vph; /**< Print handler   */
+	void *arg;         /**< Handler agument */
+};
+
 
 /* Wrapper functions for NEAT */
 
@@ -1945,9 +2008,13 @@ uint8_t *rawrtc_mbuf_buf(const struct mbuf *mb);
 
 int rawrtc_mbuf_fill(struct mbuf *mb, uint8_t c, size_t n);
 
+int rawrtc_mbuf_write_mem(struct mbuf *mb, const uint8_t *buf, size_t size);
+
 size_t rawrtc_mbuf_get_space(const struct mbuf *mb);
 
 void *rawrtc_mem_deref(void *data);
+
+void *rawrtc_mem_ref(void *data);
 
 typedef void (rawrtc_mem_destroy_h)(void *data);
 
@@ -1960,3 +2027,31 @@ int rawrtc_alloc_fds(int maxfds);
 void rawrtc_set_uv_loop(uv_loop_t *loop);
 
 void rawrtc_list_unlink(struct le *le);
+
+uint32_t rawrtc_list_count(const struct rawrtc_list *list);
+
+struct le *rawrtc_list_head(const struct rawrtc_list *list);
+
+void rawrtc_list_flush(struct rawrtc_list *list);
+
+void rawrtc_list_append(struct rawrtc_list *list, struct le *le, void *data);
+
+void rawrtc_list_init(struct rawrtc_list *list);
+
+typedef void (fd_h)(int flags, void *arg);
+int rawrtc_fd_listen(int fd, int flags, fd_h *fh, void *arg);
+
+int rawrtc_odict_alloc(struct odict **op, uint32_t hash_size);
+
+int rawrtc_odict_entry_add(struct odict *o, const char *key, enum odict_type type, ...);
+
+int rawrtc_json_encode_odict(struct re_printf *pf, const struct odict *o);
+
+int rawrtc_json_decode_odict(struct odict **op, uint32_t hash_size, const char *str,
+		                     size_t len, unsigned maxdepth);
+
+const struct odict_entry *rawrtc_odict_lookup(const struct odict *o, const char *key);
+
+void rawrtc_dbg_info(const char *fmt, ...);
+
+int webrtc_upcall_handler(struct socket* socket, void* arg, int flags);
