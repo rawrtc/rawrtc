@@ -472,7 +472,7 @@ enum rawrtc_code rawrtc_certificate_generate(
 ) {
     struct rawrtc_certificate* certificate;
     enum rawrtc_code error;
-printf("rawrtc_certificate_generate\n");
+
     // Check arguments
     if (!certificatep) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

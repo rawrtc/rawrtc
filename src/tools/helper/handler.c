@@ -15,7 +15,6 @@ void default_ice_gatherer_state_change_handler(
         enum rawrtc_ice_gatherer_state const state, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     char const * const state_name = rawrtc_ice_gatherer_state_to_name(state);
     (void) arg;
@@ -32,7 +31,6 @@ void default_ice_gatherer_error_handler(
         char const * const error_text, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     (void) host_candidate; (void) error_code; (void) arg;
     DEBUG_PRINTF("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
@@ -46,7 +44,6 @@ void default_ice_gatherer_local_candidate_handler(
         char const * const url, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     (void) candidate; (void) arg;
     print_ice_candidate(candidate, url, client);
@@ -59,7 +56,6 @@ void default_ice_transport_state_change_handler(
         enum rawrtc_ice_transport_state const state,
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     char const * const state_name = rawrtc_ice_transport_state_to_name(state);
     (void) arg;
@@ -74,7 +70,6 @@ void default_ice_transport_candidate_pair_change_handler(
         struct rawrtc_ice_candidate* const remote, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     (void) local; (void) remote;
     DEBUG_PRINTF("(%s) ICE transport candidate pair change\n", client->name);
@@ -87,7 +82,6 @@ void default_dtls_transport_state_change_handler(
         enum rawrtc_dtls_transport_state const state, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     char const * const state_name = rawrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
@@ -100,7 +94,6 @@ void default_dtls_transport_error_handler(
         /* TODO: error.message (probably from OpenSSL) */
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     // TODO: Print error message
     DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
@@ -113,7 +106,6 @@ void default_sctp_transport_state_change_handler(
         enum rawrtc_sctp_transport_state const state,
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     char const * const state_name = rawrtc_sctp_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
@@ -126,7 +118,6 @@ void default_data_channel_handler(
         struct rawrtc_data_channel* const channel, // read-only, MUST be referenced when used
         void* const arg // will be casted to `struct client*`
 ) {
-printf("%s\n", __func__);
     struct client* const client = arg;
     struct rawrtc_data_channel_parameters* parameters;
     enum rawrtc_code const ignore[] = {RAWRTC_CODE_NO_VALUE};

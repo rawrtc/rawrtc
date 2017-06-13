@@ -207,7 +207,7 @@ static void dtls_receive_handler(
         void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
-printf("%s\n", __func__);
+
     // Check state
     if (is_closed(transport)) {
         DEBUG_PRINTF("Ignoring incoming DTLS message, transport is closed\n");
@@ -248,7 +248,7 @@ static void verify_certificate(
     enum tls_fingerprint algorithm;
     uint8_t expected_fingerprint[RAWRTC_FINGERPRINT_MAX_SIZE];
     uint8_t actual_fingerprint[RAWRTC_FINGERPRINT_MAX_SIZE];
-printf("%s\n", __func__);
+
     // Verify the peer's certificate
     // TODO: Fix this. Testing the fingerprint alone is okay for now though.
 //    error = rawrtc_error_to_code(tls_peer_verify(transport->connection));
@@ -345,7 +345,7 @@ static void establish_handler(
         void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
-printf("%s\n", __func__);
+
     // Check state
     if (is_closed(transport)) {
         DEBUG_WARNING("Ignoring established DTLS connection, transport is closed\n");
@@ -375,7 +375,7 @@ static void connect_handler(
     bool have_connection;
     int err;
     (void) peer;
-printf("%s\n", __func__);
+
     // Check state
     if (is_closed(transport)) {
         DEBUG_PRINTF("Ignoring incoming DTLS connection, transport is closed\n");
@@ -421,7 +421,6 @@ static enum rawrtc_code do_connect(
         struct rawrtc_dtls_transport* const transport,
         const struct sa* const peer
 ) {
-printf("%s\n", __func__);
     // Connect
     DEBUG_PRINTF("Starting DTLS connection to %J\n", peer);
     return rawrtc_error_to_code(dtls_connect(
@@ -442,7 +441,7 @@ static int send_handler(
     struct trice* const ice = transport->ice_transport->gatherer->ice;
     bool closed = is_closed(transport);
     (void) tc; (void) original_destination;
-printf("%s\n", __func__);
+
     // Note: No need to check if closed as only non-application data may be sent if the
     //       transport is already closed.
 
@@ -500,7 +499,7 @@ static bool udp_receive_handler(
     struct rawrtc_dtls_transport* const transport = arg;
     struct sa* source = context;
     struct sa const* peer;
-printf("%s\n", __func__);
+
     // TODO: Check if DTLS or SRTP packet
     // TODO: This handler should also be moved into ICE transport
     // https://tools.ietf.org/search/rfc7983#section-7
@@ -537,7 +536,6 @@ static bool udp_receive_helper(
         struct mbuf* buffer,
         void* arg
 ) {
-printf("%s\n", __func__);
     // Receive
     udp_receive_handler(buffer, source, arg);
 
@@ -553,7 +551,7 @@ static void rawrtc_dtls_transport_destroy(
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct le* le;
-printf("%s\n", __func__);
+
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_dtls_transport_stop(transport);
@@ -597,7 +595,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     struct le* le;
     uint8_t* certificate_der;
     size_t certificate_der_length;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!transportp || !ice_transport || !certificates || !n_certificates) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -652,7 +650,7 @@ printf("%s\n", __func__);
         // Append to list
         list_append(&transport->certificates, &certificate->le, certificate);
     }
-printf("Creating DTLS context\n");
+
     // Create (D)TLS context
     DEBUG_PRINTF("Creating DTLS context\n");
     error = rawrtc_error_to_code(tls_alloc(&transport->context, TLS_METHOD_DTLS, NULL, NULL));
@@ -668,7 +666,7 @@ printf("Creating DTLS context\n");
     if (error) {
         goto out;
     }
-printf("Setting certificate on DTLS context\n");
+
     // Set certificate
     DEBUG_PRINTF("Setting certificate on DTLS context\n");
     error = rawrtc_error_to_code(tls_set_certificate_der(
@@ -699,7 +697,7 @@ printf("Setting DH parameters on DTLS context\n");
 
     // Send client certificate (client) / request client certificate (server)
     tls_set_verify_client(transport->context);
-printf("Creating DTLS socket\n");
+
     // Create DTLS socket
     DEBUG_PRINTF("Creating DTLS socket\n");
     error = rawrtc_error_to_code(dtls_socketless(
@@ -743,7 +741,7 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 ) {
     enum rawrtc_code error;
     struct rawrtc_candidate_helper* candidate_helper = NULL;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!transport || !candidate_pair) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -810,7 +808,7 @@ enum rawrtc_code rawrtc_dtls_transport_start(
 ) {
     enum rawrtc_code error;
     enum rawrtc_ice_role ice_role;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!transport || !remote_parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -908,7 +906,6 @@ enum rawrtc_code rawrtc_dtls_transport_have_data_transport(
         bool* const have_data_transportp, // de-referenced
         struct rawrtc_dtls_transport* const transport
 ) {
-printf("%s\n", __func__);
     // Check arguments
     if (!have_data_transportp || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -934,7 +931,7 @@ static bool intermediate_receive_handler(
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     (void) context;
-printf("%s\n", __func__);
+
     // Pipe into the actual receive handler
     if (transport->receive_handler) {
         transport->receive_handler(buffer, transport->receive_handler_arg);
@@ -956,7 +953,7 @@ enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
 ) {
     enum rawrtc_code error;
     bool have_data_transport;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!transport || !receive_handler) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -996,7 +993,7 @@ enum rawrtc_code rawrtc_dtls_transport_clear_data_transport(
     if (!transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
-printf("%s\n", __func__);
+
     // TODO: Clear buffered messages (?)
 
     // Clear handler and argument
@@ -1015,7 +1012,7 @@ enum rawrtc_code rawrtc_dtls_transport_send(
         struct mbuf* const buffer
 ) {
     enum rawrtc_code error;
-printf("%s\n", __func__);
+
     // Check arguments
     if (!transport || !buffer) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

@@ -88,6 +88,11 @@ void rawrtc_list_init(struct list *list)
 	return list_init(list);
 }
 
+void *rawrtc_list_ledata(const struct le *le)
+{
+	return list_ledata(le);
+}
+
 uint8_t *rawrtc_mbuf_buf(const struct mbuf *mb)
 {
 	return mbuf_buf(mb);

@@ -119,7 +119,6 @@ static void ice_gatherer_local_candidate_handler(
 
     // Print local parameters (if last candidate)
     if (!candidate) {
-    printf("ice_gatherer_local_candidate_handler: call print_local_parameters\n");
         print_local_parameters(client);
     }
 }

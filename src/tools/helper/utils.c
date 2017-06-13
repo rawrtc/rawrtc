@@ -336,10 +336,9 @@ void add_to_other_if_ice_candidate_type_enabled(
         struct rawrtc_ice_candidate* const candidate,
         struct rawrtc_ice_transport* const transport
 ) {
-printf("%s\n", __func__);
     if (candidate) {
         enum rawrtc_ice_candidate_type type;
-printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)transport);
+
         // Get ICE candidate type
         EOE(rawrtc_ice_candidate_get_type(&type, candidate));
 
@@ -348,7 +347,6 @@ printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)t
             EOE(rawrtc_ice_transport_add_remote_candidate(transport, candidate));
         }
     } else {
-printf("%s: no candidate\n", __func__);
         // Last candidate is always being added
         EOE(rawrtc_ice_transport_add_remote_candidate(transport, candidate));
     }

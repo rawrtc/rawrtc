@@ -310,6 +310,7 @@ printf("%s\n", __func__);
 enum rawrtc_code rawrtc_data_channel_close(
         struct rawrtc_data_channel* const channel
 ) {
+printf("%s\n", __func__);
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

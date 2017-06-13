@@ -91,7 +91,8 @@ void data_channel_handler(
 ) {
     struct data_channel_sctp_client* const client = arg;
     struct data_channel_helper* channel_helper;
-DEBUG_PRINTF("(%s) Handle the newly created data channel\n", __func__);
+
+    DEBUG_PRINTF("(%s) Handle the newly created data channel\n", __func__);
     // Print channel
     default_data_channel_handler(channel, arg);
 

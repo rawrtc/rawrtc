@@ -29,7 +29,7 @@ static void ice_gatherer_local_candidate_handler(
         void* const arg
 ) {
     struct dtls_transport_client* const client = arg;
-printf("%s\n", __func__);
+
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
 
@@ -74,7 +74,7 @@ static void client_init(
     // Generate certificates
     EOE(rawrtc_certificate_generate(&local->certificate, NULL));
     certificates[0] = local->certificate;
-    printf("init client %s\n", local->name);
+
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
             &local->gatherer, local->gather_options,
@@ -86,7 +86,7 @@ static void client_init(
             &local->ice_transport, local->gatherer,
             default_ice_transport_state_change_handler,
             default_ice_transport_candidate_pair_change_handler, local));
-printf("ice_transport=%p\n", (void *)local->ice_transport);
+
     // Create DTLS transport
     EOE(rawrtc_dtls_transport_create(
             &local->dtls_transport, local->ice_transport, certificates, ARRAY_SIZE(certificates),
@@ -97,7 +97,6 @@ static void client_start(
         struct dtls_transport_client* const local,
         struct dtls_transport_client* const remote
 ) {
-printf("start client %s\n", local->name);
     // Get & set ICE parameters
     EOE(rawrtc_ice_gatherer_get_local_parameters(
             &local->ice_parameters, remote->gatherer));
@@ -196,8 +195,7 @@ int main(int argc, char* argv[argc + 1]) {
     // Initialise clients
     client_init(&a);
     client_init(&b);
-printf("After initializing clients: a->transport=%p, b->transport=%p\n", (void *)a.ice_transport, (void *)b.ice_transport);
-printf("oter clients: a->otherTransport=%p, b->otherTransport=%p\n", (void *)a.other_client->ice_transport, (void *)b.other_client->ice_transport);
+
     // Start clients
     client_start(&a, &b);
     client_start(&b, &a);

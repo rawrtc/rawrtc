@@ -400,7 +400,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     enum rawrtc_ice_candidate_type type;
     enum rawrtc_ice_tcp_candidate_type tcp_type;
     char* related_address = NULL;
-printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)transport);
+
     // Check arguments
     if (!transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -431,6 +431,7 @@ printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)t
     if (error) {
         goto out;
     }
+
     // Skip IPv4, IPv6 if requested
     // TODO: Get config from struct
     af = sa_af(&address);
@@ -494,7 +495,7 @@ printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)t
         goto out;
     }
 
-	 // Set related address (if any)
+    // Set related address (if any)
     error = rawrtc_ice_candidate_get_related_address(&related_address, candidate);
     if (!error) {
         error = rawrtc_ice_candidate_get_related_port(&port, candidate);
@@ -509,8 +510,9 @@ printf("%s: candidate=%p transport=%p\n", __func__, (void *)candidate, (void *)t
     if (error && error != RAWRTC_CODE_NO_VALUE) {
         goto out;
     }
+
     // TODO: Add TURN permission
-printf("Added remote candidate: %J\n", &address);
+
     // Done
     DEBUG_PRINTF("Added remote candidate: %J\n", &address);
     error = RAWRTC_CODE_SUCCESS;

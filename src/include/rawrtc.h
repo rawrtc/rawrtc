@@ -2038,6 +2038,8 @@ void rawrtc_list_append(struct rawrtc_list *list, struct le *le, void *data);
 
 void rawrtc_list_init(struct rawrtc_list *list);
 
+void *rawrtc_list_ledata(const struct le *le);
+
 typedef void (fd_h)(int flags, void *arg);
 int rawrtc_fd_listen(int fd, int flags, fd_h *fh, void *arg);
 

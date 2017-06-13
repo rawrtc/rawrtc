@@ -39,8 +39,8 @@ static uint16_t const sctp_events[] = {
 //    SCTP_ADAPTATION_INDICATION,
     SCTP_SEND_FAILED_EVENT,
     SCTP_STREAM_RESET_EVENT,
-    SCTP_STREAM_CHANGE_EVENT,
-    SCTP_SENDER_DRY_EVENT
+    SCTP_STREAM_CHANGE_EVENT
+//    SCTP_SENDER_DRY_EVENT
 };
 static size_t const sctp_events_length = ARRAY_SIZE(sctp_events);
 
@@ -564,7 +564,7 @@ static enum rawrtc_code reset_outgoing_stream(
     struct sctp_reset_streams* reset_streams = NULL;
     size_t length;
     enum rawrtc_code error;
-
+printf("%s\n", __func__);
     // Get context
     struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
 
@@ -590,9 +590,14 @@ static enum rawrtc_code reset_outgoing_stream(
     reset_streams->srs_stream_list[0] = context->sid;
 
     // Reset stream
-    if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
-                           reset_streams, (socklen_t) length)) {
+    int err = usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
+                           reset_streams, (socklen_t) length);
+    printf("usrsctp_setsockopt returned errno=%d\n", err);
+   /* if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
+                           reset_streams, (socklen_t) length) != 0) {*/
+    if (err != 0) {
         error = rawrtc_error_to_code(errno);
+        printf("usrsctp_setsockopt error=%d\n", error);
         goto out;
     }
 
@@ -902,16 +907,27 @@ static void handle_stream_reset_event(
 ) {
     uint_fast32_t length;
     uint_fast32_t i;
-
+printf("%s\n", __func__);
     // Get #sid's
     length = (event->strreset_length - sizeof(*event)) / sizeof(uint16_t);
 
     // Print debug output for event
     DEBUG_PRINTF("Stream reset event: %H", debug_stream_reset_event, event, length);
-
+printf("event=%d\n", event);
+if (event->strreset_flags) {
+    if (event->strreset_flags & SCTP_STREAM_RESET_DENIED)
+        printf("SCTP_STREAM_RESET_DENIED\n");
+    if (event->strreset_flags & SCTP_STREAM_RESET_FAILED)
+        printf("SCTP_STREAM_RESET_FAILED\n");
+    if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN)
+        printf("SCTP_STREAM_RESET_INCOMING_SSN\n");
+    if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN)
+        printf("SCTP_STREAM_RESET_OUTGOING_SSN\n");
+}
     // Ignore denied/failed events
     if (event->strreset_flags & SCTP_STREAM_RESET_DENIED
         || event->strreset_flags & SCTP_STREAM_RESET_FAILED) {
+        printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 
@@ -920,7 +936,7 @@ static void handle_stream_reset_event(
         uint_fast16_t const sid = (uint_fast16_t) event->strreset_stream_list[i];
         struct rawrtc_data_channel* channel;
         struct rawrtc_sctp_data_channel_context* context;
-
+printf("%s:%d\n", __FILE__, __LINE__);
         // Check if channel exists
         if (sid >= transport->n_channels || !transport->channels[sid]) {
             DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
@@ -934,24 +950,28 @@ static void handle_stream_reset_event(
         // Incoming stream reset
         if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN) {
             // Set flag
+            printf("%s:%d\n", __FILE__, __LINE__);
             channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET;
 
             // Reset outgoing stream (if needed)
             if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSING
                 && channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSED) {
                 if (reset_outgoing_stream(transport, channel)) {
+                printf("%s:%d\n", __FILE__, __LINE__);
                     // Error, channel has been closed automatically
                     continue;
                 }
-
+printf("%s:%d\n", __FILE__, __LINE__);
                 // Set to closing
                 rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
+            printf("%s:%d\n", __FILE__, __LINE__);
             }
         }
 
         // Outgoing stream reset (this is raised from our own stream reset)
         if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN) {
             // Set flag
+            printf("%s:%d\n", __FILE__, __LINE__);
             channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET;
         }
 
@@ -959,9 +979,11 @@ static void handle_stream_reset_event(
         if (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET
             && channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET) {
             // Set to closed
+            printf("close channel %s\n", channel->parameters->label);
             rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
 
             // Remove from transport
+            printf("%s:%d\n", __FILE__, __LINE__);
             transport->channels[context->sid] = mem_deref(channel);
         }
     }
@@ -979,37 +1001,46 @@ static void handle_notification(
     // TODO: Are all of these checks necessary or can we reduce that?
 #if (SIZE_MAX > UINT32_MAX)
     if (buffer->end > UINT32_MAX) {
+    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 #endif
 #if (UINT32_MAX > SIZE_MAX)
     if (notification->sn_header.sn_length > SIZE_MAX) {
+    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 #endif
     if (notification->sn_header.sn_length != buffer->end) {
+    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
-
+printf("notification->sn_header.sn_type=%d\n", notification->sn_header.sn_type);
     // Handle notification by type
     switch (notification->sn_header.sn_type) {
         case SCTP_ASSOC_CHANGE:
+        printf("SCTP_ASSOC_CHANGE\n");
             handle_association_change_event(transport, &notification->sn_assoc_change);
             break;
         case SCTP_SEND_FAILED_EVENT:
+        printf("SCTP_SEND_FAILED_EVENT\n");
             handle_send_failed_event(transport, &notification->sn_send_failed_event);
             break;
         case SCTP_SENDER_DRY_EVENT:
+        printf("SCTP_SENDER_DRY_EVENT\n");
             handle_sender_dry_event(transport, &notification->sn_sender_dry_event);
             break;
         case SCTP_SHUTDOWN_EVENT:
+        printf("SCTP_SHUTDOWN_EVENT\n");
             // TODO: Stop sending (this is a bit tricky to implement, so skipping for now)
             //handle_shutdown_event(transport, &notification->sn_shutdown_event);
             break;
         case SCTP_STREAM_RESET_EVENT:
+        printf("%s:%d; SCTP_STREAM_RESET_EVENT\n", __FILE__, __LINE__);
             handle_stream_reset_event(transport, &notification->sn_strreset_event);
             break;
         case SCTP_STREAM_CHANGE_EVENT:
+        printf("SCTP_STREAM_CHANGE_EVENT\n");
             // TODO: Handle
             DEBUG_WARNING("TODO: HANDLE STREAM CHANGE\n");
             // handle_stream_change_event(transport, ...);
@@ -1677,6 +1708,10 @@ printf("%s\n", __func__);
     DEBUG_WARNING("TODO: Handle SCTP error event\n");
 
 	printf("SCTP error=%s\n", strerror(usrsctp_get_error(transport->socket)));
+	if (usrsctp_get_error(transport->socket) == ECONNABORTED ||
+	    usrsctp_get_error(transport->socket) == ETIMEDOUT) {
+	 printf("close all data channels and inform upper layer\n");
+	}
     // Continue handling events
     // TODO: Probably depends on the error, right?
     return RAWRTC_SCTP_EVENT_NONE;
@@ -2462,6 +2497,7 @@ printf("%s\n", __func__);
 
         // Sanity check
         if (!channel_registered(transport, channel)) {
+        printf("channel was not registered\n");
             return RAWRTC_CODE_UNKNOWN_ERROR;
         }
 
