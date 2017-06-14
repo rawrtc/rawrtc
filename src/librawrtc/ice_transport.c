@@ -392,7 +392,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     enum rawrtc_code error;
     char* ip = NULL;
     uint16_t port;
-    struct sa address;
+    struct sa address = {{{0}}};
     int af;
     enum rawrtc_ice_protocol protocol;
     char* foundation = NULL;

@@ -772,7 +772,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
 ) {
     struct rawrtc_ice_gatherer* gatherer;
     int err;
-    struct sa dns_servers[RAWRTC_ICE_GATHERER_DNS_SERVERS];
+    struct sa dns_servers[RAWRTC_ICE_GATHERER_DNS_SERVERS] = {{{{0}}}};
     uint32_t n_dns_servers = ARRAY_SIZE(dns_servers);
     uint32_t i;
 
@@ -1448,7 +1448,8 @@ static bool interface_handler(
         return true; // Don't continue gathering
     }
 
-    // Ignore loopback and linklocal addresses
+    // Ignore loopback and link-local addresses
+    // TODO: Make this configurable
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
         return false; // Continue gathering
     }
