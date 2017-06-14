@@ -14,6 +14,36 @@ language: c
 matrix:
   include:
     - os: linux
+      dist: precise
+      compiler: gcc
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+          packages:
+            - cmake
+            - cmake-data
+# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
+#    - os: linux
+#      dist: precise
+#      compiler: gcc
+#      env: ENFORCE_OPENSSL=1
+    - os: linux
+      dist: precise
+      compiler: clang
+      addons:
+        apt:
+          sources:
+            - george-edison55-precise-backports
+          packages:
+            - cmake
+            - cmake-data
+# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
+#    - os: linux
+#      dist: precise
+#      compiler: clang
+#      env: ENFORCE_OPENSSL=1
+    - os: linux
       dist: trusty
       compiler: gcc
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
@@ -27,40 +57,6 @@ matrix:
 # TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
 #    - os: linux
 #      dist: trusty
-#      compiler: clang
-#      env: ENFORCE_OPENSSL=1
-# TODO: Re-enable once https://github.com/travis-ci/apt-source-whitelist/issues/369
-#  has been resolved
-#    - os: linux
-#      dist: precise
-#      compiler: gcc
-#      addons:
-#        apt:
-#          sources:
-#            - george-edison55-precise-backport
-#          packages:
-#            - cmake
-#            - cmake-data
-# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: precise
-#      compiler: gcc
-#      env: ENFORCE_OPENSSL=1
-# TODO: Re-enable once https://github.com/travis-ci/apt-source-whitelist/issues/369
-#  has been resolved
-#    - os: linux
-#      dist: precise
-#      compiler: clang
-#      addons:
-#        apt:
-#          sources:
-#            - george-edison55-precise-backport
-#          packages:
-#            - cmake
-#            - cmake-data
-# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: precise
 #      compiler: clang
 #      env: ENFORCE_OPENSSL=1
     - os: osx
