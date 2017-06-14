@@ -1810,6 +1810,14 @@ enum rawrtc_code data_channels_alloc(
         return RAWRTC_CODE_NO_MEMORY;
     }
 
+    // Initialise
+    // Note: We can safely multiply 'n_channels' with size of the struct as 'mem_reallocarray'
+    //       ensures that it does not overflow (returns NULL).
+    if (n_channels > n_channels_previously) {
+        struct rawrtc_data_channel** channels_offset = channels + n_channels_previously;
+        memset(channels_offset, 0, (n_channels - n_channels_previously) * sizeof(*channels));
+    }
+
     // Set pointer & done
     *channelsp = channels;
     return RAWRTC_CODE_SUCCESS;
