@@ -1448,7 +1448,8 @@ static bool interface_handler(
         return true; // Don't continue gathering
     }
 
-    // Ignore loopback and linklocal addresses
+    // Ignore loopback and link-local addresses
+    // TODO: Make this configurable
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
         return false; // Continue gathering
     }
