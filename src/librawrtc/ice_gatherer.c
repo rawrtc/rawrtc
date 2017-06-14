@@ -772,7 +772,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
 ) {
     struct rawrtc_ice_gatherer* gatherer;
     int err;
-    struct sa dns_servers[RAWRTC_ICE_GATHERER_DNS_SERVERS] = {{0}};
+    struct sa dns_servers[RAWRTC_ICE_GATHERER_DNS_SERVERS] = {{{{0}}}};
     uint32_t n_dns_servers = ARRAY_SIZE(dns_servers);
     uint32_t i;
 
