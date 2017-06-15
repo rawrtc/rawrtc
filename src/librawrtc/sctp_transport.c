@@ -853,6 +853,8 @@ static void handle_partial_delivery_event(
 
     // Abort pending message
     if (context->buffer_inbound) {
+        DEBUG_NOTICE("Abort partially delivered message of %zu bytes\n",
+                     mbuf_get_left(context->buffer_inbound));
         context->buffer_inbound = mem_deref(context->buffer_inbound);
 
         // Sanity-check
