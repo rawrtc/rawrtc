@@ -843,7 +843,7 @@ static void handle_partial_delivery_event(
     // Check if channel exists
     // TODO: Need to check if channel is open?
     if (sid >= transport->n_channels || !transport->channels[sid]) {
-        DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
+        DEBUG_NOTICE("No channel registered for sid %"PRIu16"\n", sid);
         return;
     }
 
