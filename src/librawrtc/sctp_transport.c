@@ -35,12 +35,13 @@ static uint16_t const sctp_events[] = {
     SCTP_ASSOC_CHANGE,
 //    SCTP_PEER_ADDR_CHANGE,
 //    SCTP_REMOTE_ERROR,
+    SCTP_PARTIAL_DELIVERY_EVENT,
+    SCTP_SEND_FAILED_EVENT,
+    SCTP_SENDER_DRY_EVENT,
     SCTP_SHUTDOWN_EVENT,
 //    SCTP_ADAPTATION_INDICATION,
-    SCTP_SEND_FAILED_EVENT,
-    SCTP_STREAM_RESET_EVENT,
     SCTP_STREAM_CHANGE_EVENT,
-    SCTP_SENDER_DRY_EVENT
+    SCTP_STREAM_RESET_EVENT
 };
 static size_t const sctp_events_length = ARRAY_SIZE(sctp_events);
 
@@ -697,6 +698,31 @@ int debug_association_change_event(
 }
 
 /*
+ * Print debug information for an SCTP partial delivery event.
+ */
+int debug_partial_delivery_event(
+        struct re_printf* const pf,
+        struct sctp_pdapi_event* const event
+) {
+    int err = 0;
+
+    switch (event->pdapi_indication) {
+        case SCTP_PARTIAL_DELIVERY_ABORTED:
+            re_hprintf(pf, "Partial delivery aborted ");
+            break;
+        default:
+            re_hprintf(pf, "??? ");
+            break;
+    }
+    err |= re_hprintf(pf, "(flags = %x) ", event->pdapi_flags);
+    err |= re_hprintf(pf, "stream = %"PRIu32" ", event->pdapi_stream);
+    err |= re_hprintf(pf, "sn = %"PRIu32" ", event->pdapi_seq);
+    err |= re_hprintf(pf, "\n");
+    return err;
+}
+
+
+/*
  * Print debug information for an SCTP send failed event.
  */
 int debug_send_failed_event(
@@ -789,6 +815,60 @@ static void handle_association_change_event(
             break;
         default:
             break;
+    }
+}
+
+/*
+ * Handle SCTP partial delivery event.
+ */
+static void handle_partial_delivery_event(
+        struct rawrtc_sctp_transport* const transport,
+        struct sctp_pdapi_event* const event
+) {
+    uint16_t sid;
+    struct rawrtc_data_channel* channel;
+    struct rawrtc_sctp_data_channel_context* context;
+
+    // Print debug output for event
+    DEBUG_PRINTF("Partial delivery event: %H", debug_partial_delivery_event, event);
+
+    // Validate stream ID
+    if (event->pdapi_stream >= UINT16_MAX) {
+        DEBUG_WARNING("Invalid stream id in partial delivery event: %"PRIu32"\n",
+                      event->pdapi_stream);
+    }
+    sid = (uint16_t) event->pdapi_stream;
+
+    // Check if channel exists
+    // TODO: Need to check if channel is open?
+    if (sid >= transport->n_channels || !transport->channels[sid]) {
+        DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
+        return;
+    }
+
+    // Get channel and context
+    channel = transport->channels[sid];
+    context = channel->transport_arg;
+
+    // Abort pending message
+    if (context->buffer_inbound) {
+        context->buffer_inbound = mem_deref(context->buffer_inbound);
+
+        // Sanity-check
+        if (channel->options->deliver_partially) {
+            DEBUG_WARNING("We deliver partially but there was a buffered message?!\n");
+        }
+    }
+
+    // Pass abort notification to handler
+    if (channel->options->deliver_partially) {
+        enum rawrtc_data_channel_message_flag const message_flags =
+                RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_ABORTED;
+        if (channel->message_handler) {
+            channel->message_handler(NULL, message_flags, channel->arg);
+        } else {
+            DEBUG_NOTICE("No message handler, message abort notification has been discarded\n");
+        }
     }
 }
 
@@ -992,6 +1072,9 @@ static void handle_notification(
         case SCTP_ASSOC_CHANGE:
             handle_association_change_event(transport, &notification->sn_assoc_change);
             break;
+        case SCTP_PARTIAL_DELIVERY_EVENT:
+            handle_partial_delivery_event(transport, &notification->sn_pdapi_event);
+            break;
         case SCTP_SEND_FAILED_EVENT:
             handle_send_failed_event(transport, &notification->sn_send_failed_event);
             break;
@@ -1002,13 +1085,13 @@ static void handle_notification(
             // TODO: Stop sending (this is a bit tricky to implement, so skipping for now)
             //handle_shutdown_event(transport, &notification->sn_shutdown_event);
             break;
-        case SCTP_STREAM_RESET_EVENT:
-            handle_stream_reset_event(transport, &notification->sn_strreset_event);
-            break;
         case SCTP_STREAM_CHANGE_EVENT:
             // TODO: Handle
             DEBUG_WARNING("TODO: HANDLE STREAM CHANGE\n");
             // handle_stream_change_event(transport, ...);
+            break;
+        case SCTP_STREAM_RESET_EVENT:
+            handle_stream_reset_event(transport, &notification->sn_strreset_event);
             break;
         default:
             DEBUG_WARNING("Unexpected notification event: %"PRIu16"\n",
