@@ -716,7 +716,7 @@ int debug_partial_delivery_event(
     }
     err |= re_hprintf(pf, "(flags = %x) ", event->pdapi_flags);
     err |= re_hprintf(pf, "stream = %"PRIu32" ", event->pdapi_stream);
-    err |= re_hprintf(pf, "sn = %"PRIu32" ", event->pdapi_seq);
+    err |= re_hprintf(pf, "sn = %"PRIu32, event->pdapi_seq);
     err |= re_hprintf(pf, "\n");
     return err;
 }
@@ -836,6 +836,7 @@ static void handle_partial_delivery_event(
     if (event->pdapi_stream >= UINT16_MAX) {
         DEBUG_WARNING("Invalid stream id in partial delivery event: %"PRIu32"\n",
                       event->pdapi_stream);
+        return;
     }
     sid = (uint16_t) event->pdapi_stream;
 
