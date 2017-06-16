@@ -192,8 +192,9 @@ enum rawrtc_data_channel_type {
  */
 enum rawrtc_data_channel_message_flag {
     RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE = 1 << 0,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 1 << 1,
-    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 1 << 2
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_ABORTED = 1 << 1,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE = 1 << 2,
+    RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY = 1 << 3,
 };
 
 /*
@@ -403,10 +404,15 @@ typedef void (rawrtc_data_channel_close_handler)(
 
 /*
  * Data channel message handler.
+ *
+ * Note: `buffer` may be NULL in case partial delivery has been
+ *       requested and a message has been aborted (this can only happen
+ *       on partially reliable channels).
+ *
  * TODO: ORTC is really unclear about that handler. Consider improving it with a PR.
  */
 typedef void (rawrtc_data_channel_message_handler)(
-    struct mbuf* const buffer,
+    struct mbuf* const buffer, // nullable (in case partial delivery has been requested)
     enum rawrtc_data_channel_message_flag const flags,
     void* const arg
 );
