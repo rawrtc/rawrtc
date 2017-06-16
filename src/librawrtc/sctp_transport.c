@@ -2059,7 +2059,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     list_init(&transport->buffered_messages_outgoing);
 
     // Allocate channel array
-    // TODO: Valgrind complains about uninitialised values here
     error = data_channels_alloc(&transport->channels, n_channels, 0);
     if (error) {
         goto out;
