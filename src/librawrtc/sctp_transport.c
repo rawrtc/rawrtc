@@ -721,7 +721,6 @@ int debug_partial_delivery_event(
     return err;
 }
 
-
 /*
  * Print debug information for an SCTP send failed event.
  */
