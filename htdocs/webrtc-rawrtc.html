@@ -11,42 +11,82 @@ textarea {
 <body>
     <textarea cols="120" rows="20" id="local-parameters" onclick="this.select();" readonly></textarea>
     <textarea cols="120" rows="20" id="remote-parameters"></textarea><br />
-    <button type="button" onclick="setRemoteParameters();">Start</button>
+    <button type="button" onclick="start(peer);" id="start" disabled>Start</button>
 
     <script type="text/javascript" src="sdp.js"></script>
     <script type="text/javascript" src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script type="text/javascript" src="webrtc-rawrtc.js"></script>
     <script type="text/javascript">
-        var peer = new ControllingPeer();
-        peer.createPeerConnection();
-        var cat = peer.createDataChannel(peer.pc.createDataChannel('cat-noises', {
-            ordered: true,
-            negotiated: true,
-            id: 0
-        }));
-        peer.createDataChannel();
-        peer.getLocalParameters()
-        .then((parameters) => {
-            console.log('Local parameters:', parameters);
-            document.getElementById('local-parameters').value = JSON.stringify(parameters);
-        });
+        'use strict';
+        
+        let localParameters = document.getElementById('local-parameters');
+        let remoteParameters = document.getElementById('remote-parameters');
+        let startButton = document.getElementById('start');
+        
+        function getURLParameter(name) {
+            return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search) || [null, ''])[1].replace(/\+/g, '%20')) || null;
+        }
 
-        var setRemoteParameters = () => {
-            var parameters = JSON.parse(document.getElementById('remote-parameters').value);
+        function setRemoteParameters(peer) {
+            // Parse and apply the remote parameters
+            let parameters = JSON.parse(remoteParameters.value);
             console.log('Remote parameters:', parameters);
             peer.setRemoteParameters(parameters)
+            .then((parameters) => {
+                // Generate local parameters if controlled
+                if (peer instanceof ControlledPeer) {
+                    getLocalParameters(peer);
+                }
+            })
             .catch((error) => {
                 console.error(error);
             });
-            start();
         };
 
-        var start = () => {
-            var parameters = JSON.parse(document.getElementById('local-parameters').value);
-            document.getElementById('local-parameters').value = JSON.stringify(parameters, null, 2);
-            parameters = JSON.parse(document.getElementById('remote-parameters').value);
-            document.getElementById('remote-parameters').value = JSON.stringify(parameters, null, 2);
+        function getLocalParameters(peer) {
+            // Generate and show the local parameters
+            peer.getLocalParameters()
+            .then((parameters) => {
+                console.log('Local parameters:', parameters);
+                localParameters.value = JSON.stringify(parameters);
+            });
         }
+
+        function createPeer(controllingParameter) {
+            let controlling = controllingParameter == 'true' || controllingParameter == '1';
+            console.log('Role: ICE-Controll' + (controlling ? 'ing' : 'ed'));
+            
+            // Create peer depending on the role
+            let peer = controlling ? new ControllingPeer() : new ControlledPeer();
+            peer.createPeerConnection();
+            let cat = peer.createDataChannel(peer.pc.createDataChannel('cat-noises', {
+                ordered: true,
+                negotiated: true,
+                id: 0
+            }));
+            peer.createDataChannel();
+            
+            // Create local parameters if we are the controlling peer.
+            // Keep in mind this still uses offer/answer in the background, thus this
+            // limitation which does not exist for ORTC but does for WebRTC.
+            if (controlling) {
+                getLocalParameters(peer);
+            }
+            
+            return peer;
+        }
+        
+        function start(peer) {
+            // Apply remote parameters
+            // For the controlled peer, this will automatically generate local parameters
+            setRemoteParameters(peer);
+            startButton.disabled = true;
+        }
+        
+        // Create peer
+        // Determine role from GET parameter (?controlling=true|false)
+        let peer = createPeer(getURLParameter('controlling'));
+        startButton.disabled = false;
     </script>
 </body>
 </html>

@@ -27,8 +27,8 @@ LIBRE_BRANCH="rawrtc-neat"
 LIBRE_COMMIT="d52e2df8512d98f869601adcdac742502331c997"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
-LIBREW_BRANCH="rawrtc-patched"
-LIBREW_COMMIT="66817f584131b353313a681a6cdc9bfacc1a09ae"
+LIBREW_BRANCH="master"
+LIBREW_COMMIT="31fe7c6fd2772dd72013301f0787ea19625017b1"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
@@ -199,7 +199,8 @@ eval ${re_make} info
 echo "Building libre"
 #SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-eval ${re_make} install-static
+eval ${re_make} install
+rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
 
 # Build librew

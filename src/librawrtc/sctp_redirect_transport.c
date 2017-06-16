@@ -70,7 +70,7 @@ static void redirect_from_raw(
     struct sockaddr_in from_address;
     socklen_t address_length;
     ssize_t length;
-    struct sa from;
+    struct sa from = {{{0}}};
     size_t header_length;
     uint16_t source;
     uint16_t destination;

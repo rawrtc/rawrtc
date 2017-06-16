@@ -278,7 +278,6 @@ enum rawrtc_code rawrtc_data_channel_set_options(
 
 /*
  * Send data via the data channel.
- * TODO: Add binary/string flag
  */
 enum rawrtc_code rawrtc_data_channel_send(
         struct rawrtc_data_channel* const channel,

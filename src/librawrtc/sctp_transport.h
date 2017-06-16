@@ -7,11 +7,8 @@
 #define RAWRTC_SCTP_EVENT_ALL (SCTP_EVENT_READ | SCTP_EVENT_WRITE | SCTP_EVENT_ERROR)
 
 enum {
-    RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT = 10, // TODO: @ruengeler why 10ms?
+    RAWRTC_SCTP_TRANSPORT_TIMER_TIMEOUT = 10,
     RAWRTC_SCTP_TRANSPORT_DEFAULT_PORT = 5000,
-    // TODO: Suggest re-adding reconfiguration of number of streams to spec
-    // because this requires too many streams to allocate who eat up memory
-    // Maybe add a configuration entry to enable/disable 'strict' mode
     RAWRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS = 65535,
     RAWRTC_SCTP_TRANSPORT_SID_MAX = 65534,
     RAWRTC_SCTP_TRANSPORT_EMPTY_MESSAGE_SIZE = 1
