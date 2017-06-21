@@ -1,4 +1,7 @@
 #include "rawrtc_internal.h"
+
+#define DEBUG_MODULE "uv_support"
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 void rawrtc_set_uv_loop(uv_loop_t *loop)

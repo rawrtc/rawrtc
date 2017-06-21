@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+ENFORCE_OPENSSL=1
+
 # Number of threads to use
 export THREADS=12
 
@@ -24,7 +26,7 @@ OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-neat"
-LIBRE_COMMIT="d52e2df8512d98f869601adcdac742502331c997"
+LIBRE_COMMIT="abc110e0614020ea15d86ac5e9e93f8629169140"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="master"
@@ -85,7 +87,7 @@ if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_d
         need_openssl=true
     fi
 fi
-need_openssl=true
+#need_openssl=false
 echo "Need to fetch OpenSSL: $need_openssl"
 
 
