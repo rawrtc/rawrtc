@@ -995,7 +995,7 @@ printf("%s\n", __func__);
 
     // Print debug output for event
     DEBUG_PRINTF("Stream reset event: %H", debug_stream_reset_event, event, length);
-printf("event=%d\n", event);
+
 if (event->strreset_flags) {
     if (event->strreset_flags & SCTP_STREAM_RESET_DENIED)
         printf("SCTP_STREAM_RESET_DENIED\n");

@@ -85,11 +85,10 @@ if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_d
         need_openssl=true
     fi
 fi
-need_openssl=false
+need_openssl=true
 echo "Need to fetch OpenSSL: $need_openssl"
 
-fetch_repos=false
-if [ "$fetch_repos" = true ]; then
+
 # Get openssl
 if [ "$need_openssl" = true ]; then
     if [ "$offline" = true ]; then
@@ -102,6 +101,9 @@ if [ "$need_openssl" = true ]; then
     tar -xzf openssl-${OPENSSL_VERSION}.tar.gz
     mv openssl-${OPENSSL_VERSION} ${OPENSSL_PATH}
 fi
+
+fetch_repos=false
+if [ "$fetch_repos" = true ]; then
 
 # Get usrsctp
 if [ ! -d "${USRSCTP_PATH}" ]; then
@@ -143,6 +145,8 @@ elif [ "$offline" = false ]; then
 fi
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
+fi
+# End of fetch_repos
 cd ${MAIN_DIR}
 
 
@@ -151,7 +155,7 @@ cd ${MAIN_DIR}
 if [ "$need_openssl" = true ]; then
     cd ${OPENSSL_PATH}
     echo "Configuring OpenSSL"
-    ./config sctp shared --prefix=${PREFIX}
+    ./config shared --prefix=${PREFIX}
     echo "Building OpenSSL"
     make
     echo "Installing OpenSSL"
@@ -168,8 +172,7 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 # Set openssl sysroot
 openssl_sysroot=`pkg-config --variable=prefix openssl`
 echo "Using OpenSSL sysroot: $openssl_sysroot"
-fi
-# End of fetch_repos
+
 
 # Build usrsctp
 cd ${USRSCTP_PATH}
