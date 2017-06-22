@@ -883,8 +883,6 @@ static void handle_send_failed_event(
 ) {
     // Print debug output for event
     DEBUG_PRINTF("Send failed event: %H", debug_send_failed_event, event);
-
-    // TODO: We could inform the data channel that an error occurred here... but why would we?
     (void) transport;
     (void) event;
 }

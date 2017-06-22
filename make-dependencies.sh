@@ -95,7 +95,9 @@ if [ "$need_openssl" = true ]; then
     fi
     rm -rf ${OPENSSL_PATH}
     echo "Fetching OpenSSL"
-    wget ${OPENSSL_URL}
+    which curl > /dev/null || (echo "Cannot fetch OpenSSL, curl not installed" && exit 1)
+    curl -O ${OPENSSL_URL}
+    which tar > /dev/null || (echo "Cannot unpack OpenSSL, tar not installed" && exit 1)
     tar -xzf openssl-${OPENSSL_VERSION}.tar.gz
     mv openssl-${OPENSSL_VERSION} ${OPENSSL_PATH}
 fi
