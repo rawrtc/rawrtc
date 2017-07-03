@@ -20,7 +20,7 @@
 #define AF_CONN 123
 
 #define HAVE_INTTYPES_H
-#include "/usr/local/include/uv.h"
+#include <uv.h>
 
 struct rawrtc_sctp_rcvinfo {
 	uint16_t rcv_sid;
