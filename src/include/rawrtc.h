@@ -645,7 +645,7 @@ struct sa {
 	socklen_t len;
 };
 
-/** ICE Configuration from raw re_trice.h*/
+/** ICE Configuration from rew re_trice.h*/
 struct trice_conf {
 	bool debug;             /**< Enable ICE debugging                  */
 	bool trace;             /**< Enable tracing of Connectivity checks */

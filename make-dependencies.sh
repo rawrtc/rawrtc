@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-ENFORCE_OPENSSL=1
+#ENFORCE_OPENSSL=1
 
 # Number of threads to use
 export THREADS=12
@@ -32,6 +32,7 @@ LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="master"
 LIBREW_COMMIT="31fe7c6fd2772dd72013301f0787ea19625017b1"
 LIBREW_PATH="rew"
+USRSCTP_VERSION="1.0.0"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
 USRSCTP_COMMIT="eabbea6cfb4dac224e082fc021b568ec9a731c0b"
@@ -77,11 +78,13 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 
 # Check if we need to fetch & install openssl
 need_openssl=false
-if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_dtls_1_2" = false ]; then
+pkg-config --exists --atleast-version=${OPENSSL_VERSION} openssl || need_openssl=true
+#if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_dtls_1_2" = false ]; then
+if [ "$need_openssl" = true ]; then
     # Already installed? Check version
     if [ -d "${OPENSSL_PATH}" ]; then
         # Outdated?
-        pkg-config --atleast-version=${OPENSSL_VERSION} openssl || need_openssl=true
+pkg-config --exists --atleast-version=${OPENSSL_VERSION} openssl || need_openssl=true
     else
         # Not downloaded
         need_openssl=true
@@ -104,21 +107,31 @@ if [ "$need_openssl" = true ]; then
     mv openssl-${OPENSSL_VERSION} ${OPENSSL_PATH}
 fi
 
-fetch_repos=false
-if [ "$fetch_repos" = true ]; then
+# Check for usrsctp 1.0 suppport
+echo "Usrsctp version: `pkg-config --short-errors --modversion usrsctp`"
+need_usrsctp=false
+pkg-config --exists --atleast-version=$USRSCTP_VERSION} usrsctp || need_usrsctp=true
+if [ "$need_usrsctp" = true ]; then
+    # Already installed? Check version
+    if [ -d "${USRSCTP_PATH}" ]; then
+        # Outdated?
+        pkg-config --exists --atleast-version=${USRSCTP_VERSION} usrsctp || need_usrsctp=true
+    else
+        # Not downloaded
+        need_openssl=true
+    fi
+fi
+echo "Need to fetch Usrsctp: $need_usrsctp"
+
 
 # Get usrsctp
-if [ ! -d "${USRSCTP_PATH}" ]; then
+if [ "$need_usrsctp" = true ]; then
     echo "Cloning usrsctp"
     git clone -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
     cd ${USRSCTP_PATH}
-elif [ "$offline" = false ]; then
-    cd ${USRSCTP_PATH}
-    echo "Pulling usrsctp"
-    git pull
+    git checkout ${USRSCTP_BRANCH}
+    git reset --hard ${USRSCTP_COMMIT}
 fi
-git checkout ${USRSCTP_BRANCH}
-git reset --hard ${USRSCTP_COMMIT}
 cd ${MAIN_DIR}
 
 # Get libre
@@ -147,7 +160,7 @@ elif [ "$offline" = false ]; then
 fi
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
-fi
+
 # End of fetch_repos
 cd ${MAIN_DIR}
 
@@ -177,19 +190,21 @@ echo "Using OpenSSL sysroot: $openssl_sysroot"
 
 
 # Build usrsctp
-cd ${USRSCTP_PATH}
-if [ ! -d "build" ]; then
-    mkdir build
+if [ "$need_usrsctp" = true ]; then
+    cd ${USRSCTP_PATH}
+    if [ ! -d "build" ]; then
+        mkdir build
+    fi
+    cd build
+    echo "Configuring usrsctp"
+    CFLAGS=-fPIC \
+    cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
+    echo "Cleaning usrsctp"
+    make clean
+    echo "Building & installing usrsctp"
+    make install -j${THREADS}
+    rm -f ${PREFIX}/lib/libusrsctp.*dylib
 fi
-cd build
-echo "Configuring usrsctp"
-CFLAGS=-fPIC \
-cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
-#echo "Cleaning usrsctp"
-#make clean
-echo "Building & installing usrsctp"
-make install -j${THREADS}
-rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
 cd ${MAIN_DIR}
 
 # Build libre

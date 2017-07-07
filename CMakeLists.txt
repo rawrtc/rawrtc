@@ -22,7 +22,7 @@ endif ()
 
 # Enable verbose output in DEBUG mode
 if (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
-    message(STATUS "enabling verbose outout")
+    message(STATUS "enabling verbose output")
     set(CMAKE_VERBOSE_MAKEFILE on)
 endif ()
 
@@ -67,7 +67,8 @@ list(APPEND rawrtc_DEP_LIBRARIES ${LIB_REW_STATIC_LIBRARIES})
 
 # Dependency: usrsctp
 # TODO: Use the pkg-config file of usrsctp once it has been added
-find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a)
+#find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a)
+find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.so libusrsctp.so)
 find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
 include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
