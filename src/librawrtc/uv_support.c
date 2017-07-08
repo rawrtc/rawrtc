@@ -1,4 +1,5 @@
 #include "rawrtc_internal.h"
+#include <uv.h>
 
 #define DEBUG_MODULE "uv_support"
 #define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
