@@ -40,7 +40,7 @@ static void rawrtc_ice_transport_destroy(
         void* arg
 ) {
     struct rawrtc_ice_transport* const transport = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_ice_transport_stop(transport);
@@ -48,6 +48,7 @@ static void rawrtc_ice_transport_destroy(
     // Un-reference
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
+    mem_deref(transport->dtls_transport);
 }
 
 /*
@@ -78,7 +79,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_transport_destroy\n", __func__, (void *)transport);
     // Set fields/reference
     transport->state = RAWRTC_ICE_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->gatherer = mem_ref(gatherer);

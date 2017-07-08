@@ -8,7 +8,7 @@ static void rawrtc_ice_parameters_destroy(
         void* const arg
 ) {
     struct rawrtc_ice_parameters* const parameters = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(parameters->username_fragment);
     mem_deref(parameters->password);
@@ -36,7 +36,7 @@ enum rawrtc_code rawrtc_ice_parameters_create(
     if (!parameters) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_parameters_destroy\n", __func__, (void *)parameters);
     // Set fields/copy
     error = rawrtc_strdup(&parameters->username_fragment, username_fragment);
     if (error) {

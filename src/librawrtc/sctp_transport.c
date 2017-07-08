@@ -1058,15 +1058,16 @@ printf("%s:%d\n", __FILE__, __LINE__);
         }
 
         // Close if both incoming and outgoing stream has been reset
-        if (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET
-            && channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET) {
+        if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSED
+                && (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET)
+            && (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET)) {
             // Set to closed
             printf("close channel %s\n", channel->parameters->label);
             rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
 
             // Remove from transport
             printf("%s:%d\n", __FILE__, __LINE__);
-            transport->channels[context->sid] = mem_deref(channel);
+           // transport->channels[context->sid] = mem_deref(channel);
         }
     }
 }
@@ -1852,9 +1853,9 @@ printf("%s\n", __func__);
     rawrtc_thread_leave();
 }
 
-int webrtc_upcall_handler(struct socket* socket, void* arg, int flags)
+int webrtc_upcall_handler(struct socket* socket, void* arg, int flags, int ignore)
 {
-	int events = usrsctp_get_events(socket);
+	int events = usrsctp_get_events(socket) & ~ignore;
     struct rawrtc_sctp_transport* const transport = arg;
    // int ignore_events = RAWRTC_SCTP_EVENT_NONE;
    int event = -1;
@@ -1864,7 +1865,7 @@ printf("%s\n", __func__);
     rawrtc_thread_enter();
 
  //   while (events) {
-
+    if (events) {
         // Handle error event
         if (events & SCTP_EVENT_ERROR) {
         printf("event = SCTP_EVENT_ERROR\n");
@@ -1887,7 +1888,9 @@ printf("%s\n", __func__);
         // Get upcoming events and remove events that should be ignored
   //      events = usrsctp_get_events(socket) & ~ignore_events;
   //  }
-
+    } else {
+        event = -1;
+    }
     // Unlock event loop mutex
     rawrtc_thread_leave();
     return event;
@@ -1944,7 +1947,7 @@ static void data_channels_destroy(
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
     uint_fast16_t i;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference all members
     for (i = 0; i < transport->n_channels; ++i) {
         mem_deref(transport->channels[i]);
@@ -2005,7 +2008,7 @@ static void rawrtc_sctp_transport_destroy(
         void* arg
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_sctp_transport_stop(transport);
@@ -2140,7 +2143,7 @@ printf("switch on SCTP_DEBUG_ALL\n");
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_sctp_transport_destroy\n", __func__, (void *)transport);
     // Increase in-use counter
     // Note: This needs to be below allocation to ensure the counter is decreased properly on error
     ++rawrtc_global.usrsctp_initialized;
@@ -2345,7 +2348,7 @@ static void channel_context_destroy(
         void* arg
 ) {
     struct rawrtc_sctp_data_channel_context* const context = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(context->buffer_inbound);
 }
@@ -2358,13 +2361,14 @@ static enum rawrtc_code channel_context_create(
         uint16_t const sid,
         bool const can_send_unordered
 ) {
+printf("%s\n", __func__);
     // Allocate context
     struct rawrtc_sctp_data_channel_context* const context =
             mem_zalloc(sizeof(*context), channel_context_destroy);
     if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s\n", __func__);
+printf("%s:%p, channel_context_destroy\n", __func__, (void *)context);
     // Set fields
     context->sid = sid;
     if (can_send_unordered) {
@@ -2821,7 +2825,7 @@ enum rawrtc_code message_send_context_create(
 ) {
     enum rawrtc_code error;
     struct send_context* context;
-printf("%s\n", __func__);
+printf("%s, no destroy\n", __func__);
     // Allocate context
     context = mem_zalloc(sizeof(*context), NULL);
     if (!context) {

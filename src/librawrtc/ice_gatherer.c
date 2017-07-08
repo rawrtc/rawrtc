@@ -168,7 +168,7 @@ static void rawrtc_ice_gather_options_destroy(
         void* arg
 ) {
     struct rawrtc_ice_gather_options* const options = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     list_flush(&options->ice_servers);
 }
@@ -192,7 +192,7 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
     if (!options) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_gather_options_destroy\n", __func__, (void *)options);
     // Set fields/reference
     options->gather_policy = gather_policy;
     list_init(&options->ice_servers);
@@ -368,7 +368,7 @@ static void rawrtc_ice_server_url_destroy(
         void* arg
 ) {
     struct rawrtc_ice_server_url* const url = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Remove from list
     list_unlink(&url->le);
 
@@ -398,7 +398,7 @@ static enum rawrtc_code rawrtc_ice_server_url_create(
     if (!url) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_server_url_destroy\n", __func__, (void *)url);
     // Copy URL
     error = rawrtc_strdup(&url->url, url_s);
     if (error) {
@@ -432,7 +432,7 @@ static void rawrtc_ice_server_destroy(
         void* arg
 ) {
     struct rawrtc_ice_server* const server = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     list_flush(&server->urls);
     mem_deref(server->username);
@@ -469,7 +469,7 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     if (!server) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_server_destroy\n", __func__, (void *)server);
     // Copy URLs to list
     list_init(&server->urls);
     for (i = 0; i < n_urls; ++i) {
@@ -524,6 +524,7 @@ out:
 static void ice_url_destroy_dns_contexts(
         struct rawrtc_ice_server_url* const url
 ) {
+printf("%s: %p\n", __func__, (void *)url);
     // Destroy URL DNS IPv4 context (if any)
     if (url->dns_a_context) {
         url->dns_a_context = mem_deref(url->dns_a_context);
@@ -542,6 +543,7 @@ static void ice_server_destroy_url_dns_contexts(
         struct rawrtc_ice_server* const server // not checked
 ) {
     struct le* le;
+    printf("%s: %p\n", __func__, (void *)server);
     for (le = list_head(&server->urls); le != NULL; le = le->next) {
         struct rawrtc_ice_server_url* const url = le->data;
 
@@ -557,6 +559,7 @@ static void ice_options_destroy_url_dns_contexts(
         struct rawrtc_ice_gather_options* const options // not checked
 ) {
     struct le* le;
+    printf("%s: %p\n", __func__, (void *)options);
     for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
         struct rawrtc_ice_server* const server = le->data;
 
@@ -572,7 +575,7 @@ static void rawrtc_ice_server_url_dns_context_destroy(
         void* arg
 ) {
     struct rawrtc_ice_server_url_dns_context* const context = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(context->dns_query);
     mem_deref(context->gatherer);
@@ -600,7 +603,7 @@ enum rawrtc_code rawrtc_ice_server_url_dns_context_create(
     if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_server_url_dns_context_destroy\n", __func__, (void *)context);
     // Set fields/reference
     context->dns_type = dns_type;
     context->url = mem_ref(url);
@@ -746,7 +749,7 @@ static void rawrtc_ice_gatherer_destroy(
         void* arg
 ) {
     struct rawrtc_ice_gatherer* const gatherer = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Close gatherer
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_ice_gatherer_close(gatherer);
@@ -786,7 +789,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     if (!gatherer) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_ice_gatherer_destroy\n", __func__, (void *)gatherer);
     // Set fields/reference
     gatherer->state = RAWRTC_ICE_GATHERER_NEW; // TODO: Raise state (delayed)?
     gatherer->options = mem_ref(options);
@@ -1773,7 +1776,7 @@ static void rawrtc_ice_gatherer_local_candidates_destroy(
 ) {
     struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference each item
     for (i = 0; i < candidates->n_candidates; ++i) {
         mem_deref(candidates->candidates[i]);
@@ -1808,7 +1811,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_local_candidates(
         return RAWRTC_CODE_NO_MEMORY;
     }
     candidates->n_candidates = n;
-
+printf("%s:%p, rawrtc_ice_gatherer_local_candidates_destroy\n", __func__, (void *)candidates);
     // Copy each ICE candidate
     for (le = list_head(trice_lcandl(gatherer->ice)), i = 0; le != NULL; le = le->next, ++i) {
         struct ice_lcand* re_candidate = le->data;

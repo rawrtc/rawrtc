@@ -116,6 +116,11 @@ int rawrtc_fd_listen(int fd, int flags, fd_h *fh, void *arg)
 	return fd_listen(fd, flags, fh, arg);
 }
 
+void rawrtc_fd_close(int fd)
+{
+    fd_close(fd);
+}
+
 int rawrtc_odict_alloc(struct odict **op, uint32_t hash_size) {
 	return odict_alloc(op, hash_size);
 }

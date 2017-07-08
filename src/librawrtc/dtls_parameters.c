@@ -8,7 +8,7 @@ static void rawrtc_dtls_fingerprint_destroy(
         void* const arg
 ) {
     struct rawrtc_dtls_fingerprint* const fingerprint = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(fingerprint->value);
 }
@@ -29,7 +29,7 @@ enum rawrtc_code rawrtc_dtls_fingerprint_create(
     if (!fingerprint) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_dtls_fingerprint_destroy\n", __func__, (void *)fingerprint);
     // Set fields/copy
     fingerprint->algorithm = algorithm;
     error = rawrtc_strdup(&fingerprint->value, value);
@@ -62,7 +62,7 @@ enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
     if (!fingerprint) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_dtls_fingerprint_destroy\n", __func__, (void *)fingerprint);
     // Set fields/copy
     fingerprint->algorithm = algorithm;
 
@@ -79,7 +79,7 @@ static void rawrtc_dtls_parameters_fingerprints_destroy(
 ) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference each item
     for (i = 0; i < fingerprints->n_fingerprints; ++i) {
         mem_deref(fingerprints->fingerprints[i]);
@@ -93,7 +93,7 @@ static void rawrtc_dtls_parameters_destroy(
         void* const arg
 ) {
     struct rawrtc_dtls_parameters* const parameters = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(parameters->fingerprints);
 }
@@ -115,7 +115,7 @@ static enum rawrtc_code rawrtc_dtls_parameters_allocate(
     if (!parameters) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_dtls_parameters_destroy\n", __func__, (void *)parameters);
     // Set role
     parameters->role = role;
 
@@ -127,6 +127,7 @@ static enum rawrtc_code rawrtc_dtls_parameters_allocate(
         error = RAWRTC_CODE_NO_MEMORY;
         goto out;
     }
+    printf("%s:%p, rawrtc_dtls_parameters_fingerprints_destroy\n", __func__, (void *)parameters->fingerprints);
     parameters->fingerprints->n_fingerprints = n_fingerprints;
 
 out:

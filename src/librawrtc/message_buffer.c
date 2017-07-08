@@ -31,7 +31,7 @@ static void rawrtc_message_buffer_destroy(
         void* const arg
 ) {
     struct rawrtc_buffered_message* const buffered_message = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(buffered_message->context);
     mem_deref(buffered_message->buffer);
@@ -59,7 +59,7 @@ enum rawrtc_code rawrtc_message_buffer_append(
     if (!buffered_message) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_message_buffer_destroy\n", __func__, (void *)buffered_message);
     // Set fields
     buffered_message->buffer = mem_ref(buffer);
     buffered_message->context = mem_ref(context);

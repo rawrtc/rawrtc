@@ -8,7 +8,7 @@ static void rawrtc_data_channel_parameters_destroy(
         void* const arg
 ) {
     struct rawrtc_data_channel_parameters* const parameters = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(parameters->label);
     mem_deref(parameters->protocol);
@@ -35,7 +35,7 @@ enum rawrtc_code data_parameters_create(
     if (!parameters) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+   printf("%s:%p, rawrtc_data_channel_parameters_destroy\n", __func__, (void *)parameters);
     // Set fields
     parameters->label = label;
     parameters->protocol = protocol;
@@ -140,7 +140,6 @@ enum rawrtc_code rawrtc_data_channel_parameters_create(
         mem_deref(copied_label);
         mem_deref(copied_protocol);
     }
-
     // Done
     return error;
 }

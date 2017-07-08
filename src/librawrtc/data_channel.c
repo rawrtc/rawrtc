@@ -75,7 +75,7 @@ static void rawrtc_data_channel_destroy(
         void* arg
 ) {
     struct rawrtc_data_channel* const channel = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Unset all handlers
     rawrtc_data_channel_unset_handlers(channel);
 
@@ -123,7 +123,7 @@ printf("%s\n", __func__);
     if (!channel) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+    printf("%s:%p, rawrtc_data_channel_destroy\n", __func__, (void *)channel);
     // Set fields/reference
     channel->flags = RAWRTC_DATA_CHANNEL_FLAGS_CAN_SET_OPTIONS;
     channel->state = RAWRTC_DATA_CHANNEL_STATE_CONNECTING;

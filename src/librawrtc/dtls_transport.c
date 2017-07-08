@@ -551,7 +551,7 @@ static void rawrtc_dtls_transport_destroy(
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct le* le;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_dtls_transport_stop(transport);
@@ -618,7 +618,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_dtls_transport_destroy\n", __func__, (void *)transport);
     // Set fields/reference
     transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);

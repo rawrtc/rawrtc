@@ -9,12 +9,12 @@
 /*
  * Destructor for an existing data transport.
  */
-static void rawrtc_sctp_transport_destroy(
+static void rawrtc_data_transport_destroy(
         void* const arg
 ) {
     struct rawrtc_data_transport* const transport = arg;
-
-    // Un-reference
+printf("%s: %p\n", __func__, (void *)arg);
+    // Un-reference sctp_transport
     mem_deref(transport->transport);
 }
 
@@ -37,11 +37,11 @@ printf("%s\n", __func__);
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(*transport), rawrtc_sctp_transport_destroy);
+    transport = mem_zalloc(sizeof(*transport), rawrtc_data_transport_destroy);
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+ printf("%s:%p, rawrtc_sctp_transport_destroy\n", __func__, (void *)transport);
     // Set fields
     transport->type = type;
     transport->transport = mem_ref(internal_transport);

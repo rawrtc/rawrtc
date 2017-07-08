@@ -20,7 +20,7 @@
 #define AF_CONN 123
 
 #define HAVE_INTTYPES_H
-#include "/usr/local/include/uv.h"
+#include <uv.h>
 
 struct rawrtc_sctp_rcvinfo {
 	uint16_t rcv_sid;
@@ -2047,7 +2047,10 @@ void rawrtc_list_init(struct rawrtc_list *list);
 void *rawrtc_list_ledata(const struct le *le);
 
 typedef void (fd_h)(int flags, void *arg);
+
 int rawrtc_fd_listen(int fd, int flags, fd_h *fh, void *arg);
+
+void rawrtc_fd_close(int fd);
 
 int rawrtc_odict_alloc(struct odict **op, uint32_t hash_size);
 
@@ -2062,4 +2065,4 @@ const struct odict_entry *rawrtc_odict_lookup(const struct odict *o, const char 
 
 void rawrtc_dbg_info(const char *fmt, ...);
 
-int webrtc_upcall_handler(struct socket* socket, void* arg, int flags);
+int webrtc_upcall_handler(struct socket* socket, void* arg, int flags, int ignore);

@@ -268,7 +268,7 @@ void data_channel_helper_create(
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
     }
-
+printf("%s:%p, data_channel_helper_destroy\n", __func__, (void *)channel);
     // Set fields
     channel->client = client;
     EOE(rawrtc_strdup(&channel->label, label));
@@ -297,7 +297,7 @@ void data_channel_helper_create_from_channel(
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
     }
-
+printf("%s:%p, data_channel_helper_destroy\n", __func__, (void *)channel_helper);
     // Get parameters
     EOE(rawrtc_data_channel_get_parameters(&parameters, channel));
 

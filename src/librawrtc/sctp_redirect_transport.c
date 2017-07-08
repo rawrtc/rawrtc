@@ -205,7 +205,7 @@ static void rawrtc_sctp_redirect_transport_destroy(
         void* arg
 ) {
     struct rawrtc_sctp_redirect_transport* const transport = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Stop transport
     rawrtc_sctp_redirect_transport_stop(transport);
 
@@ -253,7 +253,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_sctp_redirect_transport_destroy\n", __func__, (void *)transport);
     // Set fields
     transport->state = RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_NEW;
     transport->dtls_transport = mem_ref(dtls_transport);

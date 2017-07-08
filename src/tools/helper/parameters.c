@@ -268,7 +268,7 @@ enum rawrtc_code get_ice_candidates(
         EWE("No memory to allocate ICE candidates array");
     }
     candidates->n_candidates = 0;
-
+printf("%s:%p, ice_candidates_destroy\n", __func__, (void *)candidates);
     // Get ICE candidates
     for (le = list_head(&dict->lst); le != NULL; le = le->next) {
         struct odict* const node = ((struct odict_entry*) le->data)->u.odict;
@@ -378,7 +378,7 @@ enum rawrtc_code get_dtls_parameters(
         EWE("No memory to allocate DTLS fingerprint array");
     }
     fingerprints->n_fingerprints = n;
-
+printf("%s:%p, dtls_fingerprints_destroy\n", __func__, (void *)fingerprints);
     // Get role
     error |= dict_get_entry(&role_str, dict, "role", ODICT_STRING, true);
     error |= rawrtc_str_to_dtls_role(&role, role_str);

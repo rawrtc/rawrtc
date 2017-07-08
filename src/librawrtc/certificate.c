@@ -312,7 +312,7 @@ static void rawrtc_certificate_options_destroy(
         void* arg
 ) {
     struct rawrtc_certificate_options* const options = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(options->named_curve);
     mem_deref(options->common_name);
@@ -414,7 +414,7 @@ enum rawrtc_code rawrtc_certificate_options_create(
     if (!options) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-
+printf("%s:%p, rawrtc_certificate_options_destroy\n", __func__, (void *)options);
     // Set fields/copy
     options->key_type = key_type;
     if (common_name) {
@@ -450,7 +450,7 @@ static void rawrtc_certificate_destroy(
         void* arg
 ) {
     struct rawrtc_certificate* const certificate = arg;
-
+printf("%s: %p\n", __func__, (void *)arg);
     // Free
     if (certificate->certificate) {
         X509_free(certificate->certificate);
@@ -485,6 +485,7 @@ enum rawrtc_code rawrtc_certificate_generate(
 
     // Allocate
     certificate = mem_zalloc(sizeof(*certificate), rawrtc_certificate_destroy);
+    printf("%s:%p, rawrtc_certificate_destroy\n", __func__, (void *)certificate);
     if (!certificate) {
         return RAWRTC_CODE_NO_MEMORY;
     }
@@ -543,6 +544,7 @@ enum rawrtc_code rawrtc_certificate_copy(
 
     // Allocate
     certificate = mem_zalloc(sizeof(*certificate), rawrtc_certificate_destroy);
+        printf("%s:%p, rawrtc_certificate_destroy\n", __func__, (void *)certificate);
     if (!certificate) {
         return RAWRTC_CODE_NO_MEMORY;
     }
