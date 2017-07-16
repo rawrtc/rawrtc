@@ -12,6 +12,7 @@ set(rawrtc_SOURCES
         ice_candidate.c
         ice_gatherer.c
         ice_parameters.c
+        ice_server.c
         ice_transport.c
         main.c
         message_buffer.c

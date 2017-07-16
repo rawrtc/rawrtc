@@ -213,3 +213,85 @@ bool rawrtc_candidate_helper_remove_stun_sessions_handler(
 
     return false; // continue traversing
 }
+
+static void rawrtc_candidate_helper_turn_session_destroy(
+        void* arg
+) {
+    struct rawrtc_candidate_helper_turn_session* const session = arg;
+
+    // Remove from list
+    list_unlink(&session->le);
+
+    // Un-reference
+    mem_deref(session->url);
+    mem_deref(session->turn_client);
+    mem_deref(session->candidate_helper);
+}
+
+/*
+ * Create a TURN session.
+ */
+enum rawrtc_code rawrtc_candidate_helper_turn_session_create(
+        struct rawrtc_candidate_helper_turn_session** const sessionp, // de-referenced
+        struct rawrtc_ice_server_url* const url
+) {
+    struct rawrtc_candidate_helper_turn_session* session;
+
+    // Check arguments
+    if (!sessionp || !url) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Allocate
+    session = mem_zalloc(sizeof(*session), rawrtc_candidate_helper_turn_session_destroy);
+    if (!session) {
+        return RAWRTC_CODE_NO_MEMORY;
+    }
+
+    // Set fields/reference
+    session->url = mem_ref(url);
+
+    // Set pointer & done
+    *sessionp = session;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Add a TURN session to a candidate helper.
+ */
+enum rawrtc_code rawrtc_candidate_helper_turn_session_add(
+        struct rawrtc_candidate_helper_turn_session* const session,
+        struct rawrtc_candidate_helper* const candidate_helper,
+        struct turnc* const turn_client
+) {
+    // Check arguments
+    if (!session || !candidate_helper || !turn_client) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set fields/reference
+    session->candidate_helper = mem_ref(candidate_helper);
+    session->turn_client = mem_ref(turn_client);
+
+    // Append to TURN sessions
+    list_append(&candidate_helper->turn_sessions, &session->le, session);
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Remove TURN sessions list handler (for candidate helper lists).
+ */
+bool rawrtc_candidate_helper_remove_turn_sessions_handler(
+        struct le* le,
+        void* arg
+) {
+    struct rawrtc_candidate_helper* const candidate_helper = le->data;
+    (void) arg;
+
+    // Flush TURN sessions
+    list_flush(&candidate_helper->turn_sessions);
+
+    return false; // continue traversing
+}
