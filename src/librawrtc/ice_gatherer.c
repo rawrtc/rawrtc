@@ -43,7 +43,7 @@ static void gather_options_destroy_url_dns_contexts(
         // Destroy URL DNS contexts
         enum rawrtc_code const error = rawrtc_ice_server_destroy_url_dns_contexts(server);
         if (error) {
-            DEBUG_WARNING("Could not destroy DNS contexts of ice server URLs\n");
+            DEBUG_WARNING("Could not destroy DNS contexts of ICE server URLs\n");
             // Continue - not considered critical
         }
     }
@@ -545,6 +545,49 @@ static struct ice_lcand* find_candidate(
 }
 
 /*
+ * Handle TURN client allocation.
+ */
+static void turn_client_handler(
+        int err,
+        uint16_t scode,
+        char const* reason,
+        struct sa const* relay_address, // not checked
+        struct sa const* mapped_address, // not checked
+        struct stun_msg const* message, // not checked
+        void* arg
+) {
+    struct rawrtc_candidate_helper_stun_session* const session = arg;
+    struct rawrtc_candidate_helper* const candidate = session->candidate_helper;
+    struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
+    struct ice_lcand* const re_candidate = candidate->candidate;
+    uint32_t priority;
+    struct ice_lcand* relay_candidate;
+    enum rawrtc_code error;
+
+    DEBUG_PRINTF("TURN allocation response: err=%m, scode=%"PRIu16", reason=%s, relay-address=%j, "
+                 "mapped-address=%j\n", err, scode, reason, relay_address, mapped_address);
+
+    // Check state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        return;
+    }
+
+    // Error?
+    if (err) {
+        DEBUG_NOTICE("TURN allocation failed, reason: %m -> %"PRIu16" %s\n", err, scode, reason);
+        goto out;
+    }
+
+    // TODO: Check fingerprint?
+
+    // TODO: Handle
+    stun_msg_dump(message);
+
+out:
+    return;
+}
+
+/*
  * Gather relay candidates on an ICE server.
  */
 static enum rawrtc_code gather_relay_candidates(
@@ -553,16 +596,90 @@ static enum rawrtc_code gather_relay_candidates(
         struct rawrtc_ice_server_url* const url, // not checked
         struct rawrtc_ice_server* const server // not checked
 ) {
-    (void) candidate; (void) server;
+    enum rawrtc_code error;
+    struct ice_lcand* const re_candidate = candidate->candidate;
+    enum rawrtc_ice_protocol protocol;
+    struct ice_cand_attr* const attribute = &candidate->candidate->attr;
+    enum rawrtc_ice_candidate_type type;
+    char const* type_str;
+    struct rawrtc_candidate_helper_turn_session* session = NULL;
+    struct turnc* turn_client = NULL;
 
     // Check ICE server is enabled for TURN
     if (url->type != RAWRTC_ICE_SERVER_TYPE_TURN) {
         return RAWRTC_CODE_SUCCESS;
     }
 
-    // TODO: Create TURN request
-    DEBUG_NOTICE("TODO: Gather relay candidates using server %J (%s)\n", server_address, url->url);
-    return RAWRTC_CODE_SUCCESS;
+    // Get protocol
+    error = rawrtc_ipproto_to_ice_protocol(&protocol, re_candidate->attr.proto);
+    if (error) {
+        goto out;
+    }
+
+    // Convert ICE candidate type
+    error = rawrtc_ice_cand_type_to_ice_candidate_type(&type, attribute->type);
+    if (error) {
+        goto out;
+    }
+    type_str = rawrtc_ice_candidate_type_to_str(type);
+    (void) type_str;
+
+    // Create TURN session
+    error = rawrtc_candidate_helper_turn_session_create(&session, url);
+    if (error) {
+        goto out;
+    }
+
+    // Create TURN client
+    switch (protocol) {
+        case RAWRTC_ICE_PROTOCOL_UDP:
+            // Create client for UDP
+            // TODO: What about UDP relay for TCP candidates?
+            DEBUG_PRINTF("Creating TURN allocation for %s %s candidate %J using server %J (%s)\n",
+                         net_proto2name(attribute->proto), type_str, &attribute->addr,
+                         server_address, url->url);
+            error = rawrtc_error_to_code(turnc_alloc(
+                    &turn_client, &rawrtc_default_config.stun_config, IPPROTO_UDP,
+                    re_candidate->us, RAWRTC_LAYER_TURN, server_address, server->username,
+                    server->credential, rawrtc_default_config.turn_allocation_lifetime,
+                    turn_client_handler, session));
+            if (error) {
+                goto out;
+            }
+            break;
+
+        case RAWRTC_ICE_PROTOCOL_TCP:
+            // TODO: Create client for TCP
+            // TODO: What about TCP relay for UDP candidates?
+            error = RAWRTC_CODE_NOT_IMPLEMENTED;
+            goto out;
+            break;
+
+        default:
+            error = RAWRTC_CODE_INVALID_ARGUMENT;
+            goto out;
+            break;
+    }
+
+    // Add the TURN session to the candidate
+    error = rawrtc_candidate_helper_turn_session_add(session, candidate, turn_client);
+    if (error) {
+        goto out;
+    }
+
+    // Increase counter & done
+    ++candidate->relay_pending_count;
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    if (error) {
+        DEBUG_WARNING("Could not create TURN allocation, reason: %s\n", rawrtc_code_to_str(error));
+        mem_deref(session);
+    }
+
+    // Un-reference & done
+    mem_deref(turn_client);
+    return error;
 }
 
 /*
@@ -670,12 +787,13 @@ static enum rawrtc_code gather_reflexive_candidates(
     // Get protocol
     error = rawrtc_ipproto_to_ice_protocol(&protocol, re_candidate->attr.proto);
     if (error) {
-        return error;
+        goto out;
     }
 
     // TODO: Code below only works with UDP - sorry!
     if (protocol != RAWRTC_ICE_PROTOCOL_UDP) {
-        return RAWRTC_CODE_NOT_IMPLEMENTED;
+        error = RAWRTC_CODE_NOT_IMPLEMENTED;
+        goto out;
     }
 
     // Convert ICE candidate type
@@ -696,7 +814,7 @@ static enum rawrtc_code gather_reflexive_candidates(
 
     // Create STUN keep-alive session
     // TODO: We're using the candidate's protocol which conflicts with the ICE server URL transport
-    DEBUG_PRINTF("Creating STUN request for %s %s candidate %J using ICE server %J (%s)\n",
+    DEBUG_PRINTF("Creating STUN request for %s %s candidate %J using server %J (%s)\n",
                  net_proto2name(attribute->proto), type_str, &attribute->addr, server_address,
                  url->url);
     error = rawrtc_error_to_code(stun_keepalive_alloc(
@@ -744,15 +862,17 @@ static void gather_candidates(
     // Gather reflexive candidates
     error = gather_reflexive_candidates(candidate, server_address, url);
     if (error) {
-        DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s",
+        DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s\n",
                       rawrtc_code_to_str(error));
         // Note: Considered non-critical, continuing
     }
 
     // Gather relay candidates
+    // Note: 'gather_relay_candidates' will return immediately if the URL is not a TURN server.
+    // TODO: Once OAuth is implemented, username and password need to be resolved at this point
     error = gather_relay_candidates(candidate, server_address, url, server);
     if (error) {
-        DEBUG_WARNING("Could not gather relay candidates, reason: %s",
+        DEBUG_WARNING("Could not gather relay candidates, reason: %s\n",
                       rawrtc_code_to_str(error));
         // Note: Considered non-critical, continuing
     }

@@ -481,8 +481,9 @@ struct rawrtc_config {
     enum rawrtc_certificate_sign_algorithm sign_algorithm;
     enum rawrtc_ice_server_transport ice_server_normal_transport;
     enum rawrtc_ice_server_transport ice_server_secure_transport;
-    uint32_t stun_keepalive_interval;
+    uint32_t stun_keepalive_interval; // in seconds
     struct stun_conf stun_config;
+    uint32_t turn_allocation_lifetime; // in seconds
 };
 
 /*

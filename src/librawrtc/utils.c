@@ -23,14 +23,15 @@ struct rawrtc_config rawrtc_default_config = {
     .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
     .ice_server_normal_transport = RAWRTC_ICE_SERVER_TRANSPORT_UDP,
     .ice_server_secure_transport = RAWRTC_ICE_SERVER_TRANSPORT_TLS,
-    .stun_keepalive_interval = 25,
+    .stun_keepalive_interval = 25, // in seconds
     .stun_config = {
         STUN_DEFAULT_RTO,
         STUN_DEFAULT_RC,
         STUN_DEFAULT_RM,
         STUN_DEFAULT_TI,
         0x00
-    }
+    },
+    .turn_allocation_lifetime = 600, // in seconds
 };
 
 /*
