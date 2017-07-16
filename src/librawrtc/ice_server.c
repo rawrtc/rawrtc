@@ -62,8 +62,8 @@ static char const * const ice_credential_type_to_name(
             return "n/a";
         case RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD:
             return "password";
-        case RAWRTC_ICE_CREDENTIAL_TYPE_TOKEN:
-            return "token";
+        case RAWRTC_ICE_CREDENTIAL_TYPE_OAUTH:
+            return "oauth";
         default:
             return "???";
     }
@@ -399,6 +399,21 @@ enum rawrtc_code rawrtc_ice_server_create(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // Validate depending on credential type
+    switch (credential_type) {
+        case RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD:
+            // Password requires username and password
+            if (!username || !credential) {
+                return RAWRTC_CODE_INVALID_ARGUMENT;
+            }
+            break;
+        case RAWRTC_ICE_CREDENTIAL_TYPE_OAUTH:
+            // TODO: Implement... maybe.
+            return RAWRTC_CODE_NOT_IMPLEMENTED;
+        default:
+            break;
+    }
+
     // Allocate
     server = mem_zalloc(sizeof(*server), rawrtc_ice_server_destroy);
     if (!server) {
@@ -441,7 +456,7 @@ enum rawrtc_code rawrtc_ice_server_create(
             }
         }
     }
-    server->credential_type = credential_type; // TODO: Validation needed in case TOKEN is used?
+    server->credential_type = credential_type;
 
 out:
     if (error) {
@@ -516,6 +531,7 @@ static void rawrtc_ice_server_url_dns_context_destroy(
     // Un-reference
     mem_deref(context->dns_query);
     mem_deref(context->gatherer);
+    mem_deref(context->server);
     mem_deref(context->url);
 }
 
@@ -526,12 +542,13 @@ enum rawrtc_code rawrtc_ice_server_url_dns_context_create(
         struct rawrtc_ice_server_url_dns_context** const contextp,
         uint_fast16_t const dns_type,
         struct rawrtc_ice_server_url* const url,
+        struct rawrtc_ice_server* const server,
         struct rawrtc_ice_gatherer* const gatherer
 ) {
     struct rawrtc_ice_server_url_dns_context* context;
 
     // Check arguments
-    if (!contextp || !url || !gatherer) {
+    if (!contextp || !url || !server || !gatherer) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -544,6 +561,7 @@ enum rawrtc_code rawrtc_ice_server_url_dns_context_create(
     // Set fields/reference
     context->dns_type = dns_type;
     context->url = mem_ref(url);
+    context->server = mem_ref(server);
     context->gatherer = mem_ref(gatherer);
 
     // Set pointer

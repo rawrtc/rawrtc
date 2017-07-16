@@ -550,9 +550,10 @@ static struct ice_lcand* find_candidate(
 static enum rawrtc_code gather_relay_candidates(
         struct rawrtc_candidate_helper* const candidate, // not checked
         struct sa* server_address, // not checked
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url* const url, // not checked
+        struct rawrtc_ice_server* const server // not checked
 ) {
-    (void) candidate;
+    (void) candidate; (void) server;
 
     // Check ICE server is enabled for TURN
     if (url->type != RAWRTC_ICE_SERVER_TYPE_TURN) {
@@ -735,7 +736,8 @@ out:
 static void gather_candidates(
         struct rawrtc_candidate_helper* const candidate, // not checked
         struct sa* server_address, // not checked
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url* const url, // not checked
+        struct rawrtc_ice_server* const server // not checked
 ) {
     enum rawrtc_code error;
 
@@ -748,7 +750,7 @@ static void gather_candidates(
     }
 
     // Gather relay candidates
-    error = gather_relay_candidates(candidate, server_address, url);
+    error = gather_relay_candidates(candidate, server_address, url, server);
     if (error) {
         DEBUG_WARNING("Could not gather relay candidates, reason: %s",
                       rawrtc_code_to_str(error));
@@ -763,7 +765,8 @@ static void gather_candidates(
 static void gather_candidates_using_server(
         struct rawrtc_ice_gatherer* const gatherer,
         struct sa* server_address,
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url* const url, // not checked
+        struct rawrtc_ice_server* const server // not checked
 ) {
     struct le* le;
 
@@ -771,7 +774,7 @@ static void gather_candidates_using_server(
         struct rawrtc_candidate_helper* const candidate = le->data;
 
         // Gather candidates
-        gather_candidates(candidate, server_address, url);
+        gather_candidates(candidate, server_address, url, server);
     }
 }
 
@@ -790,13 +793,13 @@ static void gather_candidates_using_resolved_server(
         // IPv4
         if (rawrtc_default_config.ipv4_enable && !sa_is_any(&url->ipv4_address)) {
             // Gather candidates
-            gather_candidates(candidate, &url->ipv4_address, url);
+            gather_candidates(candidate, &url->ipv4_address, url, server);
         }
 
         // IPv6
         if (rawrtc_default_config.ipv6_enable && !sa_is_any(&url->ipv6_address)) {
             // Gather candidates
-            gather_candidates(candidate, &url->ipv6_address, url);
+            gather_candidates(candidate, &url->ipv6_address, url, server);
         }
     }
 }
@@ -962,6 +965,7 @@ static bool dns_record_result_handler(
 ) {
     struct rawrtc_ice_server_url_dns_context* const context = arg;
     struct rawrtc_ice_server_url* const url = context->url;
+    struct rawrtc_ice_server* const server = context->server;
     struct sa* server_address;
     DEBUG_PRINTF("DNS resource record: %H\n", dns_rr_print, resource_record);
 
@@ -986,7 +990,7 @@ static bool dns_record_result_handler(
     }
 
     // Start gathering candidates using the resolved ICE server
-    gather_candidates_using_server(context->gatherer, server_address, url);
+    gather_candidates_using_server(context->gatherer, server_address, url, server);
 
     // Done, stop traversing, one IP is sufficient
     return true;
@@ -1048,6 +1052,7 @@ static enum rawrtc_code query_a_or_aaaa_record(
         struct sa* const server_address, // not checked
         uint_fast16_t const dns_type,
         struct rawrtc_ice_server_url* const url, // not checked
+        struct rawrtc_ice_server* const server, // not checked
         struct rawrtc_ice_gatherer* const gatherer // not checked
 ) {
     bool const resolved = !sa_is_any(server_address);
@@ -1062,7 +1067,7 @@ static enum rawrtc_code query_a_or_aaaa_record(
     }
 
     // Create ICE server URL DNS context
-    error = rawrtc_ice_server_url_dns_context_create(&context, dns_type, url, gatherer);
+    error = rawrtc_ice_server_url_dns_context_create(&context, dns_type, url, server, gatherer);
     if (error) {
         return error;
     }
@@ -1112,11 +1117,11 @@ static enum rawrtc_code resolve_ice_servers_address(
     struct le* le;
 
     for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const ice_server = le->data;
+        struct rawrtc_ice_server* const server = le->data;
         struct le* url_le;
         enum rawrtc_code error;
 
-        for (url_le = list_head(&ice_server->urls); url_le != NULL; url_le = url_le->next) {
+        for (url_le = list_head(&server->urls); url_le != NULL; url_le = url_le->next) {
             struct rawrtc_ice_server_url* const url = url_le->data;
 
             // Cancel pending DNS resolve processes
@@ -1130,7 +1135,7 @@ static enum rawrtc_code resolve_ice_servers_address(
             // Query A record (if IPv4 is enabled)
             if (rawrtc_default_config.ipv4_enable) {
                 error = query_a_or_aaaa_record(
-                        &url->dns_a_context, &url->ipv4_address, DNS_TYPE_A, url, gatherer);
+                        &url->dns_a_context, &url->ipv4_address, DNS_TYPE_A, url, server, gatherer);
                 if (error) {
                     DEBUG_WARNING("Unable to query A record, reason: %s\n",
                                   rawrtc_code_to_str(error));
@@ -1141,7 +1146,8 @@ static enum rawrtc_code resolve_ice_servers_address(
             // Query AAAA record (if IPv6 is enabled)
             if (rawrtc_default_config.ipv6_enable) {
                 error = query_a_or_aaaa_record(
-                        &url->dns_aaaa_context, &url->ipv6_address, DNS_TYPE_AAAA, url, gatherer);
+                        &url->dns_aaaa_context, &url->ipv6_address, DNS_TYPE_AAAA, url, server,
+                        gatherer);
                 if (error) {
                     DEBUG_WARNING("Unable to query AAAA record, reason: %s\n",
                                   rawrtc_code_to_str(error));

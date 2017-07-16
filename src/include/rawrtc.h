@@ -101,7 +101,7 @@ enum rawrtc_ice_gather_policy {
 enum rawrtc_ice_credential_type {
     RAWRTC_ICE_CREDENTIAL_TYPE_NONE,
     RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD,
-    RAWRTC_ICE_CREDENTIAL_TYPE_TOKEN
+    RAWRTC_ICE_CREDENTIAL_TYPE_OAUTH
 };
 
 /*
@@ -563,6 +563,7 @@ struct rawrtc_ice_server_url {
 struct rawrtc_ice_server_url_dns_context {
     uint_fast16_t dns_type;
     struct rawrtc_ice_server_url* url;
+    struct rawrtc_ice_server* server;
     struct rawrtc_ice_gatherer* gatherer;
     struct dns_query* dns_query;
 };
