@@ -182,7 +182,6 @@ static enum rawrtc_code data_channel_open_message_create(
     size_t protocol_length;
     struct mbuf* buffer;
     int err;
-printf("%s\n", __func__);
     // Get length of label and protocol
     label_length = parameters->label ? strlen(parameters->label) : 0;
     protocol_length = parameters->protocol ? strlen(parameters->protocol) : 0;
@@ -315,7 +314,6 @@ static bool sctp_send_deferred_message(
     enum rawrtc_code error;
     void* info;
     socklen_t info_size;
-printf("%s: rawrtc_sctp_transport=%p\n", __func__, (void *)arg);
     // Determine info pointer and info size
     switch (send_context->info_type) {
         case SCTP_SENDV_SNDINFO:
@@ -362,7 +360,6 @@ out:
 static enum rawrtc_code sctp_send_deferred_messages(
         struct rawrtc_sctp_transport* const transport // not checked
 ) {
-printf("%s\n", __func__);
     // Send buffered outgoing SCTP packets
     return rawrtc_message_buffer_clear(
             &transport->buffered_messages_outgoing, sctp_send_deferred_message, transport);
@@ -381,7 +378,6 @@ static enum rawrtc_code send_message(
 ) {
     struct sctp_sendv_spa spa = {0};
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Set stream identifier, protocol identifier and flags
     spa.sendv_sndinfo.snd_sid = context->sid;
     spa.sendv_sndinfo.snd_flags = SCTP_EOR; // TODO: Update signature
@@ -445,18 +441,15 @@ static void set_data_channel_states(
 ) {
     uint_fast16_t i;
 
-	DEBUG_PRINTF("Set_data_channel_states from %d to %d\n", *from_state, to_state);
-	printf("num channels = %d\n", transport->n_channels);
+    DEBUG_PRINTF("Set_data_channel_states from %d to %d\n", *from_state, to_state);
     // Set state on all data channels
     for (i = 0; i < transport->n_channels; ++i) {
         struct rawrtc_data_channel* const channel = transport->channels[i];
         if (!channel) {
             continue;
         }
-printf("channel state = %d\n", channel->state);
         // Update state
         if (!from_state || channel->state == *from_state) {
-        printf("set data channel state\n");
             rawrtc_data_channel_set_state(channel, to_state);
         }
     }
@@ -483,7 +476,8 @@ static void close_data_channels(
         rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
 
         // Un-reference
-        transport->channels[i] = mem_deref(channel);
+       // transport->channels[i] = mem_deref(channel);
+       mem_deref(transport->channels[i]);
     }
 }
 
@@ -565,7 +559,6 @@ static enum rawrtc_code reset_outgoing_stream(
     struct sctp_reset_streams* reset_streams = NULL;
     size_t length;
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Get context
     struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
 
@@ -593,12 +586,8 @@ printf("%s\n", __func__);
     // Reset stream
     int err = usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
                            reset_streams, (socklen_t) length);
-    printf("usrsctp_setsockopt returned errno=%d\n", err);
-   /* if (usrsctp_setsockopt(transport->socket, IPPROTO_SCTP, SCTP_RESET_STREAMS,
-                           reset_streams, (socklen_t) length) != 0) {*/
     if (err != 0) {
         error = rawrtc_error_to_code(errno);
-        printf("usrsctp_setsockopt error=%d\n", error);
         goto out;
     }
 
@@ -624,7 +613,8 @@ out:
         }
 
         // Remove from transport
-        transport->channels[context->sid] = mem_deref(channel);
+       // transport->channels[context->sid] = mem_deref(channel);
+       mem_deref(transport->channels[context->sid]);
     }
     return error;
 }
@@ -863,7 +853,8 @@ static void handle_partial_delivery_event(
     if (context->buffer_inbound) {
         DEBUG_NOTICE("Abort partially delivered message of %zu bytes\n",
                      mbuf_get_left(context->buffer_inbound));
-        context->buffer_inbound = mem_deref(context->buffer_inbound);
+        // context->buffer_inbound = mem_deref(context->buffer_inbound);
+        mem_deref(context->buffer_inbound);
 
         // Sanity-check
         if (channel->options->deliver_partially) {
@@ -989,7 +980,6 @@ static void handle_stream_reset_event(
 ) {
     uint_fast32_t length;
     uint_fast32_t i;
-printf("%s\n", __func__);
     // Get #sid's
     length = (event->strreset_length - sizeof(*event)) / sizeof(uint16_t);
 
@@ -1009,7 +999,6 @@ if (event->strreset_flags) {
     // Ignore denied/failed events
     if (event->strreset_flags & SCTP_STREAM_RESET_DENIED
         || event->strreset_flags & SCTP_STREAM_RESET_FAILED) {
-        printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 
@@ -1018,7 +1007,6 @@ if (event->strreset_flags) {
         uint_fast16_t const sid = (uint_fast16_t) event->strreset_stream_list[i];
         struct rawrtc_data_channel* channel;
         struct rawrtc_sctp_data_channel_context* context;
-printf("%s:%d\n", __FILE__, __LINE__);
         // Check if channel exists
         if (sid >= transport->n_channels || !transport->channels[sid]) {
             DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
@@ -1032,28 +1020,23 @@ printf("%s:%d\n", __FILE__, __LINE__);
         // Incoming stream reset
         if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN) {
             // Set flag
-            printf("%s:%d\n", __FILE__, __LINE__);
             channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET;
 
             // Reset outgoing stream (if needed)
             if (channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSING
                 && channel->state != RAWRTC_DATA_CHANNEL_STATE_CLOSED) {
                 if (reset_outgoing_stream(transport, channel)) {
-                printf("%s:%d\n", __FILE__, __LINE__);
                     // Error, channel has been closed automatically
                     continue;
                 }
-printf("%s:%d\n", __FILE__, __LINE__);
                 // Set to closing
                 rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSING);
-            printf("%s:%d\n", __FILE__, __LINE__);
             }
         }
 
         // Outgoing stream reset (this is raised from our own stream reset)
         if (event->strreset_flags & SCTP_STREAM_RESET_OUTGOING_SSN) {
             // Set flag
-            printf("%s:%d\n", __FILE__, __LINE__);
             channel->flags |= RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET;
         }
 
@@ -1062,12 +1045,7 @@ printf("%s:%d\n", __FILE__, __LINE__);
                 && (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_INCOMING_STREAM_RESET)
             && (channel->flags & RAWRTC_SCTP_DATA_CHANNEL_FLAGS_OUTGOING_STREAM_RESET)) {
             // Set to closed
-            printf("close channel %s\n", channel->parameters->label);
             rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
-
-            // Remove from transport
-            printf("%s:%d\n", __FILE__, __LINE__);
-           // transport->channels[context->sid] = mem_deref(channel);
         }
     }
 }
@@ -1084,45 +1062,36 @@ static void handle_notification(
     // TODO: Are all of these checks necessary or can we reduce that?
 #if (SIZE_MAX > UINT32_MAX)
     if (buffer->end > UINT32_MAX) {
-    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 #endif
 #if (UINT32_MAX > SIZE_MAX)
     if (notification->sn_header.sn_length > SIZE_MAX) {
-    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
 #endif
     if (notification->sn_header.sn_length != buffer->end) {
-    printf("%s:%d\n", __FILE__, __LINE__);
         return;
     }
-printf("notification->sn_header.sn_type=%d\n", notification->sn_header.sn_type);
     // Handle notification by type
     switch (notification->sn_header.sn_type) {
         case SCTP_ASSOC_CHANGE:
-        printf("SCTP_ASSOC_CHANGE\n");
             handle_association_change_event(transport, &notification->sn_assoc_change);
             break;
         case SCTP_PARTIAL_DELIVERY_EVENT:
             handle_partial_delivery_event(transport, &notification->sn_pdapi_event);
             break;
         case SCTP_SEND_FAILED_EVENT:
-        printf("SCTP_SEND_FAILED_EVENT\n");
             handle_send_failed_event(transport, &notification->sn_send_failed_event);
             break;
         case SCTP_SENDER_DRY_EVENT:
-        printf("SCTP_SENDER_DRY_EVENT\n");
             handle_sender_dry_event(transport, &notification->sn_sender_dry_event);
             break;
         case SCTP_SHUTDOWN_EVENT:
-        printf("SCTP_SHUTDOWN_EVENT\n");
             // TODO: Stop sending (this is a bit tricky to implement, so skipping for now)
             //handle_shutdown_event(transport, &notification->sn_shutdown_event);
             break;
         case SCTP_STREAM_CHANGE_EVENT:
-        printf("SCTP_STREAM_CHANGE_EVENT\n");
             // TODO: Handle
             DEBUG_WARNING("TODO: HANDLE STREAM CHANGE\n");
             // handle_stream_change_event(transport, ...);
@@ -1151,7 +1120,11 @@ static int sctp_packet_handler(
     enum rawrtc_code error;
     (void) tos; // TODO: Handle?
     (void) set_df; // TODO: Handle?
-printf("%s\n", __func__);
+
+    if (rawrtc_global.usrsctp_initialized == -1) {
+        DEBUG_PRINTF("Transport already closed\n");
+        return 0;
+    }
     // Lock event loop mutex
     rawrtc_thread_enter();
 
@@ -1168,7 +1141,6 @@ printf("%s\n", __func__);
     // Note: We only need to copy the buffer if we add it to the outgoing queue
     if (transport->dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         struct mbuf mbuffer;
-printf("DTLS state: connected -> fill  buffer\n");
         // Note: dtls_send does not reference the buffer, so we can safely fake an mbuf structure
         // to avoid copying. This may change in the future, so be aware!
         mbuffer.buf = buffer;
@@ -1265,7 +1237,6 @@ static void handle_data_channel_open_message(
     struct rawrtc_data_channel* channel = NULL;
     struct rawrtc_sctp_data_channel_context* context = NULL;
     struct mbuf* buffer_out = NULL;
-printf("%s\n", __func__);
     // Check SID corresponds to other peer's role
     switch (transport->dtls_transport->role) {
         case RAWRTC_DTLS_ROLE_AUTO:
@@ -1319,6 +1290,7 @@ printf("%s\n", __func__);
         DEBUG_WARNING("Unable to create data channel, reason: %s\n", rawrtc_code_to_str(error));
         goto out;
     }
+    mem_deref(parameters);
 
     // Allocate context to be used as an argument for the data channel handlers
     error = channel_context_create(&context, info->rcv_sid, true);
@@ -1359,7 +1331,6 @@ out:
     mem_deref(buffer_out);
     mem_deref(context);
     mem_deref(channel);
-    mem_deref(data_transport);
     mem_deref(parameters);
 }
 
@@ -1432,7 +1403,7 @@ static enum rawrtc_code buffer_message_received_raise_complete(
 out:
     if (error && error != RAWRTC_CODE_NO_VALUE) {
         // Discard the message
-        *buffer_inboundp = mem_deref(*buffer_inboundp);
+      mem_deref(*buffer_inboundp);
     }
     return error;
 }
@@ -1449,7 +1420,6 @@ static void handle_application_message(
     enum rawrtc_code error;
     struct rawrtc_sctp_data_channel_context* context = NULL;
     enum rawrtc_data_channel_message_flag message_flags = RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_NONE;
-printf("%s\n", __func__);
     // Get channel and context
     struct rawrtc_data_channel* const channel = transport->channels[info->rcv_sid];
     if (!channel) {
@@ -1483,7 +1453,6 @@ printf("%s\n", __func__);
 
         // Empty message is complete
         message_flags |= RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE;
-
     } else if (!channel->options->deliver_partially) {
         // Buffer message (if needed) and get complete message (if any)
         error = buffer_message_received_raise_complete(
@@ -1532,6 +1501,7 @@ printf("%s\n", __func__);
             DEBUG_WARNING("Ignored incoming message with unknown PPID: %"PRIu32"\n",
                           info->rcv_ppid);
             error = RAWRTC_CODE_INVALID_MESSAGE;
+            mem_deref(buffer);
             goto out;
             break;
     }
@@ -1557,7 +1527,7 @@ out:
 
     // Un-reference
     if (context) {
-        context->buffer_inbound = mem_deref(context->buffer_inbound);
+       context->buffer_inbound = mem_deref(context->buffer_inbound);
     }
 }
 
@@ -1571,7 +1541,6 @@ static void handle_dcep_message(
         int const flags
 ) {
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Buffer message (if needed) and get complete message (if any)
     error = buffer_message_received_raise_complete(
             &transport->buffer_dcep_inbound, &transport->info_dcep_inbound,
@@ -1613,6 +1582,7 @@ printf("%s\n", __func__);
             break;
     }
 
+  //  mem_deref(transport->buffer_dcep_inbound);
     // Done
     error = RAWRTC_CODE_SUCCESS;
 
@@ -1624,7 +1594,7 @@ out:
     }
 
     // Un-reference
-    transport->buffer_dcep_inbound = mem_deref(transport->buffer_dcep_inbound);
+    mem_deref(transport->buffer_dcep_inbound);
 }
 
 /*
@@ -1636,7 +1606,6 @@ static void data_receive_handler(
         struct sctp_rcvinfo* const info,
         int const flags
 ) {
-printf("%s\n", __func__);
     // Convert PPID first
     info->rcv_ppid = ntohl(info->rcv_ppid);
     DEBUG_PRINTF("Received message with SID %"PRIu16", PPID: %"PRIu32"\n",
@@ -1663,7 +1632,6 @@ static int read_event_handler(
     socklen_t info_length = sizeof(info);
     unsigned int info_type = 0;
     int flags = 0;
-printf("%s\n", __func__);
     // Closed?
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         DEBUG_NOTICE("Ignoring read event, transport is closed\n");
@@ -1706,7 +1674,6 @@ printf("%s\n", __func__);
 
     // Handle notification
     if (flags & MSG_NOTIFICATION) {
-    printf("call handle_notification\n");
         handle_notification(transport, buffer);
         goto out;
     }
@@ -1722,9 +1689,9 @@ printf("%s\n", __func__);
         DEBUG_WARNING("Cannot handle incoming data without SCTP rcvfinfo\n");
         goto out;
     }
-printf("call data_receive_handler\n");
     // Pass data to handler
     data_receive_handler(transport, buffer, &info, flags);
+    transport->buffer_dcep_inbound = NULL;
 
 out:
     // Un-reference
@@ -1741,11 +1708,14 @@ static int write_event_handler(
         struct rawrtc_sctp_transport* const transport // not checked
 ) {
     // Closed?
+    if (!transport) {
+        DEBUG_NOTICE("Ignoring write event, transport is closed\n");
+        return RAWRTC_SCTP_EVENT_ALL;
+    }
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         DEBUG_NOTICE("Ignoring write event, transport is closed\n");
         return RAWRTC_SCTP_EVENT_ALL;
     }
-printf("%s\n", __func__);
     // Send all deferred messages (if not already sending)
     // TODO: Check if this flag is really necessary
     if (!(transport->flags & RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS)) {
@@ -1757,12 +1727,10 @@ printf("%s\n", __func__);
         transport->flags &= ~RAWRTC_SCTP_TRANSPORT_FLAGS_SENDING_IN_PROGRESS;
         switch (error) {
             case RAWRTC_CODE_SUCCESS:
-            printf("RAWRTC_CODE_SUCCESS\n");
-            return SCTP_EVENT_WRITE;
+                return SCTP_EVENT_WRITE;
             case RAWRTC_CODE_STOP_ITERATION:
                 // We either sent all pending messages or could not send all messages, so there's
                 // no reason to react to further write events in this iteration
-                printf("RAWRTC_CODE_STOP_ITERATION\n");
                 return SCTP_EVENT_WRITE;
             default:
                 // TODO: What now? Close?
@@ -1788,15 +1756,11 @@ static bool error_event_handler(
         DEBUG_NOTICE("Ignoring error event, transport is closed\n");
         return RAWRTC_SCTP_EVENT_ALL;
     }
-printf("%s\n", __func__);
     // TODO: What am I supposed to do with this information?
     DEBUG_WARNING("TODO: Handle SCTP error event\n");
-
-	printf("SCTP error=%s\n", strerror(usrsctp_get_error(transport->socket)));
-	if (usrsctp_get_error(transport->socket) == ECONNABORTED ||
-	    usrsctp_get_error(transport->socket) == ETIMEDOUT) {
-	 printf("close all data channels and inform upper layer\n");
-	}
+    if (usrsctp_get_error(transport->socket) == ECONNABORTED ||
+        usrsctp_get_error(transport->socket) == ETIMEDOUT) {
+    }
     // Continue handling events
     // TODO: Probably depends on the error, right?
     return RAWRTC_SCTP_EVENT_NONE;
@@ -1815,7 +1779,6 @@ void upcall_handler_helper(
     struct rawrtc_sctp_transport* const transport = arg;
     int ignore_events = RAWRTC_SCTP_EVENT_NONE;
     (void) flags; // TODO: What does this indicate?
-printf("%s\n", __func__);
     // Lock event loop mutex
     rawrtc_thread_enter();
 
@@ -1829,19 +1792,16 @@ printf("%s\n", __func__);
 
         // Handle error event
         if (events & SCTP_EVENT_ERROR) {
-        printf("event = SCTP_EVENT_ERROR\n");
             ignore_events |= error_event_handler(transport);
         }
 
         // Handle read event
         if (events & SCTP_EVENT_READ) {
-        printf("event = SCTP_EVENT_READ\n");
             ignore_events |= read_event_handler(transport);
         }
 
         // Handle write event
         if (events & SCTP_EVENT_WRITE) {
-        printf("event = SCTP_EVENT_WRITE\n");
             ignore_events |= write_event_handler(transport);
         }
 
@@ -1855,41 +1815,31 @@ printf("%s\n", __func__);
 
 int webrtc_upcall_handler(struct socket* socket, void* arg, int flags, int ignore)
 {
-	int events = usrsctp_get_events(socket) & ~ignore;
+    int events = usrsctp_get_events(socket);
     struct rawrtc_sctp_transport* const transport = arg;
    // int ignore_events = RAWRTC_SCTP_EVENT_NONE;
-   int event = -1;
+    int event = -1;
     (void) flags; // TODO: What does this indicate?
-printf("%s\n", __func__);
     // Lock event loop mutex
     rawrtc_thread_enter();
 
- //   while (events) {
     if (events) {
         // Handle error event
         if (events & SCTP_EVENT_ERROR) {
-        printf("event = SCTP_EVENT_ERROR\n");
             event= error_event_handler(transport);
         }
 
         // Handle read event
         if (events & SCTP_EVENT_READ) {
-        printf("event = SCTP_EVENT_READ\n");
             event= read_event_handler(transport);
         }
 
         // Handle write event
         if (events & SCTP_EVENT_WRITE) {
-        printf("event = SCTP_EVENT_WRITE\n");
             event= write_event_handler(transport);
-            printf("write_event_handler returned %d\n", event);
         }
-
-        // Get upcoming events and remove events that should be ignored
-  //      events = usrsctp_get_events(socket) & ~ignore_events;
-  //  }
     } else {
-        event = -1;
+      event = -1;
     }
     // Unlock event loop mutex
     rawrtc_thread_leave();
@@ -1922,7 +1872,6 @@ static void dtls_receive_handler(
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
     size_t const length = mbuf_get_left(buffer);
-printf("%s\n", __func__);
     // Closed?
     if (transport->state == RAWRTC_SCTP_TRANSPORT_STATE_CLOSED) {
         DEBUG_PRINTF("Ignoring incoming SCTP message, transport is closed\n");
@@ -1945,12 +1894,10 @@ printf("%s\n", __func__);
 static void data_channels_destroy(
         void* arg
 ) {
-    struct rawrtc_sctp_transport* const transport = arg;
-    uint_fast16_t i;
-printf("%s: %p\n", __func__, (void *)arg);
-    // Un-reference all members
-    for (i = 0; i < transport->n_channels; ++i) {
-        mem_deref(transport->channels[i]);
+    struct rawrtc_data_channel** channels = arg;
+
+    for (uint16_t i = 0; i < 65535; ++i) { // Where do I get the number of channels from?
+        mem_deref(channels[i]);
     }
 }
 
@@ -1966,7 +1913,6 @@ enum rawrtc_code data_channels_alloc(
 ) {
     size_t i;
     struct rawrtc_data_channel** channels;
-printf("%s\n", __func__);
     // Check arguments
     if (!channelsp) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2008,7 +1954,6 @@ static void rawrtc_sctp_transport_destroy(
         void* arg
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_sctp_transport_stop(transport);
@@ -2029,6 +1974,7 @@ printf("%s: %p\n", __func__, (void *)arg);
 
         // Close
         usrsctp_finish();
+        rawrtc_global.usrsctp_initialized = -1;
         DEBUG_PRINTF("Closed usrsctp\n");
     }
 }
@@ -2055,11 +2001,10 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     size_t i;
     int option_value;
     struct sockaddr_conn peer = {0};
-printf("%s\n", __func__);
 
-	if (sctp_upcall_handler == NULL) {
-		sctp_upcall_handler = upcall_handler_helper;
-	}
+    if (sctp_upcall_handler == NULL) {
+        sctp_upcall_handler = upcall_handler_helper;
+    }
     // Check arguments
     if (!transportp || !dtls_transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2096,8 +2041,7 @@ printf("%s\n", __func__);
 
         // TODO: Debugging depending on options
 #ifdef SCTP_DEBUG
-printf("switch on SCTP_DEBUG_ALL\n");
-        usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
+        usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_NONE);
 #endif
 
         // Do not send ABORTs in response to INITs (1).
@@ -2143,7 +2087,6 @@ printf("switch on SCTP_DEBUG_ALL\n");
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_sctp_transport_destroy\n", __func__, (void *)transport);
     // Increase in-use counter
     // Note: This needs to be below allocation to ensure the counter is decreased properly on error
     ++rawrtc_global.usrsctp_initialized;
@@ -2348,7 +2291,6 @@ static void channel_context_destroy(
         void* arg
 ) {
     struct rawrtc_sctp_data_channel_context* const context = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(context->buffer_inbound);
 }
@@ -2361,14 +2303,12 @@ static enum rawrtc_code channel_context_create(
         uint16_t const sid,
         bool const can_send_unordered
 ) {
-printf("%s\n", __func__);
     // Allocate context
     struct rawrtc_sctp_data_channel_context* const context =
             mem_zalloc(sizeof(*context), channel_context_destroy);
     if (!context) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, channel_context_destroy\n", __func__, (void *)context);
     // Set fields
     context->sid = sid;
     if (can_send_unordered) {
@@ -2389,7 +2329,6 @@ static bool channel_registered(
 ) {
     // Get context
     struct rawrtc_sctp_data_channel_context* const context = channel->transport_arg;
-printf("%s\n", __func__);
     // Check status
     if (transport->channels[context->sid] != channel) {
         DEBUG_WARNING("Invalid channel instance in slot. Please report this.\n");
@@ -2411,11 +2350,8 @@ static void channel_register(
     // Update channel with referenced context
     channel->transport_arg = mem_ref(context);
     transport->channels[context->sid] = mem_ref(channel);
-printf("%s\n", __func__);
-printf("set transport->channels[%d]\n", context->sid);
     // Raise data channel event?
     if (raise_event) {
-    printf("raise_event\n");
         // Call data channel handler (if any)
         rawrtc_data_channel_call_channel_handler(
                 channel, transport->data_channel_handler, transport->arg);
@@ -2435,7 +2371,6 @@ static enum rawrtc_code channel_create_negotiated(
         struct rawrtc_sctp_transport* const transport, // not checked
         struct rawrtc_data_channel_parameters const * const parameters // read-only
 ) {
-printf("%s\n", __func__);
     // Check SID (> max, >= n_channels, or channel already occupied)
     if (parameters->id > RAWRTC_SCTP_TRANSPORT_SID_MAX ||
         parameters->id >= transport->n_channels ||
@@ -2460,7 +2395,6 @@ static enum rawrtc_code channel_create_inband(
     uint_fast16_t i;
     struct rawrtc_sctp_data_channel_context* context;
     struct mbuf* buffer;
-printf("%s\n", __func__);
     // Check DTLS state
     // Note: We need to have an open DTLS connection to determine whether we use odd or even
     // SIDs.
@@ -2536,7 +2470,6 @@ static enum rawrtc_code channel_create_handler(
     struct rawrtc_sctp_transport* sctp_transport;
     enum rawrtc_code error;
     struct rawrtc_sctp_data_channel_context* context;
-printf("%s\n", __func__);
     // Check arguments
     if (!transport || !channel || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2573,7 +2506,6 @@ static enum rawrtc_code channel_close_handler(
 ) {
     struct rawrtc_sctp_transport* transport;
     struct rawrtc_sctp_data_channel_context* context;
-printf("%s\n", __func__);
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2592,7 +2524,6 @@ printf("%s\n", __func__);
 
         // Sanity check
         if (!channel_registered(transport, channel)) {
-        printf("channel was not registered\n");
             return RAWRTC_CODE_UNKNOWN_ERROR;
         }
 
@@ -2621,7 +2552,6 @@ static enum rawrtc_code channel_send_handler(
     uint_fast32_t ppid;
     struct mbuf* empty = NULL;
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2701,7 +2631,6 @@ enum rawrtc_code rawrtc_sctp_transport_get_data_transport(
         struct rawrtc_sctp_transport* const sctp_transport // referenced
 ) {
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Check arguments
     if (!sctp_transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2714,7 +2643,6 @@ printf("%s\n", __func__);
 
     // Lazy-create data transport
     if (!sctp_transport->data_transport) {
-    printf("call rawrtc_data_transport_create\n");
         error = rawrtc_data_transport_create(
                 &sctp_transport->data_transport, RAWRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
                 channel_create_handler, channel_close_handler, channel_send_handler);
@@ -2741,7 +2669,6 @@ enum rawrtc_code rawrtc_sctp_transport_start(
 ) {
     struct sockaddr_conn peer = {0};
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
-printf("%s\n", __func__);
     // Check arguments
     if (!transport || !remote_capabilities) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -2825,7 +2752,6 @@ enum rawrtc_code message_send_context_create(
 ) {
     enum rawrtc_code error;
     struct send_context* context;
-printf("%s, no destroy\n", __func__);
     // Allocate context
     context = mem_zalloc(sizeof(*context), NULL);
     if (!context) {
@@ -2883,7 +2809,6 @@ enum rawrtc_code sctp_transport_send(
     size_t length;
     ssize_t written;
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Check state
     if (transport->state != RAWRTC_SCTP_TRANSPORT_STATE_CONNECTED) {
         return RAWRTC_CODE_INVALID_STATE;
@@ -2903,11 +2828,9 @@ printf("%s\n", __func__);
 
     // EOR set?
     eor_set = send_info->snd_flags & SCTP_EOR ? true : false;
-printf("usrsctp_chunk_size=%zu\n", rawrtc_global.usrsctp_chunk_size);
     // Send until buffer is empty
     do {
         size_t const left = mbuf_get_left(buffer);
-printf("left = %zu\n", left);
         // Carefully chunk the buffer
         if (left > rawrtc_global.usrsctp_chunk_size) {
             length = rawrtc_global.usrsctp_chunk_size;
@@ -2986,7 +2909,6 @@ enum rawrtc_code rawrtc_sctp_transport_send(
 ) {
     struct send_context* context;
     enum rawrtc_code error;
-printf("%s\n", __func__);
     // Check arguments
     if (!transport || !buffer) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

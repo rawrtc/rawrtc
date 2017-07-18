@@ -2026,6 +2026,8 @@ typedef void (rawrtc_mem_destroy_h)(void *data);
 
 void *rawrtc_mem_zalloc(size_t size, rawrtc_mem_destroy_h *dh);
 
+uint32_t rawrtc_mem_nrefs(const void *data);
+
 void rawrtc_dbg_init(int level, enum dbg_flags flags);
 
 int rawrtc_alloc_fds(int maxfds);

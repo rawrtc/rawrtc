@@ -12,10 +12,10 @@
 static void rawrtc_data_transport_destroy(
         void* const arg
 ) {
-    struct rawrtc_data_transport* const transport = arg;
-printf("%s: %p\n", __func__, (void *)arg);
+ //   struct rawrtc_data_transport* const transport = arg;
+
     // Un-reference sctp_transport
-    mem_deref(transport->transport);
+ //   mem_deref(transport->transport);
 }
 
 /*
@@ -30,7 +30,6 @@ enum rawrtc_code rawrtc_data_transport_create(
         rawrtc_data_transport_channel_send_handler* const channel_send_handler
 ) {
     struct rawrtc_data_transport* transport;
-printf("%s\n", __func__);
     // Check arguments
     if (!transportp || !internal_transport || !channel_create_handler) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -41,7 +40,6 @@ printf("%s\n", __func__);
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
- printf("%s:%p, rawrtc_sctp_transport_destroy\n", __func__, (void *)transport);
     // Set fields
     transport->type = type;
     transport->transport = mem_ref(internal_transport);

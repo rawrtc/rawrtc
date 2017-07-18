@@ -550,22 +550,23 @@ static void rawrtc_dtls_transport_destroy(
         void* arg
 ) {
     struct rawrtc_dtls_transport* const transport = arg;
-    struct le* le;
-printf("%s: %p\n", __func__, (void *)arg);
+ //   struct le* le;
     // Stop transport
     // TODO: Check effects in case transport has been destroyed due to error in create
     rawrtc_dtls_transport_stop(transport);
 
     // TODO: Remove once ICE transport and DTLS transport have been separated properly
+#if 0
     for (le = list_head(&transport->ice_transport->gatherer->local_candidates);
          le != NULL; le = le->next) {
         struct rawrtc_candidate_helper* const candidate_helper = le->data;
         mem_deref(candidate_helper->udp_helper);
         // TODO: Be aware that UDP packets go to nowhere now...
     }
+#endif
 
     // Un-reference
-    mem_deref(transport->connection);
+ //   mem_deref(transport->connection); // was already removed in set_state
     mem_deref(transport->socket);
     mem_deref(transport->context);
     list_flush(&transport->fingerprints);
@@ -618,7 +619,6 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_dtls_transport_destroy\n", __func__, (void *)transport);
     // Set fields/reference
     transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);
@@ -676,7 +676,6 @@ printf("%s:%p, rawrtc_dtls_transport_destroy\n", __func__, (void *)transport);
     if (error) {
         goto out;
     }
-printf("Setting DH parameters on DTLS context\n");
     // Set Diffie-Hellman parameters
     // TODO: Get DH params from config
     DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
@@ -867,7 +866,7 @@ enum rawrtc_code rawrtc_dtls_transport_start(
             // Note: This is needed as ORTC requires us to reset previous DTLS connections
             //       if the remote role is 'server'
             DEBUG_PRINTF("Resetting DTLS connection\n");
-            transport->connection = mem_deref(transport->connection);
+            mem_deref(transport->connection);
             transport->connection_established = false;
         }
 
@@ -891,7 +890,7 @@ enum rawrtc_code rawrtc_dtls_transport_start(
 
 out:
     if (error) {
-        transport->connection = mem_deref(transport->connection);
+        mem_deref(transport->connection);
     } else {
         // Set remote parameters
         transport->remote_parameters = mem_ref(remote_parameters);

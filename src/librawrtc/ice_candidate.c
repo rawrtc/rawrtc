@@ -28,7 +28,6 @@ static void rawrtc_ice_candidate_raw_destroy(
         void* arg
 ) {
     struct rawrtc_ice_candidate_raw* const candidate = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     mem_deref(candidate->related_address);
     mem_deref(candidate->ip);
@@ -58,7 +57,6 @@ static enum rawrtc_code rawrtc_ice_candidate_raw_create(
     if (!candidate) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_ice_candidate_raw_destroy\n", __func__, (void *)candidate);
     // Set fields/copy
     error = rawrtc_strdup(&candidate->foundation, foundation);
     if (error) {
@@ -99,7 +97,6 @@ static void rawrtc_ice_candidate_destroy(
         void* arg
 ) {
     struct rawrtc_ice_candidate* const candidate = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     switch (candidate->storage_type) {
         case RAWRTC_ICE_CANDIDATE_STORAGE_RAW:
@@ -142,7 +139,6 @@ enum rawrtc_code rawrtc_ice_candidate_create(
     if (!candidate) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_ice_candidate_destroy\n", __func__, (void *)candidate);
     // Set storage type
     candidate->storage_type = RAWRTC_ICE_CANDIDATE_STORAGE_RAW;
 
@@ -214,7 +210,6 @@ enum rawrtc_code rawrtc_ice_candidate_create_from_remote_candidate(
     if (!candidate) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_ice_candidate_destroy\n", __func__, (void *)candidate);
     // Set storage type and reference remote candidate
     candidate->storage_type = RAWRTC_ICE_CANDIDATE_STORAGE_RCAND;
     candidate->candidate.remote_candidate = mem_ref(remote_candidate);

@@ -27,6 +27,11 @@ void *rawrtc_mem_ref(void *data)
 	return mem_ref(data);
 }
 
+uint32_t rawrtc_mem_nrefs(const void *data)
+{
+    return mem_nrefs(data);
+}
+
 int rawrtc_alloc_fds(int maxfds)
 {
 	return alloc_fds(maxfds);

@@ -75,7 +75,6 @@ static void rawrtc_data_channel_destroy(
         void* arg
 ) {
     struct rawrtc_data_channel* const channel = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Unset all handlers
     rawrtc_data_channel_unset_handlers(channel);
 
@@ -85,13 +84,12 @@ printf("%s: %p\n", __func__, (void *)arg);
 
     // Un-reference
     mem_deref(channel->transport);
-    mem_deref(channel->transport_arg);
-    mem_deref(channel->parameters);
 
     // Un-reference options
     if (channel->options != &rawrtc_default_data_channel_options) {
         mem_deref(channel->options);
     }
+    mem_deref(channel->arg);
 }
 
 /*
@@ -112,7 +110,6 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
 ) {
     enum rawrtc_code error;
     struct rawrtc_data_channel *channel;
-printf("%s\n", __func__);
     // Check arguments
     if (!channelp || !transport || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -123,7 +120,6 @@ printf("%s\n", __func__);
     if (!channel) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-    printf("%s:%p, rawrtc_data_channel_destroy\n", __func__, (void *)channel);
     // Set fields/reference
     channel->flags = RAWRTC_DATA_CHANNEL_FLAGS_CAN_SET_OPTIONS;
     channel->state = RAWRTC_DATA_CHANNEL_STATE_CONNECTING;
@@ -179,7 +175,6 @@ void rawrtc_data_channel_call_channel_handler(
         rawrtc_data_channel_handler* const channel_handler, // nullable
         void* const arg
 ) {
-printf("%s\n", __func__);
     // Call handler (if any)
     if (channel_handler) {
         channel_handler(channel, arg);
@@ -204,7 +199,6 @@ enum rawrtc_code rawrtc_data_channel_create(
         rawrtc_data_channel_message_handler* const message_handler, // nullable
         void* const arg // nullable
 ) {
-printf("%s\n", __func__);
     enum rawrtc_code const error = rawrtc_data_channel_create_internal(
             channelp, transport, parameters, options,
             open_handler, buffered_amount_low_handler,
@@ -284,7 +278,6 @@ enum rawrtc_code rawrtc_data_channel_send(
         struct mbuf* const buffer, // nullable (if empty message), referenced
         bool const is_binary
 ) {
-printf("%s\n", __func__);
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -309,7 +302,6 @@ printf("%s\n", __func__);
 enum rawrtc_code rawrtc_data_channel_close(
         struct rawrtc_data_channel* const channel
 ) {
-printf("%s\n", __func__);
     // Check arguments
     if (!channel) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

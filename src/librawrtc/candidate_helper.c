@@ -7,12 +7,11 @@ static void rawrtc_candidate_helper_destroy(
         void* arg
 ) {
     struct rawrtc_candidate_helper* const local_candidate = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Un-reference
     list_flush(&local_candidate->stun_sessions);
     mem_deref(local_candidate->udp_helper);
     mem_deref(local_candidate->candidate);
-    mem_deref(local_candidate->gatherer);
+   // mem_deref(local_candidate->gatherer);
 }
 
 /*
@@ -35,7 +34,6 @@ enum rawrtc_code rawrtc_candidate_helper_create(
 
     // Create candidate helper
     candidate_helper = mem_zalloc(sizeof(*candidate_helper), rawrtc_candidate_helper_destroy);
-    printf("%s:%p, rawrtc_candidate_helper_destroy\n", __func__, (void *)candidate_helper);
     if (!candidate_helper) {
         return RAWRTC_CODE_NO_MEMORY;
     }
@@ -136,7 +134,6 @@ static void rawrtc_candidate_helper_stun_session_destroy(
         void* arg
 ) {
     struct rawrtc_candidate_helper_stun_session* const session = arg;
-printf("%s: %p\n", __func__, (void *)arg);
     // Remove from list
     list_unlink(&session->le);
 
@@ -165,7 +162,6 @@ enum rawrtc_code rawrtc_candidate_helper_stun_session_create(
     if (!session) {
         return RAWRTC_CODE_NO_MEMORY;
     }
-printf("%s:%p, rawrtc_candidate_helper_stun_session_destroy\n", __func__, (void *)session);
     // Set fields/reference
     session->url = mem_ref(url);
 
