@@ -198,22 +198,6 @@ enum rawrtc_code rawrtc_candidate_helper_stun_session_add(
     return RAWRTC_CODE_SUCCESS;
 }
 
-/*
- * Remove STUN sessions list handler (for candidate helper lists).
- */
-bool rawrtc_candidate_helper_remove_stun_sessions_handler(
-        struct le* le,
-        void* arg
-) {
-    struct rawrtc_candidate_helper* const candidate_helper = le->data;
-    (void) arg;
-
-    // Flush STUN sessions
-    list_flush(&candidate_helper->stun_sessions);
-
-    return false; // continue traversing
-}
-
 static void rawrtc_candidate_helper_turn_session_destroy(
         void* arg
 ) {
@@ -281,17 +265,28 @@ enum rawrtc_code rawrtc_candidate_helper_turn_session_add(
 }
 
 /*
- * Remove TURN sessions list handler (for candidate helper lists).
+ * Remove STUN and TURN sessions (for candidate helper lists).
  */
-bool rawrtc_candidate_helper_remove_turn_sessions_handler(
+bool rawrtc_candidate_helper_remove_sessions_handler(
         struct le* le,
         void* arg
 ) {
-    struct rawrtc_candidate_helper* const candidate_helper = le->data;
+    struct rawrtc_candidate_helper* candidate_helper;
     (void) arg;
 
-    // Flush TURN sessions
+    // Check arguments
+    if (!le) {
+        // Note: Silent fail - meh!
+        return true;
+    }
+
+    candidate_helper = le->data;
+
+    // Flush TURN session
     list_flush(&candidate_helper->turn_sessions);
+
+    // Flush STUN sessions
+    list_flush(&candidate_helper->stun_sessions);
 
     return false; // continue traversing
 }

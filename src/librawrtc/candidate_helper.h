@@ -77,7 +77,7 @@ enum rawrtc_code rawrtc_candidate_helper_turn_session_add(
     struct turnc* const turn_client
 );
 
-bool rawrtc_candidate_helper_remove_stun_sessions_handler(
+bool rawrtc_candidate_helper_remove_sessions_handler(
     struct le* le,
     void* arg
 );

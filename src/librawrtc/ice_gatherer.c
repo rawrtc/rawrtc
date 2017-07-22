@@ -322,10 +322,10 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
 
     // TODO: Stop ICE transport
 
-    // Remove STUN sessions from local candidate helpers
+    // Remove STUN and TURN sessions from local candidate helpers
     // Note: Needed to purge remaining references to the gatherer so it can be free'd.
     list_apply(&gatherer->local_candidates, true,
-               rawrtc_candidate_helper_remove_stun_sessions_handler, NULL);
+               rawrtc_candidate_helper_remove_sessions_handler, NULL);
 
     // Flush local candidate helpers
     list_flush(&gatherer->local_candidates);
@@ -560,32 +560,69 @@ static void turn_client_handler(
     struct rawrtc_candidate_helper_stun_session* const session = arg;
     struct rawrtc_candidate_helper* const candidate = session->candidate_helper;
     struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
+    bool remove_session = true;
+    uint16_t method;
     struct ice_lcand* const re_candidate = candidate->candidate;
     uint32_t priority;
     struct ice_lcand* relay_candidate;
     enum rawrtc_code error;
 
-    DEBUG_PRINTF("TURN allocation response: err=%m, scode=%"PRIu16", reason=%s, relay-address=%j, "
-                 "mapped-address=%j\n", err, scode, reason, relay_address, mapped_address);
-
     // Check state
     if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
-        return;
-    }
-
-    // Error?
-    if (err) {
-        DEBUG_NOTICE("TURN allocation failed, reason: %m -> %"PRIu16" %s\n", err, scode, reason);
         goto out;
     }
 
-    // TODO: Check fingerprint?
+    // Error?
+    if (err || scode) {
+        DEBUG_NOTICE("TURN allocation failed, reason: err=%m scode=%"PRIu16" %s\n",
+                     err, scode, reason);
+        goto out;
+    }
 
-    // TODO: Handle
-    stun_msg_dump(message);
+    // Sanity-check
+    method = stun_msg_method(message);
+    if (method != STUN_METHOD_ALLOCATE) {
+        DEBUG_WARNING("Unexpected method: %s\n", stun_method_name(method));
+        goto out;
+    }
+
+    // Add relay candidate
+    // TODO: Using the candidate's protocol, TCP type and component id correct?
+    priority = rawrtc_ice_candidate_calculate_priority(
+            ICE_CAND_TYPE_RELAY, re_candidate->attr.proto, sa_af(mapped_address),
+            re_candidate->attr.tcptype);
+    err = trice_lcand_add(
+            &relay_candidate, gatherer->ice, re_candidate->attr.compid, re_candidate->attr.proto,
+            priority, relay_address, relay_address, ICE_CAND_TYPE_RELAY, mapped_address,
+            re_candidate->attr.tcptype, re_candidate->us, RAWRTC_LAYER_ICE);
+    if (err) {
+        DEBUG_WARNING("Could not add relay candidate, reason: %m\n", err);
+        goto out;
+    }
+    DEBUG_PRINTF("Added %s relay candidate for interface mapped=%j, relay=%j (%s)\n",
+                 net_proto2name(relay_candidate->attr.proto), mapped_address, relay_address,
+                 session->url->url);
+
+    // Announce candidate to handler
+    error = announce_candidate(gatherer, relay_candidate, session->url->url);
+    if (error) {
+        DEBUG_WARNING("Could not announce relay candidate, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        goto out;
+    }
+
+    // Use session
+    remove_session = false;
 
 out:
-    return;
+    // Decrease counter & check if done gathering
+    --candidate->relay_pending_count;
+    check_gathering_complete(gatherer);
+
+    // Remove session if requested
+    if (remove_session) {
+        mem_deref(session);
+    }
 }
 
 /*
@@ -600,7 +637,6 @@ static enum rawrtc_code gather_relay_candidates(
     enum rawrtc_code error;
     struct ice_lcand* const re_candidate = candidate->candidate;
     enum rawrtc_ice_protocol protocol;
-    struct ice_cand_attr* const attribute = &candidate->candidate->attr;
     enum rawrtc_ice_candidate_type type;
     char const* type_str;
     struct rawrtc_candidate_helper_turn_session* session = NULL;
@@ -611,6 +647,12 @@ static enum rawrtc_code gather_relay_candidates(
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // TODO: Add IPv6 support (re doesn't support IPv6 TURN atm)
+    if (sa_af(server_address) == AF_INET6 || (re_candidate->attr.proto == IPPROTO_UDP
+                                              && sa_af(&re_candidate->attr.addr) == AF_INET6)) {
+        return RAWRTC_CODE_SUCCESS;
+    }
+
     // Get protocol
     error = rawrtc_ipproto_to_ice_protocol(&protocol, re_candidate->attr.proto);
     if (error) {
@@ -618,7 +660,7 @@ static enum rawrtc_code gather_relay_candidates(
     }
 
     // Convert ICE candidate type
-    error = rawrtc_ice_cand_type_to_ice_candidate_type(&type, attribute->type);
+    error = rawrtc_ice_cand_type_to_ice_candidate_type(&type, re_candidate->attr.type);
     if (error) {
         goto out;
     }
@@ -637,8 +679,8 @@ static enum rawrtc_code gather_relay_candidates(
             // Create client for UDP
             // TODO: What about UDP relay for TCP candidates?
             DEBUG_PRINTF("Creating TURN allocation for %s %s candidate %J using server %J (%s)\n",
-                         net_proto2name(attribute->proto), type_str, &attribute->addr,
-                         server_address, url->url);
+                         net_proto2name(re_candidate->attr.proto), type_str,
+                         &re_candidate->attr.addr, server_address, url->url);
             error = rawrtc_error_to_code(turnc_alloc(
                     &turn_client, &rawrtc_default_config.stun_config, IPPROTO_UDP,
                     re_candidate->us, RAWRTC_LAYER_TURN, server_address, server->username,
@@ -694,16 +736,16 @@ static void reflexive_candidate_handler(
     struct rawrtc_candidate_helper_stun_session* const session = arg;
     struct rawrtc_candidate_helper* const candidate = session->candidate_helper;
     struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
+    bool remove_session = true;
     struct ice_lcand* const re_candidate = candidate->candidate;
     struct ice_lcand* re_other_candidate;
-    bool remove_session = false;
     uint32_t priority;
     struct ice_lcand* srflx_candidate;
     enum rawrtc_code error;
 
     // Check state
     if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
-        return;
+        goto out;
     }
 
     // Error?
@@ -720,11 +762,6 @@ static void reflexive_candidate_handler(
     if (re_other_candidate) {
         DEBUG_PRINTF("Ignoring server reflexive candidate with same base %J and public IP %j (%s)"
                      "\n", &re_candidate->attr.addr, address, session->url->url);
-
-        // Remove session
-        // Note: Removing is delayed here as we still need the references the session has
-        //       until the end of the function.
-        remove_session = true;
         goto out;
     }
 
@@ -752,6 +789,9 @@ static void reflexive_candidate_handler(
         goto out;
     }
 
+     // Use session
+    remove_session = false;
+
 out:
     // Decrease counter & check if done gathering
     --candidate->srflx_pending_count;
@@ -773,7 +813,6 @@ static enum rawrtc_code gather_reflexive_candidates(
 ) {
     enum rawrtc_code error;
     struct ice_lcand* const re_candidate = candidate->candidate;
-    struct ice_cand_attr* const attribute = &candidate->candidate->attr;
     enum rawrtc_ice_protocol protocol;
     enum rawrtc_ice_candidate_type type;
     char const* type_str;
@@ -781,7 +820,7 @@ static enum rawrtc_code gather_reflexive_candidates(
     struct stun_keepalive* stun_keepalive = NULL;
 
     // Ensure the candidate's protocol matches the server address's protocol
-    if (sa_af(&attribute->addr) != sa_af(server_address)) {
+    if (sa_af(&re_candidate->attr.addr) != sa_af(server_address)) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -798,7 +837,7 @@ static enum rawrtc_code gather_reflexive_candidates(
     }
 
     // Convert ICE candidate type
-    error = rawrtc_ice_cand_type_to_ice_candidate_type(&type, attribute->type);
+    error = rawrtc_ice_cand_type_to_ice_candidate_type(&type, re_candidate->attr.type);
     if (error) {
         goto out;
     }
@@ -816,8 +855,8 @@ static enum rawrtc_code gather_reflexive_candidates(
     // Create STUN keep-alive session
     // TODO: We're using the candidate's protocol which conflicts with the ICE server URL transport
     DEBUG_PRINTF("Creating STUN request for %s %s candidate %J using server %J (%s)\n",
-                 net_proto2name(attribute->proto), type_str, &attribute->addr, server_address,
-                 url->url);
+                 net_proto2name(re_candidate->attr.proto), type_str, &re_candidate->attr.addr,
+                 server_address, url->url);
     error = rawrtc_error_to_code(stun_keepalive_alloc(
             &stun_keepalive, re_candidate->attr.proto, re_candidate->us, RAWRTC_LAYER_STUN,
             server_address, &rawrtc_default_config.stun_config, reflexive_candidate_handler,
@@ -861,6 +900,8 @@ static void gather_candidates(
     enum rawrtc_code error;
 
     // Gather reflexive candidates
+    // NOTE: 'gather_reflexive_candidates' will return 'success' if it cannot gather reflexive
+    //       candidates with the provided candidate/server combination.
     error = gather_reflexive_candidates(candidate, server_address, url);
     if (error) {
         DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s\n",
@@ -869,7 +910,8 @@ static void gather_candidates(
     }
 
     // Gather relay candidates
-    // Note: 'gather_relay_candidates' will return immediately if the URL is not a TURN server.
+    // Note: 'gather_relay_candidates' will return 'success' if it cannot gather relay
+    //       candidates with the provided candidate/server combination.
     // TODO: Once OAuth is implemented, username and password need to be resolved at this point
     error = gather_relay_candidates(candidate, server_address, url, server);
     if (error) {
