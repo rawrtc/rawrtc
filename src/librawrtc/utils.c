@@ -7,8 +7,7 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "utils"
-// Note: Always log level 7 as logging is only used in tool functions.
-#define RAWRTC_DEBUG_MODULE_LEVEL 7
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -100,6 +99,10 @@ char const* rawrtc_code_to_str(
             return "stop iteration";
         case RAWRTC_CODE_NOT_PERMITTED:
             return "not permitted";
+        case RAWRTC_CODE_PATH_NOT_FOUND:
+            return "path not found";
+        case RAWRTC_CODE_BAD_FILE_DESCRIPTOR:
+            return "bad file descriptor";
         default:
             return "(no error translation)";
     }
@@ -132,7 +135,12 @@ enum rawrtc_code rawrtc_error_to_code(
             return RAWRTC_CODE_NO_MEMORY;
         case EPERM:
             return RAWRTC_CODE_NOT_PERMITTED;
+        case ENOENT:
+            return RAWRTC_CODE_PATH_NOT_FOUND;
+        case EBADF:
+            return RAWRTC_CODE_BAD_FILE_DESCRIPTOR;
         default:
+            DEBUG_NOTICE("No fitting RAWRTC error code for POSIX error code %d: %m\n", code, code);
             return RAWRTC_CODE_UNKNOWN_ERROR;
     }
 }

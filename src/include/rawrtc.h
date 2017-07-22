@@ -46,6 +46,8 @@ enum rawrtc_code {
     RAWRTC_CODE_TRY_AGAIN_LATER,
     RAWRTC_CODE_STOP_ITERATION,
     RAWRTC_CODE_NOT_PERMITTED,
+    RAWRTC_CODE_PATH_NOT_FOUND,
+    RAWRTC_CODE_BAD_FILE_DESCRIPTOR,
 }; // IMPORTANT: Add translations for new return codes in `utils.c`!
 
 /*
