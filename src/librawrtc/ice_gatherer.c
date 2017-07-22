@@ -442,7 +442,8 @@ static void check_gathering_complete(
             DEBUG_WARNING("Could not check for pending DNS queries on ICE server\n");
             // Continue - not considered critical
             continue;
-        } else if (pending) {
+        }
+        if (pending) {
             // Nope, not complete
             DEBUG_PRINTF("Gathering still in progress, pending DNS record queries (%s)\n",
                          url->url);

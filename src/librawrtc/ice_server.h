@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 enum rawrtc_code rawrtc_ice_server_create(
     struct rawrtc_ice_server** const serverp,

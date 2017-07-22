@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 /*
  * usrsctp event flag extensions for handlers.

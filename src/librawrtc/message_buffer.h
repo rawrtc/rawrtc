@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 /*
  * Handle buffered messages.
@@ -23,10 +24,4 @@ enum rawrtc_code rawrtc_message_buffer_clear(
     struct list* const message_buffer,
     rawrtc_message_buffer_handler* const message_handler,
     void* arg
-);
-
-enum rawrtc_code rawrtc_message_buffer_merge(
-    struct mbuf** const bufferp, // de-referenced
-    void** const contextp, // de-referenced
-    struct list* const message_buffer
 );

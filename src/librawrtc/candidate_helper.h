@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 /*
  * STUN keep-alive session.

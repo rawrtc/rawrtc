@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 // Note: Cannot be public until it uses fixed size types in signature (stdint)
 uint32_t rawrtc_ice_candidate_calculate_priority(

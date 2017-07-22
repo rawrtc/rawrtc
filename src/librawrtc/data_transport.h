@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 /*
  * Data channel flags.
