@@ -310,6 +310,8 @@ static void set_state(
 enum rawrtc_code rawrtc_ice_gatherer_close(
         struct rawrtc_ice_gatherer* const gatherer
 ) {
+    enum rawrtc_code error;
+
     // Check arguments
     if (!gatherer) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -324,8 +326,12 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
 
     // Remove STUN and TURN sessions from local candidate helpers
     // Note: Needed to purge remaining references to the gatherer so it can be free'd.
-    list_apply(&gatherer->local_candidates, true,
-               rawrtc_candidate_helper_remove_sessions_handler, NULL);
+    error = rawrtc_candidate_helper_remove_sessions(&gatherer->local_candidates);
+    if (error) {
+        DEBUG_WARNING("Unable to remove STUN/TURN sessions, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        // Note: Not considered critical
+    }
 
     // Flush local candidate helpers
     list_flush(&gatherer->local_candidates);
