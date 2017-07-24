@@ -1,5 +1,6 @@
 #include <rawrtc.h>
 #include "ice_transport.h"
+#include "ice_gatherer.h"
 #include "dtls_transport.h"
 #include "utils.h"
 
@@ -511,7 +512,14 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         goto out;
     }
 
-    // TODO: Add TURN permission
+    // Add TURN permission
+    error = rawrtc_ice_gatherer_add_turn_permissions(transport->gatherer, re_candidate);
+    if (error) {
+        DEBUG_WARNING("Unable to add TURN permissions for remote candidate\n");
+        // Note: Not considered critical
+    }
+
+    // TODO: Add TURN channel
 
     // Done
     DEBUG_PRINTF("Added remote candidate: %J\n", &address);

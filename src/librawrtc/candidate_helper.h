@@ -78,5 +78,5 @@ enum rawrtc_code rawrtc_candidate_helper_turn_session_add(
 );
 
 enum rawrtc_code rawrtc_candidate_helper_remove_sessions(
-        struct list* const local_candidates
+    struct list* const local_candidates
 );

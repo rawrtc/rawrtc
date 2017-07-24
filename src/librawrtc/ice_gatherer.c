@@ -552,6 +552,65 @@ static struct ice_lcand* find_candidate(
 }
 
 /*
+ * Handle TURN permission response.
+ */
+static void turn_permission_handler(
+        void* arg
+) {
+    struct ice_rcand* const remote_candidate = arg;
+    DEBUG_PRINTF("Added TURN permission for remote peer %J\n", &remote_candidate->attr.addr);
+}
+
+/*
+ * Add TURN permission for a local/remote candidate combination on a single TURN session.
+ */
+static enum rawrtc_code add_turn_permission(
+        struct rawrtc_candidate_helper_turn_session* const session, // not checked
+        struct ice_lcand* const local_candidate, // not checked
+        struct ice_rcand* const remote_candidate // not checked
+) {
+    // Ensure they have the same component id, address family and protocol
+    if (local_candidate->attr.compid != remote_candidate->attr.compid
+        || sa_af(&local_candidate->attr.addr) != sa_af(&remote_candidate->attr.addr)
+        || local_candidate->attr.proto != remote_candidate->attr.proto) {
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Add permission
+    int const err = turnc_add_perm(
+            session->turn_client, &remote_candidate->attr.addr, turn_permission_handler,
+            remote_candidate);
+    if (err) {
+        DEBUG_WARNING("Unable to add TURN permission for pair %J <-> %J, reason: %m\n",
+                      &local_candidate->attr.addr, &remote_candidate->attr.addr, err);
+    } else {
+        DEBUG_PRINTF("Trying to add TURN permission for pair %J <-> %J\n",
+                     &local_candidate->attr.addr, &remote_candidate->attr.addr);
+    }
+
+    // Done
+    return rawrtc_error_to_code(err);
+}
+
+/*
+ * Add TURN permission for all known remote candidates on a single TURN session
+ * created for a specific candidate.
+ */
+static void add_turn_permission_on_known_remote_candidates(
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        struct rawrtc_candidate_helper_turn_session* const session // not checked
+) {
+    struct le* le;
+    for (le = list_head(trice_rcandl(gatherer->ice)); le != NULL; le = le->next) {
+        struct ice_rcand* const remote_candidate = le->data;
+
+        // Add permission
+        // Note: Return code not handled as not considered critical
+        add_turn_permission(session, session->candidate_helper->candidate, remote_candidate);
+    }
+}
+
+/*
  * Handle TURN client allocation.
  */
 static void turn_client_handler(
@@ -563,7 +622,7 @@ static void turn_client_handler(
         struct stun_msg const* message, // not checked
         void* arg
 ) {
-    struct rawrtc_candidate_helper_stun_session* const session = arg;
+    struct rawrtc_candidate_helper_turn_session* const session = arg;
     struct rawrtc_candidate_helper* const candidate = session->candidate_helper;
     struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
     bool remove_session = true;
@@ -608,6 +667,9 @@ static void turn_client_handler(
     DEBUG_PRINTF("Added %s relay candidate for interface mapped=%j, relay=%j (%s)\n",
                  net_proto2name(relay_candidate->attr.proto), mapped_address, relay_address,
                  session->url->url);
+
+    // Add TURN permission
+    add_turn_permission_on_known_remote_candidates(gatherer, session);
 
     // Announce candidate to handler
     error = announce_candidate(gatherer, relay_candidate, session->url->url);
@@ -1465,4 +1527,32 @@ out:
         *candidatesp = candidates;
     }
     return error;
+}
+
+/*
+ * Add TURN permission for a single remote candidate on all TURN sessions.
+ */
+enum rawrtc_code rawrtc_ice_gatherer_add_turn_permissions(
+        struct rawrtc_ice_gatherer* const gatherer,
+        struct ice_rcand* const remote_candidate
+) {
+    struct le* le_c;
+    struct le* le_s;
+
+    // Check arguments
+    if (!gatherer || !remote_candidate) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (le_c = list_head(&gatherer->local_candidates); le_c != NULL; le_c = le_c->next) {
+        struct rawrtc_candidate_helper* const local_candidate_helper = le_c->data;
+        struct list* const sessions = &local_candidate_helper->turn_sessions;
+        for (le_s = list_head(sessions); le_s != NULL; le_s = le_s->next) {
+            struct rawrtc_candidate_helper_turn_session* const session = le_s->data;
+
+            // Add permission
+            // Note: Return code not handled as not considered critical
+            add_turn_permission(session, local_candidate_helper->candidate, remote_candidate);
+        }
+    }
 }
