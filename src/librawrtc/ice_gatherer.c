@@ -1225,7 +1225,8 @@ static enum rawrtc_code query_a_or_aaaa_record(
 
     // Check if already resolved
     if (resolved) {
-        DEBUG_PRINTF("Hostname (%s) already resolved\n", dns_type_to_address_family_name(dns_type));
+        DEBUG_PRINTF("Hostname (%s) already resolved: %r -> %j\n",
+                     dns_type_to_address_family_name(dns_type), &url->host, server_address);
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1296,7 +1297,7 @@ static enum rawrtc_code resolve_ice_servers_address(
             }
 
             // Query A record (if IPv4 is enabled)
-            if (rawrtc_default_config.ipv4_enable) {
+            if (url->need_resolving && rawrtc_default_config.ipv4_enable) {
                 error = query_a_or_aaaa_record(
                         &url->dns_a_context, &url->ipv4_address, DNS_TYPE_A, url, server, gatherer);
                 if (error) {
@@ -1307,7 +1308,7 @@ static enum rawrtc_code resolve_ice_servers_address(
             }
 
             // Query AAAA record (if IPv6 is enabled)
-            if (rawrtc_default_config.ipv6_enable) {
+            if (url->need_resolving && rawrtc_default_config.ipv6_enable) {
                 error = query_a_or_aaaa_record(
                         &url->dns_aaaa_context, &url->ipv6_address, DNS_TYPE_AAAA, url, server,
                         gatherer);

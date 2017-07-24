@@ -553,6 +553,7 @@ struct rawrtc_ice_server_url {
     struct pl host; // points inside `url`
     enum rawrtc_ice_server_type type;
     enum rawrtc_ice_server_transport transport;
+    bool need_resolving;
     struct sa ipv4_address;
     struct rawrtc_ice_server_url_dns_context* dns_a_context;
     struct sa ipv6_address;

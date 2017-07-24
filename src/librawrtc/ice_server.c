@@ -11,8 +11,9 @@
  * ICE server URL-related regular expressions.
  */
 static char const ice_server_url_regex[] = "[a-z]+:[^?]+[^]*";
+static char const ice_server_ipv6_port_regex[] = "\\[[0-9a-f:]+\\][:]*[0-9]*";
 static char const ice_server_host_port_regex[] = "[^:]+[:]*[0-9]*";
-static char const ice_server_host_port_ipv6_regex[] = "\\[[0-9a-f:]+\\][:]*[0-9]*";
+static char const ice_server_ipv4_regex[] = "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+";
 static char const ice_server_transport_regex[] = "\\?transport=[a-z]+";
 
 /*
@@ -221,6 +222,7 @@ static enum rawrtc_code decode_ice_server_url(
     bool secure;
     struct pl port_pl;
     uint_fast16_t port;
+    bool need_resolving = true;
 
     // Decode URL
     error = rawrtc_error_to_code(re_regex(
@@ -244,9 +246,9 @@ static enum rawrtc_code decode_ice_server_url(
     sa_set_in6(&url->ipv6_address, (uint8_t const*) &in6addr_any, (uint16_t) port);
 
     // Decode host: Either IPv4 or IPv6 including the port (if any)
-    // Try IPv6 first, then normal hostname/IPv4.
+    // Try IPv6 first, then hostname (but check if it could be IPv4).
     error = rawrtc_error_to_code(re_regex(
-            host_port.p, host_port.l, ice_server_host_port_ipv6_regex, &url->host, NULL, &port_pl));
+            host_port.p, host_port.l, ice_server_ipv6_port_regex, &url->host, NULL, &port_pl));
     if (error) {
         error = rawrtc_error_to_code(re_regex(
                 host_port.p, host_port.l, ice_server_host_port_regex, &url->host, NULL, &port_pl));
@@ -255,9 +257,26 @@ static enum rawrtc_code decode_ice_server_url(
                           url->url, &host_port);
             goto out;
         }
+
+        if (!re_regex(host_port.p, host_port.l, ice_server_ipv4_regex, NULL, NULL, NULL, NULL)) {
+            // Set IPv4 directly
+            DEBUG_PRINTF("Guessing IPv4 address: %r\n", &url->host);
+            if (!sa_set(&url->ipv4_address, &url->host, (uint16_t) port)) {
+                need_resolving = false;
+            }
+        }
     } else {
         // Set IPv6 directly
-        sa_set(&url->ipv6_address, &url->host, (uint16_t) port);
+        DEBUG_PRINTF("Guessing IPv6 address: %r\n", &url->host);
+        if (!sa_set(&url->ipv6_address, &url->host, (uint16_t) port)) {
+            need_resolving = false;
+        }
+    }
+
+    // Note: Check needed as IPv4 may or may not be set at this point (sa_set may fail)
+    if (need_resolving) {
+        DEBUG_PRINTF("Need to resolve: %r\n", &url->host);
+        url->need_resolving = true;
     }
 
     // Decode port (if any)
@@ -297,7 +316,7 @@ static enum rawrtc_code decode_ice_server_url(
     // Done
     error = RAWRTC_CODE_SUCCESS;
 
-    out:
+out:
     return error;
 }
 
@@ -355,7 +374,7 @@ static enum rawrtc_code rawrtc_ice_server_url_create(
     // Done
     error = RAWRTC_CODE_SUCCESS;
 
-    out:
+out:
     if (error) {
         mem_deref(url);
     } else {
