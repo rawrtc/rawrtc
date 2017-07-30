@@ -3,6 +3,7 @@
 
 enum rawrtc_code rawrtc_ice_server_create(
     struct rawrtc_ice_server** const serverp,
+    struct rawrtc_config* const config,
     char* const * const urls, // copied
     size_t const n_urls,
     char* const username, // nullable, copied

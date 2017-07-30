@@ -213,7 +213,8 @@ static enum rawrtc_code decode_ice_server_scheme(
  * seems useful)
  */
 static enum rawrtc_code decode_ice_server_url(
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url* const url, // not checked
+        struct rawrtc_config* const config // not checked
 ) {
     enum rawrtc_code error;
     struct pl scheme;
@@ -307,9 +308,9 @@ static enum rawrtc_code decode_ice_server_url(
     } else {
         // Set default transport (depending on secure flag)
         if (secure) {
-            url->transport = rawrtc_default_config.ice_server_secure_transport;
+            url->transport = config->ice_server.default_secure_transport;
         } else {
-            url->transport = rawrtc_default_config.ice_server_normal_transport;
+            url->transport = config->ice_server.default_normal_transport;
         }
     }
 
@@ -342,13 +343,14 @@ static void rawrtc_ice_server_url_destroy(
  */
 static enum rawrtc_code rawrtc_ice_server_url_create(
         struct rawrtc_ice_server_url** const urlp, // de-referenced
+        struct rawrtc_config* const config,
         char* const url_s // copied
 ) {
     struct rawrtc_ice_server_url* url;
     enum rawrtc_code error;
 
     // Check arguments
-    if (!urlp || !url_s) {
+    if (!urlp || !config || !url_s) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -366,7 +368,7 @@ static enum rawrtc_code rawrtc_ice_server_url_create(
 
     // Parse URL
     // Note: `url->host` points inside `url->url`, so we MUST have copied the URL first.
-    error = decode_ice_server_url(url);
+    error = decode_ice_server_url(url, config);
     if (error) {
         goto out;
     }
@@ -403,6 +405,7 @@ static void rawrtc_ice_server_destroy(
  */
 enum rawrtc_code rawrtc_ice_server_create(
         struct rawrtc_ice_server** const serverp,
+        struct rawrtc_config* const config,
         char* const * const urls, // copied
         size_t const n_urls,
         char* const username, // nullable, copied
@@ -451,7 +454,7 @@ enum rawrtc_code rawrtc_ice_server_create(
         }
 
         // Copy URL
-        error = rawrtc_ice_server_url_create(&url, urls[i]);
+        error = rawrtc_ice_server_url_create(&url, config, urls[i]);
         if (error) {
             goto out;
         }
@@ -634,7 +637,7 @@ int rawrtc_ice_server_debug(
         return 0;
     }
 
-    err |= re_hprintf(pf, "  ICE Server:\n", server);
+    err |= re_hprintf(pf, "  ICE Server (%p):\n", server);
 
     // Credential type
     err |= re_hprintf(pf, "    credential_type=%s\n",

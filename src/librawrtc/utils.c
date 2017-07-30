@@ -11,48 +11,6 @@
 #include "debug.h"
 
 /*
- * Default rawrtc options.
- */
-struct rawrtc_config rawrtc_default_config = {
-    .pacing_interval = 20,
-    .ipv4_enable = true,
-    .ipv6_enable = true,
-    .udp_enable = true,
-    .tcp_enable = false, // TODO: true by default
-    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
-    .ice_server_normal_transport = RAWRTC_ICE_SERVER_TRANSPORT_UDP,
-    .ice_server_secure_transport = RAWRTC_ICE_SERVER_TRANSPORT_TLS,
-    .stun_keepalive_interval = 25, // in seconds
-    .stun_config = {
-        STUN_DEFAULT_RTO,
-        STUN_DEFAULT_RC,
-        STUN_DEFAULT_RM,
-        STUN_DEFAULT_TI,
-        0x00
-    },
-    .turn_allocation_lifetime = 600, // in seconds
-};
-
-/*
- * Default certificate options.
- */
-struct rawrtc_certificate_options rawrtc_default_certificate_options = {
-    .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
-    .common_name = "anonymous@rawrtc.org",
-    .valid_until = 3600 * 24 * 30, // 30 days
-    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
-    .named_curve = "prime256v1",
-    .modulus_length = 2048
-};
-
-/*
- * Default data channel options.
- */
-struct rawrtc_data_channel_options rawrtc_default_data_channel_options = {
-    .deliver_partially = false
-};
-
-/*
  * Translate a rawrtc return code to a string.
  */
 char const* rawrtc_code_to_str(

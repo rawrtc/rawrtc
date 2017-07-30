@@ -24,7 +24,7 @@ OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
-LIBRE_COMMIT="cf8bceafa7b6f7b86a0a8c7e4c28456c3bc30e62"
+LIBRE_COMMIT="9d1ba44a913211e0dfb73f3e7f6eb28fbdac2a99"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="master"
@@ -111,6 +111,8 @@ elif [ "$offline" = false ]; then
     cd ${USRSCTP_PATH}
     echo "Pulling usrsctp"
     git pull
+else
+    cd ${USRSCTP_PATH}
 fi
 git checkout ${USRSCTP_BRANCH}
 git reset --hard ${USRSCTP_COMMIT}
@@ -125,6 +127,8 @@ elif [ "$offline" = false ]; then
     cd ${LIBRE_PATH}
     echo "Pulling libre"
     git pull
+else
+    cd ${LIBRE_PATH}
 fi
 git checkout ${LIBRE_BRANCH}
 git reset --hard ${LIBRE_COMMIT}
@@ -139,6 +143,8 @@ elif [ "$offline" = false ]; then
     cd ${LIBREW_PATH}
     echo "Pulling librew"
     git pull
+else
+    cd ${LIBREW_PATH}
 fi
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}

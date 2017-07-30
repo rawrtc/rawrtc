@@ -51,6 +51,15 @@ enum rawrtc_code {
 }; // IMPORTANT: Add translations for new return codes in `utils.c`!
 
 /*
+ * Log levels.
+ * TODO: Implement this properly (proper log levels, not on or off which is also mostly ignored)
+ */
+enum rawrtc_log_level {
+    RAWRTC_LOG_LEVEL_NONE = 0,
+    RAWRTC_LOG_LEVEL_ALL_TEMP = 1
+};
+
+/*
  * Certificate private key types.
  */
 enum rawrtc_certificate_key_type {
@@ -472,20 +481,52 @@ typedef enum rawrtc_code (rawrtc_data_transport_channel_send_handler)(
 
 /*
  * Configuration.
- * TODO: Add to a constructor... somewhere
+ *
+ * TODO: private
+ * Important: Always update `rawrtc_default_config` in config.c
  */
 struct rawrtc_config {
-    uint32_t pacing_interval;
-    bool ipv4_enable;
-    bool ipv6_enable;
-    bool udp_enable;
-    bool tcp_enable;
-    enum rawrtc_certificate_sign_algorithm sign_algorithm;
-    enum rawrtc_ice_server_transport ice_server_normal_transport;
-    enum rawrtc_ice_server_transport ice_server_secure_transport;
-    uint32_t stun_keepalive_interval; // in seconds
-    struct stun_conf stun_config;
-    uint32_t turn_allocation_lifetime; // in seconds
+    struct {
+        enum rawrtc_log_level log_level;
+        bool log_colors_enable;
+        char* packet_trace_path;
+        struct sa dummy_local_address;
+        struct sa dummy_remote_address;
+    } debug;
+
+    struct {
+        bool ipv4_enable;
+        bool ipv6_enable;
+        bool udp_enable;
+        bool tcp_enable;
+        bool loopback_enable;
+        bool link_local_enable;
+        enum rawrtc_certificate_sign_algorithm sign_algorithm;
+    } general;
+
+    struct {
+        bool prflx_enable;
+        uint32_t keepalive_interval;
+        uint32_t checklist_pacing_interval;
+    } ice;
+
+    struct {
+        enum rawrtc_ice_server_transport default_normal_transport;
+        enum rawrtc_ice_server_transport default_secure_transport;
+    } ice_server;
+
+    // Important: MUST inherit `struct stun_conf`.
+    struct {
+        uint32_t retransmission_timeout;
+        uint32_t retransmission_count;
+        uint32_t retransmissions_max;
+        uint32_t reliable_transport_timeout;
+        uint8_t tos;
+    } stun;
+
+    struct {
+        uint32_t allocation_lifetime;
+    } turn;
 };
 
 /*
@@ -616,7 +657,11 @@ struct rawrtc_ice_parameters {
  * TODO: private
  */
 struct rawrtc_ice_gatherer {
+    FILE* trace_handle_ice;
+    FILE* trace_handle_stun;
+    FILE* trace_handle_turn;
     enum rawrtc_ice_gatherer_state state;
+    struct rawrtc_config* config; // referenced
     struct rawrtc_ice_gather_options* options; // referenced
     rawrtc_ice_gatherer_state_change_handler* state_change_handler; // nullable
     rawrtc_ice_gatherer_error_handler* error_handler; // nullable
@@ -669,6 +714,8 @@ struct rawrtc_dtls_parameters {
  * TODO: private
  */
 struct rawrtc_dtls_transport {
+    struct list trace_helper_contexts;
+    FILE* trace_handle;
     enum rawrtc_dtls_transport_state state;
     struct rawrtc_ice_transport* ice_transport; // referenced
     struct list certificates; // deep-copied
@@ -747,6 +794,7 @@ struct rawrtc_sctp_capabilities {
  * TODO: private
  */
 struct rawrtc_sctp_transport {
+    FILE* trace_handle;
     enum rawrtc_sctp_transport_state state;
     uint16_t port;
     uint64_t remote_maximum_message_size;
@@ -760,7 +808,6 @@ struct rawrtc_sctp_transport {
     struct rawrtc_data_channel** channels;
     uint_fast16_t n_channels;
     uint_fast16_t current_channel_sid;
-    FILE* trace_handle;
     struct socket* socket;
     uint_fast8_t flags;
     struct rawrtc_data_transport* data_transport; // referenced
@@ -799,13 +846,21 @@ struct rawrtc_data_channel {
 /*
  * Layers.
  * TODO: private
+ * Note: Changes to this requires updating `layer_to_str` in packet_trace.c
  */
-enum {
-    RAWRTC_LAYER_SCTP = 20,
-    RAWRTC_LAYER_DTLS_SRTP_STUN = 10, // TODO: Pretty sure we are able to detect STUN earlier
-    RAWRTC_LAYER_ICE = 0,
-    RAWRTC_LAYER_STUN = -10,
-    RAWRTC_LAYER_TURN = -10
+enum rawrtc_layer {
+    RAWRTC_LAYER_SCTP = 40, // Note: Not used for a UDP helper.
+    RAWRTC_LAYER_TRACE_DATA_TRANSPORT = 35, // Note: Not used for a UDP helper.
+    RAWRTC_LAYER_DTLS_SRTP = 30,
+    RAWRTC_LAYER_TRACE_DTLS_SRTP = 25, // Note: Not used for a UDP helper.
+    RAWRTC_LAYER_ICE_RELAY = 22,
+    RAWRTC_LAYER_ICE_SRFLX = 21,
+    RAWRTC_LAYER_ICE_HOST = 20,
+    RAWRTC_LAYER_TRACE_ICE = 15,
+    RAWRTC_LAYER_TURN = 10,
+    RAWRTC_LAYER_TRACE_STUN = 5,
+    RAWRTC_LAYER_STUN = 0,
+    RAWRTC_LAYER_TRACE_TURN = -5
 };
 
 
@@ -838,6 +893,134 @@ enum rawrtc_code rawrtc_init();
  * Close rawrtc and free up all resources.
  */
 enum rawrtc_code rawrtc_close();
+
+/*
+ * Create a RAWRTC configuration.
+ *
+ * Will start with the default configuration. Each configuration has its own
+ * setter function.
+ */
+enum rawrtc_code rawrtc_config_create(
+    struct rawrtc_config** const configp // de-referenced
+);
+
+/*
+ * Get debug configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_debug_options(
+    struct rawrtc_config* const config,
+    char** const packet_trace_pathp, // de-referenced, nullable
+    struct sa* const dummy_local_addressp, // de-referenced, nullable
+    struct sa* const dummy_remote_addressp // de-referenced, nullable
+);
+
+/*
+ * Set debug configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_debug_options(
+    struct rawrtc_config* const config,
+    char* const packet_trace_path, // nullable, copied
+    struct sa* const dummy_local_address, // nullable, copied
+    struct sa* const dummy_remote_address // nullable, copied
+);
+
+/*
+ * Get general configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_general_options(
+    struct rawrtc_config* const config,
+    bool* const ipv4_enablep, // de-referenced, nullable
+    bool* const ipv6_enablep, // de-referenced, nullable
+    bool* const udp_enablep, // de-referenced, nullable
+    bool* const tcp_enablep // de-referenced, nullable
+);
+
+/*
+ * Set general configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_general_options(
+    struct rawrtc_config* const config,
+    bool const ipv4_enable,
+    bool const ipv6_enable,
+    bool const udp_enable,
+    bool const tcp_enable
+);
+
+/*
+ * Get ICE configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_ice_options(
+    struct rawrtc_config* const config,
+    uint32_t* const keepalive_intervalp, // de-referenced, nullable
+    uint32_t* const checklist_packing_intervalp // de-referenced, nullable
+);
+
+/*
+ * Set ICE configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_ice_options(
+    struct rawrtc_config* const config,
+    uint32_t const keepalive_interval,
+    uint32_t const checklist_packing_interval
+);
+
+/*
+ * Get ICE server configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_ice_server_options(
+    struct rawrtc_config* const config,
+    enum rawrtc_ice_server_transport* const default_normal_transportp, // de-referenced, nullable
+    enum rawrtc_ice_server_transport* const default_secure_transportp // de-referenced, nullable
+);
+
+/*
+ * Set ICE server configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_ice_server_options(
+    struct rawrtc_config* const config,
+    enum rawrtc_ice_server_transport const default_normal_transport,
+    enum rawrtc_ice_server_transport const default_secure_transport
+);
+
+/*
+ * Get STUN configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_stun_options(
+    struct rawrtc_config* const config,
+    uint32_t* const retransmission_timeoutp, // de-referenced, nullable
+    uint32_t* const retransmission_countp, // de-referenced, nullable
+    uint32_t* const retransmissions_maxp, // de-referenced, nullable
+    uint32_t* const reliable_transport_timeoutp, // de-referenced, nullable
+    uint8_t* const tosp // de-referenced, nullable
+);
+
+/*
+ * Set STUN configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_stun_options(
+    struct rawrtc_config* const config,
+    uint32_t const retransmission_timeout,
+    uint32_t const retransmission_count,
+    uint32_t const retransmissions_max,
+    uint32_t const reliable_transport_timeout,
+    uint8_t const tos
+);
+
+/*
+ * Get TURN configuration options.
+ */
+enum rawrtc_code rawrtc_config_get_turn_options(
+    struct rawrtc_config* const config,
+    uint32_t* const allocation_lifetimep // de-referenced, nullable
+);
+
+/*
+ * Set TURN configuration options.
+ */
+enum rawrtc_code rawrtc_config_set_turn_options(
+    struct rawrtc_config* const config,
+    uint32_t const allocation_lifetime
+);
 
 /*
  * Create certificate options.
@@ -1034,6 +1217,7 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(
     struct rawrtc_ice_gather_options* const options,
+    struct rawrtc_config* const config, // nullable
     char* const * const urls, // copied
     size_t const n_urls,
     char* const username, // nullable, copied
@@ -1060,6 +1244,7 @@ char const * const rawrtc_ice_gatherer_state_to_name(
   */
 enum rawrtc_code rawrtc_ice_gatherer_create(
     struct rawrtc_ice_gatherer** const gathererp, // de-referenced
+    struct rawrtc_config* const configuration, // referenced
     struct rawrtc_ice_gather_options* const options, // referenced
     rawrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
     rawrtc_ice_gatherer_error_handler* const error_handler, // nullable
@@ -1124,7 +1309,7 @@ char const * const rawrtc_ice_transport_state_to_name(
  */
 enum rawrtc_code rawrtc_ice_transport_create(
     struct rawrtc_ice_transport** const transportp, // de-referenced
-    struct rawrtc_ice_gatherer* const gatherer, // referenced, nullable
+    struct rawrtc_ice_gatherer* const gatherer, // referenced
     rawrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
     rawrtc_ice_transport_candidate_pair_change_handler* const candidate_pair_change_handler, // nullable
     void* const arg // nullable

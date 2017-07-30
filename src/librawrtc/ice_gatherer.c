@@ -3,7 +3,9 @@
 #include <string.h> // memcpy
 #include <rawrtc.h>
 #include "ice_gatherer.h"
+#include "config.h"
 #include "utils.h"
+#include "packet_trace.h"
 #include "ice_server.h"
 #include "ice_candidate.h"
 #include "message_buffer.h"
@@ -11,7 +13,6 @@
 
 #define DEBUG_MODULE "ice-gatherer"
 #define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include "debug.h"
 
 /*
@@ -92,6 +93,7 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(
         struct rawrtc_ice_gather_options* const options,
+        struct rawrtc_config* const config, // nullable
         char* const * const urls, // copied
         size_t const n_urls,
         char* const username, // nullable, copied
@@ -112,7 +114,9 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     }
 
     // Create ICE server
-    error = rawrtc_ice_server_create(&server, urls, n_urls, username, credential, credential_type);
+    error = rawrtc_ice_server_create(
+            &server, config ? config : &rawrtc_default_config, urls, n_urls, username, credential,
+            credential_type);
     if (error) {
         return error;
     }
@@ -193,6 +197,39 @@ static void rawrtc_ice_gatherer_destroy(
     list_flush(&gatherer->local_candidates);
     list_flush(&gatherer->buffered_messages);
     mem_deref(gatherer->options);
+    if (gatherer->config != &rawrtc_default_config) {
+        mem_deref(gatherer->config);
+    }
+
+    // Close trace file (if any): TURN
+    if (gatherer->trace_handle_turn) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_close(
+                gatherer->trace_handle_turn);
+        if (error) {
+            DEBUG_NOTICE("Could close TURN packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+
+    // Close trace file (if any): STUN
+    if (gatherer->trace_handle_stun) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_close(
+                gatherer->trace_handle_stun);
+        if (error) {
+            DEBUG_NOTICE("Could close STUN packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+
+    // Close trace file (if any): ICE
+    if (gatherer->trace_handle_ice) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_close(
+                gatherer->trace_handle_ice);
+        if (error) {
+            DEBUG_NOTICE("Could close ICE packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
 }
 
 /*
@@ -200,6 +237,7 @@ static void rawrtc_ice_gatherer_destroy(
  */
 enum rawrtc_code rawrtc_ice_gatherer_create(
         struct rawrtc_ice_gatherer** const gathererp, // de-referenced
+        struct rawrtc_config* const config, // referenced, nullable
         struct rawrtc_ice_gather_options* const options, // referenced
         rawrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
         rawrtc_ice_gatherer_error_handler* const error_handler, // nullable
@@ -207,6 +245,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
         void* const arg // nullable
 ) {
     struct rawrtc_ice_gatherer* gatherer;
+    enum rawrtc_log_level log_level;
     int err;
     struct sa dns_servers[RAWRTC_ICE_GATHERER_DNS_SERVERS] = {{{{0}}}};
     uint32_t n_dns_servers = ARRAY_SIZE(dns_servers);
@@ -225,6 +264,11 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
 
     // Set fields/reference
     gatherer->state = RAWRTC_ICE_GATHERER_NEW; // TODO: Raise state (delayed)?
+    if (!config || config == &rawrtc_default_config) {
+        gatherer->config = &rawrtc_default_config;
+    } else {
+        gatherer->config = mem_ref(config);
+    }
     gatherer->options = mem_ref(options);
     gatherer->state_change_handler = state_change_handler;
     gatherer->error_handler = error_handler;
@@ -237,12 +281,42 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     rand_str(gatherer->ice_username_fragment, sizeof(gatherer->ice_username_fragment));
     rand_str(gatherer->ice_password, sizeof(gatherer->ice_password));
 
+    // Create trace files (if requested)
+    if (gatherer->config->debug.packet_trace_path) {
+        enum rawrtc_code error;
+
+        // Layer: ICE
+        error = rawrtc_packet_trace_handle_open(
+                &gatherer->trace_handle_ice, gatherer, gatherer->config, RAWRTC_LAYER_ICE_HOST);
+        if (error) {
+            DEBUG_NOTICE("Could open ICE packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+
+        // Layer: STUN
+        error = rawrtc_packet_trace_handle_open(
+                &gatherer->trace_handle_stun, gatherer, gatherer->config, RAWRTC_LAYER_STUN);
+        if (error) {
+            DEBUG_NOTICE("Could open STUN packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+
+        // Layer: TURN
+        error = rawrtc_packet_trace_handle_open(
+                &gatherer->trace_handle_turn, gatherer, gatherer->config, RAWRTC_LAYER_TURN);
+        if (error) {
+            DEBUG_NOTICE("Could open TURN packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+
     // Set ICE configuration and create trice instance
-    // TODO: Add parameters to function arguments?
-    gatherer->ice_config.debug = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
-    gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
-    gatherer->ice_config.ansi = true;
-    gatherer->ice_config.enable_prflx = false;
+    // TODO: Update this when adding more log levels to config
+    log_level = gatherer->config->debug.log_level;
+    gatherer->ice_config.debug = log_level == RAWRTC_LOG_LEVEL_ALL_TEMP ? true : false;
+    gatherer->ice_config.trace = log_level == RAWRTC_LOG_LEVEL_ALL_TEMP ? true : false;
+    gatherer->ice_config.ansi = gatherer->config->debug.log_colors_enable;
+    gatherer->ice_config.enable_prflx = gatherer->config->ice.prflx_enable;
     err = trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ICE_ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password);
@@ -274,7 +348,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     }
 
     // Done
-    DEBUG_PRINTF("ICE gatherer created:\n%H", ice_gather_options_debug, gatherer->options);
+    DEBUG_PRINTF("ICE gatherer created:\n%H", rawrtc_ice_gatherer_debug, gatherer);
 
 out:
     if (err) {
@@ -297,6 +371,7 @@ static void set_state(
 ) {
     // Set state
     gatherer->state = state;
+    DEBUG_PRINTF("ICE gatherer:\n%H", rawrtc_ice_gatherer_debug, gatherer);
 
     // Call handler (if any)
     if (gatherer->state_change_handler) {
@@ -659,14 +734,25 @@ static void turn_client_handler(
     err = trice_lcand_add(
             &relay_candidate, gatherer->ice, re_candidate->attr.compid, re_candidate->attr.proto,
             priority, relay_address, relay_address, ICE_CAND_TYPE_RELAY, mapped_address,
-            re_candidate->attr.tcptype, re_candidate->us, RAWRTC_LAYER_ICE);
+            re_candidate->attr.tcptype, re_candidate->us, RAWRTC_LAYER_ICE_RELAY);
     if (err) {
         DEBUG_WARNING("Could not add relay candidate, reason: %m\n", err);
+        goto out;
+    }
+
+    // Add relay candidate to TURN session
+    error = rawrtc_candidate_helper_turn_session_add_candidate(session, relay_candidate);
+    if (error) {
+        DEBUG_WARNING("Could not add relay candidate to TURN session, reason: %s\n",
+                      rawrtc_code_to_str(error));
         goto out;
     }
     DEBUG_PRINTF("Added %s relay candidate for interface mapped=%j, relay=%j (%s)\n",
                  net_proto2name(relay_candidate->attr.proto), mapped_address, relay_address,
                  session->url->url);
+
+    // Use session
+    remove_session = false;
 
     // Add TURN permission
     add_turn_permission_on_known_remote_candidates(gatherer, session);
@@ -678,9 +764,6 @@ static void turn_client_handler(
                       rawrtc_code_to_str(error));
         goto out;
     }
-
-    // Use session
-    remove_session = false;
 
 out:
     // Decrease counter & check if done gathering
@@ -741,6 +824,17 @@ static enum rawrtc_code gather_relay_candidates(
         goto out;
     }
 
+    // Attach trace handler (if trace handle): TURN layer
+    if (candidate->gatherer->trace_handle_turn) {
+        error = rawrtc_candidate_helper_attach_packet_trace_handler(
+                &candidate->udp_helper_trace_turn, candidate,
+                candidate->gatherer->trace_handle_turn, RAWRTC_LAYER_TRACE_TURN);
+        if (error) {
+            DEBUG_NOTICE("Unable to attach TURN packet trace handler, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+
     // Create TURN client
     switch (protocol) {
         case RAWRTC_ICE_PROTOCOL_UDP:
@@ -750,9 +844,10 @@ static enum rawrtc_code gather_relay_candidates(
                          net_proto2name(re_candidate->attr.proto), type_str,
                          &re_candidate->attr.addr, server_address, url->url);
             error = rawrtc_error_to_code(turnc_alloc(
-                    &turn_client, &rawrtc_default_config.stun_config, IPPROTO_UDP,
-                    re_candidate->us, RAWRTC_LAYER_TURN, server_address, server->username,
-                    server->credential, rawrtc_default_config.turn_allocation_lifetime,
+                    &turn_client, (struct stun_conf*) &candidate->gatherer->config->stun,
+                    IPPROTO_UDP, re_candidate->us, (int) RAWRTC_LAYER_TURN, server_address,
+                    server->username, server->credential,
+                    candidate->gatherer->config->turn.allocation_lifetime,
                     turn_client_handler, session));
             if (error) {
                 goto out;
@@ -841,13 +936,24 @@ static void reflexive_candidate_handler(
     err = trice_lcand_add(
             &srflx_candidate, gatherer->ice, re_candidate->attr.compid, re_candidate->attr.proto,
             priority, address, &re_candidate->attr.addr, ICE_CAND_TYPE_SRFLX,
-            &re_candidate->attr.addr, re_candidate->attr.tcptype, NULL, RAWRTC_LAYER_ICE);
+            &re_candidate->attr.addr, re_candidate->attr.tcptype, NULL, RAWRTC_LAYER_ICE_SRFLX);
     if (err) {
         DEBUG_WARNING("Could not add server reflexive candidate, reason: %m\n", err);
         goto out;
     }
+
+    // Add srflx candidate to STUN session
+    error = rawrtc_candidate_helper_stun_session_add_candidate(session, srflx_candidate);
+    if (error) {
+        DEBUG_WARNING("Could not add srflx candidate to TURN session, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        goto out;
+    }
     DEBUG_PRINTF("Added %s server reflexive candidate for interface %j (%s)\n",
                  net_proto2name(srflx_candidate->attr.proto), address, session->url->url);
+
+    // Use session
+    remove_session = false;
 
     // Announce candidate to handler
     error = announce_candidate(gatherer, srflx_candidate, session->url->url);
@@ -856,9 +962,6 @@ static void reflexive_candidate_handler(
                       rawrtc_code_to_str(error));
         goto out;
     }
-
-     // Use session
-    remove_session = false;
 
 out:
     // Decrease counter & check if done gathering
@@ -920,6 +1023,17 @@ static enum rawrtc_code gather_reflexive_candidates(
         goto out;
     }
 
+    // Attach trace handler (if trace handle): STUN layer
+    if (candidate->gatherer->trace_handle_stun) {
+        error = rawrtc_candidate_helper_attach_packet_trace_handler(
+                &candidate->udp_helper_trace_stun, candidate,
+                candidate->gatherer->trace_handle_stun, RAWRTC_LAYER_TRACE_STUN);
+        if (error) {
+            DEBUG_NOTICE("Unable to attach STUN packet trace handler, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+
     // Create STUN keep-alive session
     // TODO: We're using the candidate's protocol which conflicts with the ICE server URL transport
     DEBUG_PRINTF("Creating STUN request for %s %s candidate %J using server %J (%s)\n",
@@ -927,8 +1041,8 @@ static enum rawrtc_code gather_reflexive_candidates(
                  server_address, url->url);
     error = rawrtc_error_to_code(stun_keepalive_alloc(
             &stun_keepalive, re_candidate->attr.proto, re_candidate->us, RAWRTC_LAYER_STUN,
-            server_address, &rawrtc_default_config.stun_config, reflexive_candidate_handler,
-            session));
+            server_address, (struct stun_conf*) &candidate->gatherer->config->stun,
+            reflexive_candidate_handler, session));
     if (error) {
         goto out;
     }
@@ -941,7 +1055,8 @@ static enum rawrtc_code gather_reflexive_candidates(
 
     // Increase counter, start the STUN session & done
     ++candidate->srflx_pending_count;
-    stun_keepalive_enable(stun_keepalive, rawrtc_default_config.stun_keepalive_interval);
+    // TODO: Maybe add a separate keep-alive interval to the STUN config?
+    stun_keepalive_enable(stun_keepalive, candidate->gatherer->config->ice.keepalive_interval);
     error = RAWRTC_CODE_SUCCESS;
 
 out:
@@ -967,15 +1082,22 @@ static void gather_candidates(
 ) {
     enum rawrtc_code error;
 
+    // Skip loopback and link-local candidates
+    if (sa_is_loopback(&candidate->candidate->attr.addr)
+            || sa_is_linklocal(&candidate->candidate->attr.addr)) {
+        return;
+    }
+
     // Gather reflexive candidates
     // NOTE: 'gather_reflexive_candidates' will return 'success' if it cannot gather reflexive
     //       candidates with the provided candidate/server combination.
-    error = gather_reflexive_candidates(candidate, server_address, url);
-    if (error) {
-        DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s\n",
-                      rawrtc_code_to_str(error));
-        // Note: Considered non-critical, continuing
-    }
+    // TODO: (BC) REACTIVATE
+//    error = gather_reflexive_candidates(candidate, server_address, url);
+//    if (error) {
+//        DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s\n",
+//                      rawrtc_code_to_str(error));
+//        // Note: Considered non-critical, continuing
+//    }
 
     // Gather relay candidates
     // Note: 'gather_relay_candidates' will return 'success' if it cannot gather relay
@@ -1022,13 +1144,13 @@ static void gather_candidates_using_resolved_server(
         struct rawrtc_ice_server_url* const url = le->data;
 
         // IPv4
-        if (rawrtc_default_config.ipv4_enable && !sa_is_any(&url->ipv4_address)) {
+        if (candidate->gatherer->config->general.ipv4_enable && !sa_is_any(&url->ipv4_address)) {
             // Gather candidates
             gather_candidates(candidate, &url->ipv4_address, url, server);
         }
 
         // IPv6
-        if (rawrtc_default_config.ipv6_enable && !sa_is_any(&url->ipv6_address)) {
+        if (candidate->gatherer->config->general.ipv6_enable && !sa_is_any(&url->ipv6_address)) {
             // Gather candidates
             gather_candidates(candidate, &url->ipv6_address, url, server);
         }
@@ -1075,7 +1197,7 @@ static enum rawrtc_code add_candidate(
     // TODO: Set component id properly
     err = trice_lcand_add(
             &re_candidate, gatherer->ice, 1, ipproto, priority, address,
-            NULL, ICE_CAND_TYPE_HOST, NULL, tcp_type, NULL, RAWRTC_LAYER_ICE);
+            NULL, ICE_CAND_TYPE_HOST, NULL, tcp_type, NULL, RAWRTC_LAYER_ICE_HOST);
     if (err) {
         DEBUG_WARNING("Could not add host candidate, reason: %m\n", err);
         return rawrtc_error_to_code(err);
@@ -1088,6 +1210,19 @@ static enum rawrtc_code add_candidate(
         DEBUG_WARNING("Could not create candidate helper, reason: %s\n",
                       rawrtc_code_to_str(error));
         return error;
+    }
+
+    // Attach trace handler (if trace handle): ICE layer
+    // TODO: It could be that we're missing packets here as the socket is being created in
+    //       `trice_lcand_add`.
+    if (gatherer->trace_handle_ice) {
+        error = rawrtc_candidate_helper_attach_packet_trace_handler(
+                &candidate->udp_helper_trace_ice, candidate,
+                gatherer->trace_handle_ice, RAWRTC_LAYER_TRACE_ICE);
+        if (error) {
+            DEBUG_NOTICE("Unable to attach ICE packet trace handler, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
     }
 
     // Add to local candidates list
@@ -1138,17 +1273,25 @@ static bool interface_handler(
         return true; // Don't continue gathering
     }
 
-    // Ignore loopback and link-local addresses
-    // TODO: Make this configurable
-    if (sa_is_linklocal(address) || sa_is_loopback(address)) {
+    // TODO: (BC) Remove
+    if (list_count(&gatherer->local_candidates) > 0) {
+        return true;
+    }
+
+    // Skip loopback addresses?
+    if (sa_is_loopback(address) && !gatherer->config->general.loopback_enable) {
         return false; // Continue gathering
     }
 
-    // Skip IPv4, IPv6?
-    // TODO: Get config from struct
+    // Skip link-local addresses?
+    if (sa_is_linklocal(address) && !gatherer->config->general.link_local_enable) {
+        return false; // Continue gathering
+    }
+
+    // Skip IPv4/IPv6 addresses?
     af = sa_af(address);
-    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
-            || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
+    if ((!gatherer->config->general.ipv6_enable && af == AF_INET6)
+            || (!gatherer->config->general.ipv4_enable && af == AF_INET)) {
         return false; // Continue gathering
     }
 
@@ -1157,7 +1300,7 @@ static bool interface_handler(
     DEBUG_PRINTF("Gathered local interface %j\n", address);
 
     // Add UDP candidate
-    if (rawrtc_default_config.udp_enable) {
+    if (gatherer->config->general.udp_enable) {
         error = add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_UDP, ICE_TCP_ACTIVE);
         if (error) {
             DEBUG_WARNING("Could not add candidate, reason: %s", rawrtc_code_to_str(error));
@@ -1171,8 +1314,8 @@ static bool interface_handler(
     }
 
     // Add TCP candidate
-    if (rawrtc_default_config.tcp_enable) {
-        // TODO
+    if (gatherer->config->general.tcp_enable) {
+        // TODO: Implement TCP support
         //add_candidate(gatherer, address, RAWRTC_ICE_PROTOCOL_TCP, ICE_TCP_SO);
         DEBUG_WARNING("TODO: Add TCP host candidate for interface %j\n", address);
     }
@@ -1365,7 +1508,7 @@ static enum rawrtc_code resolve_ice_servers_address(
             }
 
             // Query A record (if IPv4 is enabled)
-            if (url->need_resolving && rawrtc_default_config.ipv4_enable) {
+            if (url->need_resolving && gatherer->config->general.ipv4_enable) {
                 error = query_a_or_aaaa_record(
                         &url->dns_a_context, &url->ipv4_address, DNS_TYPE_A, url, server, gatherer);
                 if (error) {
@@ -1376,7 +1519,7 @@ static enum rawrtc_code resolve_ice_servers_address(
             }
 
             // Query AAAA record (if IPv6 is enabled)
-            if (url->need_resolving && rawrtc_default_config.ipv6_enable) {
+            if (url->need_resolving && gatherer->config->general.ipv6_enable) {
                 error = query_a_or_aaaa_record(
                         &url->dns_aaaa_context, &url->ipv6_address, DNS_TYPE_AAAA, url, server,
                         gatherer);
@@ -1555,4 +1698,47 @@ enum rawrtc_code rawrtc_ice_gatherer_add_turn_permissions(
             add_turn_permission(session, local_candidate_helper->candidate, remote_candidate);
         }
     }
+}
+
+/*
+ * Print debug information of an ICE gatherer.
+ */
+int rawrtc_ice_gatherer_debug(
+        struct re_printf* const pf,
+        struct rawrtc_ice_gatherer const* const gatherer
+) {
+    int err = 0;
+    struct le* le;
+
+    // Check arguments
+    if (!gatherer) {
+        return 0;
+    }
+
+    // Options
+    err |= re_hprintf(pf, "%H", ice_gather_options_debug, gatherer->options);
+
+    err |= re_hprintf(pf, "----- ICE Gatherer <%p> -----\n", gatherer);
+
+    // State
+    err |= re_hprintf(pf, "  state=%s\n", rawrtc_ice_gatherer_state_to_name(gatherer->state));
+
+    // Username fragment & password
+    err |= re_hprintf(pf, "  username_fragment=\"%s\"\n", gatherer->ice_username_fragment);
+    err |= re_hprintf(pf, "  password=\"%s\"\n", gatherer->ice_password);
+
+    // Buffered messages
+    err |= re_hprintf(pf, "  buffered_messages=%"PRIu32"\n",
+                      list_count(&gatherer->buffered_messages));
+
+    // Candidate helper list
+    err |= re_hprintf(pf, "  local_candidates=%"PRIu32"\n",
+                      list_count(&gatherer->local_candidates));
+    for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
+        struct rawrtc_candidate_helper* const candidate_helper = le->data;
+        err |= re_hprintf(pf, "%H", rawrtc_candidate_helper_debug, candidate_helper);
+    }
+
+    // Done
+    return err;
 }

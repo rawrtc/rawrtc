@@ -1,0 +1,7 @@
+#pragma once
+
+extern char const rawrtc_config_default_dummy_local_address[];
+extern size_t const rawrtc_config_default_dummy_local_address_length;
+extern char const rawrtc_config_default_dummy_remote_address[];
+extern size_t const rawrtc_config_default_dummy_remote_address_length;
+extern struct rawrtc_config rawrtc_default_config;

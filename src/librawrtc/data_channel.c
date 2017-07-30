@@ -1,10 +1,16 @@
 #include <rawrtc.h>
-#include "utils.h"
-#include "data_transport.h"
+#include "data_channel.h"
 
 #define DEBUG_MODULE "data-channel"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
+
+/*
+ * Default data channel options.
+ */
+struct rawrtc_data_channel_options rawrtc_default_data_channel_options = {
+    .deliver_partially = false
+};
 
 /*
  * Get the corresponding name for a data channel state.
