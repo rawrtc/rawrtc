@@ -27,6 +27,13 @@ target_link_libraries(rawrtc
 add_library(rawrtc-static STATIC ${rawrtc_SOURCES})
 target_link_libraries(rawrtc-static
         ${rawrtc_DEP_LIBRARIES})
+
+#set preprocessor flag to compile for arm
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+  target_compile_definitions(rawrtc PRIVATE TARGET_NOT_X86)
+  target_compile_definitions(rawrtc-static PRIVATE TARGET_NOT_X86)
+endif()
+
 install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
 
