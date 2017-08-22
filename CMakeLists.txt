@@ -7,6 +7,9 @@ set(PROJECT_DESCRIPTION
 set(PROJECT_URL
         "https://github.com/rawrtc/rawrtc")
 
+# Use prefix pkgconfig
+set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/:$ENV{PKG_CONFIG_PATH}")
+
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
 set(LIB_RE_VERSION "libre >= 0.5.2")
@@ -67,8 +70,8 @@ list(APPEND rawrtc_DEP_LIBRARIES ${LIB_REW_STATIC_LIBRARIES})
 
 # Dependency: usrsctp
 # TODO: Use the pkg-config file of usrsctp once it has been added
-find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a)
-find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h)
+find_library(LIB_USRSCTP_LIBRARIES NAMES usrsctp.a libusrsctp.a HINTS ${CMAKE_INSTALL_PREFIX}/lib )
+find_path(LIB_USRSCTP_INCLUDE_DIRS usrsctp.h HINTS ${CMAKE_INSTALL_PREFIX}/include )
 get_filename_component(LIB_USRSCTP_LIBRARY_DIRS ${LIB_USRSCTP_LIBRARIES} DIRECTORY)
 include_directories(${LIB_USRSCTP_INCLUDE_DIRS})
 link_directories(${LIB_USRSCTP_LIBRARY_DIRS})
