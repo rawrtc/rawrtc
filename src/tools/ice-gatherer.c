@@ -41,16 +41,16 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_ipv4_urls, ARRAY_SIZE(turn_zwuenf_org_ipv4_urls),
+            gather_options, NULL, turn_zwuenf_org_ipv4_urls, ARRAY_SIZE(turn_zwuenf_org_ipv4_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_ipv6_urls, ARRAY_SIZE(turn_threema_ch_ipv6_urls),
+            gather_options, NULL, turn_threema_ch_ipv6_urls, ARRAY_SIZE(turn_threema_ch_ipv6_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
+            gather_options, NULL, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
+            gather_options, NULL, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
             "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
             RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
@@ -59,7 +59,7 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
-            &gatherer, gather_options,
+            &gatherer, NULL, gather_options,
             gatherer_state_change_handler, default_ice_gatherer_error_handler,
             default_ice_gatherer_local_candidate_handler, &client));
 

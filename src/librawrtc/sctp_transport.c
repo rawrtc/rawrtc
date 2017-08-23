@@ -10,9 +10,11 @@
 #include <rawrtc.h>
 #include "main.h"
 #include "utils.h"
+#include "packet_trace.h"
 #include "message_buffer.h"
 #include "dtls_transport.h"
 #include "data_transport.h"
+#include "data_channel.h"
 #include "data_channel_parameters.h"
 #include "sctp_transport.h"
 
@@ -278,31 +280,6 @@ char const * const rawrtc_sctp_transport_state_to_name(
 }
 
 /*
- * Dump an SCTP packet into a trace file.
- */
-static void trace_packet(
-        struct rawrtc_sctp_transport* const transport,
-        void* const buffer,
-        size_t const length,
-        int const direction
-) {
-    char* dump_buffer;
-
-    // Have trace handle?
-    if (!transport->trace_handle) {
-        return;
-    }
-
-    // Trace (if trace handle)
-    dump_buffer = usrsctp_dumppacket(buffer, length, direction);
-    if (dump_buffer) {
-        fprintf(transport->trace_handle, "%s", dump_buffer);
-        usrsctp_freedumpbuffer(dump_buffer);
-        fflush(transport->trace_handle);
-    }
-}
-
-/*
  * Send a deferred SCTP message.
  */
 static bool sctp_send_deferred_message(
@@ -508,13 +485,6 @@ static void set_state(
             usrsctp_close(transport->socket);
             usrsctp_deregister_address(transport);
             transport->socket = NULL;
-        }
-
-        // Close trace file (if any)
-        if (transport->trace_handle) {
-            if (fclose(transport->trace_handle)) {
-                DEBUG_WARNING("Could not close trace file, reason: %m\n", errno);
-            }
         }
     }
 
@@ -1125,8 +1095,18 @@ static int sctp_packet_handler(
     }
 
     // Trace (if trace handle)
-    // Note: No need to check if NULL as the function does it for us
-    trace_packet(transport, buffer, length, SCTP_DUMP_OUTBOUND);
+    // Note: This is theoretically layer `RAWRTC_LAYER_TRACE_DATA_TRANSPORT` (35)
+    if (transport->trace_handle) {
+        struct rawrtc_config* const config =
+                transport->dtls_transport->ice_transport->gatherer->config;
+        error = rawrtc_packet_trace_handle_dump_raw(
+                transport->trace_handle, buffer, length, RAWRTC_PACKET_TRACE_OUTBOUND,
+                &config->debug.dummy_local_address, &config->debug.dummy_remote_address,
+                RAWRTC_TRANSPORT_PROTOCOL_SCTP, false);
+        if (error) {
+            DEBUG_NOTICE("Unable to trace SCTP packet, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
 
     // Note: We only need to copy the buffer if we add it to the outgoing queue
     if (transport->dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
@@ -1820,6 +1800,7 @@ static void timer_handler(
 
 /*
  * Handle incoming DTLS messages.
+ * TODO: Rename this handler.
  */
 static void dtls_receive_handler(
         struct mbuf* const buffer,
@@ -1835,8 +1816,18 @@ static void dtls_receive_handler(
     }
 
     // Trace (if trace handle)
-    // Note: No need to check if NULL as the function does it for us
-    trace_packet(transport, mbuf_buf(buffer), length, SCTP_DUMP_INBOUND);
+    // Note: This is theoretically layer `RAWRTC_LAYER_TRACE_DATA_TRANSPORT` (35)
+    if (transport->trace_handle) {
+        struct rawrtc_config* const config =
+                transport->dtls_transport->ice_transport->gatherer->config;
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_dump(
+                transport->trace_handle, buffer, RAWRTC_PACKET_TRACE_INBOUND,
+                &config->debug.dummy_remote_address, &config->debug.dummy_local_address,
+                RAWRTC_TRANSPORT_PROTOCOL_SCTP, false);
+        if (error) {
+            DEBUG_NOTICE("Unable to trace SCTP packet, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
 
     // Feed into SCTP socket
     // TODO: What about ECN bits?
@@ -1936,6 +1927,15 @@ static void rawrtc_sctp_transport_destroy(
         usrsctp_finish();
         DEBUG_PRINTF("Closed usrsctp\n");
     }
+
+    // Close trace file (if any)
+    if (transport->trace_handle) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_close(transport->trace_handle);
+        if (error) {
+            DEBUG_NOTICE("Could close SCTP packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
 }
 
 /*
@@ -1953,6 +1953,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     uint_fast16_t n_channels;
     bool have_data_transport;
     struct rawrtc_sctp_transport* transport;
+    struct rawrtc_config* config;
     struct sctp_assoc_value av;
     struct linger linger_option;
     struct sctp_event sctp_event = {0};
@@ -1972,8 +1973,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     }
 
     // Set number of channels
-    // TODO: Get from config
-    n_channels = RAWRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
+    n_channels = RAWRTC_SCTP_TRANSPORT_NUMBER_OF_STREAMS;
 
     // Set default port (if 0)
     if (port == 0) {
@@ -1994,7 +1994,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         DEBUG_PRINTF("Initialising usrsctp\n");
         usrsctp_init(0, sctp_packet_handler, dbg_info);
 
-        // TODO: Debugging depending on options
+        // Enable SCTP debugging (if compiled with `SCTP_DEBUG`)
 #ifdef SCTP_DEBUG
         usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
 #endif
@@ -2064,30 +2064,18 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     transport->n_channels = n_channels;
     transport->current_channel_sid = 0;
 
-    // Create packet tracer
-    // TODO: Debug mode only, filename set by debug options
-#ifdef SCTP_DEBUG
-    {
-        char trace_handle_id[8];
-        char* trace_handle_name;
+    // Get config
+    config = dtls_transport->ice_transport->gatherer->config;
 
-        // Create trace handle ID
-        rand_str(trace_handle_id, sizeof(trace_handle_id));
-        error = rawrtc_sdprintf(&trace_handle_name, "trace-sctp-%s.hex", trace_handle_id);
+    // Create trace file (if requested)
+    if (config->debug.packet_trace_path) {
+        error = rawrtc_packet_trace_handle_open(
+                &transport->trace_handle, transport, config, RAWRTC_LAYER_SCTP);
         if (error) {
-            DEBUG_WARNING("Could create trace file name, reason: %s\n", rawrtc_code_to_str(error));
-        } else {
-            // Open trace file
-            transport->trace_handle = fopen(trace_handle_name, "w");
-            mem_deref(trace_handle_name);
-            if (!transport->trace_handle) {
-                DEBUG_WARNING("Could not open trace file, reason: %m\n", errno);
-            } else {
-                DEBUG_INFO("Using trace handle id: %s\n", trace_handle_id);
-            }
+            DEBUG_NOTICE("Could open SCTP packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
         }
     }
-#endif
 
     // Create SCTP socket
     DEBUG_PRINTF("Creating SCTP socket\n");

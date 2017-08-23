@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
     struct rawrtc_dtls_transport* const transport,

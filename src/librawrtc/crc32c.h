@@ -1,6 +1,5 @@
 #pragma once
-#include <inttypes.h>
-#include <stdlib.h>
+#include <rawrtc.h>
 
 /*
  * Compute a CRC-32C.  If the crc32 instruction is available, use the hardware

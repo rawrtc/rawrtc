@@ -7,50 +7,8 @@
 #include "utils.h"
 
 #define DEBUG_MODULE "utils"
-// Note: Always log level 7 as logging is only used in tool functions.
-#define RAWRTC_DEBUG_MODULE_LEVEL 7
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
-
-/*
- * Default rawrtc options.
- */
-struct rawrtc_config rawrtc_default_config = {
-    .pacing_interval = 20,
-    .ipv4_enable = true,
-    .ipv6_enable = true,
-    .udp_enable = true,
-    .tcp_enable = false, // TODO: true by default
-    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
-    .ice_server_normal_transport = RAWRTC_ICE_SERVER_TRANSPORT_UDP,
-    .ice_server_secure_transport = RAWRTC_ICE_SERVER_TRANSPORT_TLS,
-    .stun_keepalive_interval = 25,
-    .stun_config = {
-        STUN_DEFAULT_RTO,
-        STUN_DEFAULT_RC,
-        STUN_DEFAULT_RM,
-        STUN_DEFAULT_TI,
-        0x00
-    }
-};
-
-/*
- * Default certificate options.
- */
-struct rawrtc_certificate_options rawrtc_default_certificate_options = {
-    .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
-    .common_name = "anonymous@rawrtc.org",
-    .valid_until = 3600 * 24 * 30, // 30 days
-    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
-    .named_curve = "prime256v1",
-    .modulus_length = 2048
-};
-
-/*
- * Default data channel options.
- */
-struct rawrtc_data_channel_options rawrtc_default_data_channel_options = {
-    .deliver_partially = false
-};
 
 /*
  * Translate a rawrtc return code to a string.
@@ -99,6 +57,10 @@ char const* rawrtc_code_to_str(
             return "stop iteration";
         case RAWRTC_CODE_NOT_PERMITTED:
             return "not permitted";
+        case RAWRTC_CODE_PATH_NOT_FOUND:
+            return "path not found";
+        case RAWRTC_CODE_BAD_FILE_DESCRIPTOR:
+            return "bad file descriptor";
         default:
             return "(no error translation)";
     }
@@ -131,7 +93,12 @@ enum rawrtc_code rawrtc_error_to_code(
             return RAWRTC_CODE_NO_MEMORY;
         case EPERM:
             return RAWRTC_CODE_NOT_PERMITTED;
+        case ENOENT:
+            return RAWRTC_CODE_PATH_NOT_FOUND;
+        case EBADF:
+            return RAWRTC_CODE_BAD_FILE_DESCRIPTOR;
         default:
+            DEBUG_NOTICE("No fitting RAWRTC error code for POSIX error code %d: %m\n", code, code);
             return RAWRTC_CODE_UNKNOWN_ERROR;
     }
 }

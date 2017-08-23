@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
     struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced

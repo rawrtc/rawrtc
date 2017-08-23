@@ -1,4 +1,5 @@
 #pragma once
+#include <rawrtc.h>
 
 enum rawrtc_code rawrtc_data_channel_parameters_create_internal(
     struct rawrtc_data_channel_parameters** const parametersp, // de-referenced

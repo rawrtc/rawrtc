@@ -1,10 +1,11 @@
 #include <rawrtc.h>
 #include "ice_transport.h"
+#include "ice_gatherer.h"
 #include "dtls_transport.h"
 #include "utils.h"
 
 #define DEBUG_MODULE "ice-transport"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -55,7 +56,7 @@ static void rawrtc_ice_transport_destroy(
  */
 enum rawrtc_code rawrtc_ice_transport_create(
         struct rawrtc_ice_transport** const transportp, // de-referenced
-        struct rawrtc_ice_gatherer* const gatherer, // referenced, nullable
+        struct rawrtc_ice_gatherer* const gatherer, // referenced
         rawrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
         rawrtc_ice_transport_candidate_pair_change_handler* const candidate_pair_change_handler, // nullable
         void* const arg // nullable
@@ -110,6 +111,7 @@ static void set_state(
 
 /*
  * ICE connection established callback.
+ * Warning: Do not un-reference failed candidate pairs - this leads to check-list issues!
  */
 static void ice_established_handler(
         struct ice_candpair* candidate_pair,
@@ -120,7 +122,7 @@ static void ice_established_handler(
     enum rawrtc_code error;
     (void) message;
 
-    DEBUG_PRINTF("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
+    DEBUG_NOTICE("Candidate pair established: %H\n", trice_candpair_debug, candidate_pair);
 
     // Ignore if closed
     if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
@@ -133,13 +135,12 @@ static void ice_established_handler(
         set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_CONNECTED);
     }
 
-    // TODO: Re-enable once 'completed' state has been fixed
-//    // Ignore if completed
-//    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
-//    //       a late failed event.
-//    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
-//        return;
-//    }
+    // Ignore if completed
+    // Note: This case can happen when the checklist is completed but an ICE candidate triggers
+    //       a late failed event.
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
+        return;
+    }
 
     // Offer candidate pair to DTLS transport (if any)
     // TODO: Offer to whatever transport lays above so we are SRTP/QUIC compatible
@@ -149,9 +150,6 @@ static void ice_established_handler(
         if (error) {
             DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
                           rawrtc_code_to_str(error));
-
-            // Remove candidate pair
-            mem_deref(candidate_pair);
         }
     }
 
@@ -159,18 +157,19 @@ static void ice_established_handler(
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
-        DEBUG_INFO("Checklist completed:\n%H", trice_debug, transport->gatherer->ice);
+        DEBUG_INFO("Checklist completed (established):\n%H", trice_debug, transport->gatherer->ice);
 
-//        // At least one candidate pair succeeded, transition to completed
-//        DEBUG_INFO("ICE connection completed\n");
-//        // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been added
-//        //       by both
-//        set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
+        // At least one candidate pair succeeded, transition to completed
+        DEBUG_INFO("ICE connection completed\n");
+        // TODO: ORTC spec says: Only transition to completed if end-of-candidates has been added
+        //       by both
+        set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
     }
 }
 
 /*
  * ICE connection failed callback.
+ * Warning: Do not un-reference failed candidate pairs - this leads to check-list issues!
  */
 static void ice_failed_handler(
         int err,
@@ -181,7 +180,7 @@ static void ice_failed_handler(
     struct rawrtc_ice_transport* const transport = arg;
     (void) err; (void) stun_code; (void) candidate_pair;
 
-    DEBUG_PRINTF("Candidate pair failed: %H (%m %"PRIu16")\n",
+    DEBUG_NOTICE("Candidate pair failed: %H (%m %"PRIu16")\n",
                  trice_candpair_debug, candidate_pair, err, stun_code);
 
     // Ignore if closed
@@ -198,7 +197,7 @@ static void ice_failed_handler(
 
     // Completed all candidate pairs?
     if (trice_checklist_iscompleted(transport->gatherer->ice)) {
-        DEBUG_INFO("Checklist completed:\n%H", trice_debug, transport->gatherer->ice);
+        DEBUG_INFO("Checklist completed (failed):\n%H", trice_debug, transport->gatherer->ice);
 
         // Do we have one candidate pair that succeeded?
         if (!list_isempty(trice_validl(transport->gatherer->ice))) {
@@ -298,12 +297,12 @@ enum rawrtc_code rawrtc_ice_transport_start(
 
     // Start checklist (if remote candidates exist)
     if (!list_isempty(trice_rcandl(transport->gatherer->ice))) {
-        // TODO: Get config from struct
         // TODO: Why are there no keep-alive messages?
         // TODO: Set 'use_cand' properly
         DEBUG_INFO("Starting checklist due to start event\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL,
+                transport->gatherer->config->ice.checklist_pacing_interval, true,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             return error;
@@ -388,6 +387,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         struct rawrtc_ice_transport* const transport,
         struct rawrtc_ice_candidate* candidate // nullable
 ) {
+    struct rawrtc_config* config;
     struct ice_rcand* re_candidate = NULL;
     enum rawrtc_code error;
     char* ip = NULL;
@@ -418,6 +418,9 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // Get config
+    config = transport->gatherer->config;
+
     // Get IP and port
     error = rawrtc_ice_candidate_get_ip(&ip, candidate);
     if (error) {
@@ -432,11 +435,10 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         goto out;
     }
 
-    // Skip IPv4, IPv6 if requested
-    // TODO: Get config from struct
+    // Skip IPv4/IPv6 if requested
     af = sa_af(&address);
-    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
-            || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
+    if ((!config->general.ipv6_enable && af == AF_INET6)
+            || (!config->general.ipv4_enable && af == AF_INET)) {
         DEBUG_PRINTF("Skipping remote candidate due to IP version: %J\n", &address);
         goto out;
     }
@@ -448,9 +450,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     }
 
     // Skip UDP/TCP if requested
-    // TODO: Get config from struct
-    if ((!rawrtc_default_config.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP)
-            || (!rawrtc_default_config.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP)) {
+    if ((!config->general.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP)
+            || (!config->general.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP)) {
         DEBUG_PRINTF("Skipping remote candidate due to protocol: %J\n", &address);
         goto out;
     }
@@ -511,7 +512,14 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         goto out;
     }
 
-    // TODO: Add TURN permission
+    // Add TURN permission
+    error = rawrtc_ice_gatherer_add_turn_permissions(transport->gatherer, re_candidate);
+    if (error) {
+        DEBUG_WARNING("Unable to add TURN permissions for remote candidate\n");
+        // Note: Not considered critical
+    }
+
+    // TODO: Add TURN channel
 
     // Done
     DEBUG_PRINTF("Added remote candidate: %J\n", &address);
@@ -525,7 +533,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
             !trice_checklist_isrunning(transport->gatherer->ice)) {
         DEBUG_INFO("Starting checklist due to new remote candidate\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL, config->ice.checklist_pacing_interval, true,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             DEBUG_WARNING("Could not start checklist, reason: %s\n", rawrtc_code_to_str(error));

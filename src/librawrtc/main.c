@@ -1,6 +1,7 @@
 #include <pthread.h> // pthread_*
 #include <rawrtc.h>
 #include "main.h"
+#include "config.h"
 
 #define DEBUG_MODULE "rawrtc-main"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -47,6 +48,26 @@ enum rawrtc_code rawrtc_init() {
 
     // Set usrsctp initialised counter
     rawrtc_global.usrsctp_initialized = 0;
+
+    // Set default dummy addresses on default config
+    err = sa_decode(
+            &rawrtc_default_config.debug.dummy_local_address,
+            rawrtc_config_default_dummy_local_address,
+            rawrtc_config_default_dummy_local_address_length);
+    if (err) {
+        DEBUG_WARNING("Failed to set default configuration's dummy local address, reason: %m\n",
+                      err);
+        return rawrtc_error_to_code(err);
+    }
+    err = sa_decode(
+            &rawrtc_default_config.debug.dummy_remote_address,
+            rawrtc_config_default_dummy_remote_address,
+            rawrtc_config_default_dummy_remote_address_length);
+    if (err) {
+        DEBUG_WARNING("Failed to set default configuration's dummy remote address, reason: %m\n",
+                      err);
+        return rawrtc_error_to_code(err);
+    }
 
     // Done
     return RAWRTC_CODE_SUCCESS;

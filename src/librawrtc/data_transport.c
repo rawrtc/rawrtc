@@ -10,7 +10,7 @@
  * Destructor for an existing data transport.
  */
 static void rawrtc_sctp_transport_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_data_transport* const transport = arg;
 

@@ -2,13 +2,14 @@
 #include <rawrtc.h>
 #include "dtls_transport.h"
 #include "dtls_parameters.h"
+#include "packet_trace.h"
 #include "message_buffer.h"
 #include "candidate_helper.h"
 #include "certificate.h"
 #include "utils.h"
 
 #define DEBUG_MODULE "dtls-transport"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*
@@ -464,6 +465,18 @@ static int send_handler(
         return ECONNRESET;
     }
 
+    // Trace (if trace handle)
+    // Note: This is theoretically layer `RAWRTC_LAYER_TRACE_DTLS_SRTP` (25)
+    if (transport->trace_handle) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_dump(
+                transport->trace_handle, buffer, RAWRTC_PACKET_TRACE_OUTBOUND,
+                &candidate_pair->lcand->attr.addr, &candidate_pair->rcand->attr.addr,
+                RAWRTC_TRANSPORT_PROTOCOL_UDP, true);
+        if (error) {
+            DEBUG_NOTICE("Unable to trace DTLS packet, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
+
     // Send
     // TODO: Is destination correct?
     DEBUG_PRINTF("Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n",
@@ -493,12 +506,14 @@ static size_t mtu_handler(
  */
 static bool udp_receive_handler(
         struct mbuf* const buffer,
-        void* const context,
+        void* const source_context,
         void* const arg
 ) {
-    struct rawrtc_dtls_transport* const transport = arg;
-    struct sa* source = context;
+    struct rawrtc_packet_trace_helper_context* const context = arg;
+    struct rawrtc_dtls_transport* const transport = context->arg;
+    struct sa* source = source_context;
     struct sa const* peer;
+    bool handled;
 
     // TODO: Check if DTLS or SRTP packet
     // TODO: This handler should also be moved into ICE transport
@@ -519,13 +534,27 @@ static bool udp_receive_handler(
         }
     }
 
+    // Trace (if trace handle)
+    // Note: This is theoretically layer `RAWRTC_LAYER_TRACE_DTLS_SRTP` (25)
+    if (transport->trace_handle) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_dump(
+                transport->trace_handle, buffer, RAWRTC_PACKET_TRACE_INBOUND, source,
+                &context->local_address, RAWRTC_TRANSPORT_PROTOCOL_UDP, true);
+        if (error) {
+            DEBUG_NOTICE("Unable to trace DTLS packet, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
+
     // Decrypt & receive
     // Note: No need to check if the transport is already closed as the messages will re-appear in
     //       the `dtls_receive_handler`.
-    dtls_receive(transport->socket, source, buffer);
+    handled = dtls_receive(transport->socket, source, buffer);
+    if (!handled) {
+        DEBUG_NOTICE("Packet of size %zu has not been handled by any layer\n");
+    }
 
-    // Continue iterating through message queue
-    return true;
+    // Done
+    return handled;
 }
 
 /*
@@ -537,10 +566,7 @@ static bool udp_receive_helper(
         void* arg
 ) {
     // Receive
-    udp_receive_handler(buffer, source, arg);
-
-    // Handled
-    return true;
+    return udp_receive_handler(buffer, source, arg);
 }
 
 /*
@@ -574,6 +600,16 @@ static void rawrtc_dtls_transport_destroy(
     mem_deref(transport->remote_parameters);
     list_flush(&transport->certificates);
     mem_deref(transport->ice_transport);
+
+    // Close trace handle and contexts (if any)
+    if (transport->trace_handle) {
+        enum rawrtc_code const error = rawrtc_packet_trace_handle_close(transport->trace_handle);
+        if (error) {
+            DEBUG_NOTICE("Could not close DTLS packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
+    }
+    list_flush(&transport->trace_helper_contexts);
 }
 
 /*
@@ -592,6 +628,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     size_t i;
     struct rawrtc_certificate* certificate;
     enum rawrtc_code error;
+    struct rawrtc_config* config;
     struct le* le;
     uint8_t* certificate_der;
     size_t certificate_der_length;
@@ -622,15 +659,11 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     // Set fields/reference
     transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);
-    list_init(&transport->certificates);
     transport->state_change_handler = state_change_handler;
     transport->error_handler = error_handler;
     transport->arg = arg;
     transport->role = RAWRTC_DTLS_ROLE_AUTO;
     transport->connection_established = false;
-    list_init(&transport->buffered_messages_in);
-    list_init(&transport->buffered_messages_out);
-    list_init(&transport->fingerprints);
 
     // Append and reference certificates
     for (i = 0; i < n_certificates; ++i) {
@@ -649,6 +682,19 @@ enum rawrtc_code rawrtc_dtls_transport_create(
 
         // Append to list
         list_append(&transport->certificates, &certificate->le, certificate);
+    }
+
+    // Get config
+    config = ice_transport->gatherer->config;
+
+    // Create trace file (if requested)
+    if (config->debug.packet_trace_path) {
+        error = rawrtc_packet_trace_handle_open(
+                &transport->trace_handle, transport, config, RAWRTC_LAYER_DTLS_SRTP);
+        if (error) {
+            DEBUG_NOTICE("Could open DTLS packet trace handle, reason: %s\n",
+                         rawrtc_code_to_str(error));
+        }
     }
 
     // Create (D)TLS context
@@ -706,6 +752,10 @@ enum rawrtc_code rawrtc_dtls_transport_create(
         goto out;
     }
 
+    // TODO: Add more robust headroom requirement handling that handles address family,
+    //       TURN channels - should probably be stored on a candidate helper.
+    dtls_set_headroom(transport->socket, 48);
+
     // Attach to existing candidate pairs
     for (le = list_head(trice_validl(ice_transport->gatherer->ice)); le != NULL; le = le->next) {
         struct ice_candpair* candidate_pair = le->data;
@@ -741,6 +791,7 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 ) {
     enum rawrtc_code error;
     struct rawrtc_candidate_helper* candidate_helper = NULL;
+    struct rawrtc_packet_trace_helper_context* context = NULL;
     
     // Check arguments
     if (!transport || !candidate_pair) {
@@ -763,10 +814,25 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
                       rawrtc_code_to_str(error));
         goto out;
     }
+    DEBUG_PRINTF("Associated:\n%H", rawrtc_candidate_helper_debug,
+                 candidate_helper);
+
+    // Create receive handler context
+    // Note: This is only needed to store the local candidate's address in the trace handle.
+    //       It's not needed in production mode but hard to avoid as we need the DTLS transport
+    //       instance to know if we need the trace handle (a chicken-egg problem).
+    // Important: Be aware that this context has a non-refed pointer to the DTLS transport instance.
+    error = rawrtc_packet_trace_helper_context_create(
+            &context, transport->trace_handle, &candidate_pair->lcand->attr.addr, transport);
+    if (error) {
+        DEBUG_WARNING("Unable to create DTLS trace helper context, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        goto out;
+    }
 
     // Receive buffered packets
     error = rawrtc_message_buffer_clear(
-            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
+            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, context);
     if (error) {
         DEBUG_WARNING("Could not handle buffered packets on candidate pair, reason: %s\n",
                       rawrtc_code_to_str(error));
@@ -775,9 +841,9 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 
     // Attach this transport's receive handler
     error = rawrtc_candidate_helper_set_receive_handler(
-            candidate_helper, udp_receive_helper, transport);
+            candidate_helper, udp_receive_helper, context);
     if (error) {
-        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
+        DEBUG_WARNING("Could not attach receive handler to candidate pair, reason: %s\n",
                       rawrtc_code_to_str(error));
         goto out;
     }
@@ -793,7 +859,11 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
     }
 
 out:
-    if (!error) {
+    if (error) {
+        mem_deref(context);
+    } else {
+        // Store context
+        list_append(&transport->trace_helper_contexts, &context->le, context);
         DEBUG_PRINTF("Attached DTLS transport to candidate pair\n");
     }
     return error;
@@ -1071,8 +1141,8 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
         struct rawrtc_dtls_parameters** const parametersp, // de-referenced
         struct rawrtc_dtls_transport* const transport
 ) {
-    // TODO: Get config from struct
-    enum rawrtc_certificate_sign_algorithm const algorithm = rawrtc_default_config.sign_algorithm;
+    struct rawrtc_config* const config = transport->ice_transport->gatherer->config;
+    enum rawrtc_certificate_sign_algorithm const algorithm = config->general.sign_algorithm;
     struct le* le;
     struct rawrtc_dtls_fingerprint* fingerprint;
     enum rawrtc_code error;

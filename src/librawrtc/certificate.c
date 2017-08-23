@@ -21,6 +21,18 @@
 #include "debug.h"
 
 /*
+ * Default certificate options.
+ */
+struct rawrtc_certificate_options rawrtc_default_certificate_options = {
+    .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
+    .common_name = "anonymous@rawrtc.org",
+    .valid_until = 3600 * 24 * 30, // 30 days
+    .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
+    .named_curve = "prime256v1",
+    .modulus_length = 2048
+};
+
+/*
  * Print and flush the OpenSSL error queue.
  */
 static int print_openssl_error(
