@@ -199,7 +199,6 @@ static inline uint32_t crc32c_shift(uint32_t zeros[][256], uint32_t crc)
            zeros[2][(crc >> 16) & 0xff] ^ zeros[3][crc >> 24];
 }
 
-#ifndef TARGET_NOT_X86
 /* Block sizes for three-way parallel crc computation.  LONG and SHORT must
    both be powers of two.  The associated string constants must be set
    accordingly, for use in constructing the assembler instructions. */
@@ -336,10 +335,3 @@ uint32_t crc32c(uint32_t crc, const void *buf, size_t len)
     SSE42(sse42);
     return sse42 ? crc32c_hw(crc, buf, len) : crc32c_sw(crc, buf, len);
 }
-#endif
-#ifdef TARGET_NOT_X86
-uint32_t crc32c(uint32_t crc, const void *buf, size_t len)
-{
-  return crc32c_sw(crc, buf, len);
-}
-#endif
