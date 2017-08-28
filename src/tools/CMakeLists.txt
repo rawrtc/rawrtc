@@ -29,13 +29,17 @@ install(TARGETS dtls-transport-loopback
         DESTINATION bin)
 
 # Tool: sctp-redirect-transport
-add_executable(sctp-redirect-transport
-        sctp-redirect-transport.c)
-target_link_libraries(sctp-redirect-transport
-        rawrtc
-        rawrtc-helper)
-install(TARGETS sctp-redirect-transport
-        DESTINATION bin)
+
+if (SCTP_REDIRECT_TRANSPORT)
+  message(STATUS "Configuring for build of SCTP redirect transport.")
+  add_executable(sctp-redirect-transport
+          sctp-redirect-transport.c)
+  target_link_libraries(sctp-redirect-transport
+          rawrtc
+          rawrtc-helper)
+  install(TARGETS sctp-redirect-transport
+          DESTINATION bin)
+endif()
 
 # Tool: sctp-transport-loopback
 add_executable(sctp-transport-loopback

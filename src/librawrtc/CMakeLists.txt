@@ -2,7 +2,6 @@
 set(rawrtc_SOURCES
         candidate_helper.c
         certificate.c
-        crc32c.c
         data_channel.c
         data_channel_options.c
         data_channel_parameters.c
@@ -15,10 +14,16 @@ set(rawrtc_SOURCES
         ice_transport.c
         main.c
         message_buffer.c
-        sctp_redirect_transport.c
         sctp_capabilities.c
         sctp_transport.c
         utils.c)
+
+if(SCTP_REDIRECT_TRANSPORT)
+  list(APPEND rawrtc_SOURCES
+        crc32c.c
+        sctp_redirect_transport.c
+    )
+endif()
 
 # Setup library (link & install)
 add_library(rawrtc SHARED ${rawrtc_SOURCES})

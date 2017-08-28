@@ -26,6 +26,9 @@ if (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
     set(CMAKE_VERBOSE_MAKEFILE on)
 endif ()
 
+# Flag for enabling building of SCTP redirect transport
+set (SCTP_REDIRECT_TRANSPORT OFF CACHE BOOL "Build the SCTP redirect transport tool.")
+
 # Use pkg-config
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
