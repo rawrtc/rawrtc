@@ -186,6 +186,7 @@ void set_sctp_parameters(
     EOR(odict_entry_add(dict, "port", ODICT_INT, port));
 }
 
+#ifdef SCTP_REDIRECT_TRANSPORT
 /*
  * Set SCTP redirect parameters in dictionary.
  */
@@ -205,6 +206,7 @@ void set_sctp_redirect_parameters(
     EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, max_message_size));
     EOR(odict_entry_add(dict, "port", ODICT_INT, port));
 }
+#endif
 
 /*
  * Get ICE parameters from dictionary.

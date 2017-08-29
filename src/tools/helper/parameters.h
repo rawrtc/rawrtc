@@ -35,6 +35,7 @@ void set_sctp_parameters(
     struct odict* const dict
 );
 
+#ifdef SCTP_REDIRECT_TRANSPORT
 /*
  * Set SCTP redirect parameters in dictionary.
  */
@@ -43,6 +44,7 @@ void set_sctp_redirect_parameters(
     struct sctp_parameters* const parameters,
     struct odict* const dict
 );
+#endif
 
 /*
  * Get ICE parameters from dictionary.

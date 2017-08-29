@@ -245,7 +245,7 @@ enum rawrtc_data_channel_state {
 };
 
 
-
+#ifdef SCTP_REDIRECT_TRANSPORT
 /*
  * SCTP redirect transport states.
  * TODO: Private -> sctp_redirect_transport.h
@@ -255,6 +255,7 @@ enum rawrtc_sctp_redirect_transport_state {
     RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_OPEN,
     RAWRTC_SCTP_REDIRECT_TRANSPORT_STATE_CLOSED
 };
+#endif
 
 /*
  * Data transport type.
@@ -683,6 +684,7 @@ struct rawrtc_dtls_transport {
     void* receive_handler_arg;
 };
 
+#ifdef SCTP_REDIRECT_TRANSPORT
 /*
  * Redirect transport.
  */
@@ -695,6 +697,7 @@ struct rawrtc_sctp_redirect_transport {
     struct mbuf* buffer;
     int socket;
 };
+#endif
 
 /*
  * Generic data transport.
@@ -1308,6 +1311,7 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
  * rawrtc_dtls_transport_set_error_handler
  */
 
+#ifdef SCTP_REDIRECT_TRANSPORT
 /*
  * Create an SCTP redirect transport.
  */
@@ -1342,6 +1346,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_get_port(
     uint16_t* const portp, // de-referenced
     struct rawrtc_sctp_redirect_transport* const transport
 );
+#endif
 
 /*
  * Create a new SCTP transport capabilities instance.

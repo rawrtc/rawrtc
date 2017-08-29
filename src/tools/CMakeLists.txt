@@ -39,6 +39,7 @@ if (SCTP_REDIRECT_TRANSPORT)
           rawrtc-helper)
   install(TARGETS sctp-redirect-transport
           DESTINATION bin)
+  target_compile_definitions(sctp-redirect-transport PRIVATE SCTP_REDIRECT_TRANSPORT)
 endif()
 
 # Tool: sctp-transport-loopback
