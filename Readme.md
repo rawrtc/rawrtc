@@ -229,6 +229,16 @@ This tool has been developed to be able to test data channel implementations
 without having to write the required DTLS and ICE stacks. An example of such a
 testing tool is [dctt][dctt] which uses the kernel SCTP stack of FreeBSD.
 
+Building:
+
+This tool is not built by default. In order to build it, set the cached CMake flag `SCTP_REDIRECT_TRANSPORT` to `ON` when building, like so: 
+    
+    cd <path-to-rawrtc>/build
+    cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
+    make install
+    
+Note that this tool contains intel-specific code and will not build for non-intel system like ARM.
+
 Usage:
 
     sctp-redirect-transport <0|1 (ice-role)> <redirect-ip> <redirect-port>
