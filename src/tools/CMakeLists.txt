@@ -29,9 +29,8 @@ install(TARGETS dtls-transport-loopback
         DESTINATION bin)
 
 # Tool: sctp-redirect-transport
-
 if (SCTP_REDIRECT_TRANSPORT)
-  message(STATUS "Configuring for build of SCTP redirect transport.")
+  message(STATUS "Configuring for build with SCTP redirect transport.")
   add_executable(sctp-redirect-transport
           sctp-redirect-transport.c)
   target_link_libraries(sctp-redirect-transport
@@ -40,7 +39,7 @@ if (SCTP_REDIRECT_TRANSPORT)
   install(TARGETS sctp-redirect-transport
           DESTINATION bin)
   target_compile_definitions(sctp-redirect-transport PRIVATE SCTP_REDIRECT_TRANSPORT)
-endif()
+endif ()
 
 # Tool: sctp-transport-loopback
 add_executable(sctp-transport-loopback
