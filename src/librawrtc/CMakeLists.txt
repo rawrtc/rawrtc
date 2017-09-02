@@ -2,7 +2,6 @@
 set(rawrtc_SOURCES
         candidate_helper.c
         certificate.c
-        crc32c.c
         data_channel.c
         data_channel_options.c
         data_channel_parameters.c
@@ -15,10 +14,18 @@ set(rawrtc_SOURCES
         ice_transport.c
         main.c
         message_buffer.c
-        sctp_redirect_transport.c
         sctp_capabilities.c
         sctp_transport.c
         utils.c)
+
+# If we are building the SCTP redirect transport tool
+if (SCTP_REDIRECT_TRANSPORT)
+  # Add the relevant source files
+  list(APPEND rawrtc_SOURCES
+        crc32c.c
+        sctp_redirect_transport.c
+    )
+endif ()
 
 # Setup library (link & install)
 add_library(rawrtc SHARED ${rawrtc_SOURCES})
@@ -29,6 +36,12 @@ target_link_libraries(rawrtc-static
         ${rawrtc_DEP_LIBRARIES})
 install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
+
+if (SCTP_REDIRECT_TRANSPORT)
+  # And set the preprocessor variable
+  target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
+  target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
+endif ()
 
 # Generate pkg-config file & install it
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pkg-config.pc.cmakein

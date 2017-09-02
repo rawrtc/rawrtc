@@ -9,3 +9,6 @@ set(rawrtc_HELPER
 add_library(rawrtc-helper STATIC ${rawrtc_HELPER})
 target_link_libraries(rawrtc-helper
         rawrtc)
+if (SCTP_REDIRECT_TRANSPORT)
+  target_compile_definitions(rawrtc-helper PRIVATE SCTP_REDIRECT_TRANSPORT)
+endif ()
