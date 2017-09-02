@@ -231,13 +231,13 @@ testing tool is [dctt][dctt] which uses the kernel SCTP stack of FreeBSD.
 
 Building:
 
-This tool is not built by default. In order to build it, set the cached CMake flag `SCTP_REDIRECT_TRANSPORT` to `ON` when building, like so: 
+This tool is not built by default. In order to build it, set the environment variable `SCTP_REDIRECT_TRANSPORT` to `ON` when building, like so: 
     
     cd <path-to-rawrtc>/build
     cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
     make install
     
-Note that this tool contains intel-specific code and will not build for non-intel system like ARM.
+Note that this tool will not build on systems that do not have SSE 4.2 support, like ARM.
 
 Usage:
 
