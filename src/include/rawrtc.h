@@ -1384,6 +1384,14 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 );
 
 /*
+ * Replace the underlying DTLS transport.
+ */
+enum rawrtc_code rawrtc_sctp_transport_set_transport(
+    struct rawrtc_sctp_transport* const transport,
+    struct rawrtc_dtls_transport* const dtls_transport // referenced
+);
+
+/*
  * Get the SCTP data transport instance.
  */
 enum rawrtc_code rawrtc_sctp_transport_get_data_transport(
@@ -1404,6 +1412,14 @@ enum rawrtc_code rawrtc_sctp_transport_start(
  * Stop and close the SCTP transport.
  */
 enum rawrtc_code rawrtc_sctp_transport_stop(
+    struct rawrtc_sctp_transport* const transport
+);
+
+/*
+ * Get the underlying DTLS transport.
+ */
+enum rawrtc_code rawrtc_sctp_transport_get_transport(
+    struct rawrtc_dtls_transport** const dtls_transportp, // de-referenced
     struct rawrtc_sctp_transport* const transport
 );
 

@@ -68,6 +68,15 @@ target_link_libraries(data-channel-sctp
 install(TARGETS data-channel-sctp
         DESTINATION bin)
 
+# Tool: data-channel-sctp-swap-dtls-transport
+add_executable(data-channel-sctp-swap-dtls-transport
+        data-channel-sctp-swap-dtls-transport.c)
+target_link_libraries(data-channel-sctp-swap-dtls-transport
+        rawrtc
+        rawrtc-helper)
+install(TARGETS data-channel-sctp-swap-dtls-transport
+        DESTINATION bin)
+
 # Tool: data-channel-sctp-echo
 add_executable(data-channel-sctp-echo
         data-channel-sctp-echo.c)

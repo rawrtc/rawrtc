@@ -192,7 +192,6 @@ static void parse_remote_parameters(
 
     // Ok?
     if (error) {
-        DEBUG_WARNING("Invalid remote parameters\n");
         if (sctp_parameters.capabilities) {
             mem_deref(sctp_parameters.capabilities);
         }
@@ -223,6 +222,8 @@ out:
         client_stop(client);
         before_exit();
         exit(0);
+    } else {
+        DEBUG_WARNING("Invalid remote parameters, try again!\n");
     }
 }
 

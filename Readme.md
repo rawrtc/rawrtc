@@ -335,6 +335,28 @@ Usage:
 
     data-channel-sctp-echo <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
 
+### data-channel-sctp-swap-dtls-transport
+
+The necessary peer connection establishment steps are identical to the ones
+described for the [data-channel-sctp](#data-channel-sctp) tool. However, this
+tool allows to create multiple ICE gatherer/ICE transport/DTLS (*ICE-DTLS*)
+transport instances:
+ 
+1. By typing `+` and pressing Enter, new ICE-DTLS instances will be created.
+   Once this has been done, pasted parameters will be associated to the latest
+   created instance.
+
+2. The JSON blob `Local Parameters:` will appear again and reflect the
+   parameters of the newly created ICE-DTLS instance.
+
+3. As soon as the DTLS transport of an ICE-DTLS instance transitions into the
+   `connected` state, the SCTP transport switches the underlying DTLS
+   transport to this instance.
+
+Usage:
+
+    data-channel-sctp-swap-dtls-transport <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
+
 [travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
 [travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
 

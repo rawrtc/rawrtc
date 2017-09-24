@@ -1951,7 +1951,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 ) {
     enum rawrtc_code error;
     uint_fast16_t n_channels;
-    bool have_data_transport;
     struct rawrtc_sctp_transport* transport;
     struct sctp_assoc_value av;
     struct linger linger_option;
@@ -1965,12 +1964,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check DTLS transport state
-    if (dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CLOSED
-            || dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
-        return RAWRTC_CODE_INVALID_STATE;
-    }
-
     // Set number of channels
     // TODO: Get from config
     n_channels = RAWRTC_SCTP_TRANSPORT_DEFAULT_NUMBER_OF_STREAMS;
@@ -1978,15 +1971,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     // Set default port (if 0)
     if (port == 0) {
         port = RAWRTC_SCTP_TRANSPORT_DEFAULT_PORT;
-    }
-
-    // Check if a data transport is already registered
-    error = rawrtc_dtls_transport_have_data_transport(&have_data_transport, dtls_transport);
-    if (error) {
-        return error;
-    }
-    if (have_data_transport) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Initialise usrsctp (if needed)
@@ -2050,7 +2034,6 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     // Set fields/reference
     transport->state = RAWRTC_SCTP_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
     transport->port = port;
-    transport->dtls_transport = mem_ref(dtls_transport);
     transport->data_channel_handler = data_channel_handler;
     transport->state_change_handler = state_change_handler;
     transport->arg = arg;
@@ -2222,10 +2205,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         goto out;
     }
 
-    // Attach to ICE transport
-    DEBUG_PRINTF("Attaching as data transport\n");
-    error = rawrtc_dtls_transport_set_data_transport(
-            transport->dtls_transport, dtls_receive_handler, transport);
+    // Attach to DTLS transport as data transport
+    error = rawrtc_sctp_transport_set_transport(transport, dtls_transport);
     if (error) {
         goto out;
     }
@@ -2238,6 +2219,45 @@ out:
         *transportp = transport;
     }
     return error;
+}
+
+/*
+ * Replace the underlying DTLS transport.
+ */
+enum rawrtc_code rawrtc_sctp_transport_set_transport(
+        struct rawrtc_sctp_transport* const transport,
+        struct rawrtc_dtls_transport* const dtls_transport // referenced
+) {
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!transport || !dtls_transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check DTLS transport state
+    if (dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CLOSED
+        || dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // Attach to DTLS transport
+    // Note: The function checks if a data transport is already registered for us
+    DEBUG_PRINTF("Attaching as data transport\n");
+    error = rawrtc_dtls_transport_set_data_transport(
+            dtls_transport, dtls_receive_handler, transport);
+    if (error) {
+        return error;
+    }
+
+    // Un-reference previous transport (if any)
+    mem_deref(transport->dtls_transport);
+
+    // Set new transport
+    transport->dtls_transport = mem_ref(dtls_transport);
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -2705,6 +2725,23 @@ enum rawrtc_code rawrtc_sctp_transport_stop(
     return RAWRTC_CODE_SUCCESS;
 
     // TODO: Anything missing?
+}
+
+/*
+ * Get the underlying DTLS transport.
+ */
+enum rawrtc_code rawrtc_sctp_transport_get_transport(
+        struct rawrtc_dtls_transport** const dtls_transportp, // de-referenced
+        struct rawrtc_sctp_transport* const transport
+) {
+    // Check arguments
+    if (!dtls_transportp || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set pointer & done
+    *dtls_transportp = mem_ref(transport->dtls_transport);
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*

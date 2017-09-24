@@ -50,6 +50,15 @@ enum rawrtc_code dict_get_uint16(
 );
 
 /*
+ * Get JSON from a buffer and parse it to a dictionary.
+ */
+enum rawrtc_code get_json(
+    struct odict** const dictp, // de-referenced
+    char* const buffer, // de-referenced, nullable
+    size_t const length
+);
+
+/*
  * Get JSON from stdin and parse it to a dictionary.
  */
 enum rawrtc_code get_json_stdin(

@@ -192,6 +192,23 @@ enum rawrtc_code dict_get_uint16(
 }
 
 /*
+ * Get JSON from a buffer and parse it to a dictionary.
+ */
+enum rawrtc_code get_json(
+        struct odict** const dictp, // de-referenced
+        char* const buffer, // de-referenced, nullable
+        size_t const length
+) {
+    // Empty (or new line only)?
+    if (length == 0 || (length == 1 && buffer[0] == '\n')) {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+
+    // Decode JSON
+    return rawrtc_error_to_code(json_decode_odict(dictp, 16, buffer, length, 3));
+}
+
+/*
  * Get JSON from stdin and parse it to a dictionary.
  */
 enum rawrtc_code get_json_stdin(
@@ -201,10 +218,11 @@ enum rawrtc_code get_json_stdin(
     size_t length;
 
     // Get message from stdin
-    if (!fgets((char*) buffer, PARAMETERS_MAX_LENGTH, stdin)) {
+    if (!fgets((char*) buffer, ARRAY_SIZE(buffer), stdin)) {
         EWE("Error polling stdin");
     }
     length = strlen(buffer);
+
 
     // Exit?
     if (length == 1 && buffer[0] == '\n') {
