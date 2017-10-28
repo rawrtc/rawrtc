@@ -9,6 +9,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+enum {
+    DEFAULT_MESSAGE_SIZE = 1073741823,
+};
+
 struct parameters {
     struct rawrtc_ice_parameters* ice_parameters;
     struct rawrtc_ice_candidates* ice_candidates;
@@ -47,12 +51,22 @@ static void timer_handler(
     struct data_channel_helper* const channel = arg;
     struct data_channel_sctp_client* const client =
             (struct data_channel_sctp_client*) channel->client;
+    uint64_t max_message_size = DEFAULT_MESSAGE_SIZE; // Default to 1 GiB
     struct mbuf* buffer;
     enum rawrtc_code error;
     enum rawrtc_dtls_role role;
 
-    // Compose message (16 KiB)
-    buffer = mbuf_alloc(1 << 14);
+    // Get the remote peer's maximum message size
+    EOE(rawrtc_sctp_capabilities_get_max_message_size(
+            &max_message_size, client->remote_parameters.sctp_parameters.capabilities));
+    if (max_message_size > 0) {
+        max_message_size = min(DEFAULT_MESSAGE_SIZE, max_message_size);
+    } else {
+        max_message_size = DEFAULT_MESSAGE_SIZE;
+    }
+
+    // Compose message
+    buffer = mbuf_alloc(max_message_size);
     EOE(buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
     EOR(mbuf_fill(buffer, 'M', mbuf_get_space(buffer)));
     mbuf_set_pos(buffer, 0);
