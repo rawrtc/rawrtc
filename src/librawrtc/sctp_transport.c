@@ -1,8 +1,11 @@
 #include <stdio.h> // fopen
 #include <string.h> // memcpy, strlen
 #include <errno.h> // errno
+#ifndef _WIN32
 #include <sys/socket.h> // AF_INET, SOCK_STREAM, linger
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, htons
+#endif
+#include <pthread.h>
 #if (RAWRTC_DEBUG_LEVEL >= 7)
     #define SCTP_DEBUG
 #endif

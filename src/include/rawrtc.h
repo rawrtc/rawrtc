@@ -4,7 +4,9 @@
 
 #include <stdlib.h> // TODO: Why?
 #include <stdbool.h> // bool
+#ifndef _WIN32
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP, ...
+#endif
 #include <openssl/evp.h> // EVP_PKEY
 
 //#define ZF_LOG_LIBRARY_PREFIX rawrtc_

@@ -1,15 +1,4 @@
-#include <openssl/err.h>
-#include <openssl/rsa.h>
-#include <openssl/bn.h>
-#include <openssl/objects.h>
-#include <openssl/ec.h>
-#include <openssl/evp.h>
-#include <openssl/x509.h>
-#include <openssl/asn1.h>
-#include <openssl/asn1t.h>
-#include <openssl/crypto.h>
-#include <openssl/bio.h>
-#include <openssl/pem.h>
+
 #include <string.h>
 #include <limits.h>
 #include <rawrtc.h>
@@ -19,6 +8,18 @@
 #define DEBUG_MODULE "certificate"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
+#include <openssl/err.h>
+#include <openssl/rsa.h>
+#include <openssl/bn.h>
+#include <openssl/objects.h>
+#include <openssl/ec.h>
+#include <openssl/evp.h>
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+#include <openssl/crypto.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
 
 /*
  * Print and flush the OpenSSL error queue.
