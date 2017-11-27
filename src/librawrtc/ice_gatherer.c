@@ -1457,6 +1457,11 @@ static bool interface_handler(
         return false; // Continue gathering
     }
 
+    // Ignore 0.0.0.0
+    if(sa_af(address) == AF_INET && address->u.in.sin_addr.s_addr == 0) {
+        return false;
+    }
+
     // Skip IPv4, IPv6?
     // TODO: Get config from struct
     af = sa_af(address);
