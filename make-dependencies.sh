@@ -191,24 +191,24 @@ cd ${MAIN_DIR}
 # Build libre
 cd ${LIBRE_PATH}
 echo "Cleaning libre"
-eval ${re_make} clean
+${re_make} clean
 echo "Build information for libre:"
 SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-eval ${re_make} info
+${re_make} info
 echo "Building libre"
 SYSROOT_ALT=${openssl_sysroot} \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-eval ${re_make} install
+${re_make} install
 rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
 
 # Build librew
 cd ${LIBREW_PATH}
 echo "Cleaning librew"
-eval ${re_make} clean
+${re_make} clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
 EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-eval ${re_make} install-static
+${re_make} install-static
 cd ${MAIN_DIR}
