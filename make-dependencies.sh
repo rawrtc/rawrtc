@@ -111,6 +111,8 @@ elif [ "$offline" = false ]; then
     cd ${USRSCTP_PATH}
     echo "Pulling usrsctp"
     git pull
+else
+    cd ${USRSCTP_PATH}
 fi
 git checkout ${USRSCTP_BRANCH}
 git reset --hard ${USRSCTP_COMMIT}
@@ -125,6 +127,8 @@ elif [ "$offline" = false ]; then
     cd ${LIBRE_PATH}
     echo "Pulling libre"
     git pull
+else
+    cd ${LIBRE_PATH}
 fi
 git checkout ${LIBRE_BRANCH}
 git reset --hard ${LIBRE_COMMIT}
@@ -139,6 +143,8 @@ elif [ "$offline" = false ]; then
     cd ${LIBREW_PATH}
     echo "Pulling librew"
     git pull
+else
+    cd ${LIBREW_PATH}
 fi
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
