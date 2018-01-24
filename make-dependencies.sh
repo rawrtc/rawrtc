@@ -3,6 +3,8 @@ set -e
 
 #ENFORCE_OPENSSL=1
 
+fetch_repos=false
+
 # Number of threads to use
 export THREADS=12
 
@@ -78,6 +80,8 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 
 # Check if we need to fetch & install openssl
 need_openssl=false
+
+if [ "$fetch_repos" = true ]; then
 pkg-config --exists --atleast-version=${OPENSSL_VERSION} openssl || need_openssl=true
 #if ([ ! -z "$ENFORCE_OPENSSL" ] && [ "${ENFORCE_OPENSSL}" = "1" ]) || [ "$have_dtls_1_2" = false ]; then
 if [ "$need_openssl" = true ]; then
@@ -92,7 +96,6 @@ pkg-config --exists --atleast-version=${OPENSSL_VERSION} openssl || need_openssl
 fi
 #need_openssl=false
 echo "Need to fetch OpenSSL: $need_openssl"
-
 
 # Get openssl
 if [ "$need_openssl" = true ]; then
@@ -161,7 +164,7 @@ fi
 git checkout ${LIBREW_BRANCH}
 git reset --hard ${LIBREW_COMMIT}
 
-# End of fetch_repos
+fi # End of fetch_repos
 cd ${MAIN_DIR}
 
 
@@ -218,7 +221,7 @@ EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
 eval ${re_make} info
 echo "Building libre"
 #SYSROOT_ALT=${openssl_sysroot} \
-EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+EXTRA_CFLAGS="-Werror${clang_extra_cflags} -std=gnu99" \
 eval ${re_make} install
 rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
 cd ${MAIN_DIR}
@@ -229,6 +232,6 @@ cd ${LIBREW_PATH}
 #eval ${re_make} clean
 echo "Building librew"
 LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
-EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+EXTRA_CFLAGS="-Werror${clang_extra_cflags} -std=gnu99" \
 eval ${re_make} install-static
 cd ${MAIN_DIR}

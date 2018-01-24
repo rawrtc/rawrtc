@@ -1006,7 +1006,6 @@ if (event->strreset_flags) {
     for (i = 0; i < length; ++i) {
         uint_fast16_t const sid = (uint_fast16_t) event->strreset_stream_list[i];
         struct rawrtc_data_channel* channel;
-        struct rawrtc_sctp_data_channel_context* context;
         // Check if channel exists
         if (sid >= transport->n_channels || !transport->channels[sid]) {
             DEBUG_NOTICE("No channel registered for sid %"PRIuFAST16"\n", sid);
@@ -1015,7 +1014,6 @@ if (event->strreset_flags) {
 
         // Get channel and context
         channel = transport->channels[sid];
-        context = channel->transport_arg;
 
         // Incoming stream reset
         if (event->strreset_flags & SCTP_STREAM_RESET_INCOMING_SSN) {
@@ -1895,8 +1893,9 @@ static void data_channels_destroy(
         void* arg
 ) {
     struct rawrtc_data_channel** channels = arg;
+    uint16_t i;
 
-    for (uint16_t i = 0; i < 65535; ++i) { // Where do I get the number of channels from?
+    for (i = 0; i < 65535; ++i) { // Where do I get the number of channels from?
         mem_deref(channels[i]);
     }
 }
