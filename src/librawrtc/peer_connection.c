@@ -12,8 +12,7 @@
 #include "debug.h"
 
 // Constants
-uint16_t const port_bundle_only = 0;
-uint16_t const port_unspecified = 9;
+uint16_t const discard_port = 9;
 
 /*
  * Get the corresponding name for a peer connection state.
@@ -389,13 +388,14 @@ static void rawrtc_peer_connection_destroy(
 //    rawrtc_peer_connection_close(connection);
 
     // Un-reference
-    mem_deref(connection->sdp_session);
     mem_deref(connection->context.data_transport);
     mem_deref(connection->context.dtls_transport);
     list_flush(&connection->context.certificates);
     mem_deref(connection->context.ice_transport);
     mem_deref(connection->context.ice_gatherer);
     mem_deref(connection->context.gather_options);
+    mem_deref(connection->remote_description);
+    mem_deref(connection->local_description);
     mem_deref(connection->configuration);
 }
 
@@ -444,30 +444,32 @@ enum rawrtc_code rawrtc_peer_connection_create(
 enum rawrtc_code rawrtc_peer_connection_create_offer(
         struct rawrtc_peer_connection_description** const descriptionp,
         struct rawrtc_peer_connection* const connection
+//        bool const ice_restart
 ) {
     // Check arguments
     if (!connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check if already created
-    // TODO: Do ICE restart (?)
-//    if (connection->local_description) {
-//        return RAWRTC_CODE_NOT_IMPLEMENTED;
-//    }
-    if (connection->context.ice_gatherer &&
-            connection->context.ice_gatherer->state != RAWRTC_ICE_GATHERER_STATE_NEW) {
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // TODO: Allow subsequent offers
+    if (connection->local_description) {
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
     // Create description
-    return rawrtc_peer_connection_description_create(descriptionp, connection);
+    return rawrtc_peer_connection_description_create(descriptionp, connection, true);
 }
 
 /*
  * Create an answer.
  */
 enum rawrtc_code rawrtc_peer_connection_create_answer(
+        struct rawrtc_peer_connection_description** const descriptionp,
         struct rawrtc_peer_connection* const connection
 ) {
     // Check arguments
@@ -475,40 +477,22 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Check if already created
-    // TODO: Do ICE restart (?)
-//    if (connection->local_description) {
-//        return RAWRTC_CODE_NOT_IMPLEMENTED;
-//    }
-    if (connection->context.ice_gatherer &&
-        connection->context.ice_gatherer->state != RAWRTC_ICE_GATHERER_STATE_NEW) {
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // TODO: Allow subsequent answers
+    if (connection->local_description) {
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
+    // Create description
+    return rawrtc_peer_connection_description_create(descriptionp, connection, false);
 }
 
 /*
- * When the ICE configuration changes in a way that requires a new
-   gathering phase, a 'needs-ice-restart' bit is set.  When this bit is
-   set, calls to the createOffer API will generate new ICE credentials.
-   This bit is cleared by a call to the setLocalDescription API with new
-   ICE credentials
- */
-
-/*
- * Set local description.
- * TODO: Start gathering for each new or recycled (?) m-line (?)
- * TODO: Start gathering if ICE credentials updated
- */
-enum rawrtc_code rawrtc_peer_connection_set_local_description(
-
-) {
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
-}
-
-/*
- * Set the remote description.
+ * Set and apply the remote description.
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         struct rawrtc_peer_connection* const connection,
@@ -521,7 +505,15 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
+    /*
+     * TODO: Parse remote description.
+     * - amount of m-lines must be 1 for us
+     * - if offer not bundled, just don't bundle either
+     * - fallback: get stuff from session level if not in media line
+     */
+
     // Decode SDP
+    // TODO: Fix me
     error = rawrtc_error_to_code(sdp_decode(connection->sdp_session, description, true));
     if (error) {
         goto out;
@@ -534,22 +526,6 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
 out:
     return RAWRTC_CODE_NOT_IMPLEMENTED;
 }
-
-/*
- * Parse answer.
- * TODO: amount of m-lines must be identical to offer
- * TOOD: Figure 2: JSEP State Machine
- */
-// Answer:
-// Don't bundle if not bundled
-
-// Decode:
-// is bundled? if yes get stuff from first (?) m-line
-//   if not get all stuff from each m-line
-
-// Get SCTP port 'No default value is defined for the SDP sctp-port attribute. Therefore, if
-// the attribute is not present, the associated m- line MUST be considered invalid.' LOL.
-//    sdp_session_rattr(session, "sctp-port");
 
 /*
  * Create a data channel on a peer connection.
@@ -572,6 +548,12 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     // Check arguments
     if (!connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    // TODO: Support new offer/answer
+    if (connection->connection_state != RAWRTC_PEER_CONNECTION_STATE_NEW) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
     // Initialise context

@@ -23,6 +23,16 @@
 #include <usrsctp.h>
 
 /*
+ * Version
+ *
+ * Follows Semantic Versioning 2.0.0,
+ * see: https://semver.org
+ *
+ * TODO: Find a way to keep this in sync with the one in CMakeLists.txt
+ */
+#define RAWRTC_VERSION "0.0.1"
+
+/*
  * Return codes.
  */
 enum rawrtc_code {
@@ -838,9 +848,9 @@ struct rawrtc_peer_connection_configuration {
  * TODO: private
  */
 struct rawrtc_peer_connection_description {
-    struct sdp_session* session;
-    struct list media;
     struct mbuf* sdp;
+    bool trickle_ice;
+    char* bundled_mids;
 };
 
 /*
@@ -862,15 +872,12 @@ struct rawrtc_peer_connection_context {
  * TODO: private
  */
 struct rawrtc_peer_connection {
-    uint_fast8_t local_flags;
-    uint_fast8_t remote_flags;
     enum rawrtc_peer_connection_state connection_state;
     struct rawrtc_peer_connection_configuration* configuration;
     rawrtc_peer_connection_state_change_handler* connection_state_change_handler;
     enum rawrtc_data_transport_type data_transport_type;
-    struct sdp_session* sdp_session;
-//    struct mbuf* local_description;
-//    struct mbuf* remote_description;
+    struct rawrtc_peer_connection_description* local_description;
+    struct rawrtc_peer_connection_description* remote_description;
     struct rawrtc_peer_connection_context context;
     rawrtc_data_channel_handler* data_channel_handler; // nullable
 };
@@ -1741,7 +1748,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
 
 /*
  * Set whether to use legacy SDP for data channel parameter encoding.
- * Note: Currently, legacy SDP for data channels is on by default.
+ * Note: Legacy SDP for data channels is on by default due to parsing problems in Chrome.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
     struct rawrtc_peer_connection_configuration* configuration,
@@ -1761,6 +1768,14 @@ enum rawrtc_code rawrtc_peer_connection_create(
 * Create an offer.
 */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
+    struct rawrtc_peer_connection_description** const descriptionp,
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Create an answer.
+ */
+enum rawrtc_code rawrtc_peer_connection_create_answer(
     struct rawrtc_peer_connection_description** const descriptionp,
     struct rawrtc_peer_connection* const connection
 );

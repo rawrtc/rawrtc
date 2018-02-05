@@ -143,6 +143,9 @@ static void client_init(
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
 
+    // TODO: Create in-band negotiated data channel
+    // TODO: Return some kind of promise that resolves once the data channel can be created
+
     // Un-reference data channel parameters
     mem_deref(channel_parameters);
 

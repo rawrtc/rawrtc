@@ -105,7 +105,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
 
 /*
  * Set whether to use legacy SDP for data channel parameter encoding.
- * Note: Currently, legacy SDP for data channels is on by default.
+ * Note: Legacy SDP for data channels is on by default due to parsing problems in Chrome.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
         struct rawrtc_peer_connection_configuration* configuration,

@@ -1,5 +1,6 @@
 # Project
 cmake_minimum_required(VERSION 3.2)
+# TODO: Find a way to keep this in sync with the one in rawrtc.h
 project(librawrtc
         VERSION 0.0.1)
 set(PROJECT_DESCRIPTION

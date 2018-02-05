@@ -6,20 +6,67 @@
 #include "debug.h"
 
 // Constants
-static uint16_t const port_bundle_only = 0;
-static uint16_t const port_unspecified = 9;
+static uint16_t const discard_port = 9;
+
+/*
+ * Set session boilerplate
+ */
+static enum rawrtc_code set_session_boilerplate(
+        struct mbuf* const sdp, // not checked
+        char const* const version, // not checked
+        uint32_t const id
+) {
+    int err;
+
+    // Write session boilerplate
+    err = mbuf_write_str(sdp, "v=0\r\n";
+    err |= mbuf_printf(
+            sdp, "o=sdpartanic-rawrtc-%s %"PRIu32" 1 IN IP4 127.0.0.1\r\n", version, id);
+    err |= mbuf_write_str(sdp, "s=-\r\n");
+    err |= mbuf_write_str(sdp, "t=0 0\r\n");
+
+    // Done
+    return rawrtc_error_to_code(err);
+}
+
+/*
+ * Set session attributes on SDP.
+ */
+static enum rawrtc_code set_session_attributes(
+        struct mbuf* const sdp, // not checked
+        bool const trickle_ice,
+        char const* const bundled_mids
+) {
+    int err = 0;
+
+    // Trickle ICE
+    if (trickle_ice) {
+        err = mbuf_write_str(sdp, "a=ice-options:trickle\r\n");
+    }
+
+    // WebRTC identity not supported as of now
+
+    // Bundle media (we currently only support a single SCTP transport and nothing else)
+    if (bundled_mids) {
+        err |= mbuf_printf(sdp, "a=group:BUNDLE %s\r\n", bundled_mids);
+    }
+
+    // Done
+    return rawrtc_error_to_code(err);
+}
 
 /*
  * Add ICE attributes to SDP media line.
  */
 static enum rawrtc_code add_ice_attributes(
-        struct sdp_media* const media, // not checked
+        struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_ice_parameters* parameters;
     char* username_fragment = NULL;
     char* password = NULL;
+    int err;
 
     // Get ICE parameters
     error = rawrtc_ice_gatherer_get_local_parameters(&parameters, context->ice_gatherer);
@@ -35,14 +82,9 @@ static enum rawrtc_code add_ice_attributes(
     }
 
     // Set username fragment and password
-    error = rawrtc_error_to_code(sdp_media_set_lattr(
-            media, false, "ice-ufrag", "%s", username_fragment));
-    error |= rawrtc_error_to_code(sdp_media_set_lattr(media, false, "ice-pwd", "%s", password));
-    if (error) {
-        goto out;
-    }
-
-    // TODO: Continue here
+    err = mbuf_printf(sdp, "a=ice-ufrag:%s\r\n", username_fragment);
+    err |= mbuf_printf(sdp, "a=ice-pwd:%s\r\n", password);
+    error = rawrtc_error_to_code(err);
 
 out:
     mem_deref(password);
@@ -55,7 +97,7 @@ out:
  * Add DTLS fingerprint attributes to SDP media line.
  */
 static enum rawrtc_code add_dtls_fingerprint_attributes(
-        struct sdp_media* const media, // not checked
+        struct mbuf* const sdp, // not checked
         struct rawrtc_dtls_parameters* const parameters // not checked
 ) {
     enum rawrtc_code error;
@@ -82,8 +124,8 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
         }
 
         // Add fingerprint attribute
-        error = rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "fingerprint", "%s %s",
+        error = rawrtc_error_to_code(mbuf_printf(
+                sdp, "a=fingerprint:%s %s\r\n",
                 rawrtc_certificate_sign_algorithm_to_str(sign_algorithm), value));
         if (error) {
             goto out;
@@ -102,7 +144,7 @@ out:
  * Add DTLS transport attributes to SDP media line.
  */
 static enum rawrtc_code add_dtls_attributes(
-        struct sdp_media* const media, // not checked
+        struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context, // not checked
         bool const offer
 ) {
@@ -129,37 +171,35 @@ static enum rawrtc_code add_dtls_attributes(
         // Note: When offering, we MUST use 'actpass' as specified in JSEP
         setup_str = "actpass";
     } else {
-        setup_str = "TODO";
+        switch (role) {
+            case RAWRTC_DTLS_ROLE_AUTO:
+                setup_str = "active";
+                break;
+            case RAWRTC_DTLS_ROLE_CLIENT:
+                setup_str = "active";
+                break;
+            case RAWRTC_DTLS_ROLE_SERVER:
+                setup_str = "passive";
+                break;
+            default:
+                error = RAWRTC_CODE_INVALID_STATE;
+                goto out;
+                break;
+        }
     }
-//    switch (role) {
-//        case RAWRTC_DTLS_ROLE_AUTO:
-//            setup_str = "actpass";
-//            break;
-//        case RAWRTC_DTLS_ROLE_CLIENT:
-//            setup_str = "active";
-//            break;
-//        case RAWRTC_DTLS_ROLE_SERVER:
-//            setup_str = "passive";
-//            break;
-//        default:
-//            error = RAWRTC_CODE_INVALID_STATE;
-//            goto out;
-//            break;
-//    }
-    error = rawrtc_error_to_code(sdp_media_set_lattr(media, false, "setup", setup_str));
+    error = rawrtc_error_to_code(mbuf_printf(sdp, "a=setup:%s\r\n", setup_str));
     if (error) {
         goto out;
     }
 
     // Add fingerprints
-    error = add_dtls_fingerprint_attributes(media, parameters);
+    error = add_dtls_fingerprint_attributes(sdp, parameters);
     if (error) {
         goto out;
     }
 
     // Add (D)TLS ID
-    error = rawrtc_error_to_code(sdp_media_set_lattr(
-            media, false, "tls-id", "%s", context->dtls_id));
+    error = rawrtc_error_to_code(mbuf_printf(sdp, "a=tls-id:%s\r\n", context->dtls_id));
     if (error) {
         goto out;
     }
@@ -170,189 +210,85 @@ out:
 }
 
 /*
- * Add common attributes to SDP media line.
- */
-static enum rawrtc_code add_common_attributes(
-        struct sdp_media* const media, // not checked
-        char const* const mid,
-        bool const bundle_only
-) {
-    struct sa address;
-    enum rawrtc_code error;
-
-    // Sanity-check
-    if (!mid && bundle_only) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Use IPv4 unspecified as media address
-    sa_set_in(&address, INADDR_ANY, bundle_only ? port_bundle_only : port_unspecified);
-    sdp_media_set_laddr(media, &address);
-
-    // Add identification tag attribute (if required)
-    if (mid) {
-        error = rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "mid", "%s", mid));
-        if (error) {
-            return error;
-        }
-    }
-
-    // Add bundle-only attribute (if required)
-    if (bundle_only) {
-        error = rawrtc_error_to_code(sdp_media_set_lattr(media, false, "bundle-only", NULL, NULL));
-        if (error) {
-            return error;
-        }
-    }
-
-    // Done
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
  * Add SCTP data channel media line to SDP session.
  */
 enum rawrtc_code add_sctp_data_channel(
-        struct sdp_session* const session,
-        struct rawrtc_peer_connection_context* const context,
-        char const* const mid,
+        struct mbuf* const sdp, // not checked
+        struct rawrtc_peer_connection_context* const context, // not checked
+        char const* const mid, // not checked
         bool const offer,
-        bool const bundle_only,
         bool const sctp_sdp_06
 ) {
     struct rawrtc_sctp_transport* const transport = context->data_transport->transport;
-    char const* const application = "webrtc-datachannel";
-    uint_fast8_t const maximum_message_size = 0;
     enum rawrtc_code error;
     uint16_t sctp_port;
-    char const* protocol_str;
-    struct sdp_media* media = NULL;
-    char* format_str = NULL;
-    struct sdp_format* format = NULL;
-
-    // Check arguments
-    if (!session || !context) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
+    int err;
 
     // Get SCTP port
     error = rawrtc_sctp_transport_get_port(&sctp_port, transport);
     if (error) {
-        goto out;
+        return error;
     }
 
-    // Media section
-    // Note: We choose UDP here although communication may still happen over ICE-TCP candidates.
-    // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
-    protocol_str = sctp_sdp_06 ? "DTLS/SCTP" : "UDP/DTLS/SCTP";
-    error = rawrtc_error_to_code(sdp_media_add(
-            &media, session, "application", port_unspecified, protocol_str));
+    // Add media section
+    if (!sctp_sdp_06) {
+        // Note: We choose UDP here although communication may still happen over ICE-TCP candidates.
+        // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
+        err = mbuf_printf(
+                sdp, "m=application %"PRIu16" UDP/DTLS/SCTP webrtc-datachannel\r\n", discard_port);
+    } else {
+        err = mbuf_printf(
+                sdp, "m=application %"PRIu16" DTLS/SCTP %"PRIu16"\r\n", discard_port, sctp_port);
+    }
+    // Add dummy 'c'-line
+    err |= mbuf_write_str(sdp, "c=IN IP4 0.0.0.0\r\n");
+    // Add 'mid' line
+    err |= mbuf_printf(sdp, "a=mid:%s\r\n", mid);
+    // Add direction line
+    err |= mbuf_write_str(sdp, "a=sendrecv\r\n");
+    if (err) {
+        return rawrtc_error_to_code(err);
+    }
+
+    // Add ICE attributes
+    error = add_ice_attributes(sdp, context);
     if (error) {
-        goto out;
+        return error;
     }
 
-    // Don't set direction attribute
-    sdp_media_ldir_exclude(media, true);
-
-    // Prepare format string
-    if (sctp_sdp_06) {
-        error = rawrtc_sdprintf(&format_str, "%"PRIu16, sctp_port);
-        if (error) {
-            goto out;
-        }
-    }
-
-    // Add format
-    error = rawrtc_error_to_code(sdp_format_add(
-            &format, media, false, format_str ? format_str : application,
-            NULL, 0, 0, NULL, NULL, NULL, false, ""));
-    mem_deref(format_str);
+    // Add DTLS attributes
+    error = add_dtls_attributes(sdp, context, offer);
     if (error) {
-        goto out;
-    }
-
-    // Add common attributes
-    error = add_common_attributes(media, mid, bundle_only);
-    if (error) {
-        goto out;
+        return error;
     }
 
     // Set attributes
     if (!sctp_sdp_06) {
         // Set SCTP port
-        error = rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "sctp-port", "%"PRIu16, sctp_port));
-
-        // Set maximum message size
-        error |= rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "maximum-message-size", "%"PRIuFAST8, maximum_message_size));
-
-        // Handle error
-        if (error) {
-            goto out;
-        }
+        // Note: Last time I checked, Chrome wasn't able to copy with this
+        err = mbuf_printf(sdp, "a=sctp-port:%"PRIu16"\r\n", sctp_port);
     } else {
         // Set SCTP port and maximum message size
-        // Note: We don't set the #streams as the newest DCEP spec says it MUST be set to the
-        //       maximum amount of streams, so this is not negotiable.
-        error = rawrtc_error_to_code(sdp_media_set_lattr(
-                media, false, "sctpmap", "%"PRIu16" %s %"PRIuFAST8, sctp_port, application,
-                maximum_message_size));
-        if (error) {
-            goto out;
-        }
+        err = mbuf_printf(
+                sdp, "a=sctpmap:%"PRIu16" webrtc-datachannel max-message-size=0 streams=65535\r\n",
+                sctp_port);
+    }
+    if (err) {
+        return rawrtc_error_to_code(err);
     }
 
-    // Add upper-layer attributes (if not bundled)
-    if (!bundle_only) {
-        // Add DTLS attributes
-        error = add_dtls_attributes(media, context, offer);
-        if (error) {
-            goto out;
-        }
-
-        // Add ICE attributes
-        error = add_ice_attributes(media, context);
-        if (error) {
-            goto out;
-        }
-    }
-
-out:
+    // Set maximum message size
+    // Note: While this strictly isn't part of the 06 version, it makes sense to add this here
+    //       since Firefox already parses 'max-message-size' but doesn't use the new format for the
+    //       media line.
+    err = mbuf_write_str(sdp, "a=max-message-size:0\r\n");
+    error = rawrtc_error_to_code(err);
     if (error) {
-        mem_deref(format);
-        mem_deref(media);
+        return error;
     }
-    // TODO: Set media on some kind of offer context
-    return error;
-}
-
-/*
- * Set session attributes on SDP.
- */
-static enum rawrtc_code set_session_attributes(
-        struct sdp_session* const session,
-        char const* const mids
-) {
-    int err;
-
-    // Check arguments
-    if (!session || !mids) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Trickle ICE
-    err = sdp_session_set_lattr(session, false, "ice-options", "trickle");
-
-    // WebRTC Identity
-    // (N/A)
-
-    // Bundle media (we currently only support a single SCTP transport)
-    err |= sdp_session_set_lattr(session, false, "group", "BUNDLE %s", mids);
 
     // Done
-    return rawrtc_error_to_code(err);
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -364,9 +300,8 @@ static void rawrtc_peer_connection_description_destroy(
     struct rawrtc_peer_connection_description* const description = arg;
 
     // Un-reference
+    mem_deref(description->bundled_mids);
     mem_deref(description->sdp);
-    list_flush(&description->media);
-    mem_deref(description->session);
 }
 
 /*
@@ -374,84 +309,114 @@ static void rawrtc_peer_connection_description_destroy(
  */
 enum rawrtc_code rawrtc_peer_connection_description_create(
         struct rawrtc_peer_connection_description** const descriptionp,
-        struct rawrtc_peer_connection* const connection
+        struct rawrtc_peer_connection* const connection,
+        bool const offerer
 ) {
     struct rawrtc_peer_connection_context* context;
-    struct rawrtc_peer_connection_description* description;
-    struct sa address;
+    struct rawrtc_peer_connection_description* local_description;
+    struct rawrtc_peer_connection_description* remote_description;
+    struct mbuf* sdp = NULL;
     enum rawrtc_code error;
-    char const* const mid = "rawrtc-sctp-dc";
-    bool bundle_only = false;
 
     // Check arguments
     if (!descriptionp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // Ensure a data transport has been set (when offering)
+    if (offerer && !context->data_transport) {
+        DEBUG_WARNING("No data transport set\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Ensure a remote description is available (when answering)
+    remote_description = connection->remote_description;
+    if (!offerer && !remote_description) {
+        DEBUG_WARNING("No remote description set\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
     // Get context
     context = &connection->context;
 
+    // TODO: Create a more sophisticated SDP mechanism based on
+    //       https://github.com/nils-ohlmeier/rsdparsa
+
     // Allocate
-    description = mem_zalloc(sizeof(*description), rawrtc_peer_connection_description_destroy);
-    if (!description) {
-        return RAWRTC_CODE_NO_MEMORY;
+    local_description = mem_zalloc(
+            sizeof(*local_description), rawrtc_peer_connection_description_destroy);
+    if (!local_description) {
+        error = RAWRTC_CODE_NO_MEMORY;
+        goto out;
     }
 
-    // Create SDP session (use IPv4 unspecified as session address)
-    sa_set_in(&address, INADDR_ANY, 0);
-    error = rawrtc_error_to_code(sdp_session_alloc(&description->session, &address));
+    // Set initial values
+    if (offerer) {
+        local_description->trickle_ice = true;
+        error = rawrtc_strdup(
+                &local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
+        if (error) {
+            goto out;
+        }
+    } else {
+        local_description->trickle_ice = remote_description->trickle_ice;
+        local_description->bundled_mids = mem_ref(remote_description->bundled_mids);
+    }
+
+    // Create buffer for local description
+    sdp = mbuf_alloc(RAWRTC_PEER_CONNECTION_DESCRIPTION_DEFAULT_SIZE);
+    if (!sdp) {
+        error = RAWRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+
+    // Session boilerplate
+    error = set_session_boilerplate(sdp, RAWRTC_VERSION, rand_u32());
     if (error) {
         goto out;
     }
 
     // Session attributes
-    error = set_session_attributes(description->session, mid);
+    error = set_session_attributes(
+            sdp, local_description->trickle_ice, local_description->bundled_mids);
     if (error) {
         goto out;
     }
 
     // Add data transport (if any)
-    if (context->data_transport) {
-        switch (context->data_transport->type) {
-            case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
-                // Add SCTP transport
-                error = add_sctp_data_channel(
-                        description->session, context, mid, true, bundle_only,
-                        connection->configuration->sctp_sdp_06);
-                if (error) {
-                    goto out;
-                }
-
-                // Bundle further media
-                bundle_only = true;
-                break;
-            default:
-                error = RAWRTC_CODE_UNKNOWN_ERROR;
+    // TODO: Continue here with creating answer
+    switch (context->data_transport->type) {
+        case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
+            // Add SCTP transport
+            error = add_sctp_data_channel(
+                    sdp, context, local_description->bundled_mids, true,
+                    connection->configuration->sctp_sdp_06);
+            if (error) {
                 goto out;
-                break;
-        }
-    }
-
-    // Encode SDP
-    error = rawrtc_error_to_code(sdp_encode(&description->sdp, description->session, true));
-    if (error) {
-        goto out;
+            }
+            break;
+        default:
+            error = RAWRTC_CODE_UNKNOWN_ERROR;
+            goto out;
+            break;
     }
 
     // Debug
-    (void) bundle_only;
-    DEBUG_PRINTF("Description:\n%b", mbuf_buf(description->sdp), mbuf_get_left(description->sdp));
-    DEBUG_PRINTF("%H\n", sdp_session_debug, description->session);
+    DEBUG_PRINTF(
+            "Local description (%s):\n%b",
+            offerer ? "offer" : "answer",
+            mbuf_buf(local_description->sdp), mbuf_get_left(local_description->sdp));
 
-    // Set fields/reference
-    // TODO
+    // Reference SDP
+    local_description->sdp = mem_ref(sdp);
 
 out:
+    mem_deref(sdp);
     if (error) {
-        mem_deref(description);
+        mem_deref(local_description);
     } else {
         // Set pointer & done
-        *descriptionp = description;
+        *descriptionp = local_description;
     }
     return error;
 }
