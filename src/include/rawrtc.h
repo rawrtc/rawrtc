@@ -86,6 +86,16 @@ enum rawrtc_certificate_encode {
 };
 
 /*
+ * SDP type.
+ */
+enum rawrtc_sdp_type {
+    RAWRTC_SDP_TYPE_OFFER,
+    RAWRTC_SDP_TYPE_PROVISIONAL_ANSWER,
+    RAWRTC_SDP_TYPE_ANSWER,
+    RAWRTC_SDP_TYPE_ROLLBACK,
+};
+
+/*
  * ICE candidate type (internal).
  * TODO: Private
  */
@@ -840,7 +850,7 @@ struct rawrtc_peer_connection_configuration {
     enum rawrtc_ice_gather_policy gather_policy;
     struct list ice_servers;
     struct list certificates;
-    bool sctp_sdp_06;
+    bool sctp_sdp_05;
 };
 
 /*
@@ -848,9 +858,13 @@ struct rawrtc_peer_connection_configuration {
  * TODO: private
  */
 struct rawrtc_peer_connection_description {
-    struct mbuf* sdp;
+    struct rawrtc_peer_connection* connection;
+    enum rawrtc_sdp_type type;
     bool trickle_ice;
     char* bundled_mids;
+    char* remote_media_line;
+    bool sctp_sdp_05;
+    struct mbuf* sdp;
 };
 
 /*
@@ -1750,9 +1764,25 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
  * Set whether to use legacy SDP for data channel parameter encoding.
  * Note: Legacy SDP for data channels is on by default due to parsing problems in Chrome.
  */
-enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_05(
     struct rawrtc_peer_connection_configuration* configuration,
     bool const on
+);
+
+/*
+ * Get the SDP type of the description.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
+    enum rawrtc_sdp_type* const typep, // de-referenced
+    struct rawrtc_peer_connection_description* const description
+);
+
+/*
+ * Get the SDP of the description.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
+    char** const sdpp, // de-referenced
+    struct rawrtc_peer_connection_description* const description
 );
 
 /*
@@ -1781,11 +1811,19 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
 );
 
 /*
- * Set the remote description.
+ * Set and apply the local description.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_local_description(
+    struct rawrtc_peer_connection* const connection,
+    struct rawrtc_peer_connection_description* const description
+);
+
+/*
+ * Set and apply the remote description.
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     struct rawrtc_peer_connection* const connection,
-    struct mbuf* const description
+    struct rawrtc_peer_connection_description* const description
 );
 
 /*
@@ -1937,6 +1975,21 @@ char const * rawrtc_certificate_sign_algorithm_to_str(
  */
 enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
     enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
+    char const* const str
+);
+
+/*
+ * Translate an SDP type to str.
+ */
+char const * rawrtc_sdp_type_to_str(
+    enum rawrtc_sdp_type const type
+);
+
+/*
+ * Translate a str to an SDP type.
+ */
+enum rawrtc_code rawrtc_str_to_sdp_type(
+    enum rawrtc_sdp_type* const typep, // de-referenced
     char const* const str
 );
 

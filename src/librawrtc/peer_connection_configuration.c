@@ -44,7 +44,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
     configuration->gather_policy = gather_policy;
     list_init(&configuration->ice_servers);
     list_init(&configuration->certificates);
-    configuration->sctp_sdp_06 = true;
+    configuration->sctp_sdp_05 = true;
 
     // Set pointer and return
     *configurationp = configuration;
@@ -107,7 +107,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
  * Set whether to use legacy SDP for data channel parameter encoding.
  * Note: Legacy SDP for data channels is on by default due to parsing problems in Chrome.
  */
-enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_05(
         struct rawrtc_peer_connection_configuration* configuration,
         bool const on
 ) {
@@ -117,6 +117,6 @@ enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_06(
     }
 
     // Set
-    configuration->sctp_sdp_06 = on;
+    configuration->sctp_sdp_05 = on;
     return RAWRTC_CODE_SUCCESS;
 }

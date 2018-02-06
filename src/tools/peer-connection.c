@@ -117,6 +117,29 @@ static void peer_connection_state_change_handler(
     }
 }
 
+static void print_local_description(
+        struct rawrtc_peer_connection_description* const description
+) {
+    enum rawrtc_sdp_type type;
+    char* sdp;
+    struct odict* dict;
+
+    // Get SDP type & the SDP itself
+    EOE(rawrtc_peer_connection_description_get_sdp_type(&type, description));
+    EOE(rawrtc_peer_connection_description_get_sdp(&sdp, description));
+
+    // Create dict & add entries
+    EOR(odict_alloc(&dict, 16));
+    EOR(odict_entry_add(dict, "type", ODICT_STRING, rawrtc_sdp_type_to_str(type)));
+    EOR(odict_entry_add(dict, "sdp", ODICT_STRING, sdp));
+
+    // Print local description as JSON
+    DEBUG_INFO("Local Description:\n%H\n", json_encode_odict, dict);
+
+    // Un-reference
+    mem_deref(dict);
+}
+
 static void client_init(
         struct peer_connection_client* const client
 ) {
@@ -149,12 +172,13 @@ static void client_init(
     // Un-reference data channel parameters
     mem_deref(channel_parameters);
 
-    // Create offer
-    EOE(rawrtc_peer_connection_create_offer(&description, client->connection));
-    mem_deref(description);
-
-    // TODO: ...
-//    EOE(rawrtc_peer_connection_set_remote_description(client->connection, description));
+    // Offerer: Create, set and print local description
+    if (client->offerer) {
+        EOE(rawrtc_peer_connection_create_offer(&description, client->connection));
+        EOE(rawrtc_peer_connection_set_local_description(client->connection, description));
+        print_local_description(description);
+        mem_deref(description);
+    }
 }
 
 static void client_stop(

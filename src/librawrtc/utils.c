@@ -753,6 +753,64 @@ enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
     return RAWRTC_CODE_NO_VALUE;
 }
 
+static enum rawrtc_sdp_type const map_enum_sdp_type[] = {
+    RAWRTC_SDP_TYPE_OFFER,
+    RAWRTC_SDP_TYPE_PROVISIONAL_ANSWER,
+    RAWRTC_SDP_TYPE_ANSWER,
+    RAWRTC_SDP_TYPE_ROLLBACK,
+};
+
+static char const * const map_str_sdp_type[] = {
+    "offer",
+    "pranswer",
+    "answer",
+    "rollback",
+};
+
+static size_t const map_sdp_type_length =
+        ARRAY_SIZE(map_enum_sdp_type);
+
+/*
+ * Translate an SDP type to str.
+ */
+char const * rawrtc_sdp_type_to_str(
+        enum rawrtc_sdp_type const type
+) {
+    size_t i;
+
+    for (i = 0; i < map_sdp_type_length; ++i) {
+        if (map_enum_sdp_type[i] == type) {
+            return map_str_sdp_type[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an SDP type.
+ */
+enum rawrtc_code rawrtc_str_to_sdp_type(
+        enum rawrtc_sdp_type* const typep, // de-referenced
+        char const* const str
+) {
+    size_t i;
+
+    // Check arguments
+    if (!typep || !str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < map_sdp_type_length; ++i) {
+        if (str_casecmp(map_str_sdp_type[i], str) == 0) {
+            *typep = map_enum_sdp_type[i];
+            return RAWRTC_CODE_SUCCESS;
+        }
+    }
+
+    return RAWRTC_CODE_NO_VALUE;
+}
+
 static enum rawrtc_data_transport_type const map_enum_data_transport_type[] = {
     RAWRTC_DATA_TRANSPORT_TYPE_SCTP,
 };

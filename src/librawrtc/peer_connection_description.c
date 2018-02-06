@@ -19,7 +19,7 @@ static enum rawrtc_code set_session_boilerplate(
     int err;
 
     // Write session boilerplate
-    err = mbuf_write_str(sdp, "v=0\r\n";
+    err = mbuf_write_str(sdp, "v=0\r\n");
     err |= mbuf_printf(
             sdp, "o=sdpartanic-rawrtc-%s %"PRIu32" 1 IN IP4 127.0.0.1\r\n", version, id);
     err |= mbuf_write_str(sdp, "s=-\r\n");
@@ -146,7 +146,7 @@ out:
 static enum rawrtc_code add_dtls_attributes(
         struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context, // not checked
-        bool const offer
+        bool const offerer
 ) {
     enum rawrtc_code error;
     struct rawrtc_dtls_parameters* parameters;
@@ -166,8 +166,7 @@ static enum rawrtc_code add_dtls_attributes(
     }
 
     // Add setup attribute
-    // TODO: Needs to be fixed for answer
-    if (offer) {
+    if (offerer) {
         // Note: When offering, we MUST use 'actpass' as specified in JSEP
         setup_str = "actpass";
     } else {
@@ -210,14 +209,15 @@ out:
 }
 
 /*
- * Add SCTP data channel media line to SDP session.
+ * Add SCTP data transport media line to SDP session.
  */
-enum rawrtc_code add_sctp_data_channel(
+static enum rawrtc_code add_sctp_data_transport(
         struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context, // not checked
+        bool const offerer,
+        char const* const remote_media_line,
         char const* const mid, // not checked
-        bool const offer,
-        bool const sctp_sdp_06
+        bool const sctp_sdp_05
 ) {
     struct rawrtc_sctp_transport* const transport = context->data_transport->transport;
     enum rawrtc_code error;
@@ -231,14 +231,22 @@ enum rawrtc_code add_sctp_data_channel(
     }
 
     // Add media section
-    if (!sctp_sdp_06) {
-        // Note: We choose UDP here although communication may still happen over ICE-TCP candidates.
-        // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
-        err = mbuf_printf(
-                sdp, "m=application %"PRIu16" UDP/DTLS/SCTP webrtc-datachannel\r\n", discard_port);
+    if (remote_media_line) {
+        // Just repeat the remote media line.
+        err = mbuf_write_str(sdp, remote_media_line);
     } else {
-        err = mbuf_printf(
-                sdp, "m=application %"PRIu16" DTLS/SCTP %"PRIu16"\r\n", discard_port, sctp_port);
+        if (!sctp_sdp_05) {
+            // Note: We choose UDP here although communication may still happen over ICE-TCP
+            //       candidates.
+            // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
+            err = mbuf_printf(
+                    sdp, "m=application %"PRIu16" UDP/DTLS/SCTP webrtc-datachannel\r\n",
+                    discard_port);
+        } else {
+            err = mbuf_printf(
+                    sdp, "m=application %"PRIu16" DTLS/SCTP %"PRIu16"\r\n",
+                    discard_port, sctp_port);
+        }
     }
     // Add dummy 'c'-line
     err |= mbuf_write_str(sdp, "c=IN IP4 0.0.0.0\r\n");
@@ -257,20 +265,20 @@ enum rawrtc_code add_sctp_data_channel(
     }
 
     // Add DTLS attributes
-    error = add_dtls_attributes(sdp, context, offer);
+    error = add_dtls_attributes(sdp, context, offerer);
     if (error) {
         return error;
     }
 
     // Set attributes
-    if (!sctp_sdp_06) {
+    if (!sctp_sdp_05) {
         // Set SCTP port
-        // Note: Last time I checked, Chrome wasn't able to copy with this
+        // Note: Last time I checked, Chrome wasn't able to cope with this
         err = mbuf_printf(sdp, "a=sctp-port:%"PRIu16"\r\n", sctp_port);
     } else {
-        // Set SCTP port and maximum message size
+        // Set SCTP port, upper layer protocol and number of streams
         err = mbuf_printf(
-                sdp, "a=sctpmap:%"PRIu16" webrtc-datachannel max-message-size=0 streams=65535\r\n",
+                sdp, "a=sctpmap:%"PRIu16" webrtc-datachannel 65535\r\n",
                 sctp_port);
     }
     if (err) {
@@ -278,9 +286,8 @@ enum rawrtc_code add_sctp_data_channel(
     }
 
     // Set maximum message size
-    // Note: While this strictly isn't part of the 06 version, it makes sense to add this here
-    //       since Firefox already parses 'max-message-size' but doesn't use the new format for the
-    //       media line.
+    // Note: This isn't part of the 05 version but Firefox can only parse 'max-message-size' but
+    //       doesn't understand the old 'sctpmap' one (from 06 to 21).
     err = mbuf_write_str(sdp, "a=max-message-size:0\r\n");
     error = rawrtc_error_to_code(err);
     if (error) {
@@ -300,15 +307,17 @@ static void rawrtc_peer_connection_description_destroy(
     struct rawrtc_peer_connection_description* const description = arg;
 
     // Un-reference
-    mem_deref(description->bundled_mids);
     mem_deref(description->sdp);
+    mem_deref(description->remote_media_line);
+    mem_deref(description->bundled_mids);
+    mem_deref(description->connection);
 }
 
 /*
- * Create a new description.
+ * Create a description by creating an offer or answer.
  */
-enum rawrtc_code rawrtc_peer_connection_description_create(
-        struct rawrtc_peer_connection_description** const descriptionp,
+enum rawrtc_code rawrtc_peer_connection_description_create_internal(
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
         struct rawrtc_peer_connection* const connection,
         bool const offerer
 ) {
@@ -323,6 +332,9 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // Get context
+    context = &connection->context;
+
     // Ensure a data transport has been set (when offering)
     if (offerer && !context->data_transport) {
         DEBUG_WARNING("No data transport set\n");
@@ -335,9 +347,6 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         DEBUG_WARNING("No remote description set\n");
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
-
-    // Get context
-    context = &connection->context;
 
     // TODO: Create a more sophisticated SDP mechanism based on
     //       https://github.com/nils-ohlmeier/rsdparsa
@@ -352,15 +361,21 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
     // Set initial values
     if (offerer) {
+        local_description->connection = mem_ref(connection); // TODO: Possible circular reference
+        local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
+        local_description->sctp_sdp_05 = connection->configuration->sctp_sdp_05;
         error = rawrtc_strdup(
                 &local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
         if (error) {
             goto out;
         }
     } else {
+        local_description->type = RAWRTC_SDP_TYPE_ANSWER;
         local_description->trickle_ice = remote_description->trickle_ice;
         local_description->bundled_mids = mem_ref(remote_description->bundled_mids);
+        local_description->remote_media_line = mem_ref(remote_description->remote_media_line);
+        local_description->sctp_sdp_05 = remote_description->sctp_sdp_05;
     }
 
     // Create buffer for local description
@@ -370,13 +385,13 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         goto out;
     }
 
-    // Session boilerplate
+    // Set session boilerplate
     error = set_session_boilerplate(sdp, RAWRTC_VERSION, rand_u32());
     if (error) {
         goto out;
     }
 
-    // Session attributes
+    // Set session attributes
     error = set_session_attributes(
             sdp, local_description->trickle_ice, local_description->bundled_mids);
     if (error) {
@@ -384,13 +399,12 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Add data transport (if any)
-    // TODO: Continue here with creating answer
     switch (context->data_transport->type) {
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
             // Add SCTP transport
-            error = add_sctp_data_channel(
-                    sdp, context, local_description->bundled_mids, true,
-                    connection->configuration->sctp_sdp_06);
+            error = add_sctp_data_transport(
+                    sdp, context, true, local_description->remote_media_line,
+                    local_description->bundled_mids, local_description->sctp_sdp_05);
             if (error) {
                 goto out;
             }
@@ -419,4 +433,69 @@ out:
         *descriptionp = local_description;
     }
     return error;
+}
+
+/*
+ * Create a description by parsing an offer or answer.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_create(
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+        struct rawrtc_peer_connection* const connection,
+        bool const offerer
+) {
+    /*
+     * TODO: Parse remote description.
+     * - only accept 'offer' or 'answer'
+     * - amount of m-lines must be 1 for us
+     * - if offer not bundled, just don't bundle either
+     * - fallback: get stuff from session level if not in media line
+     * - create a data transport if it's not created
+     * - return NO_VALUE if nothing to do
+     */
+
+    // Decode SDP
+    // TODO: Fix me
+    error = rawrtc_error_to_code(sdp_decode(session, description, true));
+    if (error) {
+        goto out;
+    }
+
+    // Debug
+    DEBUG_PRINTF("Remote description:\n%b", mbuf_buf(description), mbuf_get_left(description));
+    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
+}
+
+/*
+ * Get the SDP type of the description.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
+        enum rawrtc_sdp_type* const typep, // de-referenced
+        struct rawrtc_peer_connection_description* const description
+) {
+    // Check arguments
+    if (!typep || !description) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set SDP type
+    *typep = description->type;
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the SDP of the description.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
+        char** const sdpp, // de-referenced
+        struct rawrtc_peer_connection_description* const description
+) {
+    // Check arguments
+    if (!sdpp || !description) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Copy SDP
+    return rawrtc_sdprintf(sdpp, "%b", mbuf_buf(description->sdp), mbuf_get_left(description->sdp));
 }

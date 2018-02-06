@@ -462,7 +462,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
     }
 
     // Create description
-    return rawrtc_peer_connection_description_create(descriptionp, connection, true);
+    return rawrtc_peer_connection_description_create_internal(descriptionp, connection, true);
 }
 
 /*
@@ -488,7 +488,47 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
     }
 
     // Create description
-    return rawrtc_peer_connection_description_create(descriptionp, connection, false);
+    return rawrtc_peer_connection_description_create_internal(descriptionp, connection, false);
+}
+
+/*
+ * Set and apply the local description.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_local_description(
+        struct rawrtc_peer_connection* const connection,
+        struct rawrtc_peer_connection_description* const description
+) {
+    // Check arguments
+    if (!connection || !description) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Ensure it has been created by the local peer connection.
+    if (description->connection != connection) {
+        // Yeah, sorry, nope, I'm not parsing all this SDP nonsense again just to check
+        // what kind of nasty things could have been done in the meantime.
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // TODO: Allow changing the local description
+    if (connection->local_description) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Remove reference to self
+    description->connection = mem_deref(description->connection);
+
+    // Set local description
+    connection->local_description = mem_ref(description);
+
+    // TODO: Local and remote description set, start gathering, etc...
+    if (connection->local_description && connection->remote_description) {
+        DEBUG_WARNING("TODO: Local and remote description set, start gathering, etc...\n");
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -496,35 +536,33 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         struct rawrtc_peer_connection* const connection,
-        struct mbuf* const description
+        struct rawrtc_peer_connection_description* const description
 ) {
-    enum rawrtc_code error;
-
     // Check arguments
     if (!connection || !description) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    /*
-     * TODO: Parse remote description.
-     * - amount of m-lines must be 1 for us
-     * - if offer not bundled, just don't bundle either
-     * - fallback: get stuff from session level if not in media line
-     */
-
-    // Decode SDP
-    // TODO: Fix me
-    error = rawrtc_error_to_code(sdp_decode(connection->sdp_session, description, true));
-    if (error) {
-        goto out;
+    // TODO: Allow changing the remote description
+    if (connection->remote_description) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
-    // Debug
-    DEBUG_PRINTF("Remote description:\n%b", mbuf_buf(description), mbuf_get_left(description));
-    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
-
-out:
+    // TODO: Ensure remote description fits our requirements
+    // TODO: Continue here
     return RAWRTC_CODE_NOT_IMPLEMENTED;
+
+    // Set remote description
+    connection->remote_description = mem_ref(description);
+
+    // TODO: Local and remote description set, start gathering, etc...
+    if (connection->local_description && connection->remote_description) {
+        DEBUG_WARNING("TODO: Local and remote description set, start gathering, etc...\n");
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
