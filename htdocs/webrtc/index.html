@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>WebRTC Data Channel Example</title>
+    <style>
+        #container {
+            display: flex;
+            flex-wrap: nowrap;
+        }
+
+        section {
+            flex-grow: 1;
+            flex-basis: 0;
+            padding: 5px;
+            border: 1px dashed black;
+        }
+
+        section textarea {
+            width: 100%;
+        }
+
+        #log {
+            flex-grow: 1;
+            flex-basis: 0;
+            margin: 0;
+            padding: 0;
+        }
+        #log > * {
+            margin: 2px 0;
+            padding: 0 6px;
+        }
+        #log .debug, #log .log {
+            border-left: 2px solid lightgrey;
+        }
+        #log .error {
+            border-left: 2px solid red;
+        }
+        #log .info {
+            border-left: 2px solid cornflowerblue;
+        }
+        #log .warn {
+            border-left: 2px solid orange;
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <section>
+        <!-- Role -->
+        <label for="role">Role: Offering</label>
+        <input type="checkbox" id="role" checked>
+        <br>
+
+        <!-- Message size to be used -->
+        <label for="message-size">Message size (bytes):</label>
+        <input id="message-size" type="number" name="message-size" value="16384" step="16384">
+        <br>
+
+        <!-- Start button -->
+        <button type="button" id="start" disabled>Start</button>
+        <br><hr>
+
+        <!-- Copy local description from this textarea -->
+        Copy local description:<br>
+        <textarea rows="15" id="local-description" readonly></textarea>
+
+        Paste remote description:<br>
+        <!-- Paste remote description into this textarea -->
+        <textarea rows="15" id="remote-description"></textarea>
+        <br>
+    </section>
+    <section>
+        <pre id="log"></pre>
+    </section>
+</div>
+
+<!-- Import dependencies -->
+<script src="https://webrtc.github.io/adapter/adapter-6.1.1.js"></script>
+<script src="signaling.js"></script>
+<script src="peerconnection.js"></script>
+
+<!-- UI code -->
+<script>
+'use strict';
+
+// Get elements
+const localDescriptionTextarea = document.getElementById('local-description');
+const remoteDescriptionTextarea = document.getElementById('remote-description');
+const roleCheckbox = document.getElementById('role');
+const startButton = document.getElementById('start');
+const logPre = document.getElementById('log');
+
+// Display console logs in the browser as well
+for (const name of ['debug', 'error', 'info', 'log', 'warn']) {
+    const method = window.console[name];
+    window.console[name] = function() {
+        method.apply(this, arguments);
+        const entry = document.createElement('div');
+        entry.className = name;
+        for (let i = 0; i < arguments.length; ++i) {
+            if (typeof arguments[i] === 'object') {
+                entry.innerHTML += JSON.stringify(arguments[i], undefined, 2) + ' ';
+            } else {
+                entry.innerHTML += arguments[i] + ' ';
+            }
+        }
+        logPre.appendChild(entry);
+    };
+}
+console.debug('debug', { bla: true });
+console.error('error');
+console.info('info', { bla: true });
+console.log('log', { bla: true });
+console.warn('warn', { bla: true });
+
+// Auto-select all text when clicking local description
+localDescriptionTextarea.addEventListener('click', function() {
+    this.select();
+});
+
+// TODO: Set message size minimum, maximum and initial value
+
+// Bind start button & enable
+startButton.addEventListener('click', () => {
+    start();
+});
+startButton.disabled = false;
+
+const start = (offering) => {
+    // Create peer connection
+    const pc = createPeerConnection('pc', offering, signaling);
+    console.log(pc._name, 'role:', offering ? 'Offering' : 'Answering');
+
+    // Create data channels
+    const createDataChannelWithName = (
+        name, options = null, createOnOpenWithName = null, createOnOpenOptions = null
+    ) => {
+        const dc = createDataChannel(name, pc, options);
+        const defaultOnOpenHandler = dc.onopen;
+        dc.onopen = (event) => {
+            defaultOnOpenHandler(event);
+            if (createOnOpenWithName !== null) {
+                window.setTimeout(() => {
+                    createDataChannelWithName(createOnOpenWithName, createOnOpenOptions);
+                }, 1000);
+            }
+            134217728
+            const maxMessageSize =
+                pc.sctp.maxMessageSize === 0 ? 1073741823 : pc.sctp.maxMessageSize;
+            let data = new Uint8Array(maxMessageSize);
+            console.log(dc._name, 'outgoing message (' + data.byteLength +
+                ' bytes):', data);
+            try {
+                dc.send(data);
+            } catch (error) {
+                console.error("This SHALL NOT throw but it did:", error.name, error);
+            }
+            if (pc.sctp.maxMessageSize > 0) {
+                data = new Uint8Array(maxMessageSize + 1);
+                console.log(dc._name, 'outgoing message (' + data.byteLength +
+                    ' bytes):', data);
+                try {
+                    dc.send(data);
+                    console.error("This MUST throw but it didn't!");
+                } catch (error) {
+                    console.warn('Unable to send message:', error.name, error);
+                }
+            }
+        };
+    };
+    createDataChannelWithName('test-in-band');
+}
+</script>
+
+</body>
+</html>

@@ -1770,6 +1770,15 @@ enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_05(
 );
 
 /*
+ * Create a description by parsing it from SDP.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_create(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    enum rawrtc_sdp_type const type,
+    char const* const sdp
+);
+
+/*
  * Get the SDP type of the description.
  */
 enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
@@ -1779,6 +1788,7 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
 
 /*
  * Get the SDP of the description.
+ * `*sdpp` will be set to a copy of the SDP that must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
     char** const sdpp, // de-referenced

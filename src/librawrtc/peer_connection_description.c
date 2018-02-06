@@ -146,7 +146,7 @@ out:
 static enum rawrtc_code add_dtls_attributes(
         struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context, // not checked
-        bool const offerer
+        bool const offering
 ) {
     enum rawrtc_code error;
     struct rawrtc_dtls_parameters* parameters;
@@ -166,7 +166,7 @@ static enum rawrtc_code add_dtls_attributes(
     }
 
     // Add setup attribute
-    if (offerer) {
+    if (offering) {
         // Note: When offering, we MUST use 'actpass' as specified in JSEP
         setup_str = "actpass";
     } else {
@@ -214,7 +214,7 @@ out:
 static enum rawrtc_code add_sctp_data_transport(
         struct mbuf* const sdp, // not checked
         struct rawrtc_peer_connection_context* const context, // not checked
-        bool const offerer,
+        bool const offering,
         char const* const remote_media_line,
         char const* const mid, // not checked
         bool const sctp_sdp_05
@@ -265,7 +265,7 @@ static enum rawrtc_code add_sctp_data_transport(
     }
 
     // Add DTLS attributes
-    error = add_dtls_attributes(sdp, context, offerer);
+    error = add_dtls_attributes(sdp, context, offering);
     if (error) {
         return error;
     }
@@ -319,7 +319,7 @@ static void rawrtc_peer_connection_description_destroy(
 enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
         struct rawrtc_peer_connection* const connection,
-        bool const offerer
+        bool const offering
 ) {
     struct rawrtc_peer_connection_context* context;
     struct rawrtc_peer_connection_description* local_description;
@@ -336,14 +336,14 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     context = &connection->context;
 
     // Ensure a data transport has been set (when offering)
-    if (offerer && !context->data_transport) {
+    if (offering && !context->data_transport) {
         DEBUG_WARNING("No data transport set\n");
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     // Ensure a remote description is available (when answering)
     remote_description = connection->remote_description;
-    if (!offerer && !remote_description) {
+    if (!offering && !remote_description) {
         DEBUG_WARNING("No remote description set\n");
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
@@ -360,7 +360,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     }
 
     // Set initial values
-    if (offerer) {
+    if (offering) {
         local_description->connection = mem_ref(connection); // TODO: Possible circular reference
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
@@ -418,7 +418,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     // Debug
     DEBUG_PRINTF(
             "Local description (%s):\n%b",
-            offerer ? "offer" : "answer",
+            offering ? "offer" : "answer",
             mbuf_buf(local_description->sdp), mbuf_get_left(local_description->sdp));
 
     // Reference SDP
@@ -436,13 +436,24 @@ out:
 }
 
 /*
- * Create a description by parsing an offer or answer.
+ * Create a description by parsing it from SDP.
  */
 enum rawrtc_code rawrtc_peer_connection_description_create(
         struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        struct rawrtc_peer_connection* const connection,
-        bool const offerer
+        enum rawrtc_sdp_type const type,
+        char const* const sdp
 ) {
+    // Check arguments
+    if (!descriptionp || !sdp) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // We only accept 'offer' or 'answer' at the moment
+    // TODO: Handle the other ones as well
+    if (type != RAWRTC_SDP_TYPE_OFFER && type != RAWRTC_SDP_TYPE_ANSWER) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
     /*
      * TODO: Parse remote description.
      * - only accept 'offer' or 'answer'
@@ -452,17 +463,39 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
      * - create a data transport if it's not created
      * - return NO_VALUE if nothing to do
      */
+    enum rawrtc_code error;
+    struct sdp_session* session;
+    struct sa address;
+    struct mbuf* buffer;
 
     // Decode SDP
-    // TODO: Fix me
-    error = rawrtc_error_to_code(sdp_decode(session, description, true));
+    error = rawrtc_error_to_code(sa_set_str(&address, "127.0.0.1", 9));
+    if (error) {
+        return error;
+    }
+    error = rawrtc_error_to_code(sdp_session_alloc(&session, &address));
+    if (error) {
+        return error;
+    }
+    buffer = mbuf_alloc(1024);
+    if (!buffer) {
+        goto out;
+    }
+    error = rawrtc_error_to_code(mbuf_write_str(buffer, sdp));
+    if (error) {
+        goto out;
+    }
+    error = rawrtc_error_to_code(sdp_decode(session, buffer, true));
     if (error) {
         goto out;
     }
 
     // Debug
-    DEBUG_PRINTF("Remote description:\n%b", mbuf_buf(description), mbuf_get_left(description));
-    DEBUG_PRINTF("%H\n", sdp_session_debug, connection->sdp_session);
+    DEBUG_PRINTF("%H\n", sdp_session_debug, session);
+
+out:
+    mem_deref(buffer);
+    mem_deref(session);
 }
 
 /*
@@ -486,6 +519,7 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
 
 /*
  * Get the SDP of the description.
+ * `*sdpp` will be set to a copy of the SDP that must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
         char** const sdpp, // de-referenced
@@ -497,5 +531,5 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
     }
 
     // Copy SDP
-    return rawrtc_sdprintf(sdpp, "%b", mbuf_buf(description->sdp), mbuf_get_left(description->sdp));
+    return rawrtc_sdprintf(sdpp, "%b", description->sdp->buf, description->sdp->end);
 }

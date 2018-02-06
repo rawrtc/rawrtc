@@ -9,5 +9,5 @@ enum {
 enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     struct rawrtc_peer_connection_description** const descriptionp,
     struct rawrtc_peer_connection* const connection,
-    bool const offerer
+    bool const offering
 );

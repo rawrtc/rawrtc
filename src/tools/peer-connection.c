@@ -11,7 +11,7 @@ struct peer_connection_client {
     char* name;
     char** ice_candidate_types;
     size_t n_ice_candidate_types;
-    bool offerer;
+    bool offering;
     struct rawrtc_peer_connection_configuration* configuration;
     struct rawrtc_peer_connection* connection;
     struct data_channel_helper* data_channel_negotiated;
@@ -42,8 +42,8 @@ static void timer_handler(
     }
     mem_deref(buffer);
 
-    // Close if answerer
-    if (!client->offerer) {
+    // Close if answering
+    if (!client->offering) {
         // Close bear-noises
         DEBUG_PRINTF("(%s) Closing channel\n", client->name, channel->label);
         EOR(rawrtc_data_channel_close(client->data_channel->channel));
@@ -91,9 +91,9 @@ static void peer_connection_state_change_handler(
     // Print state
     default_peer_connection_state_change_handler(state, arg);
 
-    // Open? Create new channel (if answerer)
+    // Open? Create new channel (if answering)
     // TODO: Move this once we can create data channels earlier
-    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED && !client->offerer) {
+    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED && !client->offering) {
         struct rawrtc_data_channel_parameters* channel_parameters;
 
         // Create data channel helper for in-band negotiated data channel
@@ -137,7 +137,11 @@ static void print_local_description(
     DEBUG_INFO("Local Description:\n%H\n", json_encode_odict, dict);
 
     // Un-reference
+struct rawrtc_peer_connection_description* descriptiona = NULL;
+rawrtc_peer_connection_description_create(&descriptiona, type, sdp);
+mem_deref(descriptiona);
     mem_deref(dict);
+    mem_deref(sdp);
 }
 
 static void client_init(
@@ -172,8 +176,8 @@ static void client_init(
     // Un-reference data channel parameters
     mem_deref(channel_parameters);
 
-    // Offerer: Create, set and print local description
-    if (client->offerer) {
+    // Offering: Create, set and print local description
+    if (client->offering) {
         EOE(rawrtc_peer_connection_create_offer(&description, client->connection));
         EOE(rawrtc_peer_connection_set_local_description(client->connection, description));
         print_local_description(description);
@@ -197,7 +201,7 @@ static void client_stop(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (offerer)> [<ice-candidate-type> ...]", program);
+    DEBUG_WARNING("Usage: %s <0|1 (offering)> [<ice-candidate-type> ...]", program);
     exit(1);
 }
 
@@ -254,7 +258,7 @@ int main(int argc, char* argv[argc + 1]) {
     client.ice_candidate_types = ice_candidate_types;
     client.n_ice_candidate_types = n_ice_candidate_types;
     client.configuration = configuration;
-    client.offerer = role == RAWRTC_ICE_ROLE_CONTROLLING ? true : false;
+    client.offering = role == RAWRTC_ICE_ROLE_CONTROLLING ? true : false;
 
     // Setup client
     client_init(&client);
