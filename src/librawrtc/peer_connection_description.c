@@ -511,6 +511,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 out:
     mem_deref(buffer);
     mem_deref(session);
+    return RAWRTC_CODE_NOT_IMPLEMENTED;
 }
 
 /*
