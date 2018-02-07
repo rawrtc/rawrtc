@@ -5,7 +5,7 @@
  */
 enum {
     RAWRTC_DATA_CHANNEL_FLAGS_INITIALIZED = 1 << 0,
-    RAWRTC_DATA_CHANNEL_FLAGS_CAN_SET_OPTIONS = 1 << 1
+    RAWRTC_DATA_CHANNEL_FLAGS_CAN_SET_OPTIONS = 1 << 1,
 };
 
 void rawrtc_data_channel_set_state(

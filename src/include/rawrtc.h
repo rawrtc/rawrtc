@@ -871,6 +871,7 @@ struct rawrtc_peer_connection_description {
     char* bundled_mids;
     char* remote_media_line;
     bool sctp_sdp_05;
+    bool end_of_candidates;
     struct mbuf* sdp;
 };
 
@@ -1803,6 +1804,51 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp_type(
 enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
     char** const sdpp, // de-referenced
     struct rawrtc_peer_connection_description* const description
+);
+
+/*
+ * Encode the candidate into SDP.
+ * `*sdpp` will be set to a copy of the SDP attribute that must be
+ * unreferenced.
+ *
+ * Note: This is equivalent to the `candidate` attribute of the W3C
+ *       WebRTC specification's `RTCIceCandidateInit`.
+ */
+enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp(
+    char** const sdpp, // de-referenced
+    struct rawrtc_ice_candidate* const candidate
+);
+
+/*
+ * Get the media stream identification tag the candidate is associated to.
+ * `*midp` will be set to a copy of the 'mid' field that must be
+ * unreferenced.
+*/
+enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp_mid(
+    char** const midp, // de-referenced
+    struct rawrtc_ice_candidate* const candidate,
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get the media stream line index the candidate is associated to.
+ *
+*/
+enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp_media_line_index(
+    uint8_t* const media_line_index, // de-referenced
+    struct rawrtc_ice_candidate* const candidate,
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get the username fragment the candidate is associated to.
+ * `*username_fragmentp` will be set to a copy of the associated
+ * username fragment that must be unreferenced.
+ */
+enum rawrtc_code rawrtc_peer_connection_candidate_get_username_fragment(
+    char** const username_fragmentp, // de-referenced
+    struct rawrtc_ice_candidate* const candidate,
+    struct rawrtc_peer_connection* const connection
 );
 
 /*

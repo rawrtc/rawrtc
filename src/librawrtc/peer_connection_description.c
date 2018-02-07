@@ -365,6 +365,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
         local_description->sctp_sdp_05 = connection->configuration->sctp_sdp_05;
+        local_description->end_of_candidates = false;
         error = rawrtc_strdup(
                 &local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
         if (error) {
@@ -376,6 +377,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         local_description->bundled_mids = mem_ref(remote_description->bundled_mids);
         local_description->remote_media_line = mem_ref(remote_description->remote_media_line);
         local_description->sctp_sdp_05 = remote_description->sctp_sdp_05;
+        local_description->end_of_candidates = false;
     }
 
     // Create buffer for local description
@@ -442,12 +444,62 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
         struct rawrtc_peer_connection_description* const description,
         struct rawrtc_ice_candidate* const candidate // nullable
 ) {
-    // TODO: Continue here
-    /*
-     * a=candidate:0 1 UDP 2122187007 10.26.2.1 45636 typ host
-       a=end-of-candidates   (when candidate null)
-     */
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!description) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Write candidate or end of candidates indication
+    if (candidate) {
+        char* candidate_sdp;
+
+        // Already written?
+        if (description->end_of_candidates) {
+            return RAWRTC_CODE_INVALID_STATE;
+        }
+
+        // Get candidate SDP
+        error = rawrtc_peer_connection_candidate_get_sdp(&candidate_sdp, candidate);
+        if (error) {
+            return error;
+        }
+
+        // TODO: We would have to get the associated 'mid', media line index and username fragment
+        //       as well and...
+        //
+        //       * inject the candidate at the correct place (compare 'mid' or line index), and
+        //       * compare the username fragment against the one that's currently active (once we
+        //         support ICE restarts).
+
+        // Write candidate to SDP
+        // Note: We only have one media line, so it should be fine to append this to the end
+        error = rawrtc_error_to_code(mbuf_printf(
+                description->sdp, "a=%s\r\n", candidate_sdp));
+        mem_deref(candidate_sdp);
+        if (error) {
+            DEBUG_WARNING("Couldn't write candidate to description, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return error;
+        }
+    } else {
+        // Already written?
+        if (description->end_of_candidates) {
+            DEBUG_WARNING("End of candidates has already been written\n");
+            return RAWRTC_CODE_SUCCESS;
+        }
+
+        // Write end of candidates into SDP
+        error = rawrtc_error_to_code(mbuf_write_str(description->sdp, "a=end-of-candidates\r\n"));
+        if (error) {
+            return error;
+        }
+        description->end_of_candidates = true;
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*

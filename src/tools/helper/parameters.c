@@ -90,7 +90,7 @@ void set_ice_candidates(
         if (related_address) {
             EOR(odict_entry_add(node, "relatedAddress", ODICT_STRING, related_address));
         }
-        if (related_port) {
+        if (related_port > 0) {
             EOR(odict_entry_add(node, "relatedPort", ODICT_INT, related_port));
         }
 

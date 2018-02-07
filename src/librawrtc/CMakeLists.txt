@@ -17,6 +17,7 @@ set(rawrtc_SOURCES
         main.c
         message_buffer.c
         peer_connection.c
+        peer_connection_candidate.c
         peer_connection_configuration.c
         peer_connection_description.c
         sctp_capabilities.c
@@ -25,11 +26,10 @@ set(rawrtc_SOURCES
 
 # If we are building the SCTP redirect transport tool
 if (SCTP_REDIRECT_TRANSPORT)
-  # Add the relevant source files
-  list(APPEND rawrtc_SOURCES
-        crc32c.c
-        sctp_redirect_transport.c
-    )
+    # Add the relevant source files
+    list(APPEND rawrtc_SOURCES
+            crc32c.c
+            sctp_redirect_transport.c)
 endif ()
 
 # Setup library (link & install)
@@ -43,9 +43,9 @@ install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
 
 if (SCTP_REDIRECT_TRANSPORT)
-  # And set the preprocessor variable
-  target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
-  target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
+    # And set the preprocessor variable
+    target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
+    target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
 endif ()
 
 # Generate pkg-config file & install it
