@@ -4,16 +4,39 @@
     <meta charset="UTF-8">
     <title>WebRTC Data Channel Example</title>
     <style>
-        #container {
+        @keyframes new-fade {
+            0% {
+                background-color: #fffb85;
+            }
+            100% {
+                background-color: transparent;
+            }
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        body {
+            height: 100vh;
             display: flex;
+        }
+
+        main {
+            width: 100%;
+            display: flex;
+            flex-grow: 1;
             flex-wrap: nowrap;
         }
 
-        section {
+        section, aside {
+            padding: 5px;
             flex-grow: 1;
             flex-basis: 0;
-            padding: 5px;
-            border: 1px dashed black;
+        }
+        aside {
+            overflow-y: auto;
         }
 
         section textarea {
@@ -21,14 +44,15 @@
         }
 
         #log {
-            flex-grow: 1;
-            flex-basis: 0;
             margin: 0;
             padding: 0;
+            flex-grow: 1;
+            flex-basis: 0;
         }
         #log > * {
             margin: 2px 0;
             padding: 0 6px;
+            animation: new-fade 1.5s ease-out 1;
         }
         #log .debug, #log .log {
             border-left: 2px solid lightgrey;
@@ -46,35 +70,38 @@
 </head>
 <body>
 
-<div id="container">
+<main>
     <section>
-        <!-- Role -->
-        <label for="role">Role: Offering</label>
-        <input type="checkbox" id="role" checked>
-        <br>
+        <form autocomplete="off">
+            <!-- Role -->
+            <label for="role">Role: Offering</label>
+            <input type="checkbox" id="role" checked>
+            <br>
 
-        <!-- Message size to be used -->
-        <label for="message-size">Message size (bytes):</label>
-        <input id="message-size" type="number" name="message-size" value="16384" step="16384">
-        <br>
+            <!-- Message size to be used -->
+            <label for="message-size">Message size (bytes):</label>
+            <input id="message-size" type="number" name="message-size" value="16384" step="16384">
+            <br>
 
-        <!-- Start button -->
-        <button type="button" id="start" disabled>Start</button>
-        <br><hr>
+            <!-- WebSocket URL & Start button -->
+            <input type="text" id="ws-url" placeholder="Optional Server URL">
+            <button type="button" id="start" disabled>Start</button>
+            <br><hr>
 
-        <!-- Copy local description from this textarea -->
-        Copy local description:<br>
-        <textarea rows="15" id="local-description" readonly></textarea>
+            <!-- Copy local description from this textarea -->
+            Copy local description:<br>
+            <textarea rows="15" id="local-description" disabled readonly></textarea>
 
-        Paste remote description:<br>
-        <!-- Paste remote description into this textarea -->
-        <textarea rows="15" id="remote-description"></textarea>
-        <br>
+            <!-- Paste remote description into this textarea -->
+            Paste remote description:<br>
+            <textarea rows="15" id="remote-description" disabled></textarea>
+            <br>
+        </form>
     </section>
-    <section>
+    <aside>
         <pre id="log"></pre>
-    </section>
-</div>
+    </aside>
+</main>
 
 <!-- Import dependencies -->
 <script src="https://webrtc.github.io/adapter/adapter-6.1.1.js"></script>
@@ -86,58 +113,125 @@
 'use strict';
 
 // Get elements
+const roleCheckbox = document.getElementById('role');
+const messageSizeInput = document.getElementById('message-size');
 const localDescriptionTextarea = document.getElementById('local-description');
 const remoteDescriptionTextarea = document.getElementById('remote-description');
-const roleCheckbox = document.getElementById('role');
+const wsUrlInput = document.getElementById('ws-url');
 const startButton = document.getElementById('start');
 const logPre = document.getElementById('log');
+
+// Load & store persistent values
+if (typeof(Storage) !== 'undefined') {
+    const persistentElements = [
+        ['role', 'checked', (value) => value === 'true'],
+        ['message-size', 'value'],
+        ['ws-url', 'value']
+    ];
+    for (const [id, property, transform] of persistentElements) {
+        let value = localStorage.getItem(id);
+        const element = document.getElementById(id);
+        if (transform !== undefined) {
+            value = transform(value);
+        }
+        if (value !== null) {
+            element[property] = value;
+        }
+        element.addEventListener('change', () => {
+            localStorage.setItem(id, element[property]);
+        });
+    }
+}
 
 // Display console logs in the browser as well
 for (const name of ['debug', 'error', 'info', 'log', 'warn']) {
     const method = window.console[name];
     window.console[name] = function() {
-        method.apply(this, arguments);
+        method.apply(null, arguments);
         const entry = document.createElement('div');
-        entry.className = name;
+        entry.classList.add(name);
         for (let i = 0; i < arguments.length; ++i) {
+            let item = arguments[i];
             if (typeof arguments[i] === 'object') {
-                entry.innerHTML += JSON.stringify(arguments[i], undefined, 2) + ' ';
+                entry.innerHTML += JSON.stringify(item, null, 2) + ' ';
             } else {
-                entry.innerHTML += arguments[i] + ' ';
+                entry.innerHTML += item + ' ';
             }
         }
-        logPre.appendChild(entry);
+        logPre.prepend(entry);
     };
 }
-console.debug('debug', { bla: true });
-console.error('error');
-console.info('info', { bla: true });
-console.log('log', { bla: true });
-console.warn('warn', { bla: true });
 
 // Auto-select all text when clicking local description
 localDescriptionTextarea.addEventListener('click', function() {
     this.select();
 });
 
-// TODO: Set message size minimum, maximum and initial value
-
 // Bind start button & enable
 startButton.addEventListener('click', () => {
-    start();
+    roleCheckbox.disabled = true;
+    messageSizeInput.disabled = true;
+    wsUrlInput.disabled = true;
+    startButton.disabled = true;
+    localDescriptionTextarea.disabled = false;
+    start(roleCheckbox.checked);
 });
 startButton.disabled = false;
 
 const start = (offering) => {
-    // Create peer connection
-    const pc = createPeerConnection('pc', offering, signaling);
-    console.log(pc._name, 'role:', offering ? 'Offering' : 'Answering');
+    console.info('Starting with role:', offering ? 'Offering' : 'Answering');
+
+    // Create signaling instance
+    const wsUrl = wsUrlInput.value;
+    let signaling;
+    if (wsUrl === '') {
+        signaling = new CopyPasteSignaling();
+    } else {
+        signaling = new WebSocketSignaling(wsUrl);
+    }
+    signaling.onLocalDescriptionUpdate = (description) => {
+        localDescriptionTextarea.value = JSON.stringify(description);
+
+        // Enable remote description once local description has been set
+        remoteDescriptionTextarea.disabled = false;
+    };
+    signaling.onRemoteDescriptionUpdate = (description) => {
+        remoteDescriptionTextarea.value = JSON.stringify(description);
+    };
+
+    // Create peer connection instance
+    const pc = new WebRTCPeerConnection(signaling, offering);
+
+    // Apply remote description when pasting
+    remoteDescriptionTextarea.onchange = () => {
+        // Remove event listener
+        remoteDescriptionTextarea.onchange = null;
+
+        // Apply remote description once (needs to include candidates)
+        const description = JSON.parse(remoteDescriptionTextarea.value);
+        signaling.handleRemoteDescription(description, true)
+            .catch((error) => console.error(error));
+
+        // Make read-only
+        remoteDescriptionTextarea.readOnly = true;
+    };
+
+    // Enable remote description early (if not offering)
+    if (!offering) {
+        remoteDescriptionTextarea.disabled = false;
+    }
+
+    // Get message size
+    const messageSize = parseInt(messageSizeInput.value);
+    if (isNaN(messageSize)) {
+        throw 'Invalid message size value';
+    }
 
     // Create data channels
     const createDataChannelWithName = (
         name, options = null, createOnOpenWithName = null, createOnOpenOptions = null
     ) => {
-        const dc = createDataChannel(name, pc, options);
+        const dc = pc.createDataChannel(name, options);
         const defaultOnOpenHandler = dc.onopen;
         dc.onopen = (event) => {
             defaultOnOpenHandler(event);
@@ -146,32 +240,28 @@ const start = (offering) => {
                     createDataChannelWithName(createOnOpenWithName, createOnOpenOptions);
                 }, 1000);
             }
-            134217728
-            const maxMessageSize =
-                pc.sctp.maxMessageSize === 0 ? 1073741823 : pc.sctp.maxMessageSize;
-            let data = new Uint8Array(maxMessageSize);
-            console.log(dc._name, 'outgoing message (' + data.byteLength +
-                ' bytes):', data);
+            if (messageSize > pc.pc.sctp.maxMessageSize) {
+                console.warn(dc._name, 'message size (' + messageSize + ') > maximum message size' +
+                    ' (' + pc.pc.sctp.maxMessageSize + ')');
+            }
+            let data = new Uint8Array(messageSize);
+            console.log(dc._name, 'outgoing message (' + data.byteLength + ' bytes)');
             try {
                 dc.send(data);
             } catch (error) {
-                console.error("This SHALL NOT throw but it did:", error.name, error);
-            }
-            if (pc.sctp.maxMessageSize > 0) {
-                data = new Uint8Array(maxMessageSize + 1);
-                console.log(dc._name, 'outgoing message (' + data.byteLength +
-                    ' bytes):', data);
-                try {
-                    dc.send(data);
-                    console.error("This MUST throw but it didn't!");
-                } catch (error) {
-                    console.warn('Unable to send message:', error.name, error);
+                if (error.name === 'TypeError') {
+                    console.error(dc._name, 'message too large to send');
+                } else {
+                    console.error(dc._name, 'Unknown error:', error.name);
                 }
             }
         };
     };
-    createDataChannelWithName('test-in-band');
-}
+    createDataChannelWithName('in-band');
+};
+
+// Introduction
+console.info("Hello! Press 'Start' when you're ready.");
 </script>
 
 </body>

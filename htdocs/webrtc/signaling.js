@@ -1,65 +1,120 @@
 'use strict';
 
 /**
- * An abstract signalling implementation. Tightly coupled with the
- * WebRTC peer connection class.
+ * A copy & paste signalling implementation.
+ *
+ * Tightly coupled with the WebRTC peer connection class.
  */
-class Signaling {
+class CopyPasteSignaling {
     constructor(pc = null) {
         this._pc = pc;
-        this.name = 'unknown';
         this.pending_inbound_messages = [];
         this.localIceCandidatesSent = false;
         this.remoteIceCandidatesReceived = false;
+        this._onLocalDescriptionUpdate = null;
+        this._onRemoteDescriptionUpdate = null;
     }
 
     set pc(pc) {
         this._pc = pc;
-        this.name = pc._name;
+
+        // Process all pending inbound messages
         for (const message of this.pending_inbound_messages) {
             this.receiveMessage(message.type, message.value);
         }
     }
 
-    handleLocalDescription(description) {
-        console.log(this.name, 'Sending remote description:', description);
-        this.sendMessage('description', description);
+    set onLocalDescriptionUpdate(callback) {
+        this._onLocalDescriptionUpdate = callback;
     }
 
-    async handleRemoteDescription(description) {
-        console.log(this.name, 'Received remote description:', description);
+    set onRemoteDescriptionUpdate(callback) {
+        this._onRemoteDescriptionUpdate = callback;
+    }
+
+    handleLocalDescription(description, complete = false) {
+        console.log('Local description:', description);
+
+        // Send local description
+        this.sendMessage('description', description);
+        if (complete) {
+            this.localIceCandidatesSent = true;
+            this.maybeClose();
+            console.info('Local description complete');
+        }
+
+        // Call 'update'
+        if (this._onLocalDescriptionUpdate !== null) {
+            this._onLocalDescriptionUpdate(this._pc.localDescription);
+        }
+    }
+
+    async handleRemoteDescription(description, complete = false) {
+        // Set remote description
+        console.log('Setting remote description');
         await this._pc.setRemoteDescription(description);
+        console.log('Remote description:', this._pc.remoteDescription);
+        if (complete) {
+            this.remoteIceCandidatesReceived = true;
+            this.maybeClose();
+            console.info('Remote description complete');
+        }
+
+        // Call 'update' (remote description)
+        if (this._onRemoteDescriptionUpdate !== null) {
+            this._onRemoteDescriptionUpdate(this._pc.remoteDescription);
+        }
 
         // Create answer (if required)
         if (!this._pc._offering) {
             console.log(name, 'Creating answer');
             description = await this._pc.createAnswer();
+
+            // Apply local description
             await this._pc.setLocalDescription(description);
             this.handleLocalDescription(description);
         }
     }
 
     handleLocalCandidate(candidate) {
-        console.log(this.name, 'Sending local ICE candidate:', candidate);
+        console.log('Local ICE candidate:', candidate);
+
+        // Send local candidate
         this.sendMessage('candidate', candidate);
+
+        // Special handling for last candidate
         if (candidate === null) {
             this.localIceCandidatesSent = true;
             this.maybeClose();
+            console.info('Local description complete');
+        }
+
+        // Call 'update' (local description)
+        if (this._onLocalDescriptionUpdate !== null) {
+            this._onLocalDescriptionUpdate(this._pc.localDescription);
         }
     }
 
-    handleRemoteCandidate(candidate) {
-        console.log(this.name, 'Received remote ICE candidate:', candidate);
+    async handleRemoteCandidate(candidate) {
+        console.log('Remote ICE candidate:', candidate);
         if (candidate !== null) {
-            this._pc.addIceCandidate(candidate);
+            // Add remote candidate (if any)
+            await this._pc.addIceCandidate(candidate);
         } else {
+            // Special handling for last candidate
             this.remoteIceCandidatesReceived = true;
             this.maybeClose();
+            console.info('Remote description complete');
+        }
+
+        // Call 'update' (remote description)
+        if (this._onRemoteDescriptionUpdate !== null) {
+            this._onRemoteDescriptionUpdate(this._pc.remoteDescription);
         }
     }
 
     sendMessage(type, value) {
-        console.error(this.name, 'You need to implement this!');
+        // Does nothing by default
     }
 
     receiveMessage(type, value) {
@@ -74,17 +129,18 @@ class Signaling {
                 this.handleRemoteDescription(value).catch((error) => console.error(error));
                 break;
             case 'candidate':
-                this.handleRemoteCandidate(value);
+                this.handleRemoteCandidate(value).catch((error) => console.error(error));
                 break;
             default:
-                console.warn(this.name, 'Unknown message type:', type);
+                console.warn('Unknown message type:', type);
                 break;
         }
     }
 
     maybeClose() {
+        // Close once all messages have been exchanged
         if (this.localIceCandidatesSent && this.remoteIceCandidatesReceived) {
-            console.log(this.name, 'Closing signalling channel');
+            console.log('Closing signalling channel');
             this.close();
         }
     }
@@ -95,28 +151,15 @@ class Signaling {
 }
 
 /**
- * An signalling implementation where offer and answer need to be
- * copied and pasted by hand.
- */
-class CopyPasteSignaling extends Signaling {
-    constructor(element, pc = null) {
-        super(pc);
-        this.element = element;
-    }
-
-    sendMessage(type, value) {
-
-    }
-}
-
-/**
  * A signalling implementation intended for this signalling server:
  * https://github.com/rawrtc/rawrtc-terminal-demo/tree/master/signaling
+ *
+ * Tightly coupled with the WebRTC peer connection class.
  *
  * Example: `ws://localhost/meow/0` when offering, and
  *          `ws://localhost/meow/1` when answering.
  */
-class WebSocketSignaling extends Signaling {
+class WebSocketSignaling extends CopyPasteSignaling {
     constructor(wsUrl, pc = null) {
         super(pc);
         this.pending_outbound_messages = [];

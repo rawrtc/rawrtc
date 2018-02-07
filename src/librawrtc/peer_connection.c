@@ -74,13 +74,29 @@ static void apply_context(
     connection->context = *context;
 }
 
+/*
+ * Add candidate to description and announce candidate.
+ */
 void ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
         char const * const url,
         void* const arg
 ) {
-    (void) candidate; (void) arg;
-    DEBUG_WARNING("HANDLE ICE gatherer local candidate, URL: %s\n", url);
+    struct rawrtc_peer_connection* const connection = arg;
+    enum rawrtc_code error;
+
+    // Add candidate to description
+    error = rawrtc_peer_connection_description_add_candidate(
+            connection->local_description, candidate);
+    if (error) {
+        DEBUG_WARNING("Unable to add local candidate to local description, reason: %s\n",
+                      rawrtc_code_to_str(error));
+    }
+
+    // Call handler
+    if (connection->local_candidate_handler) {
+        connection->local_candidate_handler(candidate, url, connection->arg);
+    }
 }
 
 void ice_gatherer_error_handler(
@@ -91,7 +107,8 @@ void ice_gatherer_error_handler(
         void* const arg
 ) {
     (void) host_candidate; (void) error_code; (void) arg;
-    DEBUG_WARNING("HANDLE ICE gatherer error, URL: %s, reason: %s\n", url, error_text);
+    // TODO: HANDLE ICE gatherer error
+    DEBUG_WARNING("TODO: HANDLE ICE gatherer error, URL: %s, reason: %s\n", url, error_text);
 }
 
 void ice_gatherer_state_change_handler(
@@ -99,6 +116,7 @@ void ice_gatherer_state_change_handler(
         void* const arg
 ) {
     (void) arg;
+    // TODO: HANDLE ICE gatherer state
     DEBUG_WARNING("HANDLE ICE gatherer state: %s\n", rawrtc_ice_gatherer_state_to_name(state));
 }
 
@@ -405,14 +423,15 @@ static void rawrtc_peer_connection_destroy(
 enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection** const connectionp, // de-referenced
         struct rawrtc_peer_connection_configuration* configuration, // referenced
-//        rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
-//        rawrtc_peer_connection_ice_candidate_handler* const ice_candidate_handler, // nullable
+        rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
+        rawrtc_ice_gatherer_local_candidate_handler* const local_candidate_handler, // nullable
 //        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
 //        rawrtc_peer_connection_signaling_state_change_handler* const signaling_state_change_handler, // nullable
 //        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
 //        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
-        rawrtc_peer_connection_state_change_handler* const connection_state_change_handler //nullable
+        rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
 //        rawrtc_peer_connection_fingerprint_failure_handler* const fingerprint_failure_handler // nullable
+        void* const arg // nullable
 ) {
     struct rawrtc_peer_connection* connection;
 
@@ -430,8 +449,11 @@ enum rawrtc_code rawrtc_peer_connection_create(
     // Set fields/reference
     connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
     connection->configuration = mem_ref(configuration);
+    connection->negotiation_needed_handler = negotiation_needed_handler;
+    connection->local_candidate_handler = local_candidate_handler;
     connection->connection_state_change_handler = connection_state_change_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
+    connection->arg = arg;
 
     // Set pointer & done
     *connectionp = connection;
@@ -498,6 +520,9 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
         struct rawrtc_peer_connection* const connection,
         struct rawrtc_peer_connection_description* const description
 ) {
+    bool initial_description = true;
+    enum rawrtc_code error;
+
     // Check arguments
     if (!connection || !description) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -512,6 +537,8 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
 
     // TODO: Allow changing the local description
     if (connection->local_description) {
+        initial_description = false;
+        (void) initial_description;
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
@@ -521,9 +548,18 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
     // Set local description
     connection->local_description = mem_ref(description);
 
-    // TODO: Local and remote description set, start gathering, etc...
+    // Start gathering (if initial description)
+    if (initial_description) {
+        error = rawrtc_ice_gatherer_gather(connection->context.ice_gatherer, NULL);
+        if (error) {
+            DEBUG_WARNING("Unable to start gathering, reason: %s\n", rawrtc_code_to_str(error));
+            return error;
+        }
+    }
+
+    // TODO: Local and remote description set, start transports, etc...
     if (connection->local_description && connection->remote_description) {
-        DEBUG_WARNING("TODO: Local and remote description set, start gathering, etc...\n");
+        DEBUG_WARNING("TODO: Local and remote description set, start transports, etc...\n");
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
@@ -555,14 +591,56 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     // Set remote description
     connection->remote_description = mem_ref(description);
 
-    // TODO: Local and remote description set, start gathering, etc...
+    // TODO: Local and remote description set, start transports, etc...
     if (connection->local_description && connection->remote_description) {
-        DEBUG_WARNING("TODO: Local and remote description set, start gathering, etc...\n");
+        DEBUG_WARNING("TODO: Local and remote description set, start transports, etc...\n");
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
     // Done
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get local description.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_description(
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+        struct rawrtc_peer_connection* const connection
+) {
+    // Check arguments
+    if (!descriptionp || !connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Reference description (if any)
+    if (connection->local_description) {
+        *descriptionp = mem_ref(connection->local_description);
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+}
+
+/*
+ * Get remote description.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_remote_description(
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+        struct rawrtc_peer_connection* const connection
+) {
+    // Check arguments
+    if (!descriptionp || !connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Reference description (if any)
+    if (connection->remote_description) {
+        *descriptionp = mem_ref(connection->remote_description);
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
 }
 
 /*
@@ -619,6 +697,12 @@ out:
     } else {
         // Apply context
         apply_context(connection, &context);
+
+        // Negotiation needed?
+        if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_NEW
+            && connection->negotiation_needed_handler) {
+            connection->negotiation_needed_handler(connection->arg);
+        }
     }
     return error;
 }

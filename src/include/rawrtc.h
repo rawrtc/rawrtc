@@ -480,6 +480,13 @@ typedef void (rawrtc_peer_connection_state_change_handler)(
 );
 
 /*
+ * Peer connection negotiation needed handler.
+ */
+typedef void (rawrtc_peer_connection_negotiation_needed_handler)(
+    void* const arg
+);
+
+/*
  * Handle incoming data messages.
  * TODO: private -> dtls_transport.h
  */
@@ -887,13 +894,16 @@ struct rawrtc_peer_connection_context {
  */
 struct rawrtc_peer_connection {
     enum rawrtc_peer_connection_state connection_state;
-    struct rawrtc_peer_connection_configuration* configuration;
-    rawrtc_peer_connection_state_change_handler* connection_state_change_handler;
+    struct rawrtc_peer_connection_configuration* configuration; // referenced
+    rawrtc_peer_connection_negotiation_needed_handler* negotiation_needed_handler; // nullable
+    rawrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
+    rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
-    struct rawrtc_peer_connection_description* local_description;
-    struct rawrtc_peer_connection_description* remote_description;
+    struct rawrtc_peer_connection_description* local_description; // referenced
+    struct rawrtc_peer_connection_description* remote_description; // referenced
     struct rawrtc_peer_connection_context context;
     rawrtc_data_channel_handler* data_channel_handler; // nullable
+    void* arg; // nullable
 };
 
 /*
@@ -1801,7 +1811,10 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
 enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection** const connectionp, // de-referenced
     struct rawrtc_peer_connection_configuration* configuration, // referenced
-    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler //nullable
+    rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
+    rawrtc_ice_gatherer_local_candidate_handler* const ice_candidate_handler, // nullable
+    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
+    void* const arg // nullable
 );
 
 /*
@@ -1834,6 +1847,22 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     struct rawrtc_peer_connection* const connection,
     struct rawrtc_peer_connection_description* const description
+);
+
+/*
+ * Get local description.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get remote description.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_remote_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
 );
 
 /*

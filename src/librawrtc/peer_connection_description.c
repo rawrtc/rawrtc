@@ -419,7 +419,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     DEBUG_PRINTF(
             "Local description (%s):\n%b",
             offering ? "offer" : "answer",
-            mbuf_buf(local_description->sdp), mbuf_get_left(local_description->sdp));
+            sdp->buf, sdp->end);
 
     // Reference SDP
     local_description->sdp = mem_ref(sdp);
@@ -433,6 +433,21 @@ out:
         *descriptionp = local_description;
     }
     return error;
+}
+
+/*
+ * Add an ICE candidate to the description.
+ */
+enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
+        struct rawrtc_peer_connection_description* const description,
+        struct rawrtc_ice_candidate* const candidate // nullable
+) {
+    // TODO: Continue here
+    /*
+     * a=candidate:0 1 UDP 2122187007 10.26.2.1 45636 typ host
+       a=end-of-candidates   (when candidate null)
+     */
+    return RAWRTC_CODE_NOT_IMPLEMENTED;
 }
 
 /*

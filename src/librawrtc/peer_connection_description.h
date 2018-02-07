@@ -11,3 +11,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     struct rawrtc_peer_connection* const connection,
     bool const offering
 );
+
+enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
+    struct rawrtc_peer_connection_description* const description,
+    struct rawrtc_ice_candidate* const candidate
+);
