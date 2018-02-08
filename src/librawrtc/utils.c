@@ -137,15 +137,15 @@ enum rawrtc_code rawrtc_error_to_code(
 }
 
 static enum rawrtc_ice_gather_policy const map_enum_ice_gather_policy[] = {
-    RAWRTC_ICE_GATHER_POLICY_ALL,
-    RAWRTC_ICE_GATHER_POLICY_NOHOST,
-    RAWRTC_ICE_GATHER_POLICY_RELAY
+        RAWRTC_ICE_GATHER_POLICY_ALL,
+        RAWRTC_ICE_GATHER_POLICY_NOHOST,
+        RAWRTC_ICE_GATHER_POLICY_RELAY
 };
 
 static char const * const map_str_ice_gather_policy[] = {
-    "all",
-    "nohost",
-    "relay"
+        "all",
+        "nohost",
+        "relay"
 };
 
 static size_t const map_ice_gather_policy_length = ARRAY_SIZE(map_enum_ice_gather_policy);
@@ -832,6 +832,37 @@ char const * rawrtc_data_transport_type_to_str(
     for (i = 0; i < map_data_transport_type_length; ++i) {
         if (map_enum_data_transport_type[i] == type) {
             return map_str_data_transport_type[i];
+        }
+    }
+
+    return "???";
+}
+
+static enum rawrtc_ice_candidate_storage const map_enum_ice_candidate_storage[] = {
+    RAWRTC_ICE_CANDIDATE_STORAGE_RAW,
+    RAWRTC_ICE_CANDIDATE_STORAGE_LCAND,
+    RAWRTC_ICE_CANDIDATE_STORAGE_RCAND,
+};
+
+static char const * const map_str_ice_candidate_storage[] = {
+    "raw",
+    "lcand",
+    "rcand",
+};
+
+static size_t const map_ice_candidate_storage_length = ARRAY_SIZE(map_enum_ice_candidate_storage);
+
+/*
+ * Translate an ICE candidate storage type to str.
+ */
+char const * rawrtc_ice_candidate_storage_to_str(
+        enum rawrtc_ice_candidate_storage const type
+) {
+    size_t i;
+
+    for (i = 0; i < map_ice_candidate_storage_length; ++i) {
+        if (map_enum_ice_candidate_storage[i] == type) {
+            return map_str_ice_candidate_storage[i];
         }
     }
 

@@ -127,7 +127,7 @@ enum rawrtc_code rawrtc_ice_candidate_create(
         uint16_t const port,
         enum rawrtc_ice_candidate_type const type,
         enum rawrtc_ice_tcp_candidate_type const tcp_type,
-        char* const related_address, // copied
+        char* const related_address, // copied, nullable
         uint16_t const related_port
 ) {
     struct rawrtc_ice_candidate* candidate;
@@ -225,6 +225,136 @@ enum rawrtc_code rawrtc_ice_candidate_create_from_remote_candidate(
     DEBUG_PRINTF("Created candidate (rcand): %j\n",
                  &candidate->candidate.remote_candidate->attr.addr);
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Print debug information for an ICE candidate.
+ */
+int rawrtc_ice_candidate_debug(
+        struct re_printf* const pf,
+        struct rawrtc_ice_candidate* const candidate
+) {
+    int err = 0;
+    enum rawrtc_code error;
+    char* foundation = NULL;
+    uint32_t priority;
+    char* ip = NULL;
+    enum rawrtc_ice_protocol protocol;
+    uint16_t port;
+    enum rawrtc_ice_candidate_type type;
+    enum rawrtc_ice_tcp_candidate_type tcp_type;
+    char* related_address = NULL;
+    uint16_t related_port;
+
+    // Check arguments
+    if (!candidate) {
+        return 0;
+    }
+
+    err |= re_hprintf(pf, "  ICE Candidate <%p>:\n", candidate);
+
+    // Storage type
+    err |= re_hprintf(
+            pf, "    storage_type=%s\n",
+            rawrtc_ice_candidate_storage_to_str(candidate->storage_type));
+
+    // Foundation
+    error = rawrtc_ice_candidate_get_foundation(&foundation, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    foundation=\"%s\"\n", foundation);
+
+    // Priority
+    error = rawrtc_ice_candidate_get_priority(&priority, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    priority=%"PRIu32"\n", priority);
+
+    // IP
+    error = rawrtc_ice_candidate_get_ip(&ip, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    ip=\"%s\"\n", ip);
+
+    // Protocol
+    error = rawrtc_ice_candidate_get_protocol(&protocol, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    protocol=%s\n", rawrtc_ice_protocol_to_str(protocol));
+
+    // Port
+    error = rawrtc_ice_candidate_get_port(&port, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    port=%"PRIu16"\n", port);
+
+    // Type
+    error = rawrtc_ice_candidate_get_type(&type, candidate);
+    if (error) {
+        goto out;
+    }
+    err |= re_hprintf(pf, "    type=%s\n", rawrtc_ice_candidate_type_to_str(type));
+
+    // TCP type (if any)
+    err |= re_hprintf(pf, "    tcp_type=");
+    error = rawrtc_ice_candidate_get_tcp_type(&tcp_type, candidate);
+    switch (error) {
+        case RAWRTC_CODE_SUCCESS:
+            err |= re_hprintf(pf, "%s\n", rawrtc_ice_tcp_candidate_type_to_str(tcp_type));
+            break;
+        case RAWRTC_CODE_NO_VALUE:
+            err |= re_hprintf(pf, "n/a\n");
+            break;
+        default:
+            goto out;
+            break;
+    }
+
+    // Related address (if any)
+    error = rawrtc_ice_candidate_get_related_address(&related_address, candidate);
+    switch (error) {
+        case RAWRTC_CODE_SUCCESS:
+            break;
+        case RAWRTC_CODE_NO_VALUE:
+            related_address = "n/a";
+            break;
+        default:
+            goto out;
+            break;
+    }
+    err |= re_hprintf(pf, "    related_address=%s\n", related_address);
+
+    // Related port (if any)
+    err |= re_hprintf(pf, "    related_port=");
+    error = rawrtc_ice_candidate_get_related_port(&related_port, candidate);
+    switch (error) {
+        case RAWRTC_CODE_SUCCESS:
+            err |= re_hprintf(pf, "%"PRIu16"\n", related_port);
+            break;
+        case RAWRTC_CODE_NO_VALUE:
+            err |= re_hprintf(pf, "n/a\n");
+            break;
+        default:
+            goto out;
+            break;
+    }
+
+out:
+    // Un-reference
+    mem_deref(related_address);
+    mem_deref(ip);
+    mem_deref(foundation);
+
+    // Translate error & done
+    if (!err && error) {
+        err = EINVAL;
+    }
+    return err;
 }
 
 /*

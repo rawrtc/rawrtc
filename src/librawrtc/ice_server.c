@@ -639,7 +639,7 @@ int rawrtc_ice_server_debug(
         return 0;
     }
 
-    err |= re_hprintf(pf, "  ICE Server:\n", server);
+    err |= re_hprintf(pf, "  ICE Server <%p>:\n", server);
 
     // Credential type
     err |= re_hprintf(pf, "    credential_type=%s\n",

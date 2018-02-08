@@ -96,16 +96,6 @@ enum rawrtc_sdp_type {
 };
 
 /*
- * ICE candidate type (internal).
- * TODO: Private
- */
-enum rawrtc_ice_candidate_storage {
-    RAWRTC_ICE_CANDIDATE_STORAGE_RAW,
-    RAWRTC_ICE_CANDIDATE_STORAGE_LCAND,
-    RAWRTC_ICE_CANDIDATE_STORAGE_RCAND,
-};
-
-/*
  * ICE gather policy.
  */
 enum rawrtc_ice_gather_policy {
@@ -294,6 +284,16 @@ enum rawrtc_sctp_redirect_transport_state {
  */
 enum rawrtc_data_transport_type {
     RAWRTC_DATA_TRANSPORT_TYPE_SCTP
+};
+
+/*
+ * ICE candidate storage type (internal).
+ * TODO: Private
+ */
+enum rawrtc_ice_candidate_storage {
+    RAWRTC_ICE_CANDIDATE_STORAGE_RAW,
+    RAWRTC_ICE_CANDIDATE_STORAGE_LCAND,
+    RAWRTC_ICE_CANDIDATE_STORAGE_RCAND,
 };
 
 /*
@@ -636,7 +636,7 @@ struct rawrtc_ice_candidate_raw {
     uint16_t port;
     enum rawrtc_ice_candidate_type type;
     enum rawrtc_ice_tcp_candidate_type tcp_type;
-    char* related_address; // copied
+    char* related_address; // copied, nullable
     uint16_t related_port;
 };
 

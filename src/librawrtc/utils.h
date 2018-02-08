@@ -57,6 +57,10 @@ char const * rawrtc_data_transport_type_to_str(
     enum rawrtc_data_transport_type const type
 );
 
+char const * rawrtc_ice_candidate_storage_to_str(
+    enum rawrtc_ice_candidate_storage const type
+);
+
 EVP_MD const * const rawrtc_get_sign_function(
     enum rawrtc_certificate_sign_algorithm type
 );

@@ -1,6 +1,9 @@
 #include <string.h> // strlen
 #include <rawrtc.h>
+#include "ice_parameters.h"
+#include "ice_candidate.h"
 #include "dtls_parameters.h"
+#include "sctp_capabilities.h"
 #include "sctp_transport.h"
 #include "peer_connection_description.h"
 
@@ -24,15 +27,15 @@ static char const sdp_ice_username_fragment_regex[] = "ice-ufrag:[^]+";
 static char const sdp_ice_password_regex[] = "ice-pwd:[^]+";
 static char const sdp_ice_lite[] = "ice-lite";
 static char const sdp_dtls_role_regex[] = "setup:[^]+";
-static char const * const map_str_dtls_role[] = {
-    "actpass"
-    "active",
-    "passive",
-};
 static enum rawrtc_dtls_role const map_enum_dtls_role[] = {
     RAWRTC_DTLS_ROLE_AUTO,
     RAWRTC_DTLS_ROLE_CLIENT,
     RAWRTC_DTLS_ROLE_SERVER,
+};
+static char const * const map_str_dtls_role[] = {
+    "actpass"
+    "active",
+    "passive",
 };
 static size_t const map_dtls_role_length =
         ARRAY_SIZE(map_enum_dtls_role);
@@ -669,12 +672,13 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
             break;
     }
 
-    // TODO: Debug
-    DEBUG_WARNING("TODO: Debug output for description (internal)\n");
-    DEBUG_PRINTF("Description (internal):\n%b", sdp->buf, sdp->end);
-
     // Reference SDP
     local_description->sdp = mem_ref(sdp);
+
+    // Debug
+    DEBUG_PRINTF(
+            "Description (internal):\n%H\n",
+            rawrtc_peer_connection_description_debug, local_description);
 
 out:
     mem_deref(sdp);
@@ -752,9 +756,9 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
         description->end_of_candidates = true;
 
         // Debug
-        DEBUG_WARNING("TODO: Debug output for description (end-of-candidates)\n");
-        DEBUG_PRINTF("Description (end-of-candidates):\n%b",
-                     description->sdp->buf, description->sdp->end);
+        DEBUG_PRINTF(
+                "Description (end-of-candidates):\n%H\n",
+                rawrtc_peer_connection_description_debug, description);
     }
 
     // Done
@@ -764,12 +768,85 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
 // Helper for parsing SDP attributes
 #define HANDLE_ATTRIBUTE(code)\
 error = code;\
-if (code == RAWRTC_CODE_SUCCESS) {\
+if (error == RAWRTC_CODE_SUCCESS) {\
     break;\
-} else if (code != RAWRTC_CODE_NO_VALUE) {\
+} else if (error != RAWRTC_CODE_NO_VALUE) {\
     goto out;\
     break;\
 }\
+
+/*
+ * Print debug information for a peer connection description.
+ */
+int rawrtc_peer_connection_description_debug(
+        struct re_printf* const pf,
+        struct rawrtc_peer_connection_description* const description
+) {
+    int err = 0;
+    struct le* le;
+
+    // Check arguments
+    if (!description) {
+        return 0;
+    }
+
+    err |= re_hprintf(pf, "----- Peer Connection Description <%p>\n", description);
+
+    // Print general fields
+    err |= re_hprintf(pf, "  peer_connection=%p\n", description->connection);
+    err |= re_hprintf(pf, "  sdp_type=%s\n", rawrtc_sdp_type_to_str(description->type));
+    err |= re_hprintf(pf, "  trickle_ice=%s\n", description->trickle_ice ? "yes" : "no");
+    err |= re_hprintf(pf, "  bundled_mids=");
+    if (description->bundled_mids) {
+        err |= re_hprintf(pf, "\"%s\"\n", description->bundled_mids);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
+    err |= re_hprintf(pf, "  remote_media_line=");
+    if (description->remote_media_line) {
+        err |= re_hprintf(pf, "\"%s\"\n", description->remote_media_line);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
+    err |= re_hprintf(pf, "  sctp_sdp_05=%s\n", description->sctp_sdp_05 ? "yes" : "no");
+    err |= re_hprintf(
+            pf, "  end_of_candidates=%s\n", description->end_of_candidates ? "yes" : "no");
+
+    // Print ICE parameters
+    if (description->ice_parameters) {
+        err |= re_hprintf(pf, "%H", rawrtc_ice_parameters_debug, description->ice_parameters);
+    } else {
+        err |= re_hprintf(pf, "  ICE Parameters <n/a>\n");
+    }
+
+    // Print ICE candidates
+    for (le = list_head(&description->ice_candidates); le != NULL; le = le->next) {
+        struct rawrtc_ice_candidate* const candidate = le->data;
+        err |= re_hprintf(pf, "%H", rawrtc_ice_candidate_debug, candidate);
+    }
+
+    // Print DTLS parameters
+    if (description->dtls_parameters) {
+        err |= re_hprintf(pf, "%H", rawrtc_dtls_parameters_debug, description->dtls_parameters);
+    } else {
+        err |= re_hprintf(pf, "  DTLS Parameters <n/a>\n");
+    }
+
+    // Print SCTP capabilities & port
+    if (description->sctp_capabilities) {
+        err |= re_hprintf(pf, "%H", rawrtc_sctp_capabilities_debug, description->sctp_capabilities);
+    } else {
+        err |= re_hprintf(pf, "  SCTP Capabilities <n/a>\n");
+    }
+    err |= re_hprintf(
+            pf, "  sctp_port=%"PRIu16"\n", description->sctp_port);
+
+    // Print SDP
+    err |= re_hprintf(pf, "  sdp=\n%b", description->sdp->buf, description->sdp->end);
+
+    // Done
+    return err;
+}
 
 /*
  * Create a description by parsing it from SDP.
@@ -783,7 +860,6 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     struct rawrtc_peer_connection_description* remote_description;
     char const* cursor;
     bool media_line = false;
-    struct mbuf* sdp_mbuf_copy = NULL;
 
     // ICE parameters
     char* ice_username_fragment = NULL;
@@ -949,22 +1025,23 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Copy SDP
-    sdp_mbuf_copy = mbuf_alloc(strlen(sdp));
-    if (!sdp_mbuf_copy) {
+    remote_description->sdp = mbuf_alloc(strlen(sdp));
+    if (!remote_description->sdp) {
         error = RAWRTC_CODE_NO_MEMORY;
         goto out;
     }
+    mbuf_write_str(remote_description->sdp, sdp);
 
-    // TODO: Debug
-    DEBUG_WARNING("TODO: Debug output for description (parsed)\n");
-    DEBUG_PRINTF("Description (parsed):\n%s", sdp);
+    // Debug
+    DEBUG_PRINTF(
+            "Description (parsed):\n%H\n",
+            rawrtc_peer_connection_description_debug, remote_description);
 
     // Done
     error = RAWRTC_CODE_SUCCESS;
 
 out:
     // Un-reference
-    mem_deref(sdp_mbuf_copy);
     list_flush(&dtls_fingerprints);
     mem_deref(ice_password);
     mem_deref(ice_username_fragment);
