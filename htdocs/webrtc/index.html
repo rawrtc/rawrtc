@@ -203,8 +203,9 @@ const start = (offering) => {
     const pc = new WebRTCPeerConnection(signaling, offering);
 
     // Apply remote description when pasting
-    remoteDescriptionTextarea.onchange = () => {
+    const onRemoteDescriptionTextareaChange = () => {
         // Remove event listener
+        remoteDescriptionTextarea.oninput = null;
         remoteDescriptionTextarea.onchange = null;
 
         // Apply remote description once (needs to include candidates)
@@ -215,6 +216,8 @@ const start = (offering) => {
         // Make read-only
         remoteDescriptionTextarea.readOnly = true;
     };
+    remoteDescriptionTextarea.oninput = onRemoteDescriptionTextareaChange;
+    remoteDescriptionTextarea.onchange = onRemoteDescriptionTextareaChange;
 
     // Enable remote description early (if not offering)
     if (!offering) {
