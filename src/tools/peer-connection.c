@@ -287,11 +287,6 @@ static void print_local_description(
     // Print local description as JSON
     DEBUG_INFO("Local Description:\n%H\n", json_encode_odict, dict);
 
-// TODO: Remove these 3 lines
-struct rawrtc_peer_connection_description* descriptiona = NULL;
-EOE(rawrtc_peer_connection_description_create(&descriptiona, type, sdp));
-mem_deref(descriptiona);
-
     // Un-reference
     mem_deref(dict);
     mem_deref(sdp);

@@ -820,9 +820,14 @@ int rawrtc_peer_connection_description_debug(
     }
 
     // Print ICE candidates
-    for (le = list_head(&description->ice_candidates); le != NULL; le = le->next) {
-        struct rawrtc_ice_candidate* const candidate = le->data;
-        err |= re_hprintf(pf, "%H", rawrtc_ice_candidate_debug, candidate);
+    le = list_head(&description->ice_candidates);
+    if (le) {
+        for (; le != NULL; le = le->next) {
+            struct rawrtc_ice_candidate *const candidate = le->data;
+            err |= re_hprintf(pf, "%H", rawrtc_ice_candidate_debug, candidate);
+        }
+    } else {
+        err |= re_hprintf(pf, "  ICE Candidates <n/a>\n");
     }
 
     // Print DTLS parameters
