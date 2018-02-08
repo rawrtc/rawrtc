@@ -149,8 +149,8 @@ enum rawrtc_code rawrtc_dtls_parameters_create(
         size_t const n_fingerprints
 ) {
     struct rawrtc_dtls_parameters* parameters;
-    size_t i;
     enum rawrtc_code error;
+    size_t i;
 
     // Check arguments
     if (!parametersp || !fingerprints || n_fingerprints < 1) {
@@ -166,7 +166,7 @@ enum rawrtc_code rawrtc_dtls_parameters_create(
     // Reference and set each fingerprint
     for (i = 0; i < n_fingerprints; ++i) {
         // Null?
-        if (fingerprints[i] == NULL) {
+        if (!fingerprints[i]) {
             error = RAWRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }

@@ -1046,3 +1046,57 @@ enum rawrtc_code rawrtc_sdprintf(
     va_end(args);
     return rawrtc_error_to_code(err);
 }
+
+/*
+ * Convert a list to a dynamically allocated array.
+ * If `reference` is set to `true`, each item in the list will be
+ * referenced.
+ *
+ * Note: In case the list is empty, `*lengthp` will be set to `0` and
+ *       `*arrayp` will be set to `NULL`.
+ */
+enum rawrtc_code rawrtc_list_to_array(
+        void*** const arrayp, // de-referenced
+        size_t* const lengthp, // de-referenced
+        struct list const* const list,
+        bool reference
+) {
+    size_t length;
+    void** array;
+    struct le* le;
+    size_t i;
+
+    // Check arguments
+    if (!arrayp || !lengthp || !list) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get list length
+    length = list_count(list);
+
+    // Empty?
+    if (length == 0) {
+        *arrayp = NULL;
+        *lengthp = 0;
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Allocate array
+    array = mem_alloc(sizeof(*array) * length, NULL);
+    if (!array) {
+        return RAWRTC_CODE_NO_MEMORY;
+    }
+
+    // Copy pointer to each item
+    for (le = list_head(list), i = 0; le != NULL; le = le->next, ++i) {
+        if (reference) {
+            mem_ref(le->data);
+        }
+        array[i] = le->data;
+    }
+
+    // Set pointer & done
+    *arrayp = array;
+    *lengthp = length;
+    return RAWRTC_CODE_SUCCESS;
+}

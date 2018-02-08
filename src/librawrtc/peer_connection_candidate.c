@@ -65,11 +65,11 @@ enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp(
         goto out;
     }
     error = rawrtc_ice_candidate_get_related_address(&related_address, candidate);
-    if (error != RAWRTC_CODE_NO_VALUE) {
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
         goto out;
     }
     error = rawrtc_ice_candidate_get_related_port(&related_port, candidate);
-    if (error != RAWRTC_CODE_NO_VALUE) {
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
         goto out;
     }
     protocol_str = rawrtc_ice_protocol_to_str(protocol);

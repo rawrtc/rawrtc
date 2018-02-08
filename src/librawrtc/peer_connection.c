@@ -585,6 +585,7 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     }
 
     // TODO: Ensure remote description fits our requirements
+    // TODO: Create a data transport if it's not there, yet (and we're answering)
     // TODO: Continue here
     return RAWRTC_CODE_NOT_IMPLEMENTED;
 

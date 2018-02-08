@@ -872,6 +872,11 @@ struct rawrtc_peer_connection_description {
     char* remote_media_line;
     bool sctp_sdp_05;
     bool end_of_candidates;
+    struct list ice_candidates;
+    struct rawrtc_ice_parameters* ice_parameters;
+    struct rawrtc_dtls_parameters* dtls_parameters;
+    struct rawrtc_sctp_capabilities* sctp_capabilities;
+    uint16_t sctp_port;
     struct mbuf* sdp;
 };
 
@@ -2105,4 +2110,19 @@ enum rawrtc_code rawrtc_sdprintf(
     char** const destinationp,
     char* const formatter,
     ...
+);
+
+/*
+ * Convert a list to a dynamically allocated array.
+ * If `reference` is set to `true`, each item in the list will be
+ * referenced.
+ *
+ * Note: In case the list is empty, `*lengthp` will be set to `0` and
+ *       `*arrayp` will be set to `NULL`.
+ */
+enum rawrtc_code rawrtc_list_to_array(
+    void*** const arrayp, // de-referenced
+    size_t* const lengthp, // de-referenced
+    struct list const* const list,
+    bool reference
 );
