@@ -7,6 +7,21 @@ extern struct rawrtc_config rawrtc_default_config;
 extern struct rawrtc_certificate_options rawrtc_default_certificate_options;
 extern struct rawrtc_data_channel_options rawrtc_default_data_channel_options;
 
+enum rawrtc_code rawrtc_pl_to_ice_protocol(
+    enum rawrtc_ice_protocol* const protocolp, // de-referenced
+    struct pl const* const pl
+);
+
+enum rawrtc_code rawrtc_pl_to_ice_candidate_type(
+    enum rawrtc_ice_candidate_type* const typep, // de-referenced
+    struct pl const* const pl
+);
+
+enum rawrtc_code rawrtc_pl_to_ice_tcp_candidate_type(
+    enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
+    struct pl const* const pl
+);
+
 enum ice_cand_type rawrtc_ice_candidate_type_to_ice_cand_type(
     enum rawrtc_ice_candidate_type const type
 );

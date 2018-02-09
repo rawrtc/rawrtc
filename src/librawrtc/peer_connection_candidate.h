@@ -1,5 +1,0 @@
-#pragma once
-
-enum {
-    RAWRTC_PEER_CONNECTION_CANDIDATE_DEFAULT_SIZE = 256,
-};

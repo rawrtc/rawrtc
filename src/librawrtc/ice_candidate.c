@@ -41,14 +41,14 @@ static void rawrtc_ice_candidate_raw_destroy(
  */
 static enum rawrtc_code rawrtc_ice_candidate_raw_create(
         struct rawrtc_ice_candidate_raw** const candidatep, // de-referenced
-        char* const foundation, // copied
+        struct pl* const foundation, // copied
         uint32_t const priority,
-        char* const ip, // copied
+        struct pl* const ip, // copied
         enum rawrtc_ice_protocol const protocol,
         uint16_t const port,
         enum rawrtc_ice_candidate_type const type,
         enum rawrtc_ice_tcp_candidate_type const tcp_type,
-        char* const related_address, // copied, nullable
+        struct pl* const related_address, // copied, nullable
         uint16_t const related_port
 ) {
     struct rawrtc_ice_candidate_raw* candidate;
@@ -61,12 +61,12 @@ static enum rawrtc_code rawrtc_ice_candidate_raw_create(
     }
 
     // Set fields/copy
-    error = rawrtc_strdup(&candidate->foundation, foundation);
+    error = rawrtc_error_to_code(pl_strdup(&candidate->foundation, foundation));
     if (error) {
         goto out;
     }
     candidate->priority = priority;
-    error = rawrtc_strdup(&candidate->ip, ip);
+    error = rawrtc_error_to_code(pl_strdup(&candidate->ip, ip));
     if (error) {
         goto out;
     }
@@ -74,8 +74,8 @@ static enum rawrtc_code rawrtc_ice_candidate_raw_create(
     candidate->port = port;
     candidate->type = type;
     candidate->tcp_type = tcp_type;
-    if (related_address) {
-        error = rawrtc_strdup(&candidate->related_address, related_address);
+    if (pl_isset(related_address)) {
+        error = rawrtc_error_to_code(pl_strdup(&candidate->related_address, related_address));
         if (error) {
             goto out;
         }
@@ -116,25 +116,25 @@ static void rawrtc_ice_candidate_destroy(
 }
 
 /*
- * Create an ICE candidate.
+ * Create an ICE candidate (pl variant).
  */
-enum rawrtc_code rawrtc_ice_candidate_create(
+enum rawrtc_code rawrtc_ice_candidate_create_internal(
         struct rawrtc_ice_candidate** const candidatep, // de-referenced
-        char* const foundation, // copied
+        struct pl* const foundation, // copied
         uint32_t const priority,
-        char* const ip, // copied
+        struct pl* const ip, // copied
         enum rawrtc_ice_protocol const protocol,
         uint16_t const port,
         enum rawrtc_ice_candidate_type const type,
         enum rawrtc_ice_tcp_candidate_type const tcp_type,
-        char* const related_address, // copied, nullable
+        struct pl* const related_address, // copied, nullable
         uint16_t const related_port
 ) {
     struct rawrtc_ice_candidate* candidate;
     enum rawrtc_code error;
 
     // Check arguments
-    if (!candidatep || !foundation || !ip) {
+    if (!candidatep || !pl_isset(foundation) || !pl_isset(ip)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -163,6 +163,43 @@ out:
         *candidatep = candidate;
     }
     return error;
+}
+
+/*
+ * Create an ICE candidate.
+ */
+enum rawrtc_code rawrtc_ice_candidate_create(
+        struct rawrtc_ice_candidate** const candidatep, // de-referenced
+        char* const foundation, // copied
+        uint32_t const priority,
+        char* const ip, // copied
+        enum rawrtc_ice_protocol const protocol,
+        uint16_t const port,
+        enum rawrtc_ice_candidate_type const type,
+        enum rawrtc_ice_tcp_candidate_type const tcp_type,
+        char* const related_address, // copied, nullable
+        uint16_t const related_port
+) {
+    struct pl foundation_pl;
+    struct pl ip_pl;
+    struct pl related_address_pl = PL_INIT;
+
+    // Check arguments
+    if (!foundation || !ip) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&foundation_pl, foundation);
+    pl_set_str(&ip_pl, ip);
+    if (related_address) {
+        pl_set_str(&related_address_pl, related_address);
+    }
+
+    // Create ICE candidate
+    return rawrtc_ice_candidate_create_internal(
+            candidatep, &foundation_pl, priority, &ip_pl, protocol, port, type, tcp_type,
+            &related_address_pl, related_port);
 }
 
 /*

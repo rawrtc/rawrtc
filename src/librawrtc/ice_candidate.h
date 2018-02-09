@@ -8,6 +8,19 @@ uint32_t rawrtc_ice_candidate_calculate_priority(
     enum ice_tcptype const tcp_type
 );
 
+enum rawrtc_code rawrtc_ice_candidate_create_internal(
+    struct rawrtc_ice_candidate** const candidatep, // de-referenced
+    struct pl* const foundation, // copied
+    uint32_t const priority,
+    struct pl* const ip, // copied
+    enum rawrtc_ice_protocol const protocol,
+    uint16_t const port,
+    enum rawrtc_ice_candidate_type const type,
+    enum rawrtc_ice_tcp_candidate_type const tcp_type,
+    struct pl* const related_address, // copied, nullable
+    uint16_t const related_port
+);
+
 enum rawrtc_code rawrtc_ice_candidate_create_from_local_candidate(
     struct rawrtc_ice_candidate** const candidatep, // de-referenced
     struct ice_lcand* const local_candidate // referenced

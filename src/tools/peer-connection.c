@@ -88,14 +88,20 @@ static void data_channel_open_handler(
 }
 
 static void local_candidate_handler(
-        struct rawrtc_ice_candidate* const candidate,
+        struct rawrtc_peer_connection_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
     struct peer_connection_client* const client = arg;
+    struct rawrtc_ice_candidate* ortc_candidate = NULL;
+
+    // Get underlying ORTC ICE candidate (if any)
+    if (candidate) {
+        EOE(rawrtc_peer_connection_ice_candidate_get_ortc_candidate(&ortc_candidate, candidate));
+    }
 
     // Print local candidate
-    default_ice_gatherer_local_candidate_handler(candidate, url, arg);
+    default_ice_gatherer_local_candidate_handler(ortc_candidate, url, arg);
 
     // Print local description (if last candidate)
     if (!candidate) {

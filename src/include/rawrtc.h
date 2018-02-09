@@ -341,6 +341,7 @@ struct rawrtc_data_channel_parameters;
 struct rawrtc_data_transport;
 struct rawrtc_sctp_transport;
 struct rawrtc_sctp_capabilities;
+struct rawrtc_peer_connection_ice_candidate;
 
 
 
@@ -483,6 +484,17 @@ typedef void (rawrtc_peer_connection_state_change_handler)(
  * Peer connection negotiation needed handler.
  */
 typedef void (rawrtc_peer_connection_negotiation_needed_handler)(
+    void* const arg
+);
+
+/*
+ * Per connection local candidate handler.
+ * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
+ * 'url' will be NULL in case a host candidate has been gathered.
+ */
+typedef void (rawrtc_peer_connection_local_candidate_handler)(
+    struct rawrtc_peer_connection_ice_candidate* const candidate,
+    char const * const url, // read-only
     void* const arg
 );
 
@@ -861,6 +873,18 @@ struct rawrtc_peer_connection_configuration {
 };
 
 /*
+ * Peer connection ICE candidate.
+ * TODO: private
+ */
+struct rawrtc_peer_connection_ice_candidate {
+    struct le le;
+    struct rawrtc_ice_candidate* candidate;
+    char* mid;
+    uint8_t media_line_index;
+    char* username_fragment;
+};
+
+/*
  * Peer connection description.
  * TODO: private
  */
@@ -902,7 +926,7 @@ struct rawrtc_peer_connection {
     enum rawrtc_peer_connection_state connection_state;
     struct rawrtc_peer_connection_configuration* configuration; // referenced
     rawrtc_peer_connection_negotiation_needed_handler* negotiation_needed_handler; // nullable
-    rawrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
+    rawrtc_peer_connection_local_candidate_handler* local_candidate_handler; // nullable
     rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
     struct rawrtc_peer_connection_description* local_description; // referenced
@@ -1812,48 +1836,70 @@ enum rawrtc_code rawrtc_peer_connection_description_get_sdp(
 );
 
 /*
- * Encode the candidate into SDP.
+ * Create a new ICE candidate from SDP.
+ *
+ * Note: This is equivalent to creating an `RTCIceCandidate` from an
+ *       `RTCIceCandidateInit` instance in the W3C WebRTC
+ *       specification.
+ */
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_create(
+    struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
+    char* const sdp,
+    char* const mid, // nullable, copied
+    uint8_t const* const media_line_index, // nullable, copied
+    char* const username_fragment // nullable, copied
+);
+
+/*
+ * Encode the ICE candidate into SDP.
  * `*sdpp` will be set to a copy of the SDP attribute that must be
  * unreferenced.
  *
  * Note: This is equivalent to the `candidate` attribute of the W3C
  *       WebRTC specification's `RTCIceCandidateInit`.
  */
-enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp(
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
     char** const sdpp, // de-referenced
-    struct rawrtc_ice_candidate* const candidate
+    struct rawrtc_peer_connection_ice_candidate* const candidate
 );
 
 /*
- * Get the media stream identification tag the candidate is associated to.
+ * Get the media stream identification tag the ICE candidate is
+ * associated to.
  * `*midp` will be set to a copy of the 'mid' field that must be
  * unreferenced.
 */
-enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp_mid(
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
     char** const midp, // de-referenced
-    struct rawrtc_ice_candidate* const candidate,
-    struct rawrtc_peer_connection* const connection
+    struct rawrtc_peer_connection_ice_candidate* const candidate
 );
 
 /*
- * Get the media stream line index the candidate is associated to.
+ * Get the media stream line index the ICE candidate is associated to.
  *
 */
-enum rawrtc_code rawrtc_peer_connection_candidate_get_sdp_media_line_index(
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
     uint8_t* const media_line_index, // de-referenced
-    struct rawrtc_ice_candidate* const candidate,
-    struct rawrtc_peer_connection* const connection
+    struct rawrtc_peer_connection_ice_candidate* const candidate
 );
 
 /*
- * Get the username fragment the candidate is associated to.
+ * Get the username fragment the ICE candidate is associated to.
  * `*username_fragmentp` will be set to a copy of the associated
  * username fragment that must be unreferenced.
  */
-enum rawrtc_code rawrtc_peer_connection_candidate_get_username_fragment(
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
     char** const username_fragmentp, // de-referenced
-    struct rawrtc_ice_candidate* const candidate,
-    struct rawrtc_peer_connection* const connection
+    struct rawrtc_peer_connection_ice_candidate* const candidate
+);
+
+/*
+ * Get the underlying ORTC ICE candidate from the ICE candidate.
+ * `*ortc_candidatep` must be unreferenced.
+ */
+enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_ortc_candidate(
+    struct rawrtc_ice_candidate** const ortc_candidatep, // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate
 );
 
 /*
@@ -1863,7 +1909,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection** const connectionp, // de-referenced
     struct rawrtc_peer_connection_configuration* configuration, // referenced
     rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
-    rawrtc_ice_gatherer_local_candidate_handler* const ice_candidate_handler, // nullable
+    rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
     void* const arg // nullable
 );
@@ -1872,7 +1918,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
 * Create an offer.
 */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
-    struct rawrtc_peer_connection_description** const descriptionp,
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1880,7 +1926,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
  * Create an answer.
  */
 enum rawrtc_code rawrtc_peer_connection_create_answer(
-    struct rawrtc_peer_connection_description** const descriptionp,
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1889,7 +1935,7 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_description(
     struct rawrtc_peer_connection* const connection,
-    struct rawrtc_peer_connection_description* const description
+    struct rawrtc_peer_connection_description* const description // referenced
 );
 
 /*
@@ -1897,7 +1943,7 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     struct rawrtc_peer_connection* const connection,
-    struct rawrtc_peer_connection_description* const description
+    struct rawrtc_peer_connection_description* const description // referenced
 );
 
 /*

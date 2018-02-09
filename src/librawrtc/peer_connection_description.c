@@ -6,6 +6,7 @@
 #include "sctp_capabilities.h"
 #include "sctp_transport.h"
 #include "peer_connection_description.h"
+#include "peer_connection_ice_candidate.h"
 
 #define DEBUG_MODULE "peer-connection-description"
 #define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -43,13 +44,9 @@ static char const sdp_dtls_fingerprint_regex[] = "fingerprint:[^ ]+ [^]+";
 static char const sdp_sctp_port_sctmap_regex[] = "sctpmap:[0-9]+[^]*";
 static char const sdp_sctp_port_regex[] = "sctp-port:[0-9]+";
 static char const sdp_sctp_maximum_message_size_regex[] = "max-message-size:[0-9]+";
-static char const sdp_ice_candidate_regex[] =
-        "candidate:[^ ]+ [0-9]+ [^ ]+ [0-9]+ [^ ]+ [0-9]+ typ [^ ]+[^]*";
-static char const sdp_ice_candidate_related_address_regex[] = " raddr [^ ]+[^]*";
-static char const sdp_ice_candidate_related_port_regex[] = " rport [0-9]+[^]*";
-static char const sdp_ice_candidate_tcp_type_regex[] = " tcptype [^ ]+[^]*";
 static char const sdp_ice_end_of_candidates[] = "end-of-candidates";
-
+static char const sdp_ice_candidate_head[] = "candidate:";
+static size_t const sdp_ice_candidate_head_length = ARRAY_SIZE(sdp_ice_candidate_head);
 
 /*
  * Set session boilerplate
@@ -542,11 +539,39 @@ static enum rawrtc_code get_sctp_attributes(
 static enum rawrtc_code get_ice_candidate_attributes(
         struct list* const candidates, // not checked
         bool* const end_of_candidatesp, // de-referenced, not checked
-        struct pl* const line // not checked
+        struct pl* const line, // not checked
+        char* const mid, // nullable
+        uint8_t const media_line_index,
+        char* const username_fragment // nullable
 ) {
-    // TODO: Continue here!
-    // TODO: ICE candidate?
-    // TODO: ICE end of candidates?
+    // ICE candidate
+    if (line->l >= sdp_ice_candidate_head_length) {
+        struct pl candidate_pl = {
+                .p = line->p,
+                .l = sdp_ice_candidate_head_length - 1,
+        };
+        if (pl_strcmp(&candidate_pl, sdp_ice_candidate_head) == 0) {
+            // Create ICE candidate
+            struct rawrtc_peer_connection_ice_candidate* candidate;
+            enum rawrtc_code error = rawrtc_peer_connection_ice_candidate_create_internal(
+                    &candidate, line, mid, &media_line_index, username_fragment);
+            if (error) {
+                return error;
+            }
+
+            // Add ICE candidate to the list
+            DEBUG_WARNING("TODO: Parsed ICE candidate %p (print debug info here)\n", candidate);
+            list_append(candidates, &candidate->le, candidate);
+        }
+    }
+
+    // End of candidates
+    if (!pl_strcmp(line, sdp_ice_end_of_candidates)) {
+        *end_of_candidatesp = true;
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Done
     return RAWRTC_CODE_NO_VALUE;
 }
 
@@ -696,7 +721,7 @@ out:
  */
 enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
         struct rawrtc_peer_connection_description* const description,
-        struct rawrtc_ice_candidate* const candidate // nullable
+        struct rawrtc_peer_connection_ice_candidate* const candidate // nullable
 ) {
     enum rawrtc_code error;
 
@@ -715,7 +740,7 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
         }
 
         // Get candidate SDP
-        error = rawrtc_peer_connection_candidate_get_sdp(&candidate_sdp, candidate);
+        error = rawrtc_peer_connection_ice_candidate_get_sdp(&candidate_sdp, candidate);
         if (error) {
             return error;
         }
@@ -949,7 +974,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                         &remote_description->sctp_port, &sctp_max_message_size, &line));
                 HANDLE_ATTRIBUTE(get_ice_candidate_attributes(
                         &remote_description->ice_candidates, &remote_description->end_of_candidates,
-                        &line));
+                        &line, remote_description->bundled_mids, 0, ice_username_fragment));
                 break;
             }
             case 'm': {

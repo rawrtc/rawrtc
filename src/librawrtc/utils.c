@@ -256,27 +256,46 @@ char const * rawrtc_ice_protocol_to_str(
 }
 
 /*
- * Translate a str to an ICE protocol (case-insensitive).
+ * Translate a pl to an ICE protocol (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_protocol(
+enum rawrtc_code rawrtc_pl_to_ice_protocol(
         enum rawrtc_ice_protocol* const protocolp, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!protocolp || !str) {
+    if (!protocolp || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_protocol_length; ++i) {
-        if (str_casecmp(map_str_ice_protocol[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_protocol[i]) == 0) {
             *protocolp = map_enum_ice_protocol[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE protocol (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_protocol(
+        enum rawrtc_ice_protocol* const protocolp, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_protocol(protocolp, &pl);
 }
 
 /*
@@ -354,27 +373,46 @@ char const * rawrtc_ice_candidate_type_to_str(
 }
 
 /*
- * Translate a str to an ICE candidate type (case-insensitive).
+ * Translate a pl to an ICE candidate type (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_candidate_type(
+enum rawrtc_code rawrtc_pl_to_ice_candidate_type(
         enum rawrtc_ice_candidate_type* const typep, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!typep || !str) {
+    if (!typep || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_candidate_type_length; ++i) {
-        if (str_casecmp(map_str_ice_candidate_type[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_candidate_type[i]) == 0) {
             *typep = map_enum_ice_candidate_type[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE candidate type (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_candidate_type(
+        enum rawrtc_ice_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_candidate_type(typep, &pl);
 }
 
 /*
@@ -449,25 +487,44 @@ char const * rawrtc_ice_tcp_candidate_type_to_str(
 /*
  * Translate a str to an ICE TCP candidate type (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_tcp_candidate_type(
+enum rawrtc_code rawrtc_pl_to_ice_tcp_candidate_type(
         enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!typep || !str) {
+    if (!typep || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
-        if (str_casecmp(map_str_ice_tcp_candidate_type[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_tcp_candidate_type[i]) == 0) {
             *typep = map_enum_ice_tcp_candidate_type[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE TCP candidate type (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_tcp_candidate_type(
+        enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_tcp_candidate_type(typep, &pl);
 }
 
 /*

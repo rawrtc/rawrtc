@@ -5,6 +5,7 @@
 #include "certificate.h"
 #include "dtls_transport.h"
 #include "peer_connection_description.h"
+#include "peer_connection_ice_candidate.h"
 #include "peer_connection.h"
 
 #define DEBUG_MODULE "peer-connection"
@@ -78,25 +79,56 @@ static void apply_context(
  * Add candidate to description and announce candidate.
  */
 void ice_gatherer_local_candidate_handler(
-        struct rawrtc_ice_candidate* const candidate,
+        struct rawrtc_ice_candidate* const ortc_candidate,
         char const * const url,
         void* const arg
 ) {
     struct rawrtc_peer_connection* const connection = arg;
     enum rawrtc_code error;
+    char* username_fragment = NULL;
+    struct rawrtc_peer_connection_ice_candidate* candidate = NULL;
+    uint8_t media_line_index = 0;
+    
+    if (ortc_candidate) {
+        // Copy username fragment (is going to be referenced later)
+        error = rawrtc_strdup(
+                &username_fragment, connection->context.ice_gatherer->ice_username_fragment);
+        if (error) {
+            DEBUG_WARNING("Unable to copy username fragment from ICE gatherer, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return;
+        }
 
-    // Add candidate to description
+        // Create candidate
+        // Note: The local description will exist at this point since we start gathering when the local
+        //       description is being set.
+        error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
+                &candidate, ortc_candidate, connection->local_description->bundled_mids,
+                &media_line_index, username_fragment);
+        if (error) {
+            DEBUG_WARNING("Unable to create local candidate from ORTC candidate, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            goto out;
+        }
+    }
+
+    // Add candidate (or end-of-candidate) to description
     error = rawrtc_peer_connection_description_add_candidate(
             connection->local_description, candidate);
     if (error) {
         DEBUG_WARNING("Unable to add local candidate to local description, reason: %s\n",
                       rawrtc_code_to_str(error));
+        goto out;
     }
 
     // Call handler
     if (connection->local_candidate_handler) {
         connection->local_candidate_handler(candidate, url, connection->arg);
     }
+    
+out:
+    // Un-reference
+    mem_deref(username_fragment);
 }
 
 void ice_gatherer_error_handler(
@@ -424,7 +456,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection** const connectionp, // de-referenced
         struct rawrtc_peer_connection_configuration* configuration, // referenced
         rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
-        rawrtc_ice_gatherer_local_candidate_handler* const local_candidate_handler, // nullable
+        rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
 //        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
 //        rawrtc_peer_connection_signaling_state_change_handler* const signaling_state_change_handler, // nullable
 //        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
@@ -464,7 +496,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
  * Create an offer.
  */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
-        struct rawrtc_peer_connection_description** const descriptionp,
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
         struct rawrtc_peer_connection* const connection
 //        bool const ice_restart
 ) {
@@ -491,7 +523,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
  * Create an answer.
  */
 enum rawrtc_code rawrtc_peer_connection_create_answer(
-        struct rawrtc_peer_connection_description** const descriptionp,
+        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
         struct rawrtc_peer_connection* const connection
 ) {
     // Check arguments
@@ -518,7 +550,7 @@ enum rawrtc_code rawrtc_peer_connection_create_answer(
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_description(
         struct rawrtc_peer_connection* const connection,
-        struct rawrtc_peer_connection_description* const description
+        struct rawrtc_peer_connection_description* const description // referenced
 ) {
     bool initial_description = true;
     enum rawrtc_code error;
@@ -572,7 +604,7 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         struct rawrtc_peer_connection* const connection,
-        struct rawrtc_peer_connection_description* const description
+        struct rawrtc_peer_connection_description* const description // referenced
 ) {
     // Check arguments
     if (!connection || !description) {
