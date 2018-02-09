@@ -560,7 +560,7 @@ static enum rawrtc_code get_ice_candidate_attributes(
             }
 
             // Add ICE candidate to the list
-            DEBUG_WARNING("TODO: Parsed ICE candidate %p (print debug info here)\n", candidate);
+            DEBUG_PRINTF("Adding ICE candidate to description\n");
             list_append(candidates, &candidate->le, candidate);
         }
     }
@@ -818,7 +818,12 @@ int rawrtc_peer_connection_description_debug(
     err |= re_hprintf(pf, "----- Peer Connection Description <%p>\n", description);
 
     // Print general fields
-    err |= re_hprintf(pf, "  peer_connection=%p\n", description->connection);
+    err |= re_hprintf(pf, "  peer_connection=");
+    if (description->connection) {
+        err |= re_hprintf(pf, "%p\n", description->connection);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
     err |= re_hprintf(pf, "  sdp_type=%s\n", rawrtc_sdp_type_to_str(description->type));
     err |= re_hprintf(pf, "  trickle_ice=%s\n", description->trickle_ice ? "yes" : "no");
     err |= re_hprintf(pf, "  bundled_mids=");
@@ -848,8 +853,8 @@ int rawrtc_peer_connection_description_debug(
     le = list_head(&description->ice_candidates);
     if (le) {
         for (; le != NULL; le = le->next) {
-            struct rawrtc_ice_candidate *const candidate = le->data;
-            err |= re_hprintf(pf, "%H", rawrtc_ice_candidate_debug, candidate);
+            struct rawrtc_peer_connection_ice_candidate *const candidate = le->data;
+            err |= re_hprintf(pf, "%H", rawrtc_peer_connection_ice_candidate_debug, candidate);
         }
     } else {
         err |= re_hprintf(pf, "  ICE Candidates <n/a>\n");

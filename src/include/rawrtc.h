@@ -880,7 +880,7 @@ struct rawrtc_peer_connection_ice_candidate {
     struct le le;
     struct rawrtc_ice_candidate* candidate;
     char* mid;
-    uint8_t media_line_index;
+    int16_t media_line_index;
     char* username_fragment;
 };
 
@@ -1866,9 +1866,10 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
 /*
  * Get the media stream identification tag the ICE candidate is
  * associated to.
- * `*midp` will be set to a copy of the 'mid' field that must be
- * unreferenced.
-*/
+ * Return `RAWRTC_CODE_NO_VALUE` in case no 'mid' has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*midp* must
+ * be unreferenced.
+ */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
     char** const midp, // de-referenced
     struct rawrtc_peer_connection_ice_candidate* const candidate
@@ -1876,8 +1877,9 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
 
 /*
  * Get the media stream line index the ICE candidate is associated to.
- *
-*/
+ * Return `RAWRTC_CODE_NO_VALUE` in case no media line index has been
+ * set.
+ */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
     uint8_t* const media_line_index, // de-referenced
     struct rawrtc_peer_connection_ice_candidate* const candidate
@@ -1885,8 +1887,9 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
 
 /*
  * Get the username fragment the ICE candidate is associated to.
- * `*username_fragmentp` will be set to a copy of the associated
- * username fragment that must be unreferenced.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no username fragment has been
+ * set. Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and
+ * `*username_fragmentp* must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
     char** const username_fragmentp, // de-referenced

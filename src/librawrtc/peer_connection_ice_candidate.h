@@ -4,6 +4,11 @@ enum {
     RAWRTC_PEER_CONNECTION_CANDIDATE_DEFAULT_SIZE = 256,
 };
 
+int rawrtc_peer_connection_ice_candidate_debug(
+    struct re_printf* const pf,
+    struct rawrtc_peer_connection_ice_candidate* const candidate
+);
+
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
     struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
     struct rawrtc_ice_candidate* const ortc_candidate,

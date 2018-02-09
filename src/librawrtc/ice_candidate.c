@@ -314,7 +314,7 @@ int rawrtc_ice_candidate_debug(
     if (error) {
         goto out;
     }
-    err |= re_hprintf(pf, "    ip=\"%s\"\n", ip);
+    err |= re_hprintf(pf, "    ip=%s\n", ip);
 
     // Protocol
     error = rawrtc_ice_candidate_get_protocol(&protocol, candidate);
@@ -353,18 +353,19 @@ int rawrtc_ice_candidate_debug(
     }
 
     // Related address (if any)
+    err |= re_hprintf(pf, "    related_address=");
     error = rawrtc_ice_candidate_get_related_address(&related_address, candidate);
     switch (error) {
         case RAWRTC_CODE_SUCCESS:
+            err |= re_hprintf(pf, "%s\n", related_address);
             break;
         case RAWRTC_CODE_NO_VALUE:
-            related_address = "n/a";
+            err |= re_hprintf(pf, "n/a\n");
             break;
         default:
             goto out;
             break;
     }
-    err |= re_hprintf(pf, "    related_address=%s\n", related_address);
 
     // Related port (if any)
     err |= re_hprintf(pf, "    related_port=");

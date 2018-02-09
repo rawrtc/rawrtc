@@ -14,6 +14,51 @@ static char const sdp_ice_candidate_related_port_regex[] = "[^]* rport [0-9]+";
 static char const sdp_ice_candidate_tcp_type_regex[] = "[^]* tcptype [^ ]+";
 
 /*
+ * Print debug information for an ICE candidate.
+ */
+int rawrtc_peer_connection_ice_candidate_debug(
+        struct re_printf* const pf,
+        struct rawrtc_peer_connection_ice_candidate* const candidate
+) {
+    int err = 0;
+
+    // Check arguments
+    if (!candidate) {
+        return 0;
+    }
+
+    // ORTC ICE candidate
+    err |= re_hprintf(pf, "%H", rawrtc_ice_candidate_debug, candidate->candidate);
+
+    // Media line identification tag
+    err |= re_hprintf(pf, "    mid=");
+    if (candidate->mid) {
+        err |= re_hprintf(pf, "\"%s\"\n", candidate->mid);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
+
+    // Media line index
+    err |= re_hprintf(pf, "    media_line_index=");
+    if (candidate->media_line_index >= 0 && candidate->media_line_index <= UINT8_MAX) {
+        err |= re_hprintf(pf, "%"PRId16"\n", candidate->media_line_index);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
+
+    // Username fragment
+    err |= re_hprintf(pf, "    username_fragment=");
+    if (candidate->username_fragment) {
+        err |= re_hprintf(pf, "\"%s\"\n", candidate->username_fragment);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
+
+    // Done
+    return err;
+}
+
+/*
  * Destructor for an existing peer connection.
  */
 static void rawrtc_peer_connection_ice_candidate_destroy(
@@ -39,6 +84,11 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
 ) {
     struct rawrtc_peer_connection_ice_candidate* candidate;
 
+    // Ensure either 'mid' or the media line index is present
+    if (!mid && !media_line_index) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
     // Allocate
     candidate = mem_zalloc(sizeof(*candidate), rawrtc_peer_connection_ice_candidate_destroy);
     if (!candidate) {
@@ -48,7 +98,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
     // Set fields
     candidate->candidate = mem_ref(ortc_candidate);
     candidate->mid = mem_ref(mid);
-    candidate->media_line_index = *media_line_index;
+    candidate->media_line_index = media_line_index ? *media_line_index : -1;
     candidate->username_fragment = mem_ref(username_fragment);
 
     // Set pointer & done
@@ -372,8 +422,9 @@ out:
 /*
  * Get the media stream identification tag the ICE candidate is
  * associated to.
- * `*midp` will be set to a copy of the 'mid' field that must be
- * unreferenced.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no 'mid' has been set.
+ * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*midp* must
+ * be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
         char** const midp, // de-referenced
@@ -384,12 +435,18 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Copy mid
-    return rawrtc_strdup(midp, candidate->mid);
+    // Copy mid (if any)
+    if (candidate->mid) {
+        return rawrtc_strdup(midp, candidate->mid);
+    } else {
+        RAWRTC_CODE_NO_VALUE;
+    }
 }
 
 /*
  * Get the media stream line index the ICE candidate is associated to.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no media line index has been
+ * set.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
         uint8_t* const media_line_index, // de-referenced
@@ -400,15 +457,20 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Set media line index
-    *media_line_index = candidate->media_line_index;
-    return RAWRTC_CODE_SUCCESS;
+    // Set media line index (if any)
+    if (candidate->media_line_index >= 0 && candidate->media_line_index <= UINT8_MAX) {
+        *media_line_index = (uint8_t) candidate->media_line_index;
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
 }
 
 /*
  * Get the username fragment the ICE candidate is associated to.
- * `*username_fragmentp` will be set to a copy of the associated
- * username fragment that must be unreferenced.
+ * Return `RAWRTC_CODE_NO_VALUE` in case no username fragment has been
+ * set. Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and
+ * `*username_fragmentp* must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
         char** const username_fragmentp, // de-referenced
@@ -419,8 +481,12 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Copy username fragment;
-    return rawrtc_strdup(username_fragmentp, candidate->username_fragment);
+    // Copy username fragment (if any)
+    if (candidate->username_fragment) {
+        return rawrtc_strdup(username_fragmentp, candidate->username_fragment);
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
 }
 
 /*
