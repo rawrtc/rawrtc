@@ -16,6 +16,89 @@
 uint16_t const discard_port = 9;
 
 /*
+ * All the nasty SDP stuff has been done. Fire it all up - YAY!
+ */
+enum rawrtc_code peer_connection_start(
+        struct rawrtc_peer_connection* const connection
+) {
+    enum rawrtc_code error;
+    struct rawrtc_peer_connection_context* const context = &connection->context;
+    struct rawrtc_peer_connection_description* description;
+    enum rawrtc_ice_role ice_role;
+    struct le* le;
+
+    // Check if it's too early to start
+    if (!connection->local_description || !connection->remote_description) {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+
+    DEBUG_INFO("Local and remote description set, starting transports\n");
+    description = connection->remote_description;
+
+    // Determine ICE role
+    // TODO: Is this correct?
+    switch (description->type) {
+        case RAWRTC_SDP_TYPE_OFFER:
+            ice_role = RAWRTC_ICE_ROLE_CONTROLLED;
+            break;
+        case RAWRTC_SDP_TYPE_ANSWER:
+            ice_role = RAWRTC_ICE_ROLE_CONTROLLING;
+            break;
+        default:
+            DEBUG_WARNING("Cannot determine ICE role from SDP type %s, report this!\n",
+                          rawrtc_sdp_type_to_str(description->type));
+            return RAWRTC_CODE_UNKNOWN_ERROR;
+    }
+
+    // Start ICE transport
+    error = rawrtc_ice_transport_start(
+            context->ice_transport, context->ice_gatherer, description->ice_parameters, ice_role);
+    if (error) {
+        return error;
+    }
+
+    // Start data transport
+    switch (context->data_transport->type) {
+        case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
+            struct rawrtc_sctp_transport* const sctp_transport = context->data_transport->transport;
+
+            // Start DTLS transport
+            error = rawrtc_dtls_transport_start(context->dtls_transport, description->dtls_parameters);
+            if (error) {
+                return error;
+            }
+
+            // Start SCTP transport
+            error = rawrtc_sctp_transport_start(
+                    sctp_transport, description->sctp_capabilities, description->sctp_port);
+            if (error) {
+                return error;
+            }
+            break;
+        }
+        default:
+            DEBUG_WARNING("Invalid data transport type\n");
+            return RAWRTC_CODE_UNKNOWN_ERROR;
+    }
+
+    // Add remote ICE candidates
+    for (le = list_head(&description->ice_candidates); le != NULL; le = le->next) {
+        struct rawrtc_peer_connection_ice_candidate* const candidate = le->data;
+        error = rawrtc_ice_transport_add_remote_candidate(
+                context->ice_transport, candidate->candidate);
+        if (error) {
+            DEBUG_WARNING("Unable to add remote candidate, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            // Note: Continuing here since other candidates may work
+        }
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+
+/*
  * Get the corresponding name for a peer connection state.
  */
 char const * const rawrtc_peer_connection_state_to_name(
@@ -388,36 +471,34 @@ static enum rawrtc_code get_data_transport(
 
     // Create data transport depending on what we want to have
     switch (connection->data_transport_type) {
-        case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
-            {
-                struct rawrtc_sctp_transport* sctp_transport;
+        case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
+            struct rawrtc_sctp_transport* sctp_transport;
 
-                // Get DTLS transport
-                error = get_dtls_transport(context, connection);
-                if (error) {
-                    return error;
-                }
-
-                // Create SCTP transport
-                error = rawrtc_sctp_transport_create(
-                        &sctp_transport, context->dtls_transport,
-                        RAWRTC_PEER_CONNECTION_SCTP_TRANSPORT_PORT,
-                        connection->data_channel_handler, sctp_transport_state_change_handler,
-                        connection);
-                if (error) {
-                    return error;
-                }
-
-                // Get data transport
-                error = rawrtc_sctp_transport_get_data_transport(
-                        &context->data_transport, sctp_transport);
-                if (error) {
-                    mem_deref(sctp_transport);
-                    return error;
-                }
+            // Get DTLS transport
+            error = get_dtls_transport(context, connection);
+            if (error) {
+                return error;
             }
 
+            // Create SCTP transport
+            error = rawrtc_sctp_transport_create(
+                    &sctp_transport, context->dtls_transport,
+                    RAWRTC_PEER_CONNECTION_SCTP_TRANSPORT_PORT,
+                    connection->data_channel_handler, sctp_transport_state_change_handler,
+                    connection);
+            if (error) {
+                return error;
+            }
+
+            // Get data transport
+            error = rawrtc_sctp_transport_get_data_transport(
+                    &context->data_transport, sctp_transport);
+            if (error) {
+                mem_deref(sctp_transport);
+                return error;
+            }
             break;
+        }
         default:
             return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
@@ -497,12 +578,18 @@ enum rawrtc_code rawrtc_peer_connection_create(
  */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
         struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-//        bool const ice_restart
+        struct rawrtc_peer_connection* const connection,
+        bool const ice_restart
 ) {
     // Check arguments
     if (!connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // TODO: Support ICE restart
+    if (ice_restart) {
+        DEBUG_WARNING("ICE restart currently not supported\n");
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
     // Check state
@@ -574,6 +661,56 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
+    // We only accept 'offer' or 'answer' at the moment
+    // TODO: Handle the other ones as well
+    if (description->type != RAWRTC_SDP_TYPE_OFFER && description->type != RAWRTC_SDP_TYPE_ANSWER) {
+        DEBUG_WARNING("Only 'offer' or 'answer' descriptions can be handled at the moment\n");
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Check SDP type
+    DEBUG_PRINTF(
+            "Set local description: %s (local), %s (remote)\n",
+            rawrtc_sdp_type_to_str(description->type),
+            connection->remote_description ? rawrtc_sdp_type_to_str(
+                    connection->remote_description->type) : "n/a");
+    if (connection->remote_description) {
+        switch (description->type) {
+            case RAWRTC_SDP_TYPE_OFFER:
+                // We have a remote description and get an offer. This requires renegotiation we
+                // currently don't support.
+                // TODO: Add support for this
+                DEBUG_WARNING("There's no support for renegotiation at the moment.\n");
+                return RAWRTC_CODE_NOT_IMPLEMENTED;
+            case RAWRTC_SDP_TYPE_ANSWER:
+                // We have a remote description and get an answer. Sanity-check that the remote
+                // description is an offer.
+                if (connection->remote_description->type != RAWRTC_SDP_TYPE_OFFER) {
+                    DEBUG_WARNING(
+                            "Got 'answer' but remote description is '%s'\n",
+                            rawrtc_sdp_type_to_str(connection->remote_description->type));
+                    return RAWRTC_CODE_INVALID_STATE;
+                }
+                break;
+            default:
+                DEBUG_WARNING("Unknown SDP type, please report this!\n");
+                return RAWRTC_CODE_UNKNOWN_ERROR;
+        }
+    } else {
+        switch (description->type) {
+            case RAWRTC_SDP_TYPE_OFFER:
+                // We have no remote description and get an offer. Fine.
+                break;
+            case RAWRTC_SDP_TYPE_ANSWER:
+                // We have no remote description and get an answer. Not going to work.
+                DEBUG_WARNING("Got 'answer' but have no remote description\n");
+                return RAWRTC_CODE_INVALID_STATE;
+            default:
+                DEBUG_WARNING("Unknown SDP type, please report this!\n");
+                return RAWRTC_CODE_UNKNOWN_ERROR;
+        }
+    }
+
     // Remove reference to self
     description->connection = mem_deref(description->connection);
 
@@ -589,10 +726,11 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
         }
     }
 
-    // TODO: Local and remote description set, start transports, etc...
-    if (connection->local_description && connection->remote_description) {
-        DEBUG_WARNING("TODO: Local and remote description set, start transports, etc...\n");
-        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    // Start peer connection if both description are set
+    error = peer_connection_start(connection);
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
+        DEBUG_WARNING("Unable to start peer connection, reason: %s\n", rawrtc_code_to_str(error));
+        return error;
     }
 
     // Done
@@ -606,6 +744,9 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         struct rawrtc_peer_connection* const connection,
         struct rawrtc_peer_connection_description* const description // referenced
 ) {
+    enum rawrtc_code error;
+    struct rawrtc_peer_connection_context context;
+
     // Check arguments
     if (!connection || !description) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -616,22 +757,199 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 
-    // TODO: Ensure remote description fits our requirements
-    // TODO: Create a data transport if it's not there, yet (and we're answering)
-    // TODO: Continue here
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
+    // We only accept 'offer' or 'answer' at the moment
+    // TODO: Handle the other ones as well
+    if (description->type != RAWRTC_SDP_TYPE_OFFER && description->type != RAWRTC_SDP_TYPE_ANSWER) {
+        DEBUG_WARNING("Only 'offer' or 'answer' descriptions can be handled at the moment\n");
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Check SDP type
+    DEBUG_PRINTF(
+            "Set remote description: %s (local), %s (remote)\n",
+            connection->local_description ? rawrtc_sdp_type_to_str(
+                    connection->local_description->type) : "n/a",
+            rawrtc_sdp_type_to_str(description->type));
+    if (connection->local_description) {
+        switch (description->type) {
+            case RAWRTC_SDP_TYPE_OFFER:
+                // We have a local description and get an offer. This requires renegotiation we
+                // currently don't support.
+                // TODO: Add support for this
+                DEBUG_WARNING("There's no support for renegotiation at the moment.\n");
+                return RAWRTC_CODE_NOT_IMPLEMENTED;
+            case RAWRTC_SDP_TYPE_ANSWER:
+                // We have a local description and get an answer. Sanity-check that the local
+                // description is an offer.
+                if (connection->local_description->type != RAWRTC_SDP_TYPE_OFFER) {
+                    DEBUG_WARNING(
+                            "Got 'answer' but local description is '%s'\n",
+                            rawrtc_sdp_type_to_str(connection->local_description->type));
+                    return RAWRTC_CODE_INVALID_STATE;
+                }
+                break;
+            default:
+                DEBUG_WARNING("Unknown SDP type, please report this!\n");
+                return RAWRTC_CODE_UNKNOWN_ERROR;
+        }
+    } else {
+        switch (description->type) {
+            case RAWRTC_SDP_TYPE_OFFER:
+                // We have no local description and get an offer. Fine.
+                break;
+            case RAWRTC_SDP_TYPE_ANSWER:
+                // We have no local description and get an answer. Not going to work.
+                DEBUG_WARNING("Got 'answer' but have no local description\n");
+                return RAWRTC_CODE_INVALID_STATE;
+            default:
+                DEBUG_WARNING("Unknown SDP type, please report this!\n");
+                return RAWRTC_CODE_UNKNOWN_ERROR;
+        }
+    }
+
+    // No trickle ICE? Ensure we have all candidates
+    if (!description->trickle_ice && !description->end_of_candidates) {
+        DEBUG_WARNING("No trickle ICE indicated but don't have all candidates\n");
+        // Note: We continue since we still accept further candidates.
+    }
+
+    // No remote media 'application' line?
+    if (!description->remote_media_line) {
+        DEBUG_WARNING("No remote media 'application' line for data channels found\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // No ICE parameters?
+    // Note: We either have valid ICE parameters or none at this point
+    if (!description->ice_parameters) {
+        DEBUG_WARNING("Required ICE parameters not present\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // No DTLS parameters?
+    // Note: We either have valid DTLS parameters or none at this point
+    if (!description->dtls_parameters) {
+        DEBUG_WARNING("Required DTLS parameters not present\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // No SCTP capabilities or port?
+    // Note: We either have valid SCTP capabilities or none at this point
+    if (!description->sctp_capabilities) {
+        DEBUG_WARNING("Required SCTP capabilities not present\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+    if (description->sctp_port == 0) {
+        DEBUG_WARNING("Invalid SCTP port (0)\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
 
     // Set remote description
     connection->remote_description = mem_ref(description);
 
-    // TODO: Local and remote description set, start transports, etc...
-    if (connection->local_description && connection->remote_description) {
-        DEBUG_WARNING("TODO: Local and remote description set, start transports, etc...\n");
-        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    // Initialise context
+    context = connection->context;
+
+    // Create a data transport if we're answering
+    if (description->type == RAWRTC_SDP_TYPE_OFFER) {
+        // Get data transport
+        error = get_data_transport(&context, connection);
+        if (error) {
+            DEBUG_WARNING("Unable to create data transport, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return error;
+        }
+
+        // Apply context
+        apply_context(connection, &context);
+    }
+
+    // Start peer connection if both description are set
+    error = peer_connection_start(connection);
+    if (error && error != RAWRTC_CODE_NO_VALUE) {
+        DEBUG_WARNING("Unable to start peer connection, reason: %s\n", rawrtc_code_to_str(error));
+        return error;
     }
 
     // Done
     return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Add an ICE candidate to the peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
+        struct rawrtc_peer_connection* const connection,
+        struct rawrtc_peer_connection_ice_candidate* const candidate
+) {
+    // TODO: Continue here
+    return RAWRTC_CODE_NOT_IMPLEMENTED;
+}
+
+/*
+ * Create a data channel on a peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_create_data_channel(
+        struct rawrtc_data_channel** const channelp, // de-referenced
+        struct rawrtc_peer_connection* const connection,
+        struct rawrtc_data_channel_parameters* const parameters, // referenced
+        struct rawrtc_data_channel_options* const options, // nullable, referenced
+        rawrtc_data_channel_open_handler* const open_handler, // nullable
+        rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
+        rawrtc_data_channel_error_handler* const error_handler, // nullable
+        rawrtc_data_channel_close_handler* const close_handler, // nullable
+        rawrtc_data_channel_message_handler* const message_handler, // nullable
+        void* const arg // nullable
+) {
+    enum rawrtc_code error;
+    struct rawrtc_peer_connection_context context;
+
+    // Check arguments
+    if (!connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    // TODO: Support new offer/answer
+    if (connection->connection_state != RAWRTC_PEER_CONNECTION_STATE_NEW) {
+        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    }
+
+    // Initialise context
+    context = connection->context;
+
+    // Get data transport
+    error = get_data_transport(&context, connection);
+    if (error) {
+        DEBUG_WARNING("Unable to create data transport, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        return error;
+    }
+
+    // Create data channel
+    // TODO: Fix data channel cannot be created before transports have been started
+    error = rawrtc_data_channel_create(
+            channelp, context.data_transport, parameters, options, open_handler,
+            buffered_amount_low_handler, error_handler, close_handler, message_handler, arg);
+    if (error) {
+        goto out;
+    }
+
+out:
+    if (error) {
+        // Remove all newly created instances
+        revert_context(&context, &connection->context);
+    } else {
+        // Apply context
+        apply_context(connection, &context);
+
+        // Negotiation needed?
+        if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_NEW
+            && connection->negotiation_needed_handler) {
+            connection->negotiation_needed_handler(connection->arg);
+        }
+    }
+    return error;
 }
 
 /*
@@ -674,68 +992,4 @@ enum rawrtc_code rawrtc_peer_connection_get_remote_description(
     } else {
         return RAWRTC_CODE_NO_VALUE;
     }
-}
-
-/*
- * Create a data channel on a peer connection.
- */
-enum rawrtc_code rawrtc_peer_connection_create_data_channel(
-        struct rawrtc_data_channel** const channelp, // de-referenced
-        struct rawrtc_peer_connection* const connection,
-        struct rawrtc_data_channel_parameters* const parameters, // referenced
-        struct rawrtc_data_channel_options* const options, // nullable, referenced
-        rawrtc_data_channel_open_handler* const open_handler, // nullable
-        rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
-        rawrtc_data_channel_error_handler* const error_handler, // nullable
-        rawrtc_data_channel_close_handler* const close_handler, // nullable
-        rawrtc_data_channel_message_handler* const message_handler, // nullable
-        void* const arg // nullable
-) {
-    enum rawrtc_code error;
-    struct rawrtc_peer_connection_context context;
-
-    // Check arguments
-    if (!connection) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Check state
-    // TODO: Support new offer/answer
-    if (connection->connection_state != RAWRTC_PEER_CONNECTION_STATE_NEW) {
-        return RAWRTC_CODE_NOT_IMPLEMENTED;
-    }
-
-    // Initialise context
-    context = connection->context;
-
-    // Get data transport
-    error = get_data_transport(&context, connection);
-    if (error) {
-        return error;
-    }
-
-    // Create data channel
-    // TODO: Fix data channel cannot be created before transports have been started
-    error = rawrtc_data_channel_create(
-            channelp, context.data_transport, parameters, options, open_handler,
-            buffered_amount_low_handler, error_handler, close_handler, message_handler, arg);
-    if (error) {
-        goto out;
-    }
-
-out:
-    if (error) {
-        // Remove all newly created instances
-        revert_context(&context, &connection->context);
-    } else {
-        // Apply context
-        apply_context(connection, &context);
-
-        // Negotiation needed?
-        if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_NEW
-            && connection->negotiation_needed_handler) {
-            connection->negotiation_needed_handler(connection->arg);
-        }
-    }
-    return error;
 }

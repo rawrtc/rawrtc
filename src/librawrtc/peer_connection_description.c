@@ -619,7 +619,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     // Ensure a data transport has been set (when offering)
     if (offering && !context->data_transport) {
         DEBUG_WARNING("No data transport set\n");
-        return RAWRTC_CODE_INVALID_ARGUMENT;
+        return RAWRTC_CODE_NO_VALUE;
     }
 
     // Ensure a remote description is available (when answering)
@@ -916,6 +916,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     // We only accept 'offer' or 'answer' at the moment
     // TODO: Handle the other ones as well
     if (type != RAWRTC_SDP_TYPE_OFFER && type != RAWRTC_SDP_TYPE_ANSWER) {
+        DEBUG_WARNING("Only 'offer' or 'answer' descriptions can be handled at the moment\n");
         return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
 

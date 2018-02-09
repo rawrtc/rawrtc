@@ -118,7 +118,7 @@ static void negotiation_needed_handler(
     // Offering: Create and set local description
     if (client->offering) {
         struct rawrtc_peer_connection_description* description;
-        EOE(rawrtc_peer_connection_create_offer(&description, client->connection));
+        EOE(rawrtc_peer_connection_create_offer(&description, client->connection, false));
         EOE(rawrtc_peer_connection_set_local_description(client->connection, description));
         mem_deref(description);
     }

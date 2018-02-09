@@ -260,7 +260,10 @@ const start = (offering) => {
             }
         };
     };
-    createDataChannelWithName('in-band');
+    createDataChannelWithName('cat-noises', {
+        negotiated: true,
+        id: 0,
+    }, 'dinosaur-noises');
 };
 
 // Introduction

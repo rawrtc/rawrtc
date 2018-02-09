@@ -57,14 +57,6 @@ class WebRTCPeerConnection {
     createDataChannel(name, options = null) {
         const pc = this.pc;
 
-        // Set default options (if none provided)
-        if (options === null) {
-            options = {
-                negotiated: true,
-                id: Object.keys(this.dcs).length + 1
-            };
-        }
-
         // Create data channel and bind events
         const dc = pc.createDataChannel(name, options);
         dc._name = name; // Meh!

@@ -1922,7 +1922,8 @@ enum rawrtc_code rawrtc_peer_connection_create(
 */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
     struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-    struct rawrtc_peer_connection* const connection
+    struct rawrtc_peer_connection* const connection,
+    bool const ice_restart
 );
 
 /*
@@ -1950,24 +1951,8 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
 );
 
 /*
- * Get local description.
+ * Create a data channel on a peer connection.
  */
-enum rawrtc_code rawrtc_peer_connection_get_local_description(
-    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-    struct rawrtc_peer_connection* const connection
-);
-
-/*
- * Get remote description.
- */
-enum rawrtc_code rawrtc_peer_connection_get_remote_description(
-    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-    struct rawrtc_peer_connection* const connection
-);
-
-/*
-* Create a data channel on a peer connection.
-*/
 enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     struct rawrtc_data_channel** const channelp, // de-referenced
     struct rawrtc_peer_connection* const connection,
@@ -1979,6 +1964,22 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     rawrtc_data_channel_close_handler* const close_handler, // nullable
     rawrtc_data_channel_message_handler* const message_handler, // nullable
     void* const arg // nullable
+);
+
+/*
+ * Get local description.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+* Get remote description.
+*/
+enum rawrtc_code rawrtc_peer_connection_get_remote_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
 );
 
 
