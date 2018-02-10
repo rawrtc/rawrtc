@@ -178,7 +178,8 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_peer_connection_create_data_channel(
-            &client->data_channel_negotiated->channel, client->connection, channel_parameters, NULL,
+            &client->data_channel_negotiated->channel, client->connection,
+            channel_parameters, NULL,
             data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
@@ -193,7 +194,7 @@ static void client_init(
 static void client_stop(
         struct peer_connection_client* const client
 ) {
-//    EOE(rawrtc_peer_connection_stop(client->connection));
+    EOE(rawrtc_peer_connection_close(client->connection));
 
     // Un-reference & close
     client->data_channel = mem_deref(client->data_channel);

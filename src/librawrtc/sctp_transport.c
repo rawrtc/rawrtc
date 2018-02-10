@@ -478,7 +478,7 @@ static void close_data_channels(
         DEBUG_PRINTF("Closing channel with SID %"PRIu16"\n", i);
         rawrtc_data_channel_set_state(channel, RAWRTC_DATA_CHANNEL_STATE_CLOSED);
 
-        // Un-reference
+        // Remove from transport
         transport->channels[i] = mem_deref(channel);
     }
 }
@@ -2279,7 +2279,7 @@ static enum rawrtc_code channel_context_create(
 }
 
 /*
- * Check if a data channel is registered in the transport.
+ * Check if a data channel is registered on the transport.
  */
 static bool channel_registered(
         struct rawrtc_sctp_transport* const transport, // not checked
@@ -2595,6 +2595,7 @@ enum rawrtc_code rawrtc_sctp_transport_get_data_transport(
         struct rawrtc_sctp_transport* const sctp_transport // referenced
 ) {
     enum rawrtc_code error;
+    struct rawrtc_data_transport* transport;
 
     // Check arguments
     if (!sctp_transport) {
@@ -2606,21 +2607,16 @@ enum rawrtc_code rawrtc_sctp_transport_get_data_transport(
         return RAWRTC_CODE_INVALID_STATE;
     }
 
-    // Lazy-create data transport
-    if (!sctp_transport->data_transport) {
-        error = rawrtc_data_transport_create(
-                &sctp_transport->data_transport, RAWRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
-                channel_create_handler, channel_close_handler, channel_send_handler);
-        if (error) {
-            return error;
-        }
-    } else {
-        // +1 when handing out the instance
-        mem_ref(sctp_transport->data_transport);
+    // Create data transport
+    error = rawrtc_data_transport_create(
+            &transport, RAWRTC_DATA_TRANSPORT_TYPE_SCTP, sctp_transport,
+            channel_create_handler, channel_close_handler, channel_send_handler);
+    if (error) {
+        return error;
     }
 
     // Set pointer & done
-    *transportp = sctp_transport->data_transport;
+    *transportp = transport;
     return RAWRTC_CODE_SUCCESS;
 }
 

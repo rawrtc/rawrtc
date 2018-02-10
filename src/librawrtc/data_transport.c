@@ -9,7 +9,7 @@
 /*
  * Destructor for an existing data transport.
  */
-static void rawrtc_sctp_transport_destroy(
+static void rawrtc_data_transport_destroy(
         void* arg
 ) {
     struct rawrtc_data_transport* const transport = arg;
@@ -37,7 +37,7 @@ enum rawrtc_code rawrtc_data_transport_create(
     }
 
     // Allocate
-    transport = mem_zalloc(sizeof(*transport), rawrtc_sctp_transport_destroy);
+    transport = mem_zalloc(sizeof(*transport), rawrtc_data_transport_destroy);
     if (!transport) {
         return RAWRTC_CODE_NO_MEMORY;
     }

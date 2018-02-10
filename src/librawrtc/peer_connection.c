@@ -32,26 +32,6 @@ static void set_signaling_state(
 }
 
 /*
- * Close the peer connection. This will stop all transports and update
- * all affected states appropriately.
- */
-static void peer_connection_close(
-        struct rawrtc_peer_connection* const connection // not checked
-) {
-    (void) connection;
-
-    // TODO: Stop all transports
-    DEBUG_WARNING("TODO: Stop all transports\n");
-
-    // TODO: Update states (?)
-    DEBUG_WARNING("TODO: Update states (?)\n");
-
-    // Update signalling state
-    set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
-}
-
-
-/*
  * All the nasty SDP stuff has been done. Fire it all up - YAY!
  */
 static enum rawrtc_code peer_connection_start(
@@ -155,6 +135,9 @@ static void revert_context(
     if (new->ice_gatherer != current->ice_gatherer) {
         mem_deref(new->ice_gatherer);
     }
+    if (new->gather_options != current->gather_options) {
+        mem_deref(new->gather_options);
+    }
 }
 
 /*
@@ -217,9 +200,10 @@ void ice_gatherer_local_candidate_handler(
     if (connection->local_candidate_handler) {
         connection->local_candidate_handler(candidate, url, connection->arg);
     }
-    
+
 out:
     // Un-reference
+    mem_deref(candidate);
     mem_deref(username_fragment);
 }
 
@@ -500,10 +484,12 @@ static enum rawrtc_code get_data_transport(
             }
 
             // Get data transport
+            // Note: Since the data transport has a reference to the SCTP transport, we can still
+            //       retrieve the reference later.
             error = rawrtc_sctp_transport_get_data_transport(
                     &context->data_transport, sctp_transport);
+            mem_deref(sctp_transport);
             if (error) {
-                mem_deref(sctp_transport);
                 return error;
             }
             break;
@@ -525,7 +511,7 @@ static void rawrtc_peer_connection_destroy(
     struct rawrtc_peer_connection* const connection = arg;
 
     // Close peer connection
-    peer_connection_close(connection);
+    rawrtc_peer_connection_close(connection);
 
     // Un-reference
     mem_deref(connection->context.data_transport);
@@ -581,6 +567,73 @@ enum rawrtc_code rawrtc_peer_connection_create(
 
     // Set pointer & done
     *connectionp = connection;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Close the peer connection. This will stop all underlying transports
+ * and results in a final 'closed' state.
+ */
+enum rawrtc_code rawrtc_peer_connection_close(
+        struct rawrtc_peer_connection* const connection
+) {
+    enum rawrtc_code error;
+
+    // Check arguments
+    if (!connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // TODO: Check state
+    DEBUG_WARNING("TODO: Check if closed\n");
+
+    // Stop data transport (if any)
+    if (connection->context.data_transport) {
+        switch (connection->data_transport_type) {
+            case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
+                struct rawrtc_sctp_transport *const sctp_transport =
+                        connection->context.data_transport->transport;
+                error = rawrtc_sctp_transport_stop(sctp_transport);
+                if (error) {
+                    DEBUG_WARNING("Unable to stop SCTP transport, reason: %s\n",
+                                  rawrtc_code_to_str(error));
+                }
+                break;
+            }
+        }
+    }
+
+    // Stop DTLS transport (if any)
+    if (connection->context.dtls_transport) {
+        error = rawrtc_dtls_transport_stop(connection->context.dtls_transport);
+        if (error) {
+            DEBUG_WARNING("Unable to stop DTLS transport, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
+
+    // Stop ICE transport (if any)
+    if (connection->context.ice_transport) {
+        error = rawrtc_ice_transport_stop(connection->context.ice_transport);
+        if (error) {
+            DEBUG_WARNING("Unable to stop ICE transport, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
+
+    // Close ICE gatherer (if any)
+    if (connection->context.ice_gatherer) {
+        error = rawrtc_ice_gatherer_close(connection->context.ice_gatherer);
+        if (error) {
+            DEBUG_WARNING("Unable to close ICE gatherer, reason: %s\n", rawrtc_code_to_str(error));
+        }
+    }
+
+    // TODO: Update states (?)
+    DEBUG_WARNING("TODO: Update states (?)\n");
+
+    // Update signalling state
+    set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
+
+    // Done
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -1023,6 +1076,7 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
 ) {
     enum rawrtc_code error;
     struct rawrtc_peer_connection_context context;
+    struct rawrtc_data_channel* channel;
 
     // Check arguments
     if (!connection) {
@@ -1049,7 +1103,7 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     // Create data channel
     // TODO: Fix data channel cannot be created before transports have been started
     error = rawrtc_data_channel_create(
-            channelp, context.data_transport, parameters, options, open_handler,
+            &channel, context.data_transport, parameters, options, open_handler,
             buffered_amount_low_handler, error_handler, close_handler, message_handler, arg);
     if (error) {
         goto out;
@@ -1057,11 +1111,17 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
 
 out:
     if (error) {
+        // Un-reference
+        mem_deref(channel);
+
         // Remove all newly created instances
         revert_context(&context, &connection->context);
     } else {
         // Apply context
         apply_context(connection, &context);
+
+        // Set pointer
+        *channelp = channel;
 
         // Negotiation needed?
         if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_NEW

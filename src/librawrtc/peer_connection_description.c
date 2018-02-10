@@ -229,6 +229,7 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
     enum rawrtc_code error;
     struct rawrtc_dtls_fingerprints* fingerprints;
     size_t i;
+    char* value = NULL;
 
     // Get fingerprints
     error = rawrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters);
@@ -240,11 +241,15 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
     for (i = 0; i < fingerprints->n_fingerprints; ++i) {
         struct rawrtc_dtls_fingerprint* const fingerprint = fingerprints->fingerprints[i];
         enum rawrtc_certificate_sign_algorithm sign_algorithm;
-        char* value;
 
-        // Get sign algorithm and fingerprint value
+        // Get sign algorithm
         error = rawrtc_dtls_parameters_fingerprint_get_sign_algorithm(&sign_algorithm, fingerprint);
-        error |= rawrtc_dtls_parameters_fingerprint_get_value(&value, fingerprint);
+        if (error) {
+            goto out;
+        }
+
+        // Get fingerprint value
+        error = rawrtc_dtls_parameters_fingerprint_get_value(&value, fingerprint);
         if (error) {
             goto out;
         }
@@ -263,6 +268,7 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
 
 out:
     // Un-reference
+    mem_deref(value);
     mem_deref(fingerprints);
     return error;
 }

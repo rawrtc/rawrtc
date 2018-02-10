@@ -849,7 +849,6 @@ struct rawrtc_sctp_transport {
     FILE* trace_handle;
     struct socket* socket;
     uint_fast8_t flags;
-    struct rawrtc_data_transport* data_transport; // referenced
 };
 
 /*
@@ -1947,6 +1946,14 @@ enum rawrtc_code rawrtc_peer_connection_create(
     rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
     void* const arg // nullable
+);
+
+/*
+ * Close the peer connection. This will stop all underlying transports
+ * and results in a final 'closed' state.
+ */
+enum rawrtc_code rawrtc_peer_connection_close(
+    struct rawrtc_peer_connection* const connection
 );
 
 /*

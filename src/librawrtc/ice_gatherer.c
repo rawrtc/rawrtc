@@ -897,7 +897,7 @@ static enum rawrtc_code query_a_or_aaaa_record(
         struct sa* const server_address, // not checked
         uint_fast16_t const dns_type,
         struct rawrtc_ice_server_url* const url, // not checked
-        struct rawrtc_ice_gatherer* const gatherer // not checked
+        struct rawrtc_ice_gatherer* const gatherer // referenced, not checked
 ) {
     bool const resolved = !sa_is_any(server_address);
     enum rawrtc_code error;
