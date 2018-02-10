@@ -806,7 +806,7 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
 
     // No trickle ICE? Ensure we have all candidates
     if (!description->trickle_ice && !description->end_of_candidates) {
-        DEBUG_WARNING("No trickle ICE indicated but don't have all candidates\n");
+        DEBUG_NOTICE("No trickle ICE indicated but don't have all candidates\n");
         // Note: We continue since we still accept further candidates.
     }
 
@@ -925,7 +925,7 @@ enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
         }
 
         // Compare username fragments
-        matching = str_cmp(candidate->username_fragment, username_fragment) != 0;
+        matching = str_cmp(candidate->username_fragment, username_fragment) == 0;
         mem_deref(username_fragment);
         if (!matching) {
             DEBUG_WARNING("Username fragments don't match\n");

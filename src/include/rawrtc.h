@@ -322,7 +322,7 @@ enum rawrtc_ice_server_transport {
  * TODO: private
  */
 enum {
-    ICE_USERNAME_FRAGMENT_LENGTH = 32,
+    ICE_USERNAME_FRAGMENT_LENGTH = 16,
     ICE_PASSWORD_LENGTH = 32,
     DTLS_ID_LENGTH = 32,
 };
