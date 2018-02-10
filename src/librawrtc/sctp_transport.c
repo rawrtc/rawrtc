@@ -651,7 +651,7 @@ int debug_association_change_event(
             err |= re_hprintf(pf, "???");
             break;
     }
-    err |= re_hprintf(pf, ", streams (in/out) = (%u/%u)",
+    err |= re_hprintf(pf, ", streams (in/out) = (%"PRIu16"/%"PRIu16")",
                event->sac_inbound_streams, event->sac_outbound_streams);
     length = event->sac_length - sizeof(*event);
     if (length > 0) {

@@ -1,4 +1,3 @@
-#include <string.h> // memcpy
 #include <rawrtc.h>
 #include "ice_server.h"
 #include "ice_gather_options.h"
@@ -84,8 +83,7 @@ enum rawrtc_code peer_connection_start(
     // Add remote ICE candidates
     for (le = list_head(&description->ice_candidates); le != NULL; le = le->next) {
         struct rawrtc_peer_connection_ice_candidate* const candidate = le->data;
-        error = rawrtc_ice_transport_add_remote_candidate(
-                context->ice_transport, candidate->candidate);
+        error = rawrtc_peer_connection_add_ice_candidate(connection, candidate);
         if (error) {
             DEBUG_WARNING("Unable to add remote candidate, reason: %s\n",
                           rawrtc_code_to_str(error));
@@ -170,8 +168,7 @@ void ice_gatherer_local_candidate_handler(
     enum rawrtc_code error;
     char* username_fragment = NULL;
     struct rawrtc_peer_connection_ice_candidate* candidate = NULL;
-    uint8_t media_line_index = 0;
-    
+
     if (ortc_candidate) {
         // Copy username fragment (is going to be referenced later)
         error = rawrtc_strdup(
@@ -186,8 +183,8 @@ void ice_gatherer_local_candidate_handler(
         // Note: The local description will exist at this point since we start gathering when the local
         //       description is being set.
         error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
-                &candidate, ortc_candidate, connection->local_description->bundled_mids,
-                &media_line_index, username_fragment);
+                &candidate, ortc_candidate, connection->local_description->mid,
+                &connection->local_description->media_line_index, username_fragment);
         if (error) {
             DEBUG_WARNING("Unable to create local candidate from ORTC candidate, reason: %s\n",
                           rawrtc_code_to_str(error));
@@ -882,8 +879,63 @@ enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
         struct rawrtc_peer_connection* const connection,
         struct rawrtc_peer_connection_ice_candidate* const candidate
 ) {
-    // TODO: Continue here
-    return RAWRTC_CODE_NOT_IMPLEMENTED;
+    enum rawrtc_code error;
+    struct rawrtc_peer_connection_description* description;
+
+    // Check arguments
+    if (!connection || !candidate) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Ensure there's a remote description
+    description = connection->remote_description;
+    if (!description) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
+    // Note: We can be sure that either 'mid' or the media line index is present at this point.
+
+    // Check if the 'mid' matches (if any)
+    // TODO: Once we support further media lines, we need to look up the appropriate transport here
+    if (candidate->mid && description->mid && str_cmp(candidate->mid, description->mid) != 0) {
+        DEBUG_WARNING("No matching 'mid' in remote description\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check if the media line index matches (if any)
+    if (candidate->media_line_index >= 0 && candidate->media_line_index <= UINT8_MAX
+        && ((uint8_t) candidate->media_line_index) != description->media_line_index) {
+        DEBUG_WARNING("No matching media line index in remote description\n");
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check if the username fragment matches (if any)
+    // TODO: This would need to be done across ICE generations
+    if (candidate->username_fragment) {
+        char* username_fragment;
+        bool matching;
+
+        // Get username fragment from the remote ICE parameters
+        error = rawrtc_ice_parameters_get_username_fragment(
+                &username_fragment, description->ice_parameters);
+        if (error) {
+            DEBUG_WARNING("Unable to retrieve username fragment, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return error;
+        }
+
+        // Compare username fragments
+        matching = str_cmp(candidate->username_fragment, username_fragment) != 0;
+        mem_deref(username_fragment);
+        if (!matching) {
+            DEBUG_WARNING("Username fragments don't match\n");
+            return RAWRTC_CODE_INVALID_ARGUMENT;
+        }
+    }
+
+    // Add ICE candidate
+    return rawrtc_ice_transport_add_remote_candidate(
+            connection->context.ice_transport, candidate->candidate);
 }
 
 /*

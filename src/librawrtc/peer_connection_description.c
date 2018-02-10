@@ -1,7 +1,6 @@
 #include <string.h> // strlen
 #include <rawrtc.h>
 #include "ice_parameters.h"
-#include "ice_candidate.h"
 #include "dtls_parameters.h"
 #include "sctp_capabilities.h"
 #include "sctp_transport.h"
@@ -23,6 +22,7 @@ static char const * const sdp_application_dtls_sctp_variants[] = {
 static size_t const sdp_application_dtls_sctp_variants_length =
         ARRAY_SIZE(sdp_application_dtls_sctp_variants);
 static char const sdp_group_regex[] = "group:BUNDLE [^]+";
+static char const sdp_mid_regex[] = "mid:[^]+";
 static char const sdp_ice_options_trickle[] = "ice-options:trickle";
 static char const sdp_ice_username_fragment_regex[] = "ice-ufrag:[^]+";
 static char const sdp_ice_password_regex[] = "ice-pwd:[^]+";
@@ -100,6 +100,7 @@ static enum rawrtc_code set_session_attributes(
  */
 static enum rawrtc_code get_general_attributes(
         char** const bundled_midsp, // de-referenced, not checked
+        char** const midp, // de-referenced, not checked
         struct pl* const line // not checked
 ) {
     enum rawrtc_code error;
@@ -122,7 +123,15 @@ static enum rawrtc_code get_general_attributes(
         }
     }
 
-    // TODO: Do we need to fetch the 'mid'?
+    // Media line identification tag
+    if (!re_regex(line->p, line->l, sdp_mid_regex, &value)) {
+        // Copy 'mid'
+        error = rawrtc_error_to_code(pl_strdup(midp, &value));
+        if (error) {
+            DEBUG_WARNING("Couldn't copy 'mid'\n");
+            return error;
+        }
+    }
 
     // Done
     return RAWRTC_CODE_NO_VALUE;
@@ -179,7 +188,7 @@ static enum rawrtc_code get_ice_attributes(
     struct pl value;
 
     // ICE options trickle
-    if (!pl_strcmp(line, sdp_ice_options_trickle)) {
+    if (pl_strcmp(line, sdp_ice_options_trickle) == 0) {
         *trickle_icep = true;
         return RAWRTC_CODE_SUCCESS;
     }
@@ -195,7 +204,7 @@ static enum rawrtc_code get_ice_attributes(
     }
 
     // ICE lite
-    if (!pl_strcmp(line, sdp_ice_lite)) {
+    if (pl_strcmp(line, sdp_ice_lite) == 0) {
         *ice_litep = true;
         return RAWRTC_CODE_SUCCESS;
     }
@@ -411,7 +420,7 @@ static enum rawrtc_code add_sctp_attributes(
         struct rawrtc_peer_connection_context* const context, // not checked
         bool const offering,
         char const* const remote_media_line,
-        char const* const mid, // not checked
+        char const* const mid,
         bool const sctp_sdp_05
 ) {
     struct rawrtc_sctp_transport* const transport = context->data_transport->transport;
@@ -445,8 +454,10 @@ static enum rawrtc_code add_sctp_attributes(
     }
     // Add dummy 'c'-line
     err |= mbuf_write_str(sdp, "c=IN IP4 0.0.0.0\r\n");
-    // Add 'mid' line
-    err |= mbuf_printf(sdp, "a=mid:%s\r\n", mid);
+    // Add 'mid' line (if any)
+    if (mid) {
+        err |= mbuf_printf(sdp, "a=mid:%s\r\n", mid);
+    }
     // Add direction line
     err |= mbuf_write_str(sdp, "a=sendrecv\r\n");
     if (err) {
@@ -566,7 +577,7 @@ static enum rawrtc_code get_ice_candidate_attributes(
     }
 
     // End of candidates
-    if (!pl_strcmp(line, sdp_ice_end_of_candidates)) {
+    if (pl_strcmp(line, sdp_ice_end_of_candidates) == 0) {
         *end_of_candidatesp = true;
         return RAWRTC_CODE_SUCCESS;
     }
@@ -589,6 +600,7 @@ static void rawrtc_peer_connection_description_destroy(
     mem_deref(description->dtls_parameters);
     mem_deref(description->ice_parameters);
     list_flush(&description->ice_candidates);
+    mem_deref(description->mid);
     mem_deref(description->remote_media_line);
     mem_deref(description->bundled_mids);
     mem_deref(description->connection);
@@ -644,18 +656,25 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         local_description->connection = mem_ref(connection); // TODO: Possible circular reference
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
-        local_description->sctp_sdp_05 = connection->configuration->sctp_sdp_05;
-        local_description->end_of_candidates = false;
         error = rawrtc_strdup(
                 &local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
         if (error) {
             goto out;
         }
+        local_description->media_line_index = 0; // Since we only support one media line...
+        error = rawrtc_strdup(&local_description->mid, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
+        if (error) {
+            goto out;
+        }
+        local_description->sctp_sdp_05 = connection->configuration->sctp_sdp_05;
+        local_description->end_of_candidates = false;
     } else {
         local_description->type = RAWRTC_SDP_TYPE_ANSWER;
         local_description->trickle_ice = remote_description->trickle_ice;
         local_description->bundled_mids = mem_ref(remote_description->bundled_mids);
         local_description->remote_media_line = mem_ref(remote_description->remote_media_line);
+        local_description->media_line_index = remote_description->media_line_index;
+        local_description->mid = mem_ref(remote_description->mid);
         local_description->sctp_sdp_05 = remote_description->sctp_sdp_05;
         local_description->end_of_candidates = false;
     }
@@ -686,7 +705,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
             // Add SCTP transport
             error = add_sctp_attributes(
                     sdp, context, true, local_description->remote_media_line,
-                    local_description->bundled_mids, local_description->sctp_sdp_05);
+                    local_description->mid, local_description->sctp_sdp_05);
             if (error) {
                 goto out;
             }
@@ -838,6 +857,13 @@ int rawrtc_peer_connection_description_debug(
     } else {
         err |= re_hprintf(pf, "n/a\n");
     }
+    err |= re_hprintf(pf, "  media_line_index=%"PRIu8"\n", description->media_line_index);
+    err |= re_hprintf(pf, "  mid=\n");
+    if (description->mid) {
+        err |= re_hprintf(pf, "\"%s\"\n", description->mid);
+    } else {
+        err |= re_hprintf(pf, "n/a\n");
+    }
     err |= re_hprintf(pf, "  sctp_sdp_05=%s\n", description->sctp_sdp_05 ? "yes" : "no");
     err |= re_hprintf(
             pf, "  end_of_candidates=%s\n", description->end_of_candidates ? "yes" : "no");
@@ -930,6 +956,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     // Set fields to initial values
     remote_description->type = type;
     remote_description->trickle_ice = false;
+    remote_description->media_line_index = 0; // Since we only support one media line...
     remote_description->sctp_sdp_05 = true;
     list_init(&remote_description->ice_candidates);
     remote_description->sctp_port = RAWRTC_PEER_CONNECTION_DESCRIPTION_DEFAULT_SCTP_PORT;
@@ -971,7 +998,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                 // * if the function returns anything else (which indicates an error), set 'error'
                 //   and jump to 'out'.
                 HANDLE_ATTRIBUTE(get_general_attributes(
-                        &remote_description->bundled_mids, &line));
+                        &remote_description->bundled_mids, &remote_description->mid, &line));
                 HANDLE_ATTRIBUTE(get_ice_attributes(
                         &remote_description->trickle_ice, &ice_username_fragment, &ice_password,
                         &ice_lite, &line));
@@ -980,7 +1007,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                         &remote_description->sctp_port, &sctp_max_message_size, &line));
                 HANDLE_ATTRIBUTE(get_ice_candidate_attributes(
                         &remote_description->ice_candidates, &remote_description->end_of_candidates,
-                        &line, remote_description->bundled_mids, 0, ice_username_fragment));
+                        &line, remote_description->mid, remote_description->media_line_index,
+                        ice_username_fragment));
                 break;
             }
             case 'm': {
@@ -1003,7 +1031,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
                 // Check if the application matches some kind of DTLS/SCTP variant (ugh...)
                 for (i = 0; i < sdp_application_dtls_sctp_variants_length; ++i) {
-                    if (!pl_strcmp(&application, sdp_application_dtls_sctp_variants[i])) {
+                    if (pl_strcmp(&application, sdp_application_dtls_sctp_variants[i]) == 0) {
                         media_line = true;
                     }
                 }

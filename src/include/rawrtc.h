@@ -894,6 +894,8 @@ struct rawrtc_peer_connection_description {
     bool trickle_ice;
     char* bundled_mids;
     char* remote_media_line;
+    uint8_t media_line_index;
+    char* mid;
     bool sctp_sdp_05;
     bool end_of_candidates;
     struct list ice_candidates;
@@ -1948,6 +1950,14 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     struct rawrtc_peer_connection* const connection,
     struct rawrtc_peer_connection_description* const description // referenced
+);
+
+/*
+ * Add an ICE candidate to the peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
+    struct rawrtc_peer_connection* const connection,
+    struct rawrtc_peer_connection_ice_candidate* const candidate
 );
 
 /*
