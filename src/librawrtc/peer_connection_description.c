@@ -48,6 +48,12 @@ static char const sdp_ice_end_of_candidates[] = "end-of-candidates";
 static char const sdp_ice_candidate_head[] = "candidate:";
 static size_t const sdp_ice_candidate_head_length = ARRAY_SIZE(sdp_ice_candidate_head);
 
+// Candidate line
+struct candidate_line {
+    struct le le;
+    struct pl line;
+};
+
 /*
  * Set session boilerplate
  */
@@ -548,12 +554,9 @@ static enum rawrtc_code get_sctp_attributes(
  * Get an ICE candidate from the description.
  */
 static enum rawrtc_code get_ice_candidate_attributes(
-        struct list* const candidates, // not checked
+        struct list* const candidate_lines, // not checked
         bool* const end_of_candidatesp, // de-referenced, not checked
-        struct pl* const line, // not checked
-        char* const mid, // nullable
-        uint8_t const media_line_index,
-        char* const username_fragment // nullable
+        struct pl* const line // not checked
 ) {
     // ICE candidate
     if (line->l >= sdp_ice_candidate_head_length) {
@@ -562,17 +565,22 @@ static enum rawrtc_code get_ice_candidate_attributes(
                 .l = sdp_ice_candidate_head_length - 1,
         };
         if (pl_strcmp(&candidate_pl, sdp_ice_candidate_head) == 0) {
-            // Create ICE candidate
-            struct rawrtc_peer_connection_ice_candidate* candidate;
-            enum rawrtc_code error = rawrtc_peer_connection_ice_candidate_create_internal(
-                    &candidate, line, mid, &media_line_index, username_fragment);
-            if (error) {
-                return error;
+            struct candidate_line* candidate_line;
+
+            // Create candidate line
+            candidate_line = mem_zalloc(sizeof(*candidate_line), NULL);
+            if (!candidate_line) {
+                DEBUG_WARNING("Unable to create candidate line, no memory\n");
+                return RAWRTC_CODE_NO_MEMORY;
             }
 
-            // Add ICE candidate to the list
-            DEBUG_PRINTF("Adding ICE candidate to description\n");
-            list_append(candidates, &candidate->le, candidate);
+            // Set fields
+            // Warning: The line is NOT copied - it's just a pointer to some memory provided by
+            //          the caller!
+            candidate_line->line = *line;
+
+            // Add candidate line to list
+            list_append(candidate_lines, &candidate_line->le, candidate_line);
         }
     }
 
@@ -920,6 +928,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     struct rawrtc_peer_connection_description* remote_description;
     char const* cursor;
     bool media_line = false;
+    struct le* le;
 
     // ICE parameters
     char* ice_username_fragment = NULL;
@@ -932,6 +941,9 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
     // SCTP capabilities
     uint64_t sctp_max_message_size = RAWRTC_PEER_CONNECTION_DESCRIPTION_DEFAULT_MAX_MESSAGE_SIZE;
+
+    // ICE candidate lines (temporarily stored, so it can be parsed later)
+    struct list ice_candidate_lines = LIST_INIT;
 
     // Check arguments
     if (!descriptionp || !sdp) {
@@ -1005,9 +1017,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                 HANDLE_ATTRIBUTE(get_sctp_attributes(
                         &remote_description->sctp_port, &sctp_max_message_size, &line));
                 HANDLE_ATTRIBUTE(get_ice_candidate_attributes(
-                        &remote_description->ice_candidates, &remote_description->end_of_candidates,
-                        &line, remote_description->mid, remote_description->media_line_index,
-                        ice_username_fragment));
+                        &ice_candidate_lines, &remote_description->end_of_candidates,
+                        &line));
                 break;
             }
             case 'm': {
@@ -1087,6 +1098,26 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         goto out;
     }
 
+    // Late parsing of ICE candidates.
+    // Note: This is required since the 'mid' and the username fragment may be parsed after a
+    //       candidate has been found.
+    for (le = list_head(&ice_candidate_lines); le != NULL; le = le->next) {
+        struct candidate_line* const candidate_line = le->data;
+
+        // Create ICE candidate
+        struct rawrtc_peer_connection_ice_candidate* candidate;
+        error = rawrtc_peer_connection_ice_candidate_create_internal(
+                &candidate, &candidate_line->line, remote_description->mid,
+                &remote_description->media_line_index, ice_username_fragment);
+        if (error) {
+            goto out;
+        }
+
+        // Add ICE candidate to the list
+        DEBUG_PRINTF("Adding ICE candidate to description\n");
+        list_append(&remote_description->ice_candidates, &candidate->le, candidate);
+    }
+
     // Copy SDP
     remote_description->sdp = mbuf_alloc(strlen(sdp));
     if (!remote_description->sdp) {
@@ -1105,6 +1136,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
 out:
     // Un-reference
+    list_flush(&ice_candidate_lines);
     list_flush(&dtls_fingerprints);
     mem_deref(ice_password);
     mem_deref(ice_username_fragment);
