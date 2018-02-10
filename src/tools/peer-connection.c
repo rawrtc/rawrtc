@@ -133,14 +133,15 @@ static void connection_state_change_handler(
     // Print state
     default_peer_connection_state_change_handler(state, arg);
 
-    // Open? Create new channel (if answering)
+    // Open? Create new channel
     // TODO: Move this once we can create data channels earlier
-    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED && !client->offering) {
+    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED) {
         struct rawrtc_data_channel_parameters* channel_parameters;
+        char* const label = client->offering ? "bear-noises" : "lion-noises";
 
         // Create data channel helper for in-band negotiated data channel
         data_channel_helper_create(
-                &client->data_channel, (struct client *) client, "bear-noises");
+                &client->data_channel, (struct client *) client, label);
 
         // Create data channel parameters
         EOE(rawrtc_data_channel_parameters_create(
@@ -219,7 +220,7 @@ static void parse_remote_description(
     char* type_str;
     char* sdp;
     enum rawrtc_sdp_type type;
-    struct rawrtc_peer_connection_description* description = NULL;
+    struct rawrtc_peer_connection_description* remote_description = NULL;
     (void) flags;
 
     // Get dict from JSON
@@ -243,7 +244,7 @@ static void parse_remote_description(
         DEBUG_WARNING("Invalid SDP type in remote description: '%s'\n", type_str);
         goto out;
     }
-    error = rawrtc_peer_connection_description_create(&description, type, sdp);
+    error = rawrtc_peer_connection_description_create(&remote_description, type, sdp);
     if (error) {
         DEBUG_WARNING("Cannot parse remote description: %s\n", rawrtc_code_to_str(error));
         goto out;
@@ -251,11 +252,19 @@ static void parse_remote_description(
 
     // Set remote description
     DEBUG_INFO("Applying remote description\n");
-    EOE(rawrtc_peer_connection_set_remote_description(client->connection, description));
+    EOE(rawrtc_peer_connection_set_remote_description(client->connection, remote_description));
+
+    // Answering: Create and set local description
+    if (!client->offering) {
+        struct rawrtc_peer_connection_description* local_description;
+        EOE(rawrtc_peer_connection_create_answer(&local_description, client->connection));
+        EOE(rawrtc_peer_connection_set_local_description(client->connection, local_description));
+        mem_deref(local_description);
+    }
 
 out:
     // Un-reference
-    mem_deref(description);
+    mem_deref(remote_description);
     mem_deref(dict);
 
     // Exit?

@@ -437,7 +437,7 @@ static enum rawrtc_code add_sctp_attributes(
     // Add media section
     if (remote_media_line) {
         // Just repeat the remote media line.
-        err = mbuf_write_str(sdp, remote_media_line);
+        err = mbuf_printf(sdp, "m=%s\r\n", remote_media_line);
     } else {
         if (!sctp_sdp_05) {
             // Note: We choose UDP here although communication may still happen over ICE-TCP
@@ -652,8 +652,9 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     }
 
     // Set initial values
+    local_description->connection = mem_ref(connection); // TODO: Possible circular reference
+    local_description->end_of_candidates = false;
     if (offering) {
-        local_description->connection = mem_ref(connection); // TODO: Possible circular reference
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
         error = rawrtc_strdup(
@@ -667,7 +668,6 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
             goto out;
         }
         local_description->sctp_sdp_05 = connection->configuration->sctp_sdp_05;
-        local_description->end_of_candidates = false;
     } else {
         local_description->type = RAWRTC_SDP_TYPE_ANSWER;
         local_description->trickle_ice = remote_description->trickle_ice;
@@ -676,7 +676,6 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         local_description->media_line_index = remote_description->media_line_index;
         local_description->mid = mem_ref(remote_description->mid);
         local_description->sctp_sdp_05 = remote_description->sctp_sdp_05;
-        local_description->end_of_candidates = false;
     }
 
     // Create buffer for local description
@@ -704,7 +703,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
             // Add SCTP transport
             error = add_sctp_attributes(
-                    sdp, context, true, local_description->remote_media_line,
+                    sdp, context, offering, local_description->remote_media_line,
                     local_description->mid, local_description->sctp_sdp_05);
             if (error) {
                 goto out;
@@ -858,7 +857,7 @@ int rawrtc_peer_connection_description_debug(
         err |= re_hprintf(pf, "n/a\n");
     }
     err |= re_hprintf(pf, "  media_line_index=%"PRIu8"\n", description->media_line_index);
-    err |= re_hprintf(pf, "  mid=\n");
+    err |= re_hprintf(pf, "  mid=");
     if (description->mid) {
         err |= re_hprintf(pf, "\"%s\"\n", description->mid);
     } else {

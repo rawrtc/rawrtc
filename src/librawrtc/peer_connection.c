@@ -180,8 +180,8 @@ void ice_gatherer_local_candidate_handler(
         }
 
         // Create candidate
-        // Note: The local description will exist at this point since we start gathering when the local
-        //       description is being set.
+        // Note: The local description will exist at this point since we start gathering when the
+        //       local description is being set.
         error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
                 &candidate, ortc_candidate, connection->local_description->mid,
                 &connection->local_description->media_line_index, username_fragment);
