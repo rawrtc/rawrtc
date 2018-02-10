@@ -39,7 +39,7 @@ void rawrtc_data_channel_set_state(
     // Note: Keep this here as it will prevent infinite recursion during closing/destroying
     channel->state = state;
     DEBUG_PRINTF("Data channel '%s' state changed to %s\n",
-                 channel->parameters->label ? channel->parameters->label : "N/A",
+                 channel->parameters->label ? channel->parameters->label : "n/a",
                  rawrtc_data_channel_state_to_name(state));
 
     // TODO: Clear options flag?
@@ -154,8 +154,8 @@ enum rawrtc_code rawrtc_data_channel_create_internal(
 
     // Done
     DEBUG_PRINTF("Created data channel: %s, protocol: %s\n",
-                 parameters->label ? parameters->label : "N/A",
-                 parameters->protocol ? parameters->protocol : "N/A");
+                 parameters->label ? parameters->label : "n/a",
+                 parameters->protocol ? parameters->protocol : "n/a");
 
 out:
     if (error) {

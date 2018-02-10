@@ -87,33 +87,13 @@ static void data_channel_open_handler(
     mem_deref(buffer);
 }
 
-static void local_candidate_handler(
-        struct rawrtc_peer_connection_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg
-) {
-    struct peer_connection_client* const client = arg;
-    struct rawrtc_ice_candidate* ortc_candidate = NULL;
-
-    // Get underlying ORTC ICE candidate (if any)
-    if (candidate) {
-        EOE(rawrtc_peer_connection_ice_candidate_get_ortc_candidate(&ortc_candidate, candidate));
-    }
-
-    // Print local candidate
-    default_ice_gatherer_local_candidate_handler(ortc_candidate, url, arg);
-
-    // Print local description (if last candidate)
-    if (!candidate) {
-        print_local_description(client);
-    }
-}
-
 static void negotiation_needed_handler(
         void* const arg
 ) {
     struct peer_connection_client* const client = arg;
-    DEBUG_INFO("Negotiation needed\n");
+
+    // Print negotiation needed
+    default_negotiation_needed_handler(arg);
 
     // Offering: Create and set local description
     if (client->offering) {
@@ -160,6 +140,22 @@ static void connection_state_change_handler(
     }
 }
 
+static void local_candidate_handler(
+        struct rawrtc_peer_connection_ice_candidate* const candidate,
+        char const * const url, // read-only
+        void* const arg
+) {
+    struct peer_connection_client* const client = arg;
+
+    // Print local candidate
+    default_peer_connection_local_candidate_handler(candidate, url, arg);
+
+    // Print local description (if last candidate)
+    if (!candidate) {
+        print_local_description(client);
+    }
+}
+
 static void client_init(
         struct peer_connection_client* const client
 ) {
@@ -168,8 +164,8 @@ static void client_init(
     // Create peer connection
     EOE(rawrtc_peer_connection_create(
             &client->connection, client->configuration,
-            negotiation_needed_handler, local_candidate_handler, connection_state_change_handler,
-            client));
+            negotiation_needed_handler, local_candidate_handler,
+            default_signaling_state_change_handler, connection_state_change_handler, client));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(

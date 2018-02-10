@@ -20,6 +20,7 @@ set(rawrtc_SOURCES
         peer_connection_configuration.c
         peer_connection_description.c
         peer_connection_ice_candidate.c
+        peer_connection_states.c
         sctp_capabilities.c
         sctp_transport.c
         utils.c)

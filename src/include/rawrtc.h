@@ -254,6 +254,18 @@ enum rawrtc_data_channel_state {
 };
 
 /*
+ * Signalling state.
+ */
+enum rawrtc_signaling_state {
+    RAWRTC_SIGNALING_STATE_STABLE,
+    RAWRTC_SIGNALING_STATE_HAVE_LOCAL_OFFER,
+    RAWRTC_SIGNALING_STATE_HAVE_REMOTE_OFFER,
+    RAWRTC_SIGNALING_STATE_HAVE_LOCAL_PROVISIONAL_ANSWER,
+    RAWRTC_SIGNALING_STATE_HAVE_REMOTE_PROVISIONAL_ANSWER,
+    RAWRTC_SIGNALING_STATE_CLOSED
+};
+
+/*
  * Peer connection state.
  */
 enum rawrtc_peer_connection_state {
@@ -481,20 +493,28 @@ typedef void (rawrtc_peer_connection_state_change_handler)(
 );
 
 /*
- * Peer connection negotiation needed handler.
+ * Negotiation needed handler.
  */
-typedef void (rawrtc_peer_connection_negotiation_needed_handler)(
+typedef void (rawrtc_negotiation_needed_handler)(
     void* const arg
 );
 
 /*
- * Per connection local candidate handler.
+ * Peer connection local candidate handler.
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
  * 'url' will be NULL in case a host candidate has been gathered.
  */
 typedef void (rawrtc_peer_connection_local_candidate_handler)(
     struct rawrtc_peer_connection_ice_candidate* const candidate,
     char const * const url, // read-only
+    void* const arg
+);
+
+/*
+ * Signaling state handler.
+ */
+typedef void (rawrtc_signaling_state_change_handler)(
+    enum rawrtc_signaling_state const state, // read-only
     void* const arg
 );
 
@@ -925,10 +945,12 @@ struct rawrtc_peer_connection_context {
  * TODO: private
  */
 struct rawrtc_peer_connection {
+    enum rawrtc_signaling_state signaling_state;
     enum rawrtc_peer_connection_state connection_state;
     struct rawrtc_peer_connection_configuration* configuration; // referenced
-    rawrtc_peer_connection_negotiation_needed_handler* negotiation_needed_handler; // nullable
+    rawrtc_negotiation_needed_handler* negotiation_needed_handler; // nullable
     rawrtc_peer_connection_local_candidate_handler* local_candidate_handler; // nullable
+    rawrtc_signaling_state_change_handler* signaling_state_change_handler; // nullable
     rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
     struct rawrtc_peer_connection_description* local_description; // referenced
@@ -1776,6 +1798,13 @@ enum rawrtc_code rawrtc_data_channel_set_message_handler(
 );
 
 /*
+ * Get the corresponding name for a signaling state.
+ */
+char const * const rawrtc_signaling_state_to_name(
+    enum rawrtc_signaling_state const state
+);
+
+/*
  * Get the corresponding name for a peer connection state.
  */
 char const * const rawrtc_peer_connection_state_to_name(
@@ -1913,8 +1942,9 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_ortc_candidate(
 enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection** const connectionp, // de-referenced
     struct rawrtc_peer_connection_configuration* configuration, // referenced
-    rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
+    rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
     rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
+    rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
     void* const arg // nullable
 );

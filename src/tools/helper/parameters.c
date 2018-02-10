@@ -316,7 +316,7 @@ enum rawrtc_code get_ice_candidates(
         }
 
         // Print ICE candidate
-        print_ice_candidate(candidate, NULL, client);
+        print_ice_candidate(candidate, NULL, NULL, client);
 
         // Store if ICE candidate type enabled
         if (ice_candidate_type_enabled(client, type)) {

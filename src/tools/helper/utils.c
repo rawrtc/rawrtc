@@ -309,7 +309,7 @@ void data_channel_helper_create_from_channel(
             mem_deref(label);
             break;
         case RAWRTC_CODE_NO_VALUE:
-            EOE(rawrtc_strdup(&channel_helper->label, "N/A"));
+            EOE(rawrtc_strdup(&channel_helper->label, "n/a"));
             break;
         default:
             EOE(error);

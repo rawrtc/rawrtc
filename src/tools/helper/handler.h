@@ -118,9 +118,36 @@ void default_data_channel_message_handler(
     void* const arg // will be casted to `struct data_channel_helper*`
 );
 
+/*
+ * Print negotiation needed (duh!)
+ */
+void default_negotiation_needed_handler(
+    void* const arg
+);
+
+/*
+ * Print the peer connection's state.
+ */
 void default_peer_connection_state_change_handler(
     enum rawrtc_peer_connection_state const state, // read-only
     void* const arg // will be casted to `struct client*`
+);
+
+/*
+ * Print the newly gathered local candidate (peer connection variant).
+ */
+void default_peer_connection_local_candidate_handler(
+    struct rawrtc_peer_connection_ice_candidate* const candidate,
+    char const * const url, // read-only
+    void* const arg
+);
+
+/*
+ * Print the signaling state.
+ */
+void default_signaling_state_change_handler(
+    enum rawrtc_signaling_state const state, // read-only
+    void* const arg
 );
 
 /*

@@ -15,10 +15,47 @@
 uint16_t const discard_port = 9;
 
 /*
+ * Change the signalling state.
+ * Will call the corresponding handler.
+ */
+static void set_signaling_state(
+        struct rawrtc_peer_connection* const connection, // not checked
+        enum rawrtc_signaling_state const state
+) {
+    // Set state
+    connection->signaling_state = state;
+
+    // Call handler (if any)
+    if (connection->signaling_state_change_handler) {
+        connection->signaling_state_change_handler(state, connection->arg);
+    }
+}
+
+/*
+ * Close the peer connection. This will stop all transports and update
+ * all affected states appropriately.
+ */
+static void peer_connection_close(
+        struct rawrtc_peer_connection* const connection // not checked
+) {
+    (void) connection;
+
+    // TODO: Stop all transports
+    DEBUG_WARNING("TODO: Stop all transports\n");
+
+    // TODO: Update states (?)
+    DEBUG_WARNING("TODO: Update states (?)\n");
+
+    // Update signalling state
+    set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
+}
+
+
+/*
  * All the nasty SDP stuff has been done. Fire it all up - YAY!
  */
-enum rawrtc_code peer_connection_start(
-        struct rawrtc_peer_connection* const connection
+static enum rawrtc_code peer_connection_start(
+        struct rawrtc_peer_connection* const connection // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_peer_connection_context* const context = &connection->context;
@@ -93,31 +130,6 @@ enum rawrtc_code peer_connection_start(
 
     // Done
     return RAWRTC_CODE_SUCCESS;
-}
-
-
-/*
- * Get the corresponding name for a peer connection state.
- */
-char const * const rawrtc_peer_connection_state_to_name(
-        enum rawrtc_peer_connection_state const state
-) {
-    switch (state) {
-        case RAWRTC_PEER_CONNECTION_STATE_NEW:
-            return "new";
-        case RAWRTC_PEER_CONNECTION_STATE_CONNECTING:
-            return "connecting";
-        case RAWRTC_PEER_CONNECTION_STATE_CONNECTED:
-            return "connected";
-        case RAWRTC_PEER_CONNECTION_STATE_DISCONNECTED:
-            return "disconnected";
-        case RAWRTC_PEER_CONNECTION_STATE_CLOSED:
-            return "closed";
-        case RAWRTC_PEER_CONNECTION_STATE_FAILED:
-            return "failed";
-        default:
-            return "???";
-    }
 }
 
 /*
@@ -513,7 +525,7 @@ static void rawrtc_peer_connection_destroy(
     struct rawrtc_peer_connection* const connection = arg;
 
     // Close peer connection
-//    rawrtc_peer_connection_close(connection);
+    peer_connection_close(connection);
 
     // Un-reference
     mem_deref(connection->context.data_transport);
@@ -533,10 +545,10 @@ static void rawrtc_peer_connection_destroy(
 enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection** const connectionp, // de-referenced
         struct rawrtc_peer_connection_configuration* configuration, // referenced
-        rawrtc_peer_connection_negotiation_needed_handler* const negotiation_needed_handler, // nullable
+        rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
         rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
 //        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
-//        rawrtc_peer_connection_signaling_state_change_handler* const signaling_state_change_handler, // nullable
+        rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
 //        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
 //        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
         rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
@@ -557,10 +569,12 @@ enum rawrtc_code rawrtc_peer_connection_create(
     }
 
     // Set fields/reference
+    connection->signaling_state = RAWRTC_SIGNALING_STATE_STABLE;
     connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
     connection->configuration = mem_ref(configuration);
     connection->negotiation_needed_handler = negotiation_needed_handler;
     connection->local_candidate_handler = local_candidate_handler;
+    connection->signaling_state_change_handler = signaling_state_change_handler;
     connection->connection_state_change_handler = connection_state_change_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
     connection->arg = arg;
@@ -730,6 +744,33 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
         return error;
     }
 
+    // Update signalling state
+    switch (connection->signaling_state) {
+        case RAWRTC_SIGNALING_STATE_STABLE:
+            // Can only be an offer or it would not have been accepted
+            set_signaling_state(connection, RAWRTC_SIGNALING_STATE_HAVE_LOCAL_OFFER);
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_LOCAL_OFFER:
+            // Update of the local offer, nothing to do
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_REMOTE_OFFER:
+            // Can only be an answer or it would not have been accepted
+            // Note: This may change once we accept PR answers
+            set_signaling_state(connection, RAWRTC_SIGNALING_STATE_STABLE);
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_LOCAL_PROVISIONAL_ANSWER:
+            // Impossible state
+            // Note: This may change once we accept PR answers
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_REMOTE_PROVISIONAL_ANSWER:
+            // Impossible state
+            // Note: This may change once we accept PR answers
+            break;
+        case RAWRTC_SIGNALING_STATE_CLOSED:
+            // Impossible state
+            break;
+    }
+
     // Done
     return RAWRTC_CODE_SUCCESS;
 }
@@ -866,6 +907,33 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
     if (error && error != RAWRTC_CODE_NO_VALUE) {
         DEBUG_WARNING("Unable to start peer connection, reason: %s\n", rawrtc_code_to_str(error));
         return error;
+    }
+
+    // Update signalling state
+    switch (connection->signaling_state) {
+        case RAWRTC_SIGNALING_STATE_STABLE:
+            // Can only be an offer or it would not have been accepted
+            set_signaling_state(connection, RAWRTC_SIGNALING_STATE_HAVE_REMOTE_OFFER);
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_LOCAL_OFFER:
+            // Can only be an answer or it would not have been accepted
+            // Note: This may change once we accept PR answers
+            set_signaling_state(connection, RAWRTC_SIGNALING_STATE_STABLE);
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_REMOTE_OFFER:
+            // Update of the remote offer, nothing to do
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_LOCAL_PROVISIONAL_ANSWER:
+            // Impossible state
+            // Note: This may change once we accept PR answers
+            break;
+        case RAWRTC_SIGNALING_STATE_HAVE_REMOTE_PROVISIONAL_ANSWER:
+            // Impossible state
+            // Note: This may change once we accept PR answers
+            break;
+        case RAWRTC_SIGNALING_STATE_CLOSED:
+            // Impossible state
+            break;
     }
 
     // Done
