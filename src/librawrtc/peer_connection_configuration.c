@@ -3,7 +3,7 @@
 #include "peer_connection_configuration.h"
 
 #define DEBUG_MODULE "peer-connection-configuration"
-#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 /*

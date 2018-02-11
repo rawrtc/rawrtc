@@ -8,7 +8,7 @@
 #include "peer_connection_ice_candidate.h"
 
 #define DEBUG_MODULE "peer-connection-description"
-#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
+//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include "debug.h"
 
 // Constants
