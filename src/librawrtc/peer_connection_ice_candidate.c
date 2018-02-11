@@ -439,7 +439,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
     if (candidate->mid) {
         return rawrtc_strdup(midp, candidate->mid);
     } else {
-        RAWRTC_CODE_NO_VALUE;
+        return RAWRTC_CODE_NO_VALUE;
     }
 }
 

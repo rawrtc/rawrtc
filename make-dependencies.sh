@@ -173,7 +173,8 @@ if [ ! -d "build" ]; then
 fi
 cd build
 echo "Configuring usrsctp"
-CFLAGS=-fPIC \
+# TODO: Disable "-Wno-address-of-packed-member" once usrsctp has fixed this
+CFLAGS="-fPIC -Wno-address-of-packed-member" \
 cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 echo "Cleaning usrsctp"
 make clean

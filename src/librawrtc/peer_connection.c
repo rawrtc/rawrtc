@@ -114,7 +114,7 @@ static void update_connection_state(
     if (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_NEW
         || dtls_transport_state == RAWRTC_DTLS_TRANSPORT_STATE_NEW
         || (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED
-            && dtls_transport_state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED)) {
+            && dtls_transport_state == RAWRTC_DTLS_TRANSPORT_STATE_CLOSED)) {
         connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
         goto out;
     }
