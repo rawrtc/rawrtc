@@ -1,5 +1,5 @@
 #pragma once
-// TODO: Move this section into meson build
+// TODO: Make this a build configuration
 #define RAWRTC_DEBUG 1
 
 #include <stdlib.h> // TODO: Why?

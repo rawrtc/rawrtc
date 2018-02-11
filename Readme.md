@@ -10,13 +10,13 @@ The following list represents all features that are planned for RAWRTC.
 Features with a check mark are already implemented.
 
 * ICE [[draft-ietf-ice-rfc-5245bis-08]][ice]
-  - [X] Trickle ICE [[draft-ietf-ice-trickle-07]][trickle-ice]
-  - [X] IPv4
-  - [X] IPv6
-  - [X] UDP
+  - [x] Trickle ICE [[draft-ietf-ice-trickle-07]][trickle-ice]
+  - [x] IPv4
+  - [x] IPv6
+  - [x] UDP
   - [ ] TCP
 * STUN [[RFC 5389]][stun]
-  - [X] UDP
+  - [x] UDP
   - [ ] TCP
   - [ ] TLS over TCP
   - [ ] DTLS over UDP [[RFC 7350]][stun-turn-dtls]
@@ -26,14 +26,13 @@ Features with a check mark are already implemented.
   - [ ] TLS over TCP
   - [ ] DTLS over UDP [[RFC 7350]][stun-turn-dtls]
 * Data Channel
-  - [X] DCEP [[draft-ietf-rtcweb-data-protocol-09]][dcep]
-  - [X] SCTP-based [[draft-ietf-rtcweb-data-channel-13]][sctp-dc]
+  - [x] DCEP [[draft-ietf-rtcweb-data-protocol-09]][dcep]
+  - [x] SCTP-based [[draft-ietf-rtcweb-data-channel-13]][sctp-dc]
 * API
-  - [ ] WebRTC C-API based on the [W3C WebRTC API][w3c-webrtc] and
-    [[draft-ietf-rtcweb-jsep-19]][jsep]
-  - [X] ORTC C-API based on the [W3C CG ORTC API][w3c-ortc]
+  - [x] WebRTC C-API based on the [W3C WebRTC API][w3c-webrtc] and
+    [[draft-ietf-rtcweb-jsep-24]][jsep]
+  - [x] ORTC C-API based on the [W3C CG ORTC API][w3c-ortc]
 * Other
-  - [ ] SDP for WebRTC [[draft-ietf-rtcweb-sdp-04]][sdp]
   - [ ] IP Address Handling [[draft-ietf-rtcweb-ip-handling-03]][ip-handling]
   - [ ] DNS-based STUN/TURN server discovery
 
@@ -46,14 +45,6 @@ The following packages are required:
 * pkg-config (`pkgconf` for newer FreeBSD versions)
 * SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and FreeBSD)
 * GNU make (`gmake` on FreeBSD for `re` and `rew` dependencies)
-
-### Meson (Alternative Build System)
-
-~~If you want to use Meson instead of CMake, you have to install both the Meson
-build system and Ninja.~~ Use CMake for now. Meson will be updated later.
-
-* [meson][meson]
-* [ninja][ninja]
 
 ## Build
 
@@ -95,7 +86,9 @@ closed.
 RAWRTC provides a lot of tools that can be used for quick testing purposes and
 to get started. Let's go through them one by one. If you just want to check out
 data channels and browser interoperation, skip to the
-[`data-channel-sctp` tool chapter](#data-channel-sctp).
+[`peer-connection` tool section](#peer-connection) which uses the WebRTC API or
+to the [`data-channel-sctp` tool section](#data-channel-sctp) which uses the
+ORTC API.
 
 Because we have used a custom *prefix*, we need to add the prefix to the
 path to run the various binaries. To be able to find the shared library
@@ -108,10 +101,20 @@ Note: We assume that you are in the `build` directory.
 Most of the tools have required or optional arguments which are shared among
 tools. Below is a description for the various arguments:
 
+#### offering
+
+Whether the peer is going to create an offer. Provide `1` to create an offer
+immediately or `0` to create an answer once the remote offer has been
+processed.
+
+Only used by WebRTC API tools.
+
 #### ice-role
 
 Determines the ICE role to be used by the ICE transport, where `0` means
 *controlled* and `1` means *controlling*.
+
+Only used by ORTC API tools.
 
 #### redirect-ip
 
@@ -134,6 +137,8 @@ The port number the internal SCTP stack is supposed to use. Defaults to `5000`.
 Note: It doesn't matter which port you choose unless you want to be able to
 debug SCTP messages. In this case, it's easier to distinguish the peers by
 their port numbers.
+
+Only used by ORTC API tools.
 
 #### maximum-message-size
 
@@ -161,6 +166,8 @@ If not supplied, all ICE candidate types are enabled.
 
 ### ice-gatherer
 
+API: ORTC
+
 The ICE gatherer tool gathers and prints ICE candidates. Once gathering is
 complete, the tool exits.
 
@@ -169,6 +176,8 @@ Usage:
     ice-gatherer
 
 ### ice-transport-loopback
+
+API: ORTC
 
 The ICE transport loopback tool starts two ICE transport instances which
 establish an ICE connection. Once you see the following line for both clients
@@ -181,6 +190,8 @@ Usage:
     ice-transport-loopback [<ice-candidate-type> ...]
 
 ### dtls-transport-loopback
+
+API: ORTC
 
 The DTLS transport loopback tool starts two DTLS transport instances which
 work on top of an established ICE transport connection. As soon as the DTLS
@@ -198,6 +209,8 @@ Usage:
     dtls-transport-loopback [<ice-candidate-type> ...]
 
 ### sctp-transport-loopback
+
+API: ORTC
 
 The SCTP transport loopback tool starts two SCTP transport instances which
 work on top of an established DTLS transport connection. As soon as the SCTP
@@ -220,8 +233,10 @@ testing purposes.
 Usage:
 
     sctp-transport-loopback [<ice-candidate-type> ...]
-    
+
 ### sctp-redirect-transport
+
+API: ORTC
 
 The SCTP redirect transport tool starts an SCTP redirect transport on top of an
 established DTLS transport to relay SCTP messages from and to a third party.
@@ -231,13 +246,15 @@ testing tool is [dctt][dctt] which uses the kernel SCTP stack of FreeBSD.
 
 Building:
 
-This tool is not built by default. In order to build it, set the environment variable `SCTP_REDIRECT_TRANSPORT` to `ON` when building, like so: 
+This tool is not built by default. In order to build it, set the environment
+variable `SCTP_REDIRECT_TRANSPORT` to `ON` when building:
     
     cd <path-to-rawrtc>/build
     cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
     make install
     
-Note that this tool will not build on systems that do not have SSE 4.2 support, like ARM.
+Note, that this tool will not build on systems that do not have SSE 4.2 support
+such as ARM.
 
 Usage:
 
@@ -246,6 +263,8 @@ Usage:
                             [<ice-candidate-type> ...]
 
 ### data-channel-sctp-loopback
+
+API: ORTC
 
 The data channel SCTP loopback tool creates several data channels on top of an
 abstracted SCTP data transport. As soon as a data channel is open, a message
@@ -268,12 +287,14 @@ Usage:
 
 ### data-channel-sctp
 
+API: ORTC
+
 The data channel SCTP tool creates several data channels on top of an
 abstracted SCTP data transport:
 
-1. A pre-negotiated data channel with the label `cat-noises` and the id `0`
-   that is reliable and ordered. In the WebRTC JS API, the channel would be
-   created by invoking:
+* A pre-negotiated data channel with the label `cat-noises` and the id `0`
+  that is reliable and ordered. In the WebRTC JS API, the channel would be
+  created by invoking:
    
    ```js
    peerConnection.createDataChannel('cat-noises', {
@@ -282,8 +303,8 @@ abstracted SCTP data transport:
    });
    ```
 
-2. A data channel with the label `bear-noises` that is reliable but unordered.
-   In the WebRTC JS API, the channel would be created by invoking:
+* A data channel with the label `bear-noises` that is reliable but unordered.
+  In the WebRTC JS API, the channel would be created by invoking:
    
    ```js
    peerConnection.createDataChannel('bear-noises', {
@@ -297,14 +318,15 @@ followed:
 
 1. The JSON blob after `Local Parameters:` must be pasted into the other peer
    you want to establish a connection with. This can be either a browser
-   instance that uses the [WebRTC-RAWRTC browser tool][webrtc-rawrtc] or
-   another instance of this tool.
+   instance that uses the 
+   [WebRTC-ORTC browser example tool][webrtc-ortc-example] or another instance
+   of this tool.
 
 2. The other peer's local parameters in form of a JSON blob must be pasted into
    this tool's instance.
 
 3. Once you've pasted the local parameters into each other's instance, the peer
-   connection can be established by pressing *Enter* in both instances (click
+   connection can be established by pressing *Enter* in both instances (press
    the *Start* button in the browser).
 
 The tool will send some test data to the other peer depending on the ICE role.
@@ -325,6 +347,8 @@ Usage:
 
 ### data-channel-sctp-echo
 
+API: ORTC
+
 The data channel SCTP echo tool behaves just like any other echo server: It
 echoes received data on any data channel back to the sender.
 
@@ -334,6 +358,72 @@ described for the [data-channel-sctp](#data-channel-sctp) tool.
 Usage:
 
     data-channel-sctp-echo <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
+
+### peer-connection
+
+API: WebRTC
+
+The peer connection tool creates a peer connection instance and several data
+channels:
+
+* A pre-negotiated data channel with the label `cat-noises` and the id `0`
+  that is reliable and ordered. In the JS API, the channel would be created
+  by invoking:
+   
+   ```js
+   peerConnection.createDataChannel('cat-noises', {
+       ordered: true,
+       id: 0
+   });
+   ```
+
+* A data channel with the label `bear-noises` that is reliable but unordered.
+  In the WebRTC JS API, the channel would be created by invoking:
+   
+   ```js
+   peerConnection.createDataChannel('bear-noises', {
+       ordered: true,
+       maxRetransmits: 0
+   });
+   ```
+
+To establish a connection with another peer, the following procecure must be
+followed:
+
+1. If the peer is taking the *offering* role, the generated JSON blob that
+   contains the *offer SDP* must be pasted into the other peer you want to
+   establish a connection with. This can be either a browser instance that uses
+   the [WebRTC browser example tool][webrtc-example] or another instance of
+   this tool. In case it is a browser instance, press the *Start* button and
+   paste the data directly into the text area below
+   `Paste remote description:`. In case it is another instance of this tool,
+   paste the data into the other peer's console and press *Enter*.
+
+2. The peer who takes the *answering* role now generates a JSON blob as well
+   that contains the *answer SDP*. It must be pasted into the other browser
+   instance or tool instance as described in the previous step.
+
+3. The peer connection should be established automatically once *offer* and
+   *answer* have been exchanged and applied.
+
+The tool will send some test data to the other peer depending on whether or not
+it took the *offering* role. However, the browser tool behaves a bit
+differently. Check the log output of the tool instances (in the browser, either
+open the console log or check out the live log on the right side) to see what
+data has been sent and whether it has been received successfully.
+
+In the browser, you can use the created data channels by accessing
+`pc.dcs['<channel-name>']` in the console log, for example:
+
+```js
+pc.dcs['cat-noises'].send('RAWR!')
+```
+
+Usage:
+
+    peer-connection <0|1 (offering)> [<ice-candidate-type> ...]
+
+
 
 [travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
 [travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
@@ -356,6 +446,7 @@ Usage:
 [meson]: https://github.com/mesonbuild/meson
 [ninja]: https://ninja-build.org
 
-[webrtc-rawrtc]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/webrtc-rawrtc.html
+[webrtc-ortc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
+[webrtc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/webrtc/index.html
 [dctt]: https://github.com/nplab/dctt
 [demystifying-webrtc-dc-size-limit]: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html
