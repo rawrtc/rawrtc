@@ -441,7 +441,7 @@ Usage:
 [git]: (https://git-scm.com)
 [cmake]: https://cmake.org
 
-[webrtc-ortc-example]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/ortc/index.html
-[webrtc-example]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/webrtc/index.html
+[webrtc-ortc-example]: http://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
+[webrtc-example]: http://rawgit.com/rawrtc/rawrtc/master/htdocs/webrtc/index.html
 [dctt]: https://github.com/nplab/dctt
 [demystifying-webrtc-dc-size-limit]: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html
