@@ -293,16 +293,56 @@ static bool apply_context(
 }
 
 /*
+ * Wrap an ORTC ICE candidate to a peer connection ICE candidate.
+ */
+enum rawrtc_code local_ortc_candidate_to_candidate(
+        struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced, not checked
+        struct rawrtc_ice_candidate* const ortc_candidate, // not checked
+        struct rawrtc_peer_connection* const connection // not checked
+) {
+    enum rawrtc_code error;
+    char* username_fragment;
+    struct rawrtc_peer_connection_ice_candidate* candidate;
+
+    // Copy username fragment (is going to be referenced later)
+    error = rawrtc_strdup(
+            &username_fragment, connection->context.ice_gatherer->ice_username_fragment);
+    if (error) {
+        DEBUG_WARNING("Unable to copy username fragment from ICE gatherer, reason: %s\n",
+                      rawrtc_code_to_str(error));
+        return error;
+    }
+
+    // Create candidate
+    // Note: The local description will exist at this point since we start gathering when the
+    //       local description is being set.
+    error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
+            &candidate, ortc_candidate, connection->local_description->mid,
+            &connection->local_description->media_line_index, username_fragment);
+    if (error) {
+        goto out;
+    }
+
+    // Set pointer & done
+    *candidatep = candidate;
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    // Un-reference
+    mem_deref(username_fragment);
+    return error;
+}
+
+/*
  * Add candidate to description and announce candidate.
  */
 void ice_gatherer_local_candidate_handler(
-        struct rawrtc_ice_candidate* const ortc_candidate,
-        char const * const url,
+        struct rawrtc_ice_candidate* const ortc_candidate, // nullable
+        char const * const url, // nullable
         void* const arg
 ) {
     struct rawrtc_peer_connection* const connection = arg;
     enum rawrtc_code error;
-    char* username_fragment = NULL;
     struct rawrtc_peer_connection_ice_candidate* candidate = NULL;
 
     // Check state
@@ -313,26 +353,13 @@ void ice_gatherer_local_candidate_handler(
         return;
     }
 
+    // Wrap candidate (if any ORTC candidate)
     if (ortc_candidate) {
-        // Copy username fragment (is going to be referenced later)
-        error = rawrtc_strdup(
-                &username_fragment, connection->context.ice_gatherer->ice_username_fragment);
-        if (error) {
-            DEBUG_WARNING("Unable to copy username fragment from ICE gatherer, reason: %s\n",
-                          rawrtc_code_to_str(error));
-            return;
-        }
-
-        // Create candidate
-        // Note: The local description will exist at this point since we start gathering when the
-        //       local description is being set.
-        error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
-                &candidate, ortc_candidate, connection->local_description->mid,
-                &connection->local_description->media_line_index, username_fragment);
+        error = local_ortc_candidate_to_candidate(&candidate, ortc_candidate, connection);
         if (error) {
             DEBUG_WARNING("Unable to create local candidate from ORTC candidate, reason: %s\n",
                           rawrtc_code_to_str(error));
-            goto out;
+            return;
         }
     }
 
@@ -353,24 +380,42 @@ void ice_gatherer_local_candidate_handler(
 out:
     // Un-reference
     mem_deref(candidate);
-    mem_deref(username_fragment);
 }
 
+/*
+ * Announce ICE gatherer error as ICE candidate error.
+ */
 void ice_gatherer_error_handler(
-        struct rawrtc_ice_candidate* const host_candidate,
+        struct rawrtc_ice_candidate* const ortc_candidate, // nullable
         char const * const url,
         uint16_t const error_code,
         char const * const error_text,
         void* const arg
 ) {
-    (void) error_code; (void) arg;
+    struct rawrtc_peer_connection* const connection = arg;
+    enum rawrtc_code error;
+    struct rawrtc_peer_connection_ice_candidate* candidate = NULL;
 
-    // Note: This is just an error on gathering a specific candidate... others may still work, so
-    //       we continue.
-    DEBUG_NOTICE("ICE gatherer error, URL: %s, error: %s\n%H",
-                 url, error_text, rawrtc_ice_candidate_debug, host_candidate);
+    // Wrap candidate (if any ORTC candidate)
+    if (ortc_candidate) {
+        error = local_ortc_candidate_to_candidate(&candidate, ortc_candidate, connection);
+        if (error) {
+            DEBUG_WARNING("Unable to create local candidate from ORTC candidate, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return;
+        }
+    }
+
+    // Call handler (if any)
+    if (connection->local_candidate_error_handler) {
+        connection->local_candidate_error_handler(
+                candidate, url, error_code, error_text, connection->arg);
+    }
 }
 
+/*
+ * Filter ICE gatherer state and announce it.
+ */
 void ice_gatherer_state_change_handler(
         enum rawrtc_ice_gatherer_state const state,
         void* const arg
@@ -601,7 +646,7 @@ static void sctp_transport_state_change_handler(
         enum rawrtc_sctp_transport_state const state,
         void* const arg
 ) {
-    (void) arg;
+    (void) arg; (void) state;
 
     // There's no handler that could potentially print this, so we print it here for debug purposes
     DEBUG_PRINTF("SCTP transport state change: %s\n", rawrtc_sctp_transport_state_to_name(state));
@@ -695,6 +740,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection_configuration* configuration, // referenced
         rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
         rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
+        rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler, // nullable
         rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
         rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
         rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
@@ -721,6 +767,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
     connection->configuration = mem_ref(configuration);
     connection->negotiation_needed_handler = negotiation_needed_handler;
     connection->local_candidate_handler = local_candidate_handler;
+    connection->local_candidate_error_handler = local_candidate_error_handler;
     connection->signaling_state_change_handler = signaling_state_change_handler;
     connection->ice_connection_state_change_handler = ice_connection_state_change_handler;
     connection->ice_gathering_state_change_handler = ice_gathering_state_change_handler;
@@ -1486,6 +1533,7 @@ enum rawrtc_code rawrtc_peer_connection_unset_handlers(
     connection->ice_gathering_state_change_handler = NULL;
     connection->ice_connection_state_change_handler = NULL;
     connection->signaling_state_change_handler = NULL;
+    connection->local_candidate_error_handler = NULL;
     connection->local_candidate_handler = NULL;
     connection->negotiation_needed_handler = NULL;
 
@@ -1533,7 +1581,7 @@ enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
 }
 
 /*
- * Set the peer connection's local candidate handler.
+ * Set the peer connection's ICE local candidate handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
         struct rawrtc_peer_connection* const connection,
@@ -1550,7 +1598,7 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
 }
 
 /*
- * Get the peer connection's local candidate handler.
+ * Get the peer connection's ICE local candidate handler.
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
@@ -1565,6 +1613,45 @@ enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
     // Get local candidate handler (if any)
     if (connection->local_candidate_handler) {
         *local_candidate_handlerp = connection->local_candidate_handler;
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
+}
+
+/*
+ * Set the peer connection's ICE local candidate error handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
+        struct rawrtc_peer_connection* const connection,
+        rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler // nullable
+) {
+    // Check arguments
+    if (!connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set local candidate error handler & done
+    connection->local_candidate_error_handler = local_candidate_error_handler;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the peer connection's ICE local candidate error handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
+        rawrtc_peer_connection_local_candidate_error_handler** const local_candidate_error_handlerp, // de-referenced
+        struct rawrtc_peer_connection* const connection
+) {
+    // Check arguments
+    if (!local_candidate_error_handlerp || !connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get local candidate error handler (if any)
+    if (connection->local_candidate_error_handler) {
+        *local_candidate_error_handlerp = connection->local_candidate_error_handler;
         return RAWRTC_CODE_SUCCESS;
     } else {
         return RAWRTC_CODE_NO_VALUE;

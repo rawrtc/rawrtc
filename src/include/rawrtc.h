@@ -369,7 +369,7 @@ typedef void (rawrtc_ice_gatherer_state_change_handler)(
  * ICE gatherer error handler.
  */
 typedef void (rawrtc_ice_gatherer_error_handler)(
-    struct rawrtc_ice_candidate* const host_candidate, // read-only, nullable
+    struct rawrtc_ice_candidate* const candidate, // read-only, nullable
     char const * const url, // read-only
     uint16_t const error_code, // read-only
     char const * const error_text, // read-only
@@ -500,13 +500,26 @@ typedef void (rawrtc_negotiation_needed_handler)(
 );
 
 /*
- * Peer connection local candidate handler.
+ * Peer connection ICE local candidate handler.
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
  * 'url' will be NULL in case a host candidate has been gathered.
  */
 typedef void (rawrtc_peer_connection_local_candidate_handler)(
     struct rawrtc_peer_connection_ice_candidate* const candidate,
     char const * const url, // read-only
+    void* const arg
+);
+
+/*
+ * Peer connection ICE local candidate error handler.
+ * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
+ * 'url' will be NULL in case a host candidate has been gathered.
+ */
+typedef void (rawrtc_peer_connection_local_candidate_error_handler)(
+    struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
+    char const * const url, // read-only
+    uint16_t const error_code, // read-only
+    char const * const error_text, // read-only
     void* const arg
 );
 
@@ -949,6 +962,7 @@ struct rawrtc_peer_connection {
     struct rawrtc_peer_connection_configuration* configuration; // referenced
     rawrtc_negotiation_needed_handler* negotiation_needed_handler; // nullable
     rawrtc_peer_connection_local_candidate_handler* local_candidate_handler; // nullable
+    rawrtc_peer_connection_local_candidate_error_handler* local_candidate_error_handler; // nullable
     rawrtc_signaling_state_change_handler* signaling_state_change_handler; // nullable
     rawrtc_ice_transport_state_change_handler* ice_connection_state_change_handler; // nullable
     rawrtc_ice_gatherer_state_change_handler* ice_gathering_state_change_handler; // nullable
@@ -2068,6 +2082,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection_configuration* configuration, // referenced
     rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
     rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
+    rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler, // nullable
     rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
     rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
     rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
@@ -2232,7 +2247,7 @@ enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
 );
 
 /*
- * Set the peer connection's local candidate handler.
+ * Set the peer connection's ICE local candidate handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
     struct rawrtc_peer_connection* const connection,
@@ -2240,11 +2255,28 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
 );
 
 /*
- * Get the peer connection's local candidate handler.
+ * Get the peer connection's ICE local candidate handler.
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
     rawrtc_peer_connection_local_candidate_handler** const local_candidate_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's ICE local candidate error handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler // nullable
+);
+
+/*
+ * Get the peer connection's ICE local candidate error handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
+    rawrtc_peer_connection_local_candidate_error_handler** const local_candidate_error_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 

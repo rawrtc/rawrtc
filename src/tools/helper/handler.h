@@ -143,6 +143,17 @@ void default_peer_connection_local_candidate_handler(
 );
 
 /*
+ * Print the peer connections local candidate error event.
+ */
+void default_peer_connection_local_candidate_error_handler(
+    struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
+    char const * const url, // read-only
+    uint16_t const error_code, // read-only
+    char const * const error_text, // read-only
+    void* const arg // will be casted to `struct client*`
+);
+
+/*
  * Print the signaling state.
  */
 void default_signaling_state_change_handler(

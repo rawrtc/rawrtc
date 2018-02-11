@@ -167,6 +167,7 @@ static void client_init(
     EOE(rawrtc_peer_connection_create(
             &client->connection, client->configuration,
             negotiation_needed_handler, local_candidate_handler,
+            default_peer_connection_local_candidate_error_handler,
             default_signaling_state_change_handler, default_ice_transport_state_change_handler,
             default_ice_gatherer_state_change_handler, connection_state_change_handler,
             default_data_channel_handler, client));

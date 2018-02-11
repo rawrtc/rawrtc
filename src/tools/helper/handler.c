@@ -25,14 +25,14 @@ void default_ice_gatherer_state_change_handler(
  * Print the ICE gatherer's error event.
  */
 void default_ice_gatherer_error_handler(
-        struct rawrtc_ice_candidate* const host_candidate, // read-only, nullable
+        struct rawrtc_ice_candidate* const candidate, // read-only, nullable
         char const * const url, // read-only
         uint16_t const error_code, // read-only
         char const * const error_text, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) host_candidate; (void) error_code; (void) arg;
+    (void) candidate; (void) error_code; (void) arg;
     DEBUG_NOTICE("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
@@ -231,6 +231,21 @@ void default_peer_connection_local_candidate_handler(
     // Print local candidate
     print_ice_candidate(ortc_candidate, url, candidate, client);
     mem_deref(ortc_candidate);
+}
+
+/*
+ * Print the peer connections local candidate error event.
+ */
+void default_peer_connection_local_candidate_error_handler(
+        struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
+        char const * const url, // read-only
+        uint16_t const error_code, // read-only
+        char const * const error_text, // read-only
+        void* const arg // will be casted to `struct client*`
+) {
+    struct client* const client = arg;
+    (void) candidate; (void) error_code; (void) arg;
+    DEBUG_NOTICE("(%s) ICE candidate error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
 /*
