@@ -47,8 +47,8 @@ static void timer_handler(
     }
     mem_deref(buffer);
 
-    // Close if answering
-    if (!client->offering) {
+    // Close if offering
+    if (client->offering) {
         // Close bear-noises
         DEBUG_PRINTF("(%s) Closing channel\n", client->name, channel->label);
         EOR(rawrtc_data_channel_close(client->data_channel->channel));
@@ -168,7 +168,8 @@ static void client_init(
             &client->connection, client->configuration,
             negotiation_needed_handler, local_candidate_handler,
             default_signaling_state_change_handler, default_ice_transport_state_change_handler,
-            default_ice_gatherer_state_change_handler, connection_state_change_handler, client));
+            default_ice_gatherer_state_change_handler, connection_state_change_handler,
+            default_data_channel_handler, client));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(

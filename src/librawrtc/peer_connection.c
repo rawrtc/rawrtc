@@ -632,7 +632,7 @@ static enum rawrtc_code get_data_transport(
                     &sctp_transport, context->dtls_transport,
                     RAWRTC_PEER_CONNECTION_SCTP_TRANSPORT_PORT,
                     connection->data_channel_handler, sctp_transport_state_change_handler,
-                    connection);
+                    connection->arg);
             if (error) {
                 return error;
             }
@@ -690,12 +690,11 @@ enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection_configuration* configuration, // referenced
         rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
         rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
-//        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
         rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
         rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
         rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
         rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
-//        rawrtc_peer_connection_fingerprint_failure_handler* const fingerprint_failure_handler // nullable
+        rawrtc_data_channel_handler* const data_channel_handler, // nullable
         void* const arg // nullable
 ) {
     struct rawrtc_peer_connection* connection;
@@ -721,6 +720,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
     connection->ice_connection_state_change_handler = ice_connection_state_change_handler;
     connection->ice_gathering_state_change_handler = ice_gathering_state_change_handler;
     connection->connection_state_change_handler = connection_state_change_handler;
+    connection->data_channel_handler = data_channel_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
     connection->arg = arg;
 

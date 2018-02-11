@@ -953,11 +953,11 @@ struct rawrtc_peer_connection {
     rawrtc_ice_transport_state_change_handler* ice_connection_state_change_handler; // nullable
     rawrtc_ice_gatherer_state_change_handler* ice_gathering_state_change_handler; // nullable
     rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
+    rawrtc_data_channel_handler* data_channel_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
     struct rawrtc_peer_connection_description* local_description; // referenced
     struct rawrtc_peer_connection_description* remote_description; // referenced
     struct rawrtc_peer_connection_context context;
-    rawrtc_data_channel_handler* data_channel_handler; // nullable
     void* arg; // nullable
 };
 
@@ -1966,6 +1966,7 @@ enum rawrtc_code rawrtc_peer_connection_create(
     rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
     rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
+    rawrtc_data_channel_handler* const data_channel_handler, // nullable
     void* const arg // nullable
 );
 

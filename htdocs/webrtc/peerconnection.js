@@ -48,6 +48,13 @@ class WebRTCPeerConnection {
         pc.onicecandidateerror = (event) => {
             console.error('ICE candidate error:', event);
         };
+        pc.ondatachannel = (event) => {
+            const dc = event.channel;
+            console.log('Incoming data channel:', dc.label);
+
+            // Bind events
+            this.bindDataChannelEvents(dc);
+        };
 
         // Store configuration & signalling instance
         this.pc = pc;
@@ -59,7 +66,15 @@ class WebRTCPeerConnection {
 
         // Create data channel and bind events
         const dc = pc.createDataChannel(name, options);
-        dc._name = name; // Meh!
+        this.bindDataChannelEvents(dc);
+
+        // Store data channel and return
+        this.dcs[name] = dc;
+        return dc;
+    }
+
+    bindDataChannelEvents(dc) {
+        dc._name = dc.label; // Meh!
         dc.onopen = () => {
             console.log(dc._name, 'open');
         };
@@ -76,9 +91,5 @@ class WebRTCPeerConnection {
             const size = event.data.byteLength || event.data.size;
             console.log(dc._name, 'incoming message (' + size + ' bytes)');
         };
-
-        // Store data channel and return
-        this.dcs[name] = dc;
-        return dc;
     }
 }
