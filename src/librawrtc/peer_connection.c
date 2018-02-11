@@ -2,6 +2,7 @@
 #include "ice_server.h"
 #include "ice_gather_options.h"
 #include "certificate.h"
+#include "ice_candidate.h"
 #include "dtls_transport.h"
 #include "peer_connection_description.h"
 #include "peer_connection_ice_candidate.h"
@@ -362,9 +363,12 @@ void ice_gatherer_error_handler(
         char const * const error_text,
         void* const arg
 ) {
-    (void) host_candidate; (void) error_code; (void) arg;
-    // TODO: HANDLE ICE gatherer error
-    DEBUG_WARNING("TODO: HANDLE ICE gatherer error, URL: %s, reason: %s\n", url, error_text);
+    (void) error_code; (void) arg;
+
+    // Note: This is just an error on gathering a specific candidate... others may still work, so
+    //       we continue.
+    DEBUG_NOTICE("ICE gatherer error, URL: %s, error: %s\n%H",
+                 url, error_text, rawrtc_ice_candidate_debug, host_candidate);
 }
 
 void ice_gatherer_state_change_handler(
@@ -453,9 +457,10 @@ static void ice_transport_candidate_pair_change_handler(
         struct rawrtc_ice_candidate* const remote, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
-    // TODO
     (void) local; (void) remote; (void) arg;
-    DEBUG_WARNING("HANDLE ICE candidate pair change\n");
+
+    // There's no handler that could potentially print this, so we print it here for debug purposes
+    DEBUG_PRINTF("ICE transport candidate pair change\n");
 }
 
 static void ice_transport_state_change_handler(
@@ -526,11 +531,12 @@ static enum rawrtc_code get_certificates(
 }
 
 static void dtls_transport_error_handler(
+        // TODO: error.message (probably from OpenSSL)
         void* const arg
 ) {
-    // TODO
     (void) arg;
-    DEBUG_WARNING("HANDLE DTLS transport error\n");
+    // TODO: Print error message
+    DEBUG_WARNING("DTLS transport error: %s\n", "???");
 }
 
 static void dtls_transport_state_change_handler(

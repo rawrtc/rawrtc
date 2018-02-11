@@ -33,7 +33,7 @@ void default_ice_gatherer_error_handler(
 ) {
     struct client* const client = arg;
     (void) host_candidate; (void) error_code; (void) arg;
-    DEBUG_PRINTF("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
+    DEBUG_NOTICE("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
 /*
@@ -91,12 +91,12 @@ void default_dtls_transport_state_change_handler(
  * Print the DTLS transport's error event.
  */
 void default_dtls_transport_error_handler(
-        /* TODO: error.message (probably from OpenSSL) */
+        // TODO: error.message (probably from OpenSSL)
         void* const arg // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
     // TODO: Print error message
-    DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
+    DEBUG_WARNING("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
 /*
@@ -161,7 +161,7 @@ void default_data_channel_error_handler(
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
-    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, channel->label);
+    DEBUG_WARNING("(%s) Data channel error: %s\n", client->name, channel->label);
 }
 
 /*

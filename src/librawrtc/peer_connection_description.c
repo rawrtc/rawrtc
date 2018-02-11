@@ -666,7 +666,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     }
 
     // Set initial values
-    local_description->connection = mem_ref(connection); // TODO: Possible circular reference
+    local_description->connection = mem_ref(connection); // Warning: Circular reference
     local_description->end_of_candidates = false;
     if (offering) {
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
