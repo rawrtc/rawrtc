@@ -17,6 +17,7 @@ uint16_t const discard_port = 9;
 /*
  * Change the signalling state.
  * Will call the corresponding handler.
+ * Caller MUST ensure that the same state is not set twice.
  */
 static void set_signaling_state(
         struct rawrtc_peer_connection* const connection, // not checked
@@ -28,6 +29,117 @@ static void set_signaling_state(
     // Call handler (if any)
     if (connection->signaling_state_change_handler) {
         connection->signaling_state_change_handler(state, connection->arg);
+    }
+}
+
+/*
+ * Change the connection state to a specific state.
+ * Will call the corresponding handler.
+ * Caller MUST ensure that the same state is not set twice.
+ */
+static void set_connection_state(
+        struct rawrtc_peer_connection* const connection, // not checked
+        enum rawrtc_peer_connection_state const state
+) {
+    // Set state
+    connection->connection_state = state;
+
+    // Call handler (if any)
+    if (connection->connection_state_change_handler) {
+        connection->connection_state_change_handler(state, connection->arg);
+    }
+}
+
+/*
+ * Update connection state.
+ * Will call the corresponding handler.
+ */
+static void update_connection_state(
+        struct rawrtc_peer_connection* const connection // not checked
+) {
+    enum rawrtc_code error;
+    enum rawrtc_ice_transport_state ice_transport_state = RAWRTC_ICE_TRANSPORT_STATE_NEW;
+    enum rawrtc_dtls_transport_state dtls_transport_state = RAWRTC_DTLS_TRANSPORT_STATE_NEW;
+    enum rawrtc_peer_connection_state connection_state;
+
+    // Nothing beats the closed state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return;
+    }
+
+    // Get ICE transport and DTLS transport states
+    if (connection->context.ice_transport) {
+        error = rawrtc_ice_transport_get_state(
+                &ice_transport_state, connection->context.ice_transport);
+        if (error) {
+            DEBUG_WARNING("Unable to get ICE transport state, reason: %s\n",
+                          rawrtc_error_to_code(error));
+        }
+    }
+    if (connection->context.dtls_transport) {
+        error = rawrtc_dtls_transport_get_state(
+                &dtls_transport_state, connection->context.dtls_transport);
+        if (error) {
+            DEBUG_WARNING("Unable to get DTLS transport state, reason: %s\n",
+                          rawrtc_error_to_code(error));
+        }
+    }
+
+    // Note: This follows the mindbogglingly confusing W3C spec description - it's just not
+    //       super-obvious. We start with states that are easy to detect and remove more and more
+    //       states from the equation.
+
+    // Failed: Any in the 'failed' state
+    if (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_FAILED
+        || dtls_transport_state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
+        connection_state = RAWRTC_PEER_CONNECTION_STATE_FAILED;
+        goto out;
+    }
+
+    // Connecting: Any in the 'connecting' or 'checking' state
+    if (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_CHECKING
+        || dtls_transport_state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING) {
+        connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTING;
+        goto out;
+    }
+
+    // Disconnected: Any in the 'disconnected' state
+    if (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_DISCONNECTED) {
+        connection_state = RAWRTC_PEER_CONNECTION_STATE_DISCONNECTED;
+        goto out;
+    }
+
+    // New: Any in 'new' or all in 'closed'
+    if (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_NEW
+        || dtls_transport_state == RAWRTC_DTLS_TRANSPORT_STATE_NEW
+        || (ice_transport_state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED
+            && dtls_transport_state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED)) {
+        connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
+        goto out;
+    }
+
+    // Connected
+    connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTED;
+
+out:
+    // Debug
+    DEBUG_PRINTF(
+            "ICE (%s) + DTLS (%s) = PC %s\n",
+            rawrtc_ice_transport_state_to_name(ice_transport_state),
+            rawrtc_dtls_transport_state_to_name(dtls_transport_state),
+            rawrtc_peer_connection_state_to_name(connection_state));
+
+    // Check if the state would change
+    if (connection->connection_state == connection_state) {
+        return;
+    }
+
+    // Set state
+    connection->connection_state = connection_state;
+
+    // Call handler (if any)
+    if (connection->connection_state_change_handler) {
+        connection->connection_state_change_handler(connection_state, connection->arg);
     }
 }
 
@@ -117,8 +229,8 @@ static enum rawrtc_code peer_connection_start(
  * associated to the peer connection.
  */
 static void revert_context(
-        struct rawrtc_peer_connection_context* const new,
-        struct rawrtc_peer_connection_context* const current
+        struct rawrtc_peer_connection_context* const new, // not checked
+        struct rawrtc_peer_connection_context* const current // not checked
 ) {
     if (new->data_transport != current->data_transport) {
         mem_deref(new->data_transport);
@@ -126,6 +238,7 @@ static void revert_context(
     if (new->dtls_transport != current->dtls_transport) {
         mem_deref(new->dtls_transport);
     }
+    // TODO: This check is brittle...
     if (!list_isempty(&new->certificates) && list_isempty(&current->certificates)) {
         list_flush(&new->certificates);
     }
@@ -142,13 +255,40 @@ static void revert_context(
 
 /*
  * Apply all instances on a peer connection.
+ * Return if anything inside the context has changed.
  */
-static void apply_context(
-        struct rawrtc_peer_connection* connection, // not checked
-        struct rawrtc_peer_connection_context* const context // de-referenced, not checked
+static bool apply_context(
+        struct rawrtc_peer_connection_context* const new, // not checked
+        struct rawrtc_peer_connection_context* const current // not checked
 ) {
-    // Store new context
-    connection->context = *context;
+    bool changed = false;
+    if (new->data_transport != current->data_transport) {
+        current->data_transport = new->data_transport;
+        changed = true;
+    }
+    if (new->dtls_transport != current->dtls_transport) {
+        current->dtls_transport = new->dtls_transport;
+        str_ncpy(current->dtls_id, new->dtls_id, DTLS_ID_LENGTH + 1);
+        changed = true;
+    }
+    // TODO: This check is brittle...
+    if (!list_isempty(&new->certificates) && list_isempty(&current->certificates)) {
+        current->certificates = new->certificates;
+        changed = true;
+    }
+    if (new->ice_transport != current->ice_transport) {
+        current->ice_transport = new->ice_transport;
+        changed = true;
+    }
+    if (new->ice_gatherer != current->ice_gatherer) {
+        current->ice_gatherer = new->ice_gatherer;
+        changed = true;
+    }
+    if (new->gather_options != current->gather_options) {
+        current->gather_options = new->gather_options;
+        changed = true;
+    }
+    return changed;
 }
 
 /*
@@ -163,6 +303,14 @@ void ice_gatherer_local_candidate_handler(
     enum rawrtc_code error;
     char* username_fragment = NULL;
     struct rawrtc_peer_connection_ice_candidate* candidate = NULL;
+
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_FAILED
+        || connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        DEBUG_NOTICE("Ignoring candidate in the %s state\n",
+                     rawrtc_peer_connection_state_to_name(connection->connection_state));
+        return;
+    }
 
     if (ortc_candidate) {
         // Copy username fragment (is going to be referenced later)
@@ -196,7 +344,7 @@ void ice_gatherer_local_candidate_handler(
         goto out;
     }
 
-    // Call handler
+    // Call handler (if any)
     if (connection->local_candidate_handler) {
         connection->local_candidate_handler(candidate, url, connection->arg);
     }
@@ -223,9 +371,17 @@ void ice_gatherer_state_change_handler(
         enum rawrtc_ice_gatherer_state const state,
         void* const arg
 ) {
-    (void) arg;
-    // TODO: HANDLE ICE gatherer state
-    DEBUG_WARNING("HANDLE ICE gatherer state: %s\n", rawrtc_ice_gatherer_state_to_name(state));
+    struct rawrtc_peer_connection* const connection = arg;
+
+    // The only difference to the ORTC gatherer states is that there's no 'closed' state.
+    if (state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
+        return;
+    }
+
+    // Call handler (if any)
+    if (connection->ice_gathering_state_change_handler) {
+        connection->ice_gathering_state_change_handler(state, connection->arg);
+    }
 }
 
 /*
@@ -306,9 +462,15 @@ static void ice_transport_state_change_handler(
         enum rawrtc_ice_transport_state const state,
         void* const arg
 ) {
-    // TODO
-    (void) arg;
-    DEBUG_WARNING("HANDLE ICE transport state: %s\n", rawrtc_ice_transport_state_to_name(state));
+    struct rawrtc_peer_connection* const connection = arg;
+
+    // Call handler (if any)
+    if (connection->ice_connection_state_change_handler) {
+        connection->ice_connection_state_change_handler(state, connection->arg);
+    }
+
+    // Update connection state
+    update_connection_state(connection);
 }
 
 /*
@@ -376,24 +538,10 @@ static void dtls_transport_state_change_handler(
         void* const arg
 ) {
     struct rawrtc_peer_connection* connection = arg;
+    (void) state;
 
     // Update connection state
-    // TODO: Handle correctly
-    switch (state) {
-        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING:
-            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTING;
-            break;
-        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED:
-            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_CONNECTED;
-            break;
-        case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
-            connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_FAILED;
-            break;
-        default:
-            break;
-    }
-    DEBUG_WARNING("HANDLE DTLS transport state: %s\n",
-                  rawrtc_dtls_transport_state_to_name(state));
+    update_connection_state(connection);
 }
 
 /*
@@ -442,10 +590,10 @@ static void sctp_transport_state_change_handler(
         enum rawrtc_sctp_transport_state const state,
         void* const arg
 ) {
-    // TODO
     (void) arg;
-    DEBUG_WARNING("HANDLE SCTP transport state: %s\n",
-                  rawrtc_sctp_transport_state_to_name(state));
+
+    // There's no handler that could potentially print this, so we print it here for debug purposes
+    DEBUG_PRINTF("SCTP transport state change: %s\n", rawrtc_sctp_transport_state_to_name(state));
 }
 
 /*
@@ -510,6 +658,9 @@ static void rawrtc_peer_connection_destroy(
 ) {
     struct rawrtc_peer_connection* const connection = arg;
 
+    // Unset all handlers
+    rawrtc_peer_connection_unset_handlers(connection);
+
     // Close peer connection
     rawrtc_peer_connection_close(connection);
 
@@ -535,8 +686,8 @@ enum rawrtc_code rawrtc_peer_connection_create(
         rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
 //        rawrtc_ice_gatherer_error_handler* const ice_candidate_error_handler, // nullable
         rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
-//        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
-//        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
+        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
+        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
         rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
 //        rawrtc_peer_connection_fingerprint_failure_handler* const fingerprint_failure_handler // nullable
         void* const arg // nullable
@@ -555,12 +706,14 @@ enum rawrtc_code rawrtc_peer_connection_create(
     }
 
     // Set fields/reference
-    connection->signaling_state = RAWRTC_SIGNALING_STATE_STABLE;
     connection->connection_state = RAWRTC_PEER_CONNECTION_STATE_NEW;
+    connection->signaling_state = RAWRTC_SIGNALING_STATE_STABLE;
     connection->configuration = mem_ref(configuration);
     connection->negotiation_needed_handler = negotiation_needed_handler;
     connection->local_candidate_handler = local_candidate_handler;
     connection->signaling_state_change_handler = signaling_state_change_handler;
+    connection->ice_connection_state_change_handler = ice_connection_state_change_handler;
+    connection->ice_gathering_state_change_handler = ice_gathering_state_change_handler;
     connection->connection_state_change_handler = connection_state_change_handler;
     connection->data_transport_type = RAWRTC_DATA_TRANSPORT_TYPE_SCTP;
     connection->arg = arg;
@@ -584,8 +737,10 @@ enum rawrtc_code rawrtc_peer_connection_close(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // TODO: Check state
-    DEBUG_WARNING("TODO: Check if closed\n");
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_SUCCESS;
+    }
 
     // Stop data transport (if any)
     if (connection->context.data_transport) {
@@ -627,11 +782,11 @@ enum rawrtc_code rawrtc_peer_connection_close(
         }
     }
 
-    // TODO: Update states (?)
-    DEBUG_WARNING("TODO: Update states (?)\n");
-
     // Update signalling state
     set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
+
+    // Update connection state
+    set_connection_state(connection, RAWRTC_PEER_CONNECTION_STATE_CLOSED);
 
     // Done
     return RAWRTC_CODE_SUCCESS;
@@ -709,6 +864,11 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
     // Check arguments
     if (!connection || !description) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Ensure it has been created by the local peer connection.
@@ -843,6 +1003,11 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
+    }
+
     // TODO: Allow changing the remote description
     if (connection->remote_description) {
         return RAWRTC_CODE_NOT_IMPLEMENTED;
@@ -952,7 +1117,7 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
         }
 
         // Apply context
-        apply_context(connection, &context);
+        apply_context(&context, &connection->context);
     }
 
     // Start peer connection if both description are set
@@ -1006,6 +1171,11 @@ enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
     // Check arguments
     if (!connection || !candidate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check state
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Ensure there's a remote description
@@ -1084,20 +1254,21 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     }
 
     // Check state
-    // TODO: Support new offer/answer
-    if (connection->connection_state != RAWRTC_PEER_CONNECTION_STATE_NEW) {
-        return RAWRTC_CODE_NOT_IMPLEMENTED;
+    if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_CLOSED) {
+        return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Initialise context
     context = connection->context;
 
-    // Get data transport
-    error = get_data_transport(&context, connection);
-    if (error) {
-        DEBUG_WARNING("Unable to create data transport, reason: %s\n",
-                      rawrtc_code_to_str(error));
-        return error;
+    // Get data transport (if no description has been set, yet)
+    if (!connection->local_description && !connection->remote_description) {
+        error = get_data_transport(&context, connection);
+        if (error) {
+            DEBUG_WARNING("Unable to create data transport, reason: %s\n",
+                          rawrtc_code_to_str(error));
+            return error;
+        }
     }
 
     // Create data channel
@@ -1118,14 +1289,13 @@ out:
         revert_context(&context, &connection->context);
     } else {
         // Apply context
-        apply_context(connection, &context);
+        bool const negotiation_needed = apply_context(&context, &connection->context);
 
         // Set pointer
         *channelp = channel;
 
         // Negotiation needed?
-        if (connection->connection_state == RAWRTC_PEER_CONNECTION_STATE_NEW
-            && connection->negotiation_needed_handler) {
+        if (negotiation_needed) {
             connection->negotiation_needed_handler(connection->arg);
         }
     }
@@ -1172,4 +1342,31 @@ enum rawrtc_code rawrtc_peer_connection_get_remote_description(
     } else {
         return RAWRTC_CODE_NO_VALUE;
     }
+}
+
+/*
+ * Unset the handler argument and all handlers of the peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_unset_handlers(
+        struct rawrtc_peer_connection* const connection
+) {
+    // Check arguments
+    if (!connection) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Unset handler argument
+    connection->arg = NULL;
+
+    // Unset all handlers
+    connection->data_channel_handler = NULL;
+    connection->connection_state_change_handler = NULL;
+    connection->ice_gathering_state_change_handler = NULL;
+    connection->ice_connection_state_change_handler = NULL;
+    connection->signaling_state_change_handler = NULL;
+    connection->local_candidate_handler = NULL;
+    connection->negotiation_needed_handler = NULL;
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
 }

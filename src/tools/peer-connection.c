@@ -114,8 +114,10 @@ static void connection_state_change_handler(
     default_peer_connection_state_change_handler(state, arg);
 
     // Open? Create new channel
+    // Note: Since this state can switch from 'connected' to 'disconnected' and back again, we
+    //       need to make sure we don't re-create data channels unintended.
     // TODO: Move this once we can create data channels earlier
-    if (state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED) {
+    if (!client->data_channel && state == RAWRTC_PEER_CONNECTION_STATE_CONNECTED) {
         struct rawrtc_data_channel_parameters* channel_parameters;
         char* const label = client->offering ? "bear-noises" : "lion-noises";
 
@@ -165,7 +167,8 @@ static void client_init(
     EOE(rawrtc_peer_connection_create(
             &client->connection, client->configuration,
             negotiation_needed_handler, local_candidate_handler,
-            default_signaling_state_change_handler, connection_state_change_handler, client));
+            default_signaling_state_change_handler, default_ice_transport_state_change_handler,
+            default_ice_gatherer_state_change_handler, connection_state_change_handler, client));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(

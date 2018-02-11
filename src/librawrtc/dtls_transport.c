@@ -1072,6 +1072,23 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
 }
 
 /*
+ * Get the current state of the DTLS transport.
+ */
+enum rawrtc_code rawrtc_dtls_transport_get_state(
+        enum rawrtc_dtls_transport_state* const statep, // de-referenced
+        struct rawrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!statep || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set state & done
+    *statep = transport->state;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * Get local DTLS parameters of a transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(

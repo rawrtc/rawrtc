@@ -944,12 +944,14 @@ struct rawrtc_peer_connection_context {
  * TODO: private
  */
 struct rawrtc_peer_connection {
-    enum rawrtc_signaling_state signaling_state;
     enum rawrtc_peer_connection_state connection_state;
+    enum rawrtc_signaling_state signaling_state;
     struct rawrtc_peer_connection_configuration* configuration; // referenced
     rawrtc_negotiation_needed_handler* negotiation_needed_handler; // nullable
     rawrtc_peer_connection_local_candidate_handler* local_candidate_handler; // nullable
     rawrtc_signaling_state_change_handler* signaling_state_change_handler; // nullable
+    rawrtc_ice_transport_state_change_handler* ice_connection_state_change_handler; // nullable
+    rawrtc_ice_gatherer_state_change_handler* ice_gathering_state_change_handler; // nullable
     rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
     struct rawrtc_peer_connection_description* local_description; // referenced
@@ -1326,7 +1328,17 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
 /*
  * TODO
  * rawrtc_ice_transport_get_component
- * rawrtc_ice_transport_get_state
+ */
+
+/*
+ * Get the current state of the ICE transport.
+ */
+enum rawrtc_code rawrtc_ice_transport_get_state(
+    enum rawrtc_ice_transport_state* const statep, // de-referenced
+    struct rawrtc_ice_transport* const transport
+);
+
+/*
  * rawrtc_ice_transport_get_remote_candidates
  * rawrtc_ice_transport_get_selected_candidate_pair
  * rawrtc_ice_transport_get_remote_parameters
@@ -1457,8 +1469,15 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
  * rawrtc_certificate_list_*
  * rawrtc_dtls_transport_get_certificates
  * rawrtc_dtls_transport_get_transport
- * rawrtc_dtls_transport_get_state
  */
+
+/*
+ * Get the current state of the DTLS transport.
+ */
+enum rawrtc_code rawrtc_dtls_transport_get_state(
+    enum rawrtc_dtls_transport_state* const statep, // de-referenced
+    struct rawrtc_dtls_transport* const transport
+);
 
 /*
  * Get local DTLS parameters of a transport.
@@ -1717,19 +1736,19 @@ enum rawrtc_code rawrtc_data_channel_set_options(
 );
 
 /*
- * Close the data channel.
- */
-enum rawrtc_code rawrtc_data_channel_close(
-    struct rawrtc_data_channel* const channel
-);
-
-/*
  * Send data via the data channel.
  */
 enum rawrtc_code rawrtc_data_channel_send(
     struct rawrtc_data_channel* const channel,
     struct mbuf* const buffer, // nullable (if empty message), referenced
     bool const is_binary
+);
+
+/*
+ * Close the data channel.
+ */
+enum rawrtc_code rawrtc_data_channel_close(
+    struct rawrtc_data_channel* const channel
 );
 
 /*
@@ -1944,6 +1963,8 @@ enum rawrtc_code rawrtc_peer_connection_create(
     rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
     rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
     rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
+    rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
+    rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
     rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
     void* const arg // nullable
 );
@@ -2026,6 +2047,13 @@ enum rawrtc_code rawrtc_peer_connection_get_local_description(
 */
 enum rawrtc_code rawrtc_peer_connection_get_remote_description(
     struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Unset the handler argument and all handlers of the peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_unset_handlers(
     struct rawrtc_peer_connection* const connection
 );
 

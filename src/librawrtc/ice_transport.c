@@ -380,6 +380,23 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
 }
 
 /*
+ * Get the current state of the ICE transport.
+ */
+enum rawrtc_code rawrtc_ice_transport_get_state(
+        enum rawrtc_ice_transport_state* const statep, // de-referenced
+        struct rawrtc_ice_transport* const transport
+) {
+    // Check arguments
+    if (!statep || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set state & done
+    *statep = transport->state;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * Add a remote candidate ot the ICE transport.
  * Note: 'candidate' must be NULL to inform the transport that the
  * remote site finished gathering.
