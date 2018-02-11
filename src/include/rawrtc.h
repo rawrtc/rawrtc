@@ -1279,8 +1279,15 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
 /*
  * TODO (from RTCIceGatherer interface)
  * rawrtc_ice_gatherer_get_component
- * rawrtc_ice_gatherer_get_state
  */
+
+/*
+ * Get the current state of an ICE gatherer.
+ */
+enum rawrtc_code rawrtc_ice_gatherer_get_state(
+    enum rawrtc_ice_gatherer_state* const statep, // de-referenced
+    struct rawrtc_ice_gatherer* const gatherer
+);
 
 /*
  * Get local ICE parameters of an ICE gatherer.
@@ -1813,11 +1820,29 @@ enum rawrtc_code rawrtc_data_channel_set_open_handler(
 );
 
 /*
+ * Get the data channel's open handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_data_channel_get_open_handler(
+    rawrtc_data_channel_open_handler** const open_handlerp, // de-referenced
+    struct rawrtc_data_channel* const channel
+);
+
+/*
  * Set the data channel's buffered amount low handler.
  */
 enum rawrtc_code rawrtc_data_channel_set_buffered_amount_low_handler(
     struct rawrtc_data_channel* const channel,
     rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler // nullable
+);
+
+/*
+ * Get the data channel's buffered amount low handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_data_channel_get_buffered_amount_low_handler(
+    rawrtc_data_channel_buffered_amount_low_handler** const buffered_amount_low_handlerp, // de-referenced
+    struct rawrtc_data_channel* const channel
 );
 
 /*
@@ -1829,6 +1854,15 @@ enum rawrtc_code rawrtc_data_channel_set_error_handler(
 );
 
 /*
+ * Get the data channel's error handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_data_channel_get_error_handler(
+    rawrtc_data_channel_error_handler** const error_handlerp, // de-referenced
+    struct rawrtc_data_channel* const channel
+);
+
+/*
  * Set the data channel's close handler.
  */
 enum rawrtc_code rawrtc_data_channel_set_close_handler(
@@ -1837,11 +1871,29 @@ enum rawrtc_code rawrtc_data_channel_set_close_handler(
 );
 
 /*
+ * Get the data channel's close handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_data_channel_get_close_handler(
+    rawrtc_data_channel_close_handler** const close_handlerp, // de-referenced
+    struct rawrtc_data_channel* const channel
+);
+
+/*
  * Set the data channel's message handler.
  */
 enum rawrtc_code rawrtc_data_channel_set_message_handler(
     struct rawrtc_data_channel* const channel,
     rawrtc_data_channel_message_handler* const message_handler // nullable
+);
+
+/*
+ * Get the data channel's message handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_data_channel_get_message_handler(
+    rawrtc_data_channel_message_handler** const message_handlerp, // de-referenced
+    struct rawrtc_data_channel* const channel
 );
 
 /*
@@ -2058,6 +2110,17 @@ enum rawrtc_code rawrtc_peer_connection_set_local_description(
 );
 
 /*
+ * Get local description.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no local description has been
+ * set. Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and
+ * `*descriptionp` must be unreferenced.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
  * Set and apply the remote description.
  */
 enum rawrtc_code rawrtc_peer_connection_set_remote_description(
@@ -2066,11 +2129,66 @@ enum rawrtc_code rawrtc_peer_connection_set_remote_description(
 );
 
 /*
+ * Get remote description.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no remote description has been
+ * set. Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and
+ * `*descriptionp` must be unreferenced.
+*/
+enum rawrtc_code rawrtc_peer_connection_get_remote_description(
+    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
  * Add an ICE candidate to the peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_add_ice_candidate(
     struct rawrtc_peer_connection* const connection,
     struct rawrtc_peer_connection_ice_candidate* const candidate
+);
+
+/*
+ * Get the current signalling state of a peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_signaling_state(
+    enum rawrtc_signaling_state* const statep, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get the current ICE gathering state of a peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state(
+    enum rawrtc_ice_gatherer_state* const statep, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get the current ICE connection state of a peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state(
+    enum rawrtc_ice_transport_state* const statep, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get the current (peer) connection state of the peer connection.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_connection_state(
+    enum rawrtc_peer_connection_state* const statep, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Get indication whether the remote peer accepts trickled ICE
+ * candidates.
+ *
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no remote description has been
+ * set.
+ */
+enum rawrtc_code rawrtc_peer_connection_can_trickle_ice_candidates(
+    bool* const can_trickle_ice_candidatesp, // de-referenced
+    struct rawrtc_peer_connection* const connection
 );
 
 /*
@@ -2090,25 +2208,128 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
 );
 
 /*
- * Get local description.
- */
-enum rawrtc_code rawrtc_peer_connection_get_local_description(
-    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-    struct rawrtc_peer_connection* const connection
-);
-
-/*
-* Get remote description.
-*/
-enum rawrtc_code rawrtc_peer_connection_get_remote_description(
-    struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-    struct rawrtc_peer_connection* const connection
-);
-
-/*
  * Unset the handler argument and all handlers of the peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_unset_handlers(
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's negotiation needed handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_negotiation_needed_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_negotiation_needed_handler* const negotiation_needed_handler // nullable
+);
+
+/*
+ * Get the peer connection's negotiation needed handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
+    rawrtc_negotiation_needed_handler** const negotiation_needed_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's local candidate handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler // nullable
+);
+
+/*
+ * Get the peer connection's local candidate handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
+    rawrtc_peer_connection_local_candidate_handler** const local_candidate_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's signaling state change handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_signaling_state_change_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_signaling_state_change_handler* const signaling_state_change_handler // nullable
+);
+
+/*
+ * Get the peer connection's signaling state change handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_signaling_state_change_handler(
+    rawrtc_signaling_state_change_handler** const signaling_state_change_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's ice connection state change handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_ice_connection_state_change_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler // nullable
+);
+
+/*
+ * Get the peer connection's ice connection state change handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state_change_handler(
+    rawrtc_ice_transport_state_change_handler** const ice_connection_state_change_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's ice gathering state change handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_ice_gathering_state_change_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler // nullable
+);
+
+/*
+ * Get the peer connection's ice gathering state change handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state_change_handler(
+    rawrtc_ice_gatherer_state_change_handler** const ice_gathering_state_change_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's (peer) connection state change handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_connection_state_change_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler // nullable
+);
+
+/*
+ * Get the peer connection's (peer) connection state change handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_connection_state_change_handler(
+    rawrtc_peer_connection_state_change_handler** const connection_state_change_handlerp, // de-referenced
+    struct rawrtc_peer_connection* const connection
+);
+
+/*
+ * Set the peer connection's data channel handler.
+ */
+enum rawrtc_code rawrtc_peer_connection_set_data_channel_handler(
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_data_channel_handler* const data_channel_handler // nullable
+);
+
+/*
+ * Get the peer connection's data channel handler.
+ * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
+ */
+enum rawrtc_code rawrtc_peer_connection_get_data_channel_handler(
+    rawrtc_data_channel_handler** const data_channel_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
