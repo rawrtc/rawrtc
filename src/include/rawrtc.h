@@ -976,7 +976,35 @@ enum {
 
 
 /*
+ * Array container.
+ * TODO: private
+ */
+struct rawrtc_array_container {
+    size_t n_items;
+    void* items[];
+};
+
+/*
+ * Certificates.
+ * Note: Inherits `struct rawrtc_array_container`.
+ */
+struct rawrtc_certificates {
+    size_t n_certificates;
+    struct rawrtc_certificate* certificates[];
+};
+
+/*
+ * ICE servers.
+ * Note: Inherits `struct rawrtc_array_container`.
+ */
+struct rawrtc_ice_servers {
+    size_t n_servers;
+    struct rawrtc_ice_server* servers[];
+};
+
+/*
  * ICE candidates.
+ * Note: Inherits `struct rawrtc_array_container`.
  */
 struct rawrtc_ice_candidates {
     size_t n_candidates;
@@ -984,7 +1012,8 @@ struct rawrtc_ice_candidates {
 };
 
 /*
- * DTLS fingerprints
+ * DTLS fingerprints.
+ * Note: Inherits `struct rawrtc_array_container`.
  */
 struct rawrtc_dtls_fingerprints {
     size_t n_fingerprints;
@@ -1840,13 +1869,38 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
 /*
  * Add an ICE server to the peer connection configuration.
  */
-enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
+enum rawrtc_code rawrtc_peer_connection_configuration_add_ice_server(
     struct rawrtc_peer_connection_configuration* const configuration,
     char* const * const urls, // copied
     size_t const n_urls,
     char* const username, // nullable, copied
     char* const credential, // nullable, copied
     enum rawrtc_ice_credential_type const credential_type
+);
+
+/*
+ * Get ICE servers from the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_get_ice_servers(
+    struct rawrtc_ice_servers** const serversp, // de-referenced
+    struct rawrtc_peer_connection_configuration* const configuration
+);
+
+/*
+ * Add a certificate to the peer connection configuration to be used
+ * instead of an ephemerally generated one.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_add_certificate(
+    struct rawrtc_peer_connection_configuration* configuration,
+    struct rawrtc_certificate* const certificate // copied
+);
+
+/*
+ * Get certificates from the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_get_certificates(
+    struct rawrtc_certificates** const certificatesp, // de-referenced
+    struct rawrtc_peer_connection_configuration* const configuration
 );
 
 /*
@@ -2236,19 +2290,4 @@ enum rawrtc_code rawrtc_sdprintf(
     char** const destinationp,
     char* const formatter,
     ...
-);
-
-/*
- * Convert a list to a dynamically allocated array.
- * If `reference` is set to `true`, each item in the list will be
- * referenced.
- *
- * Note: In case the list is empty, `*lengthp` will be set to `0` and
- *       `*arrayp` will be set to `NULL`.
- */
-enum rawrtc_code rawrtc_list_to_array(
-    void*** const arrayp, // de-referenced
-    size_t* const lengthp, // de-referenced
-    struct list const* const list,
-    bool reference
 );

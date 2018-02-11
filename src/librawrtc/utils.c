@@ -1087,6 +1087,70 @@ char const * const rawrtc_dns_type_to_address_family_name(
 }
 
 /*
+ * Destructor for an existing array container that did reference each
+ * item.
+ */
+static void rawrtc_array_container_destroy(
+        void* arg
+) {
+    struct rawrtc_array_container* const container = arg;
+    size_t i;
+
+    // Un-reference each item
+    for (i = 0; i < container->n_items; ++i) {
+        mem_deref(container->items[i]);
+    }
+}
+
+
+/*
+ * Convert a list to a dynamically allocated array container.
+ *
+ * If `reference` is set to `true`, each item in the list will be
+ * referenced and a destructor will be added that unreferences each
+ * item when unreferencing the array.
+ */
+enum rawrtc_code rawrtc_list_to_array(
+        struct rawrtc_array_container** containerp, // de-referenced
+        struct list const* const list,
+        bool reference
+) {
+    size_t n;
+    struct rawrtc_array_container* container;
+    struct le* le;
+    size_t i;
+
+    // Check arguments
+    if (!containerp || !list) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get list length
+    n = list_count(list);
+
+    // Allocate array & set length immediately
+    container = mem_zalloc(
+            sizeof(*container) + sizeof(void*) * n,
+            reference ? rawrtc_array_container_destroy : NULL);
+    if (!container) {
+        return RAWRTC_CODE_NO_MEMORY;
+    }
+    container->n_items = n;
+
+    // Copy pointer to each item
+    for (le = list_head(list), i = 0; le != NULL; le = le->next, ++i) {
+        if (reference) {
+            mem_ref(le->data);
+        }
+        container->items[i] = le->data;
+    }
+
+    // Set pointer & done
+    *containerp = container;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * Duplicate a string.
  */
 enum rawrtc_code rawrtc_strdup(
@@ -1133,58 +1197,4 @@ enum rawrtc_code rawrtc_sdprintf(
     int err = re_vsdprintf(destinationp, formatter, args);
     va_end(args);
     return rawrtc_error_to_code(err);
-}
-
-/*
- * Convert a list to a dynamically allocated array.
- * If `reference` is set to `true`, each item in the list will be
- * referenced.
- *
- * Note: In case the list is empty, `*lengthp` will be set to `0` and
- *       `*arrayp` will be set to `NULL`.
- */
-enum rawrtc_code rawrtc_list_to_array(
-        void*** const arrayp, // de-referenced
-        size_t* const lengthp, // de-referenced
-        struct list const* const list,
-        bool reference
-) {
-    size_t length;
-    void** array;
-    struct le* le;
-    size_t i;
-
-    // Check arguments
-    if (!arrayp || !lengthp || !list) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Get list length
-    length = list_count(list);
-
-    // Empty?
-    if (length == 0) {
-        *arrayp = NULL;
-        *lengthp = 0;
-        return RAWRTC_CODE_SUCCESS;
-    }
-
-    // Allocate array
-    array = mem_alloc(sizeof(*array) * length, NULL);
-    if (!array) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Copy pointer to each item
-    for (le = list_head(list), i = 0; le != NULL; le = le->next, ++i) {
-        if (reference) {
-            mem_ref(le->data);
-        }
-        array[i] = le->data;
-    }
-
-    // Set pointer & done
-    *arrayp = array;
-    *lengthp = length;
-    return RAWRTC_CODE_SUCCESS;
 }

@@ -809,13 +809,13 @@ enum rawrtc_code rawrtc_certificate_get_fingerprint(
  */
 enum rawrtc_code copy_and_append_certificate(
         struct list* const certificate_list, // de-referenced, not checked
-        struct rawrtc_certificate* const certificate // copied, not checked
+        struct rawrtc_certificate* const certificate // copied
 ) {
     enum rawrtc_code error;
     struct rawrtc_certificate* copied_certificate;
 
-    // Null?
-    if (certificate == NULL) {
+    // Check arguments
+    if (!certificate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 

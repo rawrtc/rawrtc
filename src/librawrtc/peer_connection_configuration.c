@@ -1,4 +1,6 @@
 #include <rawrtc.h>
+#include "utils.h"
+#include "certificate.h"
 #include "ice_server.h"
 #include "peer_connection_configuration.h"
 
@@ -54,7 +56,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
 /*
  * Add an ICE server instance to the peer connection configuration.
  */
-enum rawrtc_code rawrtc_peer_connection_configuration_add_server_internal(
+enum rawrtc_code rawrtc_peer_connection_configuration_add_ice_server_internal(
         struct rawrtc_peer_connection_configuration* const configuration,
         struct rawrtc_ice_server* const server
 ) {
@@ -71,7 +73,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server_internal(
 /*
  * Add an ICE server to the peer connection configuration.
  */
-enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
+enum rawrtc_code rawrtc_peer_connection_configuration_add_ice_server(
         struct rawrtc_peer_connection_configuration* const configuration,
         char* const * const urls, // copied
         size_t const n_urls,
@@ -100,7 +102,73 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_server(
     }
 
     // Add to configuration
-    return rawrtc_peer_connection_configuration_add_server_internal(configuration, server);
+    return rawrtc_peer_connection_configuration_add_ice_server_internal(configuration, server);
+}
+
+/*
+ * Get ICE servers from the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_get_ice_servers(
+        struct rawrtc_ice_servers** const serversp, // de-referenced
+        struct rawrtc_peer_connection_configuration* const configuration
+) {
+    // Check arguments
+    if (!serversp || !configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Hand out list as array
+    // Note: ICE servers handed out cannot be added to other lists
+    //       without copying since the items are only referenced.
+    return rawrtc_list_to_array(
+            (struct rawrtc_array_container**) serversp, &configuration->ice_servers, true);
+}
+
+/*
+ * Add a certificate to the peer connection configuration to be used
+ * instead of an ephemerally generated one.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_add_certificate(
+        struct rawrtc_peer_connection_configuration* configuration,
+        struct rawrtc_certificate* const certificate // copied
+) {
+    enum rawrtc_code error;
+    struct rawrtc_certificate* certificate_copy;
+
+    // Check arguments
+    if (!configuration || !certificate) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Copy certificate
+    // Note: Copying is needed as the 'le' element cannot be associated to multiple lists
+    error = rawrtc_certificate_copy(&certificate_copy, certificate);
+    if (error) {
+        return error;
+    }
+
+    // Append to list
+    list_append(&configuration->certificates, &certificate_copy->le, certificate_copy);
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get certificates from the peer connection configuration.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_get_certificates(
+        struct rawrtc_certificates** const certificatesp, // de-referenced
+        struct rawrtc_peer_connection_configuration* const configuration
+) {
+    // Check arguments
+    if (!certificatesp || !configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Hand out list as array
+    // Note: Certificates handed out cannot be added to other lists
+    //       without copying since the items are only referenced.
+    return rawrtc_list_to_array(
+            (struct rawrtc_array_container**) certificatesp, &configuration->certificates, true);
 }
 
 /*

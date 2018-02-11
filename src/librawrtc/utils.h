@@ -98,6 +98,12 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     char* source
 );
 
+enum rawrtc_code rawrtc_list_to_array(
+    struct rawrtc_array_container** containerp, // de-referenced
+    struct list const* const list,
+    bool reference
+);
+
 char const * const rawrtc_dns_type_to_address_family_name(
     uint_fast16_t const dns_type
 );

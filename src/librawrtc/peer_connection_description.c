@@ -1089,7 +1089,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Create DTLS parameters (if possible)
-    if (list_head(&dtls_fingerprints)) {
+    if (!list_isempty(&dtls_fingerprints)) {
         error = rawrtc_dtls_parameters_create_internal(
                 &remote_description->dtls_parameters, dtls_role, &dtls_fingerprints);
         if (error) {

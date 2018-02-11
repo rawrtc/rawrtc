@@ -201,6 +201,7 @@ const start = (offering) => {
 
     // Create peer connection instance
     const pc = new WebRTCPeerConnection(signaling, offering);
+    window.pc = pc;
 
     // Apply remote description when pasting
     const onRemoteDescriptionTextareaChange = () => {

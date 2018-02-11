@@ -354,10 +354,10 @@ int main(int argc, char* argv[argc + 1]) {
             &configuration, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to configuration
-    EOE(rawrtc_peer_connection_configuration_add_server(
+    EOE(rawrtc_peer_connection_configuration_add_ice_server(
             configuration, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
             NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
-    EOE(rawrtc_peer_connection_configuration_add_server(
+    EOE(rawrtc_peer_connection_configuration_add_ice_server(
             configuration, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
             "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
             RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));

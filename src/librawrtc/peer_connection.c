@@ -508,7 +508,8 @@ static enum rawrtc_code get_ice_transport(
  * Lazy-generate a certificate list.
  */
 static enum rawrtc_code get_certificates(
-        struct rawrtc_peer_connection_context* const context // not checked
+        struct rawrtc_peer_connection_context* const context, // not checked
+        struct rawrtc_peer_connection_configuration* const configuration // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_certificate* certificate;
@@ -518,8 +519,12 @@ static enum rawrtc_code get_certificates(
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // Certificates in the configuration? Copy them.
+    if (!list_isempty(&configuration->certificates)) {
+        return rawrtc_certificate_list_copy(&context->certificates, &configuration->certificates);
+    }
+
     // Generate a certificate
-    // TODO: Apply options from peer connection options
     error = rawrtc_certificate_generate(&certificate, NULL);
     if (error) {
         return error;
@@ -572,7 +577,7 @@ static enum rawrtc_code get_dtls_transport(
     }
 
     // Get certificates
-    error = get_certificates(context);
+    error = get_certificates(context, connection->configuration);
     if (error) {
         return error;
     }
