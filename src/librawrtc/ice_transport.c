@@ -303,7 +303,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
         // TODO: Set 'use_cand' properly
         DEBUG_INFO("Starting checklist due to start event\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             return error;
@@ -542,7 +542,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
             !trice_checklist_isrunning(transport->gatherer->ice)) {
         DEBUG_INFO("Starting checklist due to new remote candidate\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             DEBUG_WARNING("Could not start checklist, reason: %s\n", rawrtc_code_to_str(error));

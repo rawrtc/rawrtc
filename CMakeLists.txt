@@ -13,7 +13,7 @@ set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/:$ENV{PKG_CONFIG
 
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
-set(LIB_RE_VERSION "libre >= 0.5.2")
+set(LIB_RE_VERSION "libre >= 0.5.7")
 set(LIB_REW_VERISON "librew >= 0.5.0")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")

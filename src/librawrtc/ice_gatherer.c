@@ -103,6 +103,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.ansi = true;
     gatherer->ice_config.enable_prflx = false;
+    gatherer->ice_config.nom = ICE_NOMINATION_AGGRESSIVE;
     err = trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ICE_ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password);

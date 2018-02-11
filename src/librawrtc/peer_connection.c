@@ -800,6 +800,12 @@ enum rawrtc_code rawrtc_peer_connection_close(
         return RAWRTC_CODE_SUCCESS;
     }
 
+    // Update signalling & connection state
+    // Note: We need to do this early or the 'closed' states when tearing down the transports may
+    //       lead to surprising peer connection states such as 'connected' at the very end.
+    set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
+    set_connection_state(connection, RAWRTC_PEER_CONNECTION_STATE_CLOSED);
+
     // Stop data transport (if any)
     if (connection->context.data_transport) {
         switch (connection->data_transport_type) {
@@ -839,12 +845,6 @@ enum rawrtc_code rawrtc_peer_connection_close(
             DEBUG_WARNING("Unable to close ICE gatherer, reason: %s\n", rawrtc_code_to_str(error));
         }
     }
-
-    // Update signalling state
-    set_signaling_state(connection, RAWRTC_SIGNALING_STATE_CLOSED);
-
-    // Update connection state
-    set_connection_state(connection, RAWRTC_PEER_CONNECTION_STATE_CLOSED);
 
     // Done
     return RAWRTC_CODE_SUCCESS;
@@ -1457,7 +1457,7 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
 ) {
     enum rawrtc_code error;
     struct rawrtc_peer_connection_context context;
-    struct rawrtc_data_channel* channel;
+    struct rawrtc_data_channel* channel = NULL;
 
     // Check arguments
     if (!connection) {

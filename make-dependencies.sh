@@ -19,16 +19,16 @@ if [ ! -z "$OFFLINE" ]; then
 fi
 
 # Dependencies
-OPENSSL_VERSION="1.1.0e"
+OPENSSL_VERSION="1.1.0g"
 OPENSSL_URL="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"
 OPENSSL_PATH="openssl"
 LIBRE_GIT="https://github.com/rawrtc/re.git"
 LIBRE_BRANCH="rawrtc-patched"
-LIBRE_COMMIT="cf8bceafa7b6f7b86a0a8c7e4c28456c3bc30e62"
+LIBRE_COMMIT="7d837903ac78bbfbc56e2efb21315665d1834f1e"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="master"
-LIBREW_COMMIT="31fe7c6fd2772dd72013301f0787ea19625017b1"
+LIBREW_COMMIT="9ce0a928b919a31382b1952625db3ecdd9fd7bfe"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
@@ -174,7 +174,7 @@ fi
 cd build
 echo "Configuring usrsctp"
 # TODO: Disable "-Wno-address-of-packed-member" once usrsctp has fixed this
-CFLAGS="-fPIC -Wno-address-of-packed-member" \
+CFLAGS="-fPIC -Wno-unknown-warning-option -Wno-address-of-packed-member" \
 cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
 echo "Cleaning usrsctp"
 make clean
