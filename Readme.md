@@ -68,18 +68,15 @@ closed.
 
 ### Compile
 
-#### Meson
-
-    cd <path-to-rawrtc>
-    meson build --default-library=static --prefix=${PWD}/build/prefix
-    cd build
-    ninja install
-
 #### CMake
 
     cd <path-to-rawrtc>/build
     cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
     make install
+
+#### Meson
+
+    Will be added later. Use Cmake for now.
 
 ## Run
 
@@ -443,10 +440,8 @@ Usage:
 
 [git]: (https://git-scm.com)
 [cmake]: https://cmake.org
-[meson]: https://github.com/mesonbuild/meson
-[ninja]: https://ninja-build.org
 
-[webrtc-ortc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
-[webrtc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/webrtc/index.html
+[webrtc-ortc-example]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/ortc/index.html
+[webrtc-example]: https://github.com/rawrtc/rawrtc/blob/master/htdocs/webrtc/index.html
 [dctt]: https://github.com/nplab/dctt
 [demystifying-webrtc-dc-size-limit]: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html

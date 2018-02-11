@@ -187,7 +187,7 @@ const start = (offering) => {
     if (wsUrl === '') {
         signaling = new CopyPasteSignaling();
     } else {
-        signaling = new WebSocketSignaling(wsUrl);
+        signaling = new WebSocketSignaling(wsUrl + (offering ? '/1' : '/0'));
     }
     signaling.onLocalDescriptionUpdate = (description) => {
         localDescriptionTextarea.value = JSON.stringify(description);
