@@ -100,6 +100,7 @@ bool ice_candidate_type_enabled(
  */
 void print_ice_candidate(
     struct rawrtc_ice_candidate* const candidate,
-    char const * const url, // read-only
+    char const* const url, // read-only
+    struct rawrtc_peer_connection_ice_candidate* const pc_candidate, // nullable
     struct client* const client
 );

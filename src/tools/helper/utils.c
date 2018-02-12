@@ -242,7 +242,9 @@ static void data_channel_helper_destroy(
     struct data_channel_helper* const channel = arg;
 
     // Unset handler argument & handlers of the channel
-    EOE(rawrtc_data_channel_unset_handlers(channel->channel));
+    if (channel->channel) {
+        EOE(rawrtc_data_channel_unset_handlers(channel->channel));
+    }
 
     // Remove from list
     list_unlink(&channel->le);
@@ -309,7 +311,7 @@ void data_channel_helper_create_from_channel(
             mem_deref(label);
             break;
         case RAWRTC_CODE_NO_VALUE:
-            EOE(rawrtc_strdup(&channel_helper->label, "N/A"));
+            EOE(rawrtc_strdup(&channel_helper->label, "n/a"));
             break;
         default:
             EOE(error);

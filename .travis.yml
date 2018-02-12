@@ -67,10 +67,10 @@ matrix:
       compiler: clang
       env: ENFORCE_OPENSSL=1
     - os: osx
-      osx_image: xcode8.1
+      osx_image: xcode8.3
       compiler: clang
     - os: osx
-      osx_image: xcode8.1
+      osx_image: xcode8.3
       compiler: clang
       env: ENFORCE_OPENSSL=1
 

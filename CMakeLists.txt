@@ -1,7 +1,8 @@
 # Project
 cmake_minimum_required(VERSION 3.2)
+# TODO: Find a way to keep this in sync with the one in rawrtc.h
 project(librawrtc
-        VERSION 0.0.1)
+        VERSION 0.2.0)
 set(PROJECT_DESCRIPTION
         "A WebRTC and ORTC library with a small footprint that runs everywhere.")
 set(PROJECT_URL
@@ -12,7 +13,7 @@ set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/:$ENV{PKG_CONFIG
 
 # Dependency versions
 set(OPENSSL_VERSION "openssl >= 1.0.2")
-set(LIB_RE_VERSION "libre >= 0.5.2")
+set(LIB_RE_VERSION "libre >= 0.5.7")
 set(LIB_REW_VERISON "librew >= 0.5.0")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${OPENSSL_VERSION}, ${LIB_RE_VERSION}, ${LIB_REW_VERISON}")

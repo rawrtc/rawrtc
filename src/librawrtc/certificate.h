@@ -33,3 +33,14 @@ enum rawrtc_code rawrtc_certificate_get_fingerprint(
     struct rawrtc_certificate* const certificate,
     enum rawrtc_certificate_sign_algorithm const algorithm
 );
+
+enum rawrtc_code rawrtc_certificate_array_to_list(
+    struct list* const certificate_list, // de-referenced, copied into
+    struct rawrtc_certificate* const certificates[], // copied (each item)
+    size_t const n_certificates
+);
+
+enum rawrtc_code rawrtc_certificate_list_copy(
+    struct list* const destination_list, // de-referenced, copied into
+    struct list* const source_list // de-referenced, copied (each item)
+);

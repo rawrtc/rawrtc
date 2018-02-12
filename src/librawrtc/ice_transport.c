@@ -69,7 +69,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
 
     // Check ICE gatherer state
     // TODO: Check if gatherer.component is RTCP -> invalid state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
@@ -249,7 +249,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
 
     // Check state
     ice_transport_closed = transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED;
-    ice_gatherer_closed = gatherer->state == RAWRTC_ICE_GATHERER_CLOSED;
+    ice_gatherer_closed = gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED;
     if (ice_transport_closed || ice_gatherer_closed) {
         return RAWRTC_CODE_INVALID_STATE;
     }
@@ -303,7 +303,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
         // TODO: Set 'use_cand' properly
         DEBUG_INFO("Starting checklist due to start event\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             return error;
@@ -377,6 +377,23 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
         *rolep = role;
         return RAWRTC_CODE_SUCCESS;
     }
+}
+
+/*
+ * Get the current state of the ICE transport.
+ */
+enum rawrtc_code rawrtc_ice_transport_get_state(
+        enum rawrtc_ice_transport_state* const statep, // de-referenced
+        struct rawrtc_ice_transport* const transport
+) {
+    // Check arguments
+    if (!statep || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set state & done
+    *statep = transport->state;
+    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
@@ -525,7 +542,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
             !trice_checklist_isrunning(transport->gatherer->ice)) {
         DEBUG_INFO("Starting checklist due to new remote candidate\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval, true,
+                transport->gatherer->ice, NULL, rawrtc_default_config.pacing_interval,
                 ice_established_handler, ice_failed_handler, transport));
         if (error) {
             DEBUG_WARNING("Could not start checklist, reason: %s\n", rawrtc_code_to_str(error));

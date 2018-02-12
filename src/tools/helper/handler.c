@@ -25,19 +25,19 @@ void default_ice_gatherer_state_change_handler(
  * Print the ICE gatherer's error event.
  */
 void default_ice_gatherer_error_handler(
-        struct rawrtc_ice_candidate* const host_candidate, // read-only, nullable
+        struct rawrtc_ice_candidate* const candidate, // read-only, nullable
         char const * const url, // read-only
         uint16_t const error_code, // read-only
         char const * const error_text, // read-only
         void* const arg // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) host_candidate; (void) error_code; (void) arg;
-    DEBUG_PRINTF("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
+    (void) candidate; (void) error_code; (void) arg;
+    DEBUG_NOTICE("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
 /*
- * Print the newly gatherered local candidate.
+ * Print the newly gathered local candidate.
  */
 void default_ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
@@ -45,8 +45,8 @@ void default_ice_gatherer_local_candidate_handler(
         void* const arg // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) candidate; (void) arg;
-    print_ice_candidate(candidate, url, client);
+    (void) arg;
+    print_ice_candidate(candidate, url, NULL, client);
 }
 
 /*
@@ -91,12 +91,12 @@ void default_dtls_transport_state_change_handler(
  * Print the DTLS transport's error event.
  */
 void default_dtls_transport_error_handler(
-        /* TODO: error.message (probably from OpenSSL) */
+        // TODO: error.message (probably from OpenSSL)
         void* const arg // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
     // TODO: Print error message
-    DEBUG_PRINTF("(%s) DTLS transport error: %s\n", client->name, "???");
+    DEBUG_WARNING("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
 /*
@@ -126,7 +126,7 @@ void default_data_channel_handler(
     // Get data channel label and protocol
     EOE(rawrtc_data_channel_get_parameters(&parameters, channel));
     EOEIGN(rawrtc_data_channel_parameters_get_label(&label, parameters), ignore);
-    DEBUG_INFO("(%s) New data channel instance: %s\n", client->name, label ? label : "N/A");
+    DEBUG_INFO("(%s) New data channel instance: %s\n", client->name, label ? label : "n/a");
     mem_deref(label);
     mem_deref(parameters);
 }
@@ -161,7 +161,7 @@ void default_data_channel_error_handler(
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
-    DEBUG_PRINTF("(%s) Data channel error: %s\n", client->name, channel->label);
+    DEBUG_WARNING("(%s) Data channel error: %s\n", client->name, channel->label);
 }
 
 /*
@@ -189,6 +189,76 @@ void default_data_channel_message_handler(
     DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes\n",
                  client->name, channel->label, mbuf_get_left(buffer));
 }
+
+/*
+ * Print negotiation needed (duh!)
+ */
+void default_negotiation_needed_handler(
+        void* const arg
+) {
+    struct client* const client = arg;
+    DEBUG_PRINTF("(%s) Negotiation needed\n", client->name);
+}
+
+/*
+ * Print the peer connection's state.
+ */
+void default_peer_connection_state_change_handler(
+        enum rawrtc_peer_connection_state const state, // read-only
+        void* const arg // will be casted to `struct client*`
+) {
+    struct client* const client = arg;
+    char const * const state_name = rawrtc_peer_connection_state_to_name(state);
+    DEBUG_PRINTF("(%s) Peer connection state change: %s\n", client->name, state_name);
+}
+
+/*
+ * Print the newly gathered local candidate (peer connection variant).
+ */
+void default_peer_connection_local_candidate_handler(
+        struct rawrtc_peer_connection_ice_candidate* const candidate,
+        char const * const url, // read-only
+        void* const arg
+) {
+    struct client* const client = arg;
+    struct rawrtc_ice_candidate* ortc_candidate = NULL;
+
+    // Get underlying ORTC ICE candidate (if any)
+    if (candidate) {
+        EOE(rawrtc_peer_connection_ice_candidate_get_ortc_candidate(&ortc_candidate, candidate));
+    }
+
+    // Print local candidate
+    print_ice_candidate(ortc_candidate, url, candidate, client);
+    mem_deref(ortc_candidate);
+}
+
+/*
+ * Print the peer connections local candidate error event.
+ */
+void default_peer_connection_local_candidate_error_handler(
+        struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
+        char const * const url, // read-only
+        uint16_t const error_code, // read-only
+        char const * const error_text, // read-only
+        void* const arg // will be casted to `struct client*`
+) {
+    struct client* const client = arg;
+    (void) candidate; (void) error_code; (void) arg;
+    DEBUG_NOTICE("(%s) ICE candidate error, URL: %s, reason: %s\n", client->name, url, error_text);
+}
+
+/*
+ * Print the signaling state.
+ */
+void default_signaling_state_change_handler(
+        enum rawrtc_signaling_state const state, // read-only
+        void* const arg
+) {
+    struct client* const client = arg;
+    char const * const state_name = rawrtc_signaling_state_to_name(state);
+    DEBUG_PRINTF("(%s) Signaling state change: %s\n", client->name, state_name);
+};
 
 /*
  * Stop the main loop.

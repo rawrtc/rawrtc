@@ -7,6 +7,21 @@ extern struct rawrtc_config rawrtc_default_config;
 extern struct rawrtc_certificate_options rawrtc_default_certificate_options;
 extern struct rawrtc_data_channel_options rawrtc_default_data_channel_options;
 
+enum rawrtc_code rawrtc_pl_to_ice_protocol(
+    enum rawrtc_ice_protocol* const protocolp, // de-referenced
+    struct pl const* const pl
+);
+
+enum rawrtc_code rawrtc_pl_to_ice_candidate_type(
+    enum rawrtc_ice_candidate_type* const typep, // de-referenced
+    struct pl const* const pl
+);
+
+enum rawrtc_code rawrtc_pl_to_ice_tcp_candidate_type(
+    enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
+    struct pl const* const pl
+);
+
 enum ice_cand_type rawrtc_ice_candidate_type_to_ice_cand_type(
     enum rawrtc_ice_candidate_type const type
 );
@@ -57,6 +72,10 @@ char const * rawrtc_data_transport_type_to_str(
     enum rawrtc_data_transport_type const type
 );
 
+char const * rawrtc_ice_candidate_storage_to_str(
+    enum rawrtc_ice_candidate_storage const type
+);
+
 EVP_MD const * const rawrtc_get_sign_function(
     enum rawrtc_certificate_sign_algorithm type
 );
@@ -77,4 +96,14 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     uint8_t* const buffer, // written into
     size_t const buffer_size,
     char* source
+);
+
+enum rawrtc_code rawrtc_list_to_array(
+    struct rawrtc_array_container** containerp, // de-referenced
+    struct list const* const list,
+    bool reference
+);
+
+char const * const rawrtc_dns_type_to_address_family_name(
+    uint_fast16_t const dns_type
 );

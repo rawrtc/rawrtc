@@ -14,7 +14,7 @@ void gatherer_state_change_handler(
         void* const arg // will be casted to `struct client*`
 ) {
     default_ice_gatherer_state_change_handler(state, arg);
-    if (state == RAWRTC_ICE_GATHERER_COMPLETE) {
+    if (state == RAWRTC_ICE_GATHERER_STATE_COMPLETE) {
         re_cancel();
     }
 }

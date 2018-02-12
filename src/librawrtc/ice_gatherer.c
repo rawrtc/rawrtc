@@ -2,722 +2,18 @@
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <string.h> // memcpy
 #include <rawrtc.h>
-#include "ice_gatherer.h"
 #include "utils.h"
 #include "ice_candidate.h"
 #include "message_buffer.h"
 #include "candidate_helper.h"
+#include "ice_server.h"
+#include "ice_gather_options.h"
+#include "ice_gatherer.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include "debug.h"
-
-/*
- * ICE server URL-related regular expressions.
- */
-static char const ice_server_url_regex[] = "[a-z]+:[^?]+[^]*";
-static char const ice_server_host_port_regex[] = "[^:]+[:]*[0-9]*";
-static char const ice_server_host_port_ipv6_regex[] = "\\[[0-9a-f:]+\\][:]*[0-9]*";
-static char const ice_server_transport_regex[] = "\\?transport=[a-z]+";
-
-/*
- * Get the corresponding name for an ICE server type.
- */
-static char const * const ice_server_type_to_name(
-        enum rawrtc_ice_server_type const type
-) {
-    switch (type) {
-        case RAWRTC_ICE_SERVER_TYPE_STUN:
-            return "stun";
-        case RAWRTC_ICE_SERVER_TYPE_TURN:
-            return "turn";
-        default:
-            return "???";
-    }
-}
-
-/*
- * Get the corresponding name for an ICE server transport.
- */
-static char const * const ice_server_transport_to_name(
-        enum rawrtc_ice_server_transport const transport
-) {
-    switch (transport) {
-        case RAWRTC_ICE_SERVER_TRANSPORT_UDP:
-            return "udp";
-        case RAWRTC_ICE_SERVER_TRANSPORT_TCP:
-            return "tcp";
-        case RAWRTC_ICE_SERVER_TRANSPORT_DTLS:
-            return "dtls";
-        case RAWRTC_ICE_SERVER_TRANSPORT_TLS:
-            return "tls";
-        default:
-            return "???";
-    }
-}
-
-/*
- * Get the corresponding name for an ICE credential type.
- */
-static char const * const ice_credential_type_to_name(
-        enum rawrtc_ice_credential_type const type
-) {
-    switch (type) {
-        case RAWRTC_ICE_CREDENTIAL_TYPE_NONE:
-            return "n/a";
-        case RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD:
-            return "password";
-        case RAWRTC_ICE_CREDENTIAL_TYPE_TOKEN:
-            return "token";
-        default:
-            return "???";
-    }
-}
-
-/*
- * Get the corresponding address family name for an DNS type.
- */
-static char const * const dns_type_to_address_family_name(
-        uint_fast16_t const dns_type
-) {
-    switch (dns_type) {
-        case DNS_TYPE_A:
-            return "IPv4";
-        case DNS_TYPE_AAAA:
-            return "IPv6";
-        default:
-            return "???";
-    }
-}
-
-/*
- * Valid ICE server schemes.
- *
- * Note: Update `ice_server_scheme_type_mapping`,
- * `ice_server_scheme_secure_mapping` and
- * `ice_server_scheme_port_mapping` if changed.
- */
-static char const* const ice_server_schemes[] = {
-    "stun",
-    "stuns",
-    "turn",
-    "turns"
-};
-static size_t const ice_server_schemes_length = ARRAY_SIZE(ice_server_schemes);
-
-/*
- * ICE server scheme to server type mapping.
- */
-static enum rawrtc_ice_server_type ice_server_scheme_type_mapping[] = {
-    RAWRTC_ICE_SERVER_TYPE_STUN,
-    RAWRTC_ICE_SERVER_TYPE_STUN,
-    RAWRTC_ICE_SERVER_TYPE_TURN,
-    RAWRTC_ICE_SERVER_TYPE_TURN
-};
-
-/*
- * ICE server scheme to secure mapping.
- */
-static bool ice_server_scheme_secure_mapping[] = {
-    false,
-    true,
-    false,
-    true
-};
-
-/*
- * ICE server scheme to default port mapping.
- */
-static uint_fast16_t ice_server_scheme_port_mapping[] = {
-    3478,
-    5349,
-    3478,
-    5349
-};
-
-/*
- * Valid ICE server transports.
- *
- * Note: Update `ice_server_transport_normal_transport_mapping` and
- * `ice_server_transport_secure_transport_mapping` if changed.
- */
-static char const* const ice_server_transports[] = {
-    "udp",
-    "tcp"
-};
-static size_t const ice_server_transports_length = ARRAY_SIZE(ice_server_transports);
-
-/*
- * ICE server transport to non-secure transport mapping.
- */
-static enum rawrtc_ice_server_transport ice_server_transport_normal_transport_mapping[] = {
-    RAWRTC_ICE_SERVER_TRANSPORT_UDP,
-    RAWRTC_ICE_SERVER_TRANSPORT_TCP
-};
-
-/*
- * ICE server transport to secure transport mapping.
- */
-static enum rawrtc_ice_server_transport ice_server_transport_secure_transport_mapping[] = {
-    RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
-    RAWRTC_ICE_SERVER_TRANSPORT_TLS
-};
-
-static void rawrtc_ice_gather_options_destroy(
-        void* arg
-) {
-    struct rawrtc_ice_gather_options* const options = arg;
-
-    // Un-reference
-    list_flush(&options->ice_servers);
-}
-
-/*
- * Create a new ICE gather options.
- */
-enum rawrtc_code rawrtc_ice_gather_options_create(
-        struct rawrtc_ice_gather_options** const optionsp, // de-referenced
-        enum rawrtc_ice_gather_policy const gather_policy
-) {
-    struct rawrtc_ice_gather_options* options;
-
-    // Check arguments
-    if (!optionsp) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Allocate
-    options = mem_zalloc(sizeof(*options), rawrtc_ice_gather_options_destroy);
-    if (!options) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields/reference
-    options->gather_policy = gather_policy;
-    list_init(&options->ice_servers);
-
-    // Set pointer and return
-    *optionsp = options;
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Parse ICE server's transport.
- */
-static enum rawrtc_code decode_ice_server_transport(
-        enum rawrtc_ice_server_transport* const transportp, // de-referenced, not checked
-        struct pl* const query, // not checked
-        bool const secure
-) {
-    enum rawrtc_code error;
-    struct pl transport;
-    size_t i;
-
-    // Decode transport
-    error = rawrtc_error_to_code(re_regex(
-            query->p, query->l, ice_server_transport_regex, &transport));
-    if (error) {
-        return error;
-    }
-
-    // Translate transport to ICE server transport
-    for (i = 0; i < ice_server_transports_length; ++i) {
-        if (pl_strcmp(&transport, ice_server_transports[i]) == 0) {
-            if (!secure) {
-                *transportp = ice_server_transport_normal_transport_mapping[i];
-            } else {
-                *transportp = ice_server_transport_secure_transport_mapping[i];
-            }
-            return RAWRTC_CODE_SUCCESS;
-        }
-    }
-
-    // Not found
-    return RAWRTC_CODE_INVALID_ARGUMENT;
-}
-
-/*
- * Parse an ICE scheme to an ICE server type, 'secure' flag and
- * default port.
- */
-static enum rawrtc_code decode_ice_server_scheme(
-        enum rawrtc_ice_server_type* const typep, // de-referenced, not checked
-        bool* const securep, // de-referenced, not checked
-        uint_fast16_t* const portp, // de-referenced, not checked
-        struct pl* const scheme // not checked
-) {
-    size_t i;
-
-    // Translate scheme to ICE server type (and set if secure)
-    for (i = 0; i < ice_server_schemes_length; ++i) {
-        if (pl_strcmp(scheme, ice_server_schemes[i]) == 0) {
-            // Set values
-            *typep = ice_server_scheme_type_mapping[i];
-            *securep = ice_server_scheme_secure_mapping[i];
-            *portp = ice_server_scheme_port_mapping[i];
-
-            // Done
-            return RAWRTC_CODE_SUCCESS;
-        }
-    }
-
-    // Not found
-    return RAWRTC_CODE_INVALID_ARGUMENT;
-}
-
-/*
- * Parse an ICE server URL according to RFC 7064 and RFC 7065
- * (although the `transport` part is inaccurate for RFC 7064 but it
- * seems useful)
- */
-static enum rawrtc_code decode_ice_server_url(
-        struct rawrtc_ice_server_url* const url // not checked
-) {
-    enum rawrtc_code error;
-    struct pl scheme;
-    struct pl host_port;
-    struct pl query;
-    bool secure;
-    struct pl port_pl;
-    uint_fast16_t port;
-
-    // Decode URL
-    error = rawrtc_error_to_code(re_regex(
-            url->url, strlen(url->url), ice_server_url_regex, &scheme, &host_port, &query));
-    if (error) {
-        DEBUG_WARNING("Invalid ICE server URL: %s\n", url->url);
-        goto out;
-    }
-
-    // TODO: Can scheme or host be NULL?
-
-    // Get server type, secure flag and default port from scheme
-    error = decode_ice_server_scheme(&url->type, &secure, &port, &scheme);
-    if (error) {
-        DEBUG_WARNING("Invalid scheme in ICE server URL (%s): %r\n", url->url, &scheme);
-        goto out;
-    }
-
-    // Set default address
-    sa_set_in(&url->ipv4_address, INADDR_ANY, (uint16_t) port);
-    sa_set_in6(&url->ipv6_address, (uint8_t const*) &in6addr_any, (uint16_t) port);
-
-    // Decode host: Either IPv4 or IPv6 including the port (if any)
-    // Try IPv6 first, then normal hostname/IPv4.
-    error = rawrtc_error_to_code(re_regex(
-            host_port.p, host_port.l, ice_server_host_port_ipv6_regex, &url->host, NULL, &port_pl));
-    if (error) {
-        error = rawrtc_error_to_code(re_regex(
-                host_port.p, host_port.l, ice_server_host_port_regex, &url->host, NULL, &port_pl));
-        if (error) {
-            DEBUG_WARNING("Invalid host or port in ICE server URL (%s): %r\n",
-                          url->url, &host_port);
-            goto out;
-        }
-    } else {
-        // Set IPv6 directly
-        sa_set(&url->ipv6_address, &url->host, (uint16_t) port);
-    }
-
-    // Decode port (if any)
-    if (pl_isset(&port_pl)) {
-        uint_fast32_t port_u32;
-
-        // Get port
-        port_u32 = pl_u32(&port_pl);
-        if (port_u32 == 0 || port_u32 > UINT16_MAX) {
-            DEBUG_WARNING("Invalid port number in ICE server URL (%s): %"PRIu32"\n",
-                          url->url, port_u32);
-            error = RAWRTC_CODE_INVALID_ARGUMENT;
-            goto out;
-        }
-
-        // Set port
-        sa_set_port(&url->ipv4_address, (uint16_t) port_u32);
-        sa_set_port(&url->ipv6_address, (uint16_t) port_u32);
-    }
-
-    // Translate transport (if any) & secure flag to ICE server transport
-    if (pl_isset(&query)) {
-        error = decode_ice_server_transport(&url->transport, &query, secure);
-        if (error) {
-            DEBUG_WARNING("Invalid transport in ICE server URL (%s): %r\n", url->url, &query);
-            goto out;
-        }
-    } else {
-        // Set default transport (depending on secure flag)
-        if (secure) {
-            url->transport = rawrtc_default_config.ice_server_secure_transport;
-        } else {
-            url->transport = rawrtc_default_config.ice_server_normal_transport;
-        }
-    }
-
-    // Done
-    error = RAWRTC_CODE_SUCCESS;
-
-out:
-    return error;
-}
-
-/*
- * Destructor for URLs of the ICE gatherer.
- */
-static void rawrtc_ice_server_url_destroy(
-        void* arg
-) {
-    struct rawrtc_ice_server_url* const url = arg;
-
-    // Remove from list
-    list_unlink(&url->le);
-
-    // Un-reference
-    mem_deref(url->dns_aaaa_context);
-    mem_deref(url->dns_a_context);
-    mem_deref(url->url);
-}
-
-/*
- * Copy a URL for the ICE gatherer.
- */
-static enum rawrtc_code rawrtc_ice_server_url_create(
-        struct rawrtc_ice_server_url** const urlp, // de-referenced
-        char* const url_s // copied
-) {
-    struct rawrtc_ice_server_url* url;
-    enum rawrtc_code error;
-
-    // Check arguments
-    if (!urlp || !url_s) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Allocate
-    url = mem_zalloc(sizeof(*url), rawrtc_ice_server_url_destroy);
-    if (!url) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Copy URL
-    error = rawrtc_strdup(&url->url, url_s);
-    if (error) {
-        goto out;
-    }
-
-    // Parse URL
-    // Note: `url->host` points inside `url->url`, so we MUST have copied the URL first.
-    error = decode_ice_server_url(url);
-    if (error) {
-        goto out;
-    }
-
-    // Done
-    error = RAWRTC_CODE_SUCCESS;
-
-out:
-    if (error) {
-        mem_deref(url);
-    } else {
-        // Set pointer
-        *urlp = url;
-    }
-    return error;
-}
-
-/*
- * Destructor for an existing ICE server.
- */
-static void rawrtc_ice_server_destroy(
-        void* arg
-) {
-    struct rawrtc_ice_server* const server = arg;
-
-    // Un-reference
-    list_flush(&server->urls);
-    mem_deref(server->username);
-    mem_deref(server->credential);
-}
-
-/*
- * Add an ICE server to the gather options.
- */
-enum rawrtc_code rawrtc_ice_gather_options_add_server(
-        struct rawrtc_ice_gather_options* const options,
-        char* const * const urls, // copied
-        size_t const n_urls,
-        char* const username, // nullable, copied
-        char* const credential, // nullable, copied
-        enum rawrtc_ice_credential_type const credential_type
-) {
-    struct rawrtc_ice_server* server;
-    enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
-    size_t i;
-
-    // Check arguments
-    if (!options || !urls) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Ensure there are less than 2^8 servers
-    if (list_count(&options->ice_servers) == UINT8_MAX) {
-        return RAWRTC_CODE_INSUFFICIENT_SPACE;
-    }
-
-    // Allocate
-    server = mem_zalloc(sizeof(*server), rawrtc_ice_server_destroy);
-    if (!server) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Copy URLs to list
-    list_init(&server->urls);
-    for (i = 0; i < n_urls; ++i) {
-        struct rawrtc_ice_server_url* url;
-
-        // Ensure URLs aren't null
-        if (!urls[i]) {
-            error = RAWRTC_CODE_INVALID_ARGUMENT;
-            goto out;
-        }
-
-        // Copy URL
-        error = rawrtc_ice_server_url_create(&url, urls[i]);
-        if (error) {
-            goto out;
-        }
-
-        // Append URL to list
-        list_append(&server->urls, &url->le, url);
-    }
-
-    // Set fields
-    if (credential_type != RAWRTC_ICE_CREDENTIAL_TYPE_NONE) {
-        if (username) {
-            error = rawrtc_strdup(&server->username, username);
-            if (error) {
-                goto out;
-            }
-        }
-        if (credential) {
-            error = rawrtc_strdup(&server->credential, credential);
-            if (error) {
-                goto out;
-            }
-        }
-    }
-    server->credential_type = credential_type; // TODO: Validation needed in case TOKEN is used?
-
-    // Add to options
-    list_append(&options->ice_servers, &server->le, server);
-
-out:
-    if (error) {
-        mem_deref(server);
-    }
-    return error;
-}
-
-/*
- * Destroy both ICE server URL DNS context (IPv4 and IPv6).
- */
-static void ice_url_destroy_dns_contexts(
-        struct rawrtc_ice_server_url* const url
-) {
-    // Destroy URL DNS IPv4 context (if any)
-    if (url->dns_a_context) {
-        url->dns_a_context = mem_deref(url->dns_a_context);
-    }
-
-    // Destroy URL DNS IPv6 context (if any)
-    if (url->dns_aaaa_context) {
-        url->dns_aaaa_context = mem_deref(url->dns_aaaa_context);
-    }
-}
-
-/*
- * Destroy an ICE server's URL DNS contexts.
- */
-static void ice_server_destroy_url_dns_contexts(
-        struct rawrtc_ice_server* const server // not checked
-) {
-    struct le* le;
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // Destroy URL DNS contexts (if any)
-        ice_url_destroy_dns_contexts(url);
-    }
-}
-
-/*
- * Destroy all ICE server URL DNS contexts.
- */
-static void ice_options_destroy_url_dns_contexts(
-        struct rawrtc_ice_gather_options* const options // not checked
-) {
-    struct le* le;
-    for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
-
-        // Destroy URL DNS contexts
-        ice_server_destroy_url_dns_contexts(server);
-    }
-}
-
-/*
- * Destructor for URLs of the ICE gatherer.
- */
-static void rawrtc_ice_server_url_dns_context_destroy(
-        void* arg
-) {
-    struct rawrtc_ice_server_url_dns_context* const context = arg;
-
-    // Un-reference
-    mem_deref(context->dns_query);
-    mem_deref(context->gatherer);
-    mem_deref(context->url);
-}
-
-/*
- * Create an ICE server URL DNS context for handling DNS queries.
- */
-enum rawrtc_code rawrtc_ice_server_url_dns_context_create(
-        struct rawrtc_ice_server_url_dns_context** const contextp,
-        uint_fast16_t const dns_type,
-        struct rawrtc_ice_server_url* const url,
-        struct rawrtc_ice_gatherer* const gatherer
-) {
-    struct rawrtc_ice_server_url_dns_context* context;
-
-    // Check arguments
-    if (!contextp || !url || !gatherer) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Allocate
-    context = mem_zalloc(sizeof(*context), rawrtc_ice_server_url_dns_context_destroy);
-    if (!context) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields/reference
-    context->dns_type = dns_type;
-    context->url = mem_ref(url);
-    context->gatherer = mem_ref(gatherer);
-
-    // Set pointer
-    *contextp = context;
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Check if there are pending DNS queries for an ICE server.
- */
-static bool ice_server_dns_queries_pending(
-        struct rawrtc_ice_server_url** const urlp, // de-referenced, not checked
-        struct rawrtc_ice_server* const server // not checked
-) {
-    struct le* le;
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // DNS queries pending?
-        if (url->dns_a_context || url->dns_aaaa_context) {
-            // Set pointer
-            *urlp = url;
-            return true;
-        }
-    }
-
-    // No pending DNS queries
-    return false;
-}
-
-/*
- * Print debug information for an ICE server.
- */
-static int ice_server_debug(
-        struct re_printf* const pf,
-        struct rawrtc_ice_server const* const server
-) {
-    int err = 0;
-    struct le* le;
-
-    // Check arguments
-    if (!server) {
-        return 0;
-    }
-
-    err |= re_hprintf(pf, "  ICE Server:\n", server);
-
-    // Credential type
-    err |= re_hprintf(pf, "    credential_type=%s\n",
-                      ice_credential_type_to_name(server->credential_type));
-    if (server->credential_type != RAWRTC_ICE_CREDENTIAL_TYPE_NONE) {
-        // Username
-        err |= re_hprintf(pf, "    username=");
-        if (server->username) {
-            err |= re_hprintf(pf, "\"%s\"\n", server->username);
-        } else {
-            err |= re_hprintf(pf, "n/a\n");
-        }
-
-        // Credential
-        err |= re_hprintf(pf, "    credential=");
-        if (server->credential) {
-            err |= re_hprintf(pf, "\"%s\"\n", server->credential);
-        } else {
-            err |= re_hprintf(pf, "n/a\n");
-        }
-    }
-
-    // URLs
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // URL, STUN/TURN, transport, currently gathering?
-        err |= re_hprintf(
-                pf, "    URL=\"%s\" type=%s transport=%s resolved=%s\n",
-                url->url, ice_server_type_to_name(url->type),
-                ice_server_transport_to_name(url->transport),
-                url->dns_a_context && url->dns_aaaa_context ? "yes" : "no");
-    }
-
-    // Done
-    return err;
-}
-
-/*
- * Print debug information for the ICE gather options.
- */
-static int ice_gather_options_debug(
-        struct re_printf* const pf,
-        struct rawrtc_ice_gather_options const* const options
-) {
-    int err = 0;
-    struct le* le;
-
-    // Check arguments
-    if (!options) {
-        return 0;
-    }
-
-    err |= re_hprintf(pf, "----- ICE Gather Options <%p> -----\n", options);
-
-    // Gather policy
-    err |= re_hprintf(pf, "  gather_policy=%s\n",
-                      rawrtc_ice_gather_policy_to_str(options->gather_policy));
-
-    // ICE servers
-    for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
-        err |= re_hprintf(pf, "%H", ice_server_debug, server);
-    }
-
-    // Done
-    return err;
-}
 
 /*
  * Get the corresponding name for an ICE gatherer state.
@@ -726,13 +22,13 @@ char const * const rawrtc_ice_gatherer_state_to_name(
         enum rawrtc_ice_gatherer_state const state
 ) {
     switch (state) {
-        case RAWRTC_ICE_GATHERER_NEW:
+        case RAWRTC_ICE_GATHERER_STATE_NEW:
             return "new";
-        case RAWRTC_ICE_GATHERER_GATHERING:
+        case RAWRTC_ICE_GATHERER_STATE_GATHERING:
             return "gathering";
-        case RAWRTC_ICE_GATHERER_COMPLETE:
+        case RAWRTC_ICE_GATHERER_STATE_COMPLETE:
             return "complete";
-        case RAWRTC_ICE_GATHERER_CLOSED:
+        case RAWRTC_ICE_GATHERER_STATE_CLOSED:
             return "closed";
         default:
             return "???";
@@ -788,7 +84,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     }
 
     // Set fields/reference
-    gatherer->state = RAWRTC_ICE_GATHERER_NEW; // TODO: Raise state (delayed)?
+    gatherer->state = RAWRTC_ICE_GATHERER_STATE_NEW; // TODO: Raise state (delayed)?
     gatherer->options = mem_ref(options);
     gatherer->state_change_handler = state_change_handler;
     gatherer->error_handler = error_handler;
@@ -807,6 +103,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.ansi = true;
     gatherer->ice_config.enable_prflx = false;
+    gatherer->ice_config.nom = ICE_NOMINATION_AGGRESSIVE;
     err = trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ICE_ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password);
@@ -838,7 +135,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     }
 
     // Done
-    DEBUG_PRINTF("ICE gatherer created:\n%H", ice_gather_options_debug, gatherer->options);
+    DEBUG_PRINTF("ICE gatherer created:\n%H", rawrtc_ice_gather_options_debug, gatherer->options);
 
 out:
     if (err) {
@@ -880,7 +177,7 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
     }
 
     // Already closed?
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -896,7 +193,7 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
 
     // Remove ICE server URL DNS context's
     // TODO: Does this stop the resolving process?
-    ice_options_destroy_url_dns_contexts(gatherer->options);
+    rawrtc_ice_gather_options_destroy_url_dns_contexts(gatherer->options);
 
     // Stop ICE checklist (if running)
     trice_checklist_stop(gatherer->ice);
@@ -905,7 +202,7 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
     gatherer->ice = mem_deref(gatherer->ice);
 
     // Set state to closed and return
-    set_state(gatherer, RAWRTC_ICE_GATHERER_CLOSED);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_CLOSED);
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -990,7 +287,7 @@ static void check_gathering_complete(
     enum rawrtc_code error;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return;
     }
 
@@ -998,9 +295,17 @@ static void check_gathering_complete(
     for (le = list_head(&gatherer->options->ice_servers); le != NULL; le = le->next) {
         struct rawrtc_ice_server* const server = le->data;
         struct rawrtc_ice_server_url* url;
+        bool pending_dns_queries;
 
         // Check for pending DNS queries
-        if (ice_server_dns_queries_pending(&url, server)) {
+        error = rawrtc_ice_server_dns_queries_pending(&url, &pending_dns_queries, server);
+        if (error) {
+            DEBUG_WARNING("Unable to check for pending DNS queries, reason: %s\n",
+                          rawrtc_code_to_str(error));
+        }
+
+        // Handle pending DNS queries
+        if (pending_dns_queries) {
             // Nope
             DEBUG_PRINTF("Gathering still in progress, pending DNS record queries (%s)\n",
                          url->url);
@@ -1036,7 +341,7 @@ static void check_gathering_complete(
 
     // Update state & done
     DEBUG_PRINTF("Gathering complete:\n%H", trice_debug, gatherer->ice);
-    set_state(gatherer, RAWRTC_ICE_GATHERER_COMPLETE);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_COMPLETE);
 }
 
 /*
@@ -1116,6 +421,7 @@ static enum rawrtc_code gather_relay_candidates(
     }
 
     // TODO: Create TURN request
+    (void) candidate;
     DEBUG_NOTICE("TODO: Gather relay candidates using server %J (%s)\n", server_address, url->url);
     return RAWRTC_CODE_SUCCESS;
 }
@@ -1139,7 +445,7 @@ static void reflexive_candidate_handler(
     enum rawrtc_code error;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return;
     }
 
@@ -1417,7 +723,7 @@ static enum rawrtc_code add_candidate(
 
     // Check state
     // TODO: 'gatherer' might be free'd here
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1444,7 +750,7 @@ static bool interface_handler(
     (void) interface;
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return true; // Don't continue gathering
     }
 
@@ -1475,7 +781,7 @@ static bool interface_handler(
         }
 
         // Check state
-        if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+        if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
             return true; // Don't continue gathering
         }
     }
@@ -1592,7 +898,7 @@ static enum rawrtc_code query_a_or_aaaa_record(
         struct sa* const server_address, // not checked
         uint_fast16_t const dns_type,
         struct rawrtc_ice_server_url* const url, // not checked
-        struct rawrtc_ice_gatherer* const gatherer // not checked
+        struct rawrtc_ice_gatherer* const gatherer // referenced, not checked
 ) {
     bool const resolved = !sa_is_any(server_address);
     enum rawrtc_code error;
@@ -1601,7 +907,8 @@ static enum rawrtc_code query_a_or_aaaa_record(
 
     // Check if already resolved
     if (resolved) {
-        DEBUG_PRINTF("Hostname (%s) already resolved\n", dns_type_to_address_family_name(dns_type));
+        DEBUG_PRINTF("Hostname (%s) already resolved\n",
+                     rawrtc_dns_type_to_address_family_name(dns_type));
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1665,7 +972,11 @@ static enum rawrtc_code resolve_ice_servers_address(
 
             // Cancel pending DNS resolve processes
             // TODO: Does this stop the resolving process?
-            ice_url_destroy_dns_contexts(url);
+            error = rawrtc_ice_server_url_destroy_dns_contexts(url);
+            if (error) {
+                DEBUG_WARNING("Unable to destroy previous DNS context for ICE server URL, reason: "
+                              "%s\n", rawrtc_code_to_str(error));
+            }
 
             // Query A record (if IPv4 is enabled)
             if (rawrtc_default_config.ipv4_enable) {
@@ -1713,12 +1024,12 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Already gathering?
-    if (gatherer->state == RAWRTC_ICE_GATHERER_GATHERING) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_GATHERING) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1729,7 +1040,7 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Update state
-    set_state(gatherer, RAWRTC_ICE_GATHERER_GATHERING);
+    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_GATHERING);
 
     // Start gathering host candidates
     if (options->gather_policy != RAWRTC_ICE_GATHER_POLICY_NOHOST) {
@@ -1740,6 +1051,23 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     check_gathering_complete(gatherer);
 
     // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the current state of an ICE gatherer.
+ */
+enum rawrtc_code rawrtc_ice_gatherer_get_state(
+        enum rawrtc_ice_gatherer_state* const statep, // de-referenced
+        struct rawrtc_ice_gatherer* const gatherer
+) {
+    // Check arguments
+    if (!statep || !gatherer) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set state
+    *statep = gatherer->state;
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -1756,7 +1084,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_local_parameters(
     }
 
     // Check state
-    if (gatherer->state == RAWRTC_ICE_GATHERER_CLOSED) {
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 

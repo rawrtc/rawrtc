@@ -90,7 +90,7 @@ void set_ice_candidates(
         if (related_address) {
             EOR(odict_entry_add(node, "relatedAddress", ODICT_STRING, related_address));
         }
-        if (related_port) {
+        if (related_port > 0) {
             EOR(odict_entry_add(node, "relatedPort", ODICT_INT, related_port));
         }
 
@@ -316,7 +316,7 @@ enum rawrtc_code get_ice_candidates(
         }
 
         // Print ICE candidate
-        print_ice_candidate(candidate, NULL, client);
+        print_ice_candidate(candidate, NULL, NULL, client);
 
         // Store if ICE candidate type enabled
         if (ice_candidate_type_enabled(client, type)) {

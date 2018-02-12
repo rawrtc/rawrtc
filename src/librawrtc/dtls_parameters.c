@@ -5,7 +5,7 @@
  * Destructor for an existing DTLS fingerprint instance.
  */
 static void rawrtc_dtls_fingerprint_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_fingerprint* const fingerprint = arg;
 
@@ -75,7 +75,7 @@ enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
  * Destructor for an existing DTLS parameter's fingerprints instance.
  */
 static void rawrtc_dtls_parameters_fingerprints_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
@@ -90,7 +90,7 @@ static void rawrtc_dtls_parameters_fingerprints_destroy(
  * Destructor for an existing DTLS parameters instance.
  */
 static void rawrtc_dtls_parameters_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_dtls_parameters* const parameters = arg;
 
@@ -149,8 +149,8 @@ enum rawrtc_code rawrtc_dtls_parameters_create(
         size_t const n_fingerprints
 ) {
     struct rawrtc_dtls_parameters* parameters;
-    size_t i;
     enum rawrtc_code error;
+    size_t i;
 
     // Check arguments
     if (!parametersp || !fingerprints || n_fingerprints < 1) {
@@ -166,7 +166,7 @@ enum rawrtc_code rawrtc_dtls_parameters_create(
     // Reference and set each fingerprint
     for (i = 0; i < n_fingerprints; ++i) {
         // Null?
-        if (fingerprints[i] == NULL) {
+        if (!fingerprints[i]) {
             error = RAWRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }
@@ -242,6 +242,42 @@ out:
         *parametersp = parameters;
     }
     return error;
+}
+
+/*
+ * Print debug information for DTLS parameters.
+ */
+int rawrtc_dtls_parameters_debug(
+        struct re_printf* const pf,
+        struct rawrtc_dtls_parameters const* const parameters
+) {
+    int err = 0;
+    struct rawrtc_dtls_fingerprints* fingerprints;
+    size_t i;
+
+    // Check arguments
+    if (!parameters) {
+        return 0;
+    }
+
+    err |= re_hprintf(pf, "  DTLS Parameters <%p>:\n", parameters);
+
+    // Role
+    err |= re_hprintf(pf, "    role=%s\n", rawrtc_dtls_role_to_str(parameters->role));
+
+    // Fingerprints
+    fingerprints = parameters->fingerprints;
+    err |= re_hprintf(pf, "    Fingerprints <%p>:\n", fingerprints);
+    for (i = 0; i < fingerprints->n_fingerprints; ++i) {
+        // Fingerprint
+        err |= re_hprintf(
+                pf, "      algorithm=%s value=%s\n",
+                rawrtc_certificate_sign_algorithm_to_str(fingerprints->fingerprints[i]->algorithm),
+                fingerprints->fingerprints[i]->value);
+    }
+
+    // Done
+    return err;
 }
 
 /*

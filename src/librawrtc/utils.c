@@ -137,15 +137,15 @@ enum rawrtc_code rawrtc_error_to_code(
 }
 
 static enum rawrtc_ice_gather_policy const map_enum_ice_gather_policy[] = {
-    RAWRTC_ICE_GATHER_POLICY_ALL,
-    RAWRTC_ICE_GATHER_POLICY_NOHOST,
-    RAWRTC_ICE_GATHER_POLICY_RELAY
+        RAWRTC_ICE_GATHER_POLICY_ALL,
+        RAWRTC_ICE_GATHER_POLICY_NOHOST,
+        RAWRTC_ICE_GATHER_POLICY_RELAY
 };
 
 static char const * const map_str_ice_gather_policy[] = {
-    "all",
-    "nohost",
-    "relay"
+        "all",
+        "nohost",
+        "relay"
 };
 
 static size_t const map_ice_gather_policy_length = ARRAY_SIZE(map_enum_ice_gather_policy);
@@ -256,27 +256,46 @@ char const * rawrtc_ice_protocol_to_str(
 }
 
 /*
- * Translate a str to an ICE protocol (case-insensitive).
+ * Translate a pl to an ICE protocol (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_protocol(
+enum rawrtc_code rawrtc_pl_to_ice_protocol(
         enum rawrtc_ice_protocol* const protocolp, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!protocolp || !str) {
+    if (!protocolp || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_protocol_length; ++i) {
-        if (str_casecmp(map_str_ice_protocol[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_protocol[i]) == 0) {
             *protocolp = map_enum_ice_protocol[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE protocol (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_protocol(
+        enum rawrtc_ice_protocol* const protocolp, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_protocol(protocolp, &pl);
 }
 
 /*
@@ -354,27 +373,46 @@ char const * rawrtc_ice_candidate_type_to_str(
 }
 
 /*
- * Translate a str to an ICE candidate type (case-insensitive).
+ * Translate a pl to an ICE candidate type (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_candidate_type(
+enum rawrtc_code rawrtc_pl_to_ice_candidate_type(
         enum rawrtc_ice_candidate_type* const typep, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!typep || !str) {
+    if (!typep || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_candidate_type_length; ++i) {
-        if (str_casecmp(map_str_ice_candidate_type[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_candidate_type[i]) == 0) {
             *typep = map_enum_ice_candidate_type[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE candidate type (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_candidate_type(
+        enum rawrtc_ice_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_candidate_type(typep, &pl);
 }
 
 /*
@@ -449,25 +487,44 @@ char const * rawrtc_ice_tcp_candidate_type_to_str(
 /*
  * Translate a str to an ICE TCP candidate type (case-insensitive).
  */
-enum rawrtc_code rawrtc_str_to_ice_tcp_candidate_type(
+enum rawrtc_code rawrtc_pl_to_ice_tcp_candidate_type(
         enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
-        char const* const str
+        struct pl const* const pl
 ) {
     size_t i;
 
     // Check arguments
-    if (!typep || !str) {
+    if (!typep || !pl_isset(pl)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
     for (i = 0; i < map_ice_tcp_candidate_type_length; ++i) {
-        if (str_casecmp(map_str_ice_tcp_candidate_type[i], str) == 0) {
+        if (pl_strcasecmp(pl, map_str_ice_tcp_candidate_type[i]) == 0) {
             *typep = map_enum_ice_tcp_candidate_type[i];
             return RAWRTC_CODE_SUCCESS;
         }
     }
 
     return RAWRTC_CODE_NO_VALUE;
+}
+
+/*
+ * Translate a str to an ICE TCP candidate type (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_tcp_candidate_type(
+        enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
+        char const* const str
+) {
+    struct pl pl;
+
+    // Check arguments
+    if (!str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert str to pl
+    pl_set_str(&pl, str);
+    return rawrtc_pl_to_ice_tcp_candidate_type(typep, &pl);
 }
 
 /*
@@ -689,9 +746,6 @@ enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
     // Convert ice_cand_type
     // Note: SHA-384 and SHA-512 are currently not supported (needs to be added to libre)
     switch (re_algorithm) {
-        case TLS_FINGERPRINT_SHA1:
-            *algorithmp = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1;
-            return RAWRTC_CODE_SUCCESS;
         case TLS_FINGERPRINT_SHA256:
             *algorithmp = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256;
             return RAWRTC_CODE_SUCCESS;
@@ -701,14 +755,12 @@ enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
 }
 
 static enum rawrtc_certificate_sign_algorithm const map_enum_certificate_sign_algorithm[] = {
-    RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384,
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512,
 };
 
 static char const * const map_str_certificate_sign_algorithm[] = {
-    "sha-1",
     "sha-256",
     "sha-384",
     "sha-512",
@@ -758,6 +810,64 @@ enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
     return RAWRTC_CODE_NO_VALUE;
 }
 
+static enum rawrtc_sdp_type const map_enum_sdp_type[] = {
+    RAWRTC_SDP_TYPE_OFFER,
+    RAWRTC_SDP_TYPE_PROVISIONAL_ANSWER,
+    RAWRTC_SDP_TYPE_ANSWER,
+    RAWRTC_SDP_TYPE_ROLLBACK,
+};
+
+static char const * const map_str_sdp_type[] = {
+    "offer",
+    "pranswer",
+    "answer",
+    "rollback",
+};
+
+static size_t const map_sdp_type_length =
+        ARRAY_SIZE(map_enum_sdp_type);
+
+/*
+ * Translate an SDP type to str.
+ */
+char const * rawrtc_sdp_type_to_str(
+        enum rawrtc_sdp_type const type
+) {
+    size_t i;
+
+    for (i = 0; i < map_sdp_type_length; ++i) {
+        if (map_enum_sdp_type[i] == type) {
+            return map_str_sdp_type[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to an SDP type.
+ */
+enum rawrtc_code rawrtc_str_to_sdp_type(
+        enum rawrtc_sdp_type* const typep, // de-referenced
+        char const* const str
+) {
+    size_t i;
+
+    // Check arguments
+    if (!typep || !str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < map_sdp_type_length; ++i) {
+        if (str_casecmp(map_str_sdp_type[i], str) == 0) {
+            *typep = map_enum_sdp_type[i];
+            return RAWRTC_CODE_SUCCESS;
+        }
+    }
+
+    return RAWRTC_CODE_NO_VALUE;
+}
+
 static enum rawrtc_data_transport_type const map_enum_data_transport_type[] = {
     RAWRTC_DATA_TRANSPORT_TYPE_SCTP,
 };
@@ -785,6 +895,37 @@ char const * rawrtc_data_transport_type_to_str(
     return "???";
 }
 
+static enum rawrtc_ice_candidate_storage const map_enum_ice_candidate_storage[] = {
+    RAWRTC_ICE_CANDIDATE_STORAGE_RAW,
+    RAWRTC_ICE_CANDIDATE_STORAGE_LCAND,
+    RAWRTC_ICE_CANDIDATE_STORAGE_RCAND,
+};
+
+static char const * const map_str_ice_candidate_storage[] = {
+    "raw",
+    "lcand",
+    "rcand",
+};
+
+static size_t const map_ice_candidate_storage_length = ARRAY_SIZE(map_enum_ice_candidate_storage);
+
+/*
+ * Translate an ICE candidate storage type to str.
+ */
+char const * rawrtc_ice_candidate_storage_to_str(
+        enum rawrtc_ice_candidate_storage const type
+) {
+    size_t i;
+
+    for (i = 0; i < map_ice_candidate_storage_length; ++i) {
+        if (map_enum_ice_candidate_storage[i] == type) {
+            return map_str_ice_candidate_storage[i];
+        }
+    }
+
+    return "???";
+}
+
 /*
  * Get the EVP_MD* structure for a certificate sign algorithm type.
  */
@@ -792,8 +933,6 @@ EVP_MD const * const rawrtc_get_sign_function(
         enum rawrtc_certificate_sign_algorithm const type
 ) {
     switch (type) {
-        case RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA1:
-            return EVP_sha1();
         case RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256:
             return EVP_sha256();
         case RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA384:
@@ -928,6 +1067,86 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
 
     // Done
     *bytes_written = bin_length;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Get the corresponding address family name for an DNS type.
+ */
+char const * const rawrtc_dns_type_to_address_family_name(
+        uint_fast16_t const dns_type
+) {
+    switch (dns_type) {
+        case DNS_TYPE_A:
+            return "IPv4";
+        case DNS_TYPE_AAAA:
+            return "IPv6";
+        default:
+            return "???";
+    }
+}
+
+/*
+ * Destructor for an existing array container that did reference each
+ * item.
+ */
+static void rawrtc_array_container_destroy(
+        void* arg
+) {
+    struct rawrtc_array_container* const container = arg;
+    size_t i;
+
+    // Un-reference each item
+    for (i = 0; i < container->n_items; ++i) {
+        mem_deref(container->items[i]);
+    }
+}
+
+
+/*
+ * Convert a list to a dynamically allocated array container.
+ *
+ * If `reference` is set to `true`, each item in the list will be
+ * referenced and a destructor will be added that unreferences each
+ * item when unreferencing the array.
+ */
+enum rawrtc_code rawrtc_list_to_array(
+        struct rawrtc_array_container** containerp, // de-referenced
+        struct list const* const list,
+        bool reference
+) {
+    size_t n;
+    struct rawrtc_array_container* container;
+    struct le* le;
+    size_t i;
+
+    // Check arguments
+    if (!containerp || !list) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Get list length
+    n = list_count(list);
+
+    // Allocate array & set length immediately
+    container = mem_zalloc(
+            sizeof(*container) + sizeof(void*) * n,
+            reference ? rawrtc_array_container_destroy : NULL);
+    if (!container) {
+        return RAWRTC_CODE_NO_MEMORY;
+    }
+    container->n_items = n;
+
+    // Copy pointer to each item
+    for (le = list_head(list), i = 0; le != NULL; le = le->next, ++i) {
+        if (reference) {
+            mem_ref(le->data);
+        }
+        container->items[i] = le->data;
+    }
+
+    // Set pointer & done
+    *containerp = container;
     return RAWRTC_CODE_SUCCESS;
 }
 

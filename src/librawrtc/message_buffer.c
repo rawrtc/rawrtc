@@ -28,7 +28,7 @@ size_t buffer_sum_left(
  * Destructor for an existing buffered message.
  */
 static void rawrtc_message_buffer_destroy(
-        void* const arg
+        void* arg
 ) {
     struct rawrtc_buffered_message* const buffered_message = arg;
 

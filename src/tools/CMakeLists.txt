@@ -76,3 +76,12 @@ target_link_libraries(data-channel-sctp-echo
         rawrtc-helper)
 install(TARGETS data-channel-sctp-echo
         DESTINATION bin)
+
+# Tool: peer-connection
+add_executable(peer-connection
+        peer-connection.c)
+target_link_libraries(peer-connection
+        rawrtc
+        rawrtc-helper)
+install(TARGETS peer-connection
+        DESTINATION bin)

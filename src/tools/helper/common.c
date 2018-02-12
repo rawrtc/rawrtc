@@ -131,7 +131,8 @@ bool ice_candidate_type_enabled(
  */
 void print_ice_candidate(
         struct rawrtc_ice_candidate* const candidate,
-        char const * const url, // read-only
+        char const* const url, // read-only
+        struct rawrtc_peer_connection_ice_candidate* const pc_candidate, // nullable
         struct client* const client
 ) {
     if (candidate) {
@@ -144,10 +145,15 @@ void print_ice_candidate(
         uint16_t port;
         enum rawrtc_ice_candidate_type type;
         enum rawrtc_ice_tcp_candidate_type tcp_type;
-        char const* tcp_type_str = "N/A";
+        char const* tcp_type_str = "n/a";
         char* related_address = NULL;
         uint16_t related_port = 0;
+        char* mid = NULL;
+        uint8_t media_line_index = UINT8_MAX;
+        char* media_line_index_str = NULL;
+        char* username_fragment = NULL;
         bool is_enabled;
+        int level;
 
         // Get candidate information
         EOE(rawrtc_ice_candidate_get_foundation(&foundation, candidate));
@@ -169,20 +175,56 @@ void print_ice_candidate(
         }
         EOEIGN(rawrtc_ice_candidate_get_related_address(&related_address, candidate), ignore);
         EOEIGN(rawrtc_ice_candidate_get_related_port(&related_port, candidate), ignore);
+        if (pc_candidate) {
+            EOEIGN(rawrtc_peer_connection_ice_candidate_get_sdp_mid(&mid, pc_candidate), ignore);
+            error = rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
+                    &media_line_index, pc_candidate);
+            switch (error) {
+                case RAWRTC_CODE_SUCCESS:
+                    EOE(rawrtc_sdprintf(&media_line_index_str, "%"PRIu8, media_line_index));
+                    break;
+                case RAWRTC_CODE_NO_VALUE:
+                    break;
+                default:
+                    EOE(error);
+                    break;
+            }
+            EOEIGN(rawrtc_peer_connection_ice_candidate_get_username_fragment(
+                    &username_fragment, pc_candidate), ignore);
+        }
         is_enabled = ice_candidate_type_enabled(client, type);
 
-        // Print candidate
-        dbg_printf(
-                is_enabled ? DBG_INFO : DBG_DEBUG,
-                "(%s) ICE gatherer local candidate: foundation=%s, protocol=%s, priority=%"PRIu32""
-                        ", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s, related-address=%s,"
-                        "related-port=%"PRIu16"; URL: %s; %s\n",
-                client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority, ip, port,
-                rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
-                related_address ? related_address : "N/A", related_port, url ? url : "N/A",
-                is_enabled ? "enabled" : "disabled");
+        // Print candidate (meh, lot's of repeated code... feel free to suggest an alternative)
+        level = is_enabled ? DBG_INFO : DBG_DEBUG;
+        if (!pc_candidate) {
+            dbg_printf(
+                    level,
+                    "(%s) ICE candidate: foundation=%s, protocol=%s"
+                    ", priority=%"PRIu32", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s"
+                    ", related-address=%s, related-port=%"PRIu16"; URL: %s; %s\n",
+                    client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority,
+                    ip, port, rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
+                    related_address ? related_address : "n/a", related_port, url ? url : "n/a",
+                    is_enabled ? "enabled" : "disabled");
+        } else {
+            dbg_printf(
+                    level,
+                    "(%s) ICE candidate: foundation=%s, protocol=%s"
+                    ", priority=%"PRIu32", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s"
+                    ", related-address=%s, related-port=%"PRIu16"; URL: %s"
+                    "; mid=%s, media_line_index=%s, username_fragment=%s; %s\n",
+                    client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority,
+                    ip, port, rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
+                    related_address ? related_address : "n/a", related_port, url ? url : "n/a",
+                    mid ? mid : "n/a", media_line_index_str ? media_line_index_str : "n/a",
+                    username_fragment ? username_fragment : "n/a",
+                    is_enabled ? "enabled" : "disabled");
+        }
 
         // Unreference
+        mem_deref(username_fragment);
+        mem_deref(media_line_index_str);
+        mem_deref(mid);
         mem_deref(related_address);
         mem_deref(ip);
         mem_deref(foundation);
