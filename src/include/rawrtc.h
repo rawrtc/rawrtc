@@ -30,7 +30,7 @@
  *
  * TODO: Find a way to keep this in sync with the one in CMakeLists.txt
  */
-#define RAWRTC_VERSION "0.0.1"
+#define RAWRTC_VERSION "0.2.0"
 
 /*
  * Return codes.
