@@ -78,10 +78,10 @@ void set_ice_candidates(
 
         // Set ICE candidate values
         EOR(odict_entry_add(node, "foundation", ODICT_STRING, foundation));
-        EOR(odict_entry_add(node, "priority", ODICT_INT, priority));
+        EOR(odict_entry_add(node, "priority", ODICT_INT, (int64_t) priority));
         EOR(odict_entry_add(node, "ip", ODICT_STRING, ip));
         EOR(odict_entry_add(node, "protocol", ODICT_STRING, rawrtc_ice_protocol_to_str(protocol)));
-        EOR(odict_entry_add(node, "port", ODICT_INT, port));
+        EOR(odict_entry_add(node, "port", ODICT_INT, (int64_t) port));
         EOR(odict_entry_add(node, "type", ODICT_STRING, rawrtc_ice_candidate_type_to_str(type)));
         if (protocol == RAWRTC_ICE_PROTOCOL_TCP) {
             EOR(odict_entry_add(node, "tcpType", ODICT_STRING,
@@ -91,7 +91,7 @@ void set_ice_candidates(
             EOR(odict_entry_add(node, "relatedAddress", ODICT_STRING, related_address));
         }
         if (related_port > 0) {
-            EOR(odict_entry_add(node, "relatedPort", ODICT_INT, related_port));
+            EOR(odict_entry_add(node, "relatedPort", (int64_t) ODICT_INT, related_port));
         }
 
         // Add to array
@@ -181,9 +181,14 @@ void set_sctp_parameters(
     EOE(rawrtc_sctp_capabilities_get_max_message_size(&max_message_size, parameters->capabilities));
     EOE(rawrtc_sctp_transport_get_port(&port, transport));
 
+    // Ensure maximum message size fits into int64
+    if (max_message_size > INT64_MAX) {
+        EOE(RAWRTC_CODE_INSUFFICIENT_SPACE);
+    }
+
     // Set ICE parameters
-    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, max_message_size));
-    EOR(odict_entry_add(dict, "port", ODICT_INT, port));
+    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, (int64_t) max_message_size));
+    EOR(odict_entry_add(dict, "port", ODICT_INT, (int64_t) port));
 }
 
 #ifdef SCTP_REDIRECT_TRANSPORT
@@ -202,9 +207,14 @@ void set_sctp_redirect_parameters(
     EOE(rawrtc_sctp_capabilities_get_max_message_size(&max_message_size, parameters->capabilities));
     EOE(rawrtc_sctp_redirect_transport_get_port(&port, transport));
 
+    // Ensure maximum message size fits into int64
+    if (max_message_size > INT64_MAX) {
+        EOE(RAWRTC_CODE_INSUFFICIENT_SPACE);
+    }
+
     // Set ICE parameters
-    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, max_message_size));
-    EOR(odict_entry_add(dict, "port", ODICT_INT, port));
+    EOR(odict_entry_add(dict, "maxMessageSize", ODICT_INT, (int64_t) max_message_size));
+    EOR(odict_entry_add(dict, "port", ODICT_INT, (int64_t) port));
 }
 #endif
 
