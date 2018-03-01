@@ -1,11 +1,6 @@
 #include <rawrtc.h>
-#include "utils.h"
 #include "ice_candidate.h"
 #include "peer_connection_ice_candidate.h"
-
-#define DEBUG_MODULE "peer-connection-ice-candidate"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
 
 static char const sdp_ice_candidate_regex[] =
         "candidate:[^ ]+ [0-9]+ [^ ]+ [0-9]+ [^ ]+ [0-9]+ typ [^ ]+[^]*";
@@ -98,7 +93,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
     // Set fields
     candidate->candidate = mem_ref(ortc_candidate);
     candidate->mid = mem_ref(mid);
-    candidate->media_line_index = media_line_index ? *media_line_index : -1;
+    candidate->media_line_index = (int16_t) (media_line_index ? *media_line_index : -1);
     candidate->username_fragment = mem_ref(username_fragment);
 
     // Set pointer & done
@@ -240,6 +235,7 @@ out:
 
 /*
  * Create a new ICE candidate from SDP.
+ * `*candidatesp` must be unreferenced.
  *
  * Note: This is equivalent to creating an `RTCIceCandidate` from an
  *       `RTCIceCandidateInit` instance in the W3C WebRTC
@@ -422,6 +418,9 @@ out:
 /*
  * Get the media stream identification tag the ICE candidate is
  * associated to.
+ * `*midp` will be set to a copy of the candidate's mid and must be
+ * unreferenced.
+ *
  * Return `RAWRTC_CODE_NO_VALUE` in case no 'mid' has been set.
  * Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and `*midp* must
  * be unreferenced.
@@ -468,6 +467,9 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
 
 /*
  * Get the username fragment the ICE candidate is associated to.
+ * `*username_fragmentp` will be set to a copy of the candidate's
+ * username fragment and must be unreferenced.
+ *
  * Return `RAWRTC_CODE_NO_VALUE` in case no username fragment has been
  * set. Otherwise, `RAWRTC_CODE_SUCCESS` will be returned and
  * `*username_fragmentp* must be unreferenced.

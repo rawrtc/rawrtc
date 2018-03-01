@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <string.h> // strerror
 #include <rawrtc.h>
 #include "common.h"
@@ -17,7 +18,7 @@ size_t const ignore_success_length = ARRAY_SIZE(ignore_success);
  */
 void before_exit() {
     // Close
-    rawrtc_close();
+    rawrtc_close(true);
 
     // Check memory leaks
     tmr_debug();

@@ -1,11 +1,11 @@
 #include <string.h> // strlen
 #include <rawrtc.h>
-#include "utils.h"
+#include "config.h"
 #include "ice_server.h"
 
 #define DEBUG_MODULE "ice-server"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
+#include <rawrtcc/internal/debug.h>
 
 /*
  * ICE server URL-related regular expressions.
@@ -77,10 +77,10 @@ static char const * const ice_credential_type_to_name(
  * `ice_server_scheme_port_mapping` if changed.
  */
 static char const* const ice_server_schemes[] = {
-        "stun",
-        "stuns",
-        "turn",
-        "turns"
+    "stun",
+    "stuns",
+    "turn",
+    "turns"
 };
 static size_t const ice_server_schemes_length = ARRAY_SIZE(ice_server_schemes);
 
@@ -88,30 +88,30 @@ static size_t const ice_server_schemes_length = ARRAY_SIZE(ice_server_schemes);
  * ICE server scheme to server type mapping.
  */
 static enum rawrtc_ice_server_type ice_server_scheme_type_mapping[] = {
-        RAWRTC_ICE_SERVER_TYPE_STUN,
-        RAWRTC_ICE_SERVER_TYPE_STUN,
-        RAWRTC_ICE_SERVER_TYPE_TURN,
-        RAWRTC_ICE_SERVER_TYPE_TURN
+    RAWRTC_ICE_SERVER_TYPE_STUN,
+    RAWRTC_ICE_SERVER_TYPE_STUN,
+    RAWRTC_ICE_SERVER_TYPE_TURN,
+    RAWRTC_ICE_SERVER_TYPE_TURN
 };
 
 /*
  * ICE server scheme to secure mapping.
  */
 static bool ice_server_scheme_secure_mapping[] = {
-        false,
-        true,
-        false,
-        true
+    false,
+    true,
+    false,
+    true
 };
 
 /*
  * ICE server scheme to default port mapping.
  */
 static uint_fast16_t ice_server_scheme_port_mapping[] = {
-        3478,
-        5349,
-        3478,
-        5349
+    3478,
+    5349,
+    3478,
+    5349
 };
 
 /*
@@ -121,8 +121,8 @@ static uint_fast16_t ice_server_scheme_port_mapping[] = {
  * `ice_server_transport_secure_transport_mapping` if changed.
  */
 static char const* const ice_server_transports[] = {
-        "udp",
-        "tcp"
+    "udp",
+    "tcp"
 };
 static size_t const ice_server_transports_length = ARRAY_SIZE(ice_server_transports);
 
@@ -130,16 +130,16 @@ static size_t const ice_server_transports_length = ARRAY_SIZE(ice_server_transpo
  * ICE server transport to non-secure transport mapping.
  */
 static enum rawrtc_ice_server_transport ice_server_transport_normal_transport_mapping[] = {
-        RAWRTC_ICE_SERVER_TRANSPORT_UDP,
-        RAWRTC_ICE_SERVER_TRANSPORT_TCP
+    RAWRTC_ICE_SERVER_TRANSPORT_UDP,
+    RAWRTC_ICE_SERVER_TRANSPORT_TCP
 };
 
 /*
  * ICE server transport to secure transport mapping.
  */
 static enum rawrtc_ice_server_transport ice_server_transport_secure_transport_mapping[] = {
-        RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
-        RAWRTC_ICE_SERVER_TRANSPORT_TLS
+    RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
+    RAWRTC_ICE_SERVER_TRANSPORT_TLS
 };
 
 /*

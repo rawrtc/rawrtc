@@ -1,15 +1,18 @@
 #include <string.h> // memcmp
+#include <rawrtcc/internal/certificate.h>
+#include <rawrtcc/internal/message_buffer.h>
+#include <rawrtcc/internal/utils.h>
 #include <rawrtc.h>
+#include "config.h"
+#include "ice_gatherer.h"
+#include "ice_transport.h"
 #include "dtls_transport.h"
 #include "dtls_parameters.h"
-#include "message_buffer.h"
 #include "candidate_helper.h"
-#include "certificate.h"
-#include "utils.h"
 
 #define DEBUG_MODULE "dtls-transport"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
+#include <rawrtcc/internal/debug.h>
 
 /*
  * Embedded DH parameters in DER encoding (bits: 2048)
@@ -68,28 +71,6 @@ char const* rawrtc_default_dtls_cipher_suites[] = {
 };
 size_t const rawrtc_default_dtls_cipher_suites_length =
         ARRAY_SIZE(rawrtc_default_dtls_cipher_suites);
-
-/*
- * Get the corresponding name for an ICE transport state.
- */
-char const * const rawrtc_dtls_transport_state_to_name(
-        enum rawrtc_dtls_transport_state const state
-) {
-    switch (state) {
-        case RAWRTC_DTLS_TRANSPORT_STATE_NEW:
-            return "new";
-        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING:
-            return "connecting";
-        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED:
-            return "connected";
-        case RAWRTC_DTLS_TRANSPORT_STATE_CLOSED:
-            return "closed";
-        case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
-            return "failed";
-        default:
-            return "???";
-    }
-}
 
 /*
  * Handle outgoing buffered DTLS messages.
@@ -544,7 +525,7 @@ static bool udp_receive_helper(
 }
 
 /*
- * Destructor for an existing ICE transport.
+ * Destructor for an existing DTLS transport.
  */
 static void rawrtc_dtls_transport_destroy(
         void* arg
@@ -713,6 +694,7 @@ out:
 
 /*
  * Create a new DTLS transport.
+ * `*transport` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_transport_create(
         struct rawrtc_dtls_transport** const transportp, // de-referenced
@@ -1136,4 +1118,141 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
     // Create and return DTLS parameters instance
     return rawrtc_dtls_parameters_create_internal(
             parametersp, transport->role, &transport->fingerprints);
+}
+
+/*
+ * Get external DTLS role.
+ */
+enum rawrtc_code rawrtc_dtls_transport_get_external_role(
+        enum rawrtc_external_dtls_role* const rolep, // de-referenced
+        struct rawrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!rolep || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert role
+    switch (transport->role) {
+        case RAWRTC_DTLS_ROLE_AUTO:
+            // Unable to convert in this state
+            return RAWRTC_CODE_INVALID_STATE;
+        case RAWRTC_DTLS_ROLE_CLIENT:
+            *rolep = RAWRTC_EXTERNAL_DTLS_ROLE_CLIENT;
+            return RAWRTC_CODE_SUCCESS;
+        case RAWRTC_DTLS_ROLE_SERVER:
+            *rolep = RAWRTC_EXTERNAL_DTLS_ROLE_SERVER;
+            return RAWRTC_CODE_SUCCESS;
+        default:
+            return RAWRTC_CODE_UNKNOWN_ERROR;
+    }
+}
+
+/*
+ * Convert DTLS transport state to external DTLS transport state.
+ */
+enum rawrtc_code rawrtc_dtls_transport_get_external_state(
+        enum rawrtc_external_dtls_transport_state* const statep, // de-referenced
+        struct rawrtc_dtls_transport* const transport
+) {
+    // Check arguments
+    if (!statep || !transport) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Convert DTLS transport state to external DTLS transport state
+    switch (transport->state) {
+        case RAWRTC_DTLS_TRANSPORT_STATE_NEW:
+            *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_NEW_OR_CONNECTING;
+            return RAWRTC_CODE_SUCCESS;
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING:
+            *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_NEW_OR_CONNECTING;
+            return RAWRTC_CODE_SUCCESS;
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED:
+            *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_CONNECTED;
+            return RAWRTC_CODE_SUCCESS;
+        case RAWRTC_DTLS_TRANSPORT_STATE_CLOSED:
+            *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_CLOSED_OR_FAILED;
+            return RAWRTC_CODE_SUCCESS;
+        case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
+            *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_CLOSED_OR_FAILED;
+            return RAWRTC_CODE_SUCCESS;
+    }
+}
+
+/*
+ * Get the corresponding name for an ICE transport state.
+ */
+char const * const rawrtc_dtls_transport_state_to_name(
+        enum rawrtc_dtls_transport_state const state
+) {
+    switch (state) {
+        case RAWRTC_DTLS_TRANSPORT_STATE_NEW:
+            return "new";
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTING:
+            return "connecting";
+        case RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED:
+            return "connected";
+        case RAWRTC_DTLS_TRANSPORT_STATE_CLOSED:
+            return "closed";
+        case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
+            return "failed";
+        default:
+            return "???";
+    }
+}
+
+static enum rawrtc_dtls_role const map_enum_dtls_role[] = {
+    RAWRTC_DTLS_ROLE_AUTO,
+    RAWRTC_DTLS_ROLE_CLIENT,
+    RAWRTC_DTLS_ROLE_SERVER,
+};
+
+static char const * const map_str_dtls_role[] = {
+    "auto",
+    "client",
+    "server",
+};
+
+static size_t const map_dtls_role_length = ARRAY_SIZE(map_enum_dtls_role);
+
+/*
+ * Translate a DTLS role to str.
+ */
+char const * rawrtc_dtls_role_to_str(
+        enum rawrtc_dtls_role const role
+) {
+    size_t i;
+
+    for (i = 0; i < map_dtls_role_length; ++i) {
+        if (map_enum_dtls_role[i] == role) {
+            return map_str_dtls_role[i];
+        }
+    }
+
+    return "???";
+}
+
+/*
+ * Translate a str to a DTLS role (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_dtls_role(
+        enum rawrtc_dtls_role* const rolep, // de-referenced
+        char const* const str
+) {
+    size_t i;
+
+    // Check arguments
+    if (!rolep || !str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < map_dtls_role_length; ++i) {
+        if (str_casecmp(map_str_dtls_role[i], str) == 0) {
+            *rolep = map_enum_dtls_role[i];
+            return RAWRTC_CODE_SUCCESS;
+        }
+    }
+
+    return RAWRTC_CODE_NO_VALUE;
 }

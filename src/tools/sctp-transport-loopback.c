@@ -1,5 +1,6 @@
+#include <stdlib.h> // exit
+#include <rawrtcdc/internal/sctp_transport.h>
 #include <rawrtc.h>
-#include "../librawrtc/sctp_transport.h" /* TODO: Replace with <rawrtc_internal/sctp_transport.h> */
 #include "helper/utils.h"
 #include "helper/handler.h"
 
@@ -181,7 +182,7 @@ int main(int argc, char* argv[argc + 1]) {
     (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
     // Initialise
-    EOE(rawrtc_init());
+    EOE(rawrtc_init(true));
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);

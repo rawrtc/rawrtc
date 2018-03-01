@@ -45,6 +45,7 @@ static void rawrtc_ice_parameters_destroy(
 
 /*
  * Create a new ICE parameters instance.
+ * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_parameters_create(
         struct rawrtc_ice_parameters** const parametersp, // de-referenced

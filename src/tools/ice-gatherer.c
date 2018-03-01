@@ -30,7 +30,7 @@ int main(int argc, char* argv[argc + 1]) {
     struct client client = {0};
 
     // Initialise
-    EOE(rawrtc_init());
+    EOE(rawrtc_init(true));
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);

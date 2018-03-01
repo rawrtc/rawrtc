@@ -1,16 +1,18 @@
+#include <rawrtcc/internal/certificate.h>
 #include <rawrtc.h>
 #include "ice_server.h"
 #include "ice_gather_options.h"
-#include "certificate.h"
+#include "ice_gatherer.h"
 #include "ice_candidate.h"
 #include "dtls_transport.h"
+#include "peer_connection_configuration.h"
 #include "peer_connection_description.h"
 #include "peer_connection_ice_candidate.h"
 #include "peer_connection.h"
 
 #define DEBUG_MODULE "peer-connection"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
+#include <rawrtcc/internal/debug.h>
 
 // Constants
 uint16_t const discard_port = 9;
@@ -154,6 +156,8 @@ static enum rawrtc_code peer_connection_start(
     struct rawrtc_peer_connection_context* const context = &connection->context;
     struct rawrtc_peer_connection_description* description;
     enum rawrtc_ice_role ice_role;
+    enum rawrtc_data_transport_type data_transport_type;
+    void* data_transport;
     struct le* le;
 
     // Check if it's too early to start
@@ -186,28 +190,38 @@ static enum rawrtc_code peer_connection_start(
         return error;
     }
 
+    // Get data transport
+    error = rawrtc_data_transport_get_transport(
+            &data_transport_type, &data_transport, context->data_transport);
+    if (error) {
+        return error;
+    }
+
     // Start data transport
-    switch (context->data_transport->type) {
+    switch (data_transport_type) {
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
-            struct rawrtc_sctp_transport* const sctp_transport = context->data_transport->transport;
+            struct rawrtc_sctp_transport* const sctp_transport = data_transport;
 
             // Start DTLS transport
-            error = rawrtc_dtls_transport_start(context->dtls_transport, description->dtls_parameters);
+            error = rawrtc_dtls_transport_start(
+                    context->dtls_transport, description->dtls_parameters);
             if (error) {
-                return error;
+                goto out;
             }
 
             // Start SCTP transport
             error = rawrtc_sctp_transport_start(
                     sctp_transport, description->sctp_capabilities, description->sctp_port);
             if (error) {
-                return error;
+                goto out;
             }
             break;
         }
         default:
-            DEBUG_WARNING("Invalid data transport type\n");
-            return RAWRTC_CODE_UNKNOWN_ERROR;
+            DEBUG_WARNING("Invalid data transport type: %s\n",
+                          rawrtc_data_transport_type_to_str(data_transport_type));
+            error = RAWRTC_CODE_UNSUPPORTED_PROTOCOL;
+            goto out;
     }
 
     // Add remote ICE candidates
@@ -222,7 +236,11 @@ static enum rawrtc_code peer_connection_start(
     }
 
     // Done
-    return RAWRTC_CODE_SUCCESS;
+    error = RAWRTC_CODE_SUCCESS;
+
+out:
+    mem_deref(data_transport);
+    return error;
 }
 
 /*
@@ -734,6 +752,7 @@ static void rawrtc_peer_connection_destroy(
 
 /*
  * Create a new peer connection.
+ * `*connectionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_create(
         struct rawrtc_peer_connection** const connectionp, // de-referenced
@@ -808,17 +827,34 @@ enum rawrtc_code rawrtc_peer_connection_close(
 
     // Stop data transport (if any)
     if (connection->context.data_transport) {
-        switch (connection->data_transport_type) {
-            case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
-                struct rawrtc_sctp_transport *const sctp_transport =
-                        connection->context.data_transport->transport;
-                error = rawrtc_sctp_transport_stop(sctp_transport);
-                if (error) {
-                    DEBUG_WARNING("Unable to stop SCTP transport, reason: %s\n",
-                                  rawrtc_code_to_str(error));
+        enum rawrtc_data_transport_type data_transport_type;
+        void* data_transport;
+
+        // Get data transport
+        error = rawrtc_data_transport_get_transport(
+                &data_transport_type, &data_transport, connection->context.data_transport);
+        if (error) {
+            DEBUG_WARNING("Unable to get data transport, reason: %s\n", rawrtc_code_to_str(error));
+        } else {
+            // Stop transport
+            switch (data_transport_type) {
+                case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
+                    struct rawrtc_sctp_transport *const sctp_transport = data_transport;
+                    error = rawrtc_sctp_transport_stop(sctp_transport);
+                    if (error) {
+                        DEBUG_WARNING("Unable to stop SCTP transport, reason: %s\n",
+                                      rawrtc_code_to_str(error));
+                    }
+                    break;
                 }
-                break;
+                default:
+                    DEBUG_WARNING("Invalid data transport type: %s\n",
+                                  rawrtc_data_transport_type_to_str(data_transport_type));
+                    break;
             }
+
+            // Un-reference
+            mem_deref(data_transport);
         }
     }
 
@@ -852,6 +888,7 @@ enum rawrtc_code rawrtc_peer_connection_close(
 
 /*
  * Create an offer.
+ * `*descriptionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_create_offer(
         struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
@@ -885,6 +922,7 @@ enum rawrtc_code rawrtc_peer_connection_create_offer(
 
 /*
  * Create an answer.
+ * `*descriptionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_create_answer(
         struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
@@ -1442,6 +1480,7 @@ enum rawrtc_code rawrtc_peer_connection_can_trickle_ice_candidates(
 
 /*
  * Create a data channel on a peer connection.
+ * `*channelp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_create_data_channel(
         struct rawrtc_data_channel** const channelp, // de-referenced

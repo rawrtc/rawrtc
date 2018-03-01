@@ -1,4 +1,16 @@
 #pragma once
+#include <rawrtc.h>
+
+struct rawrtc_dtls_fingerprint {
+    struct le le;
+    enum rawrtc_certificate_sign_algorithm algorithm;
+    char* value; // copied
+};
+
+struct rawrtc_dtls_parameters {
+    enum rawrtc_dtls_role role;
+    struct rawrtc_dtls_fingerprints* fingerprints;
+};
 
 enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
     struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced

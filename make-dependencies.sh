@@ -30,10 +30,6 @@ LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="master"
 LIBREW_COMMIT="9ce0a928b919a31382b1952625db3ecdd9fd7bfe"
 LIBREW_PATH="rew"
-USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
-USRSCTP_BRANCH="usrsctp-for-rawrtc"
-USRSCTP_COMMIT="eabbea6cfb4dac224e082fc021b568ec9a731c0b"
-USRSCTP_PATH="usrsctp"
 
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
@@ -102,53 +98,41 @@ if [ "$need_openssl" = true ]; then
     mv openssl-${OPENSSL_VERSION} ${OPENSSL_PATH}
 fi
 
-# Get usrsctp
-if [ ! -d "${USRSCTP_PATH}" ]; then
-    echo "Cloning usrsctp"
-    git clone -b ${USRSCTP_BRANCH} ${USRSCTP_GIT} ${USRSCTP_PATH}
-    cd ${USRSCTP_PATH}
-elif [ "$offline" = false ]; then
-    cd ${USRSCTP_PATH}
-    echo "Pulling usrsctp"
-    git pull
-else
-    cd ${USRSCTP_PATH}
-fi
-git checkout ${USRSCTP_BRANCH}
-git reset --hard ${USRSCTP_COMMIT}
-cd ${MAIN_DIR}
-
 # Get libre
-if [ ! -d "${LIBRE_PATH}" ]; then
-    echo "Cloning libre"
-    git clone -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
-    cd ${LIBRE_PATH}
-elif [ "$offline" = false ]; then
-    cd ${LIBRE_PATH}
-    echo "Pulling libre"
-    git pull
-else
-    cd ${LIBRE_PATH}
+if [ -z "$SKIP_LIBRE" ]; then
+    if [ ! -d "${LIBRE_PATH}" ]; then
+        echo "Cloning libre"
+        git clone -b ${LIBRE_BRANCH} ${LIBRE_GIT} ${LIBRE_PATH}
+        cd ${LIBRE_PATH}
+    elif [ "$offline" = false ]; then
+        cd ${LIBRE_PATH}
+        echo "Pulling libre"
+        git pull
+    else
+        cd ${LIBRE_PATH}
+    fi
+    git checkout ${LIBRE_BRANCH}
+    git reset --hard ${LIBRE_COMMIT}
+    cd ${MAIN_DIR}
 fi
-git checkout ${LIBRE_BRANCH}
-git reset --hard ${LIBRE_COMMIT}
-cd ${MAIN_DIR}
 
 # Get librew
-if [ ! -d "${LIBREW_PATH}" ]; then
-    echo "Cloning librew"
-    git clone -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
-    cd ${LIBREW_PATH}
-elif [ "$offline" = false ]; then
-    cd ${LIBREW_PATH}
-    echo "Pulling librew"
-    git pull
-else
-    cd ${LIBREW_PATH}
+if [ -z "$SKIP_LIBREW" ]; then
+    if [ ! -d "${LIBREW_PATH}" ]; then
+        echo "Cloning librew"
+        git clone -b ${LIBREW_BRANCH} ${LIBREW_GIT} ${LIBREW_PATH}
+        cd ${LIBREW_PATH}
+    elif [ "$offline" = false ]; then
+        cd ${LIBREW_PATH}
+        echo "Pulling librew"
+        git pull
+    else
+        cd ${LIBREW_PATH}
+    fi
+    git checkout ${LIBREW_BRANCH}
+    git reset --hard ${LIBREW_COMMIT}
+    cd ${MAIN_DIR}
 fi
-git checkout ${LIBREW_BRANCH}
-git reset --hard ${LIBREW_COMMIT}
-cd ${MAIN_DIR}
 
 # Build openssl
 if [ "$need_openssl" = true ]; then
@@ -172,44 +156,31 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 openssl_sysroot=`pkg-config --variable=prefix openssl`
 echo "Using OpenSSL sysroot: $openssl_sysroot"
 
-# Build usrsctp
-cd ${USRSCTP_PATH}
-if [ ! -d "build" ]; then
-    mkdir build
-fi
-cd build
-echo "Configuring usrsctp"
-# TODO: Disable "-Wno-address-of-packed-member" once usrsctp has fixed this
-CFLAGS="-fPIC -Wno-unknown-warning-option -Wno-address-of-packed-member" \
-cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
-echo "Cleaning usrsctp"
-make clean
-echo "Building & installing usrsctp"
-make install -j${THREADS}
-rm -f ${PREFIX}/lib/libusrsctp.so* ${PREFIX}/lib/libusrsctp.*dylib
-cd ${MAIN_DIR}
-
 # Build libre
-cd ${LIBRE_PATH}
-echo "Cleaning libre"
-${re_make} clean
-echo "Build information for libre:"
-SYSROOT_ALT=${openssl_sysroot} \
-EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-${re_make} info
-echo "Building libre"
-SYSROOT_ALT=${openssl_sysroot} \
-EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-${re_make} install
-rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
-cd ${MAIN_DIR}
+if [ -z "$SKIP_LIBRE" ]; then
+    cd ${LIBRE_PATH}
+    echo "Cleaning libre"
+    ${re_make} clean
+    echo "Build information for libre:"
+    SYSROOT_ALT=${openssl_sysroot} \
+    EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+    ${re_make} info
+    echo "Building libre"
+    SYSROOT_ALT=${openssl_sysroot} \
+    EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+    ${re_make} install
+    rm -f ${PREFIX}/lib/libre.so ${PREFIX}/lib/libre.*dylib
+    cd ${MAIN_DIR}
+fi
 
 # Build librew
-cd ${LIBREW_PATH}
-echo "Cleaning librew"
-${re_make} clean
-echo "Building librew"
-LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
-EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
-${re_make} install-static
-cd ${MAIN_DIR}
+if [ -z "$SKIP_LIBREW" ]; then
+    cd ${LIBREW_PATH}
+    echo "Cleaning librew"
+    ${re_make} clean
+    echo "Building librew"
+    LIBRE_INC=${MAIN_DIR}/${LIBRE_PATH}/include \
+    EXTRA_CFLAGS="-Werror${clang_extra_cflags}" \
+    ${re_make} install-static
+    cd ${MAIN_DIR}
+fi

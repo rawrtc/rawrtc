@@ -1,10 +1,6 @@
 #include <rawrtc.h>
 #include "peer_connection_states.h"
 
-#define DEBUG_MODULE "peer-connection-states"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
-
 /*
  * Get the corresponding name for a signaling state.
  */
