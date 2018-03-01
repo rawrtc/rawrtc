@@ -1,35 +1,30 @@
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <string.h> // memcpy
+#include <rawrtcc/internal/message_buffer.h>
 #include <rawrtc.h>
-#include "utils.h"
+#include "config.h"
 #include "ice_candidate.h"
-#include "message_buffer.h"
 #include "candidate_helper.h"
-#include "ice_server.h"
 #include "ice_gather_options.h"
 #include "ice_gatherer.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
-#include "debug.h"
+#include <rawrtcc/internal/debug.h>
 
 /*
- * Get the corresponding name for an ICE gatherer state.
+ * Get the corresponding address family name for an DNS type.
  */
-char const * const rawrtc_ice_gatherer_state_to_name(
-        enum rawrtc_ice_gatherer_state const state
+static char const * const dns_type_to_address_family_name(
+        uint_fast16_t const dns_type
 ) {
-    switch (state) {
-        case RAWRTC_ICE_GATHERER_STATE_NEW:
-            return "new";
-        case RAWRTC_ICE_GATHERER_STATE_GATHERING:
-            return "gathering";
-        case RAWRTC_ICE_GATHERER_STATE_COMPLETE:
-            return "complete";
-        case RAWRTC_ICE_GATHERER_STATE_CLOSED:
-            return "closed";
+    switch (dns_type) {
+        case DNS_TYPE_A:
+            return "IPv4";
+        case DNS_TYPE_AAAA:
+            return "IPv6";
         default:
             return "???";
     }
@@ -57,6 +52,7 @@ static void rawrtc_ice_gatherer_destroy(
 
 /*
  * Create a new ICE gatherer.
+ * `*gathererp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_gatherer_create(
         struct rawrtc_ice_gatherer** const gathererp, // de-referenced
@@ -907,8 +903,7 @@ static enum rawrtc_code query_a_or_aaaa_record(
 
     // Check if already resolved
     if (resolved) {
-        DEBUG_PRINTF("Hostname (%s) already resolved\n",
-                     rawrtc_dns_type_to_address_family_name(dns_type));
+        DEBUG_PRINTF("Hostname (%s) already resolved\n", dns_type_to_address_family_name(dns_type));
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -1073,6 +1068,7 @@ enum rawrtc_code rawrtc_ice_gatherer_get_state(
 
 /*
  * Get local ICE parameters of an ICE gatherer.
+ * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_gatherer_get_local_parameters(
         struct rawrtc_ice_parameters** const parametersp, // de-referenced
@@ -1110,6 +1106,7 @@ static void rawrtc_ice_gatherer_local_candidates_destroy(
 
 /*
  * Get local ICE candidates of an ICE gatherer.
+ * `*candidatesp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_gatherer_get_local_candidates(
         struct rawrtc_ice_candidates** const candidatesp, // de-referenced
@@ -1157,4 +1154,24 @@ out:
         *candidatesp = candidates;
     }
     return error;
+}
+
+/*
+ * Get the corresponding name for an ICE gatherer state.
+ */
+char const * const rawrtc_ice_gatherer_state_to_name(
+        enum rawrtc_ice_gatherer_state const state
+) {
+    switch (state) {
+        case RAWRTC_ICE_GATHERER_STATE_NEW:
+            return "new";
+        case RAWRTC_ICE_GATHERER_STATE_GATHERING:
+            return "gathering";
+        case RAWRTC_ICE_GATHERER_STATE_COMPLETE:
+            return "complete";
+        case RAWRTC_ICE_GATHERER_STATE_CLOSED:
+            return "closed";
+        default:
+            return "???";
+    }
 }

@@ -1,12 +1,8 @@
+#include <rawrtcc/internal/certificate.h>
+#include <rawrtcc/internal/utils.h>
 #include <rawrtc.h>
-#include "utils.h"
-#include "certificate.h"
 #include "ice_server.h"
 #include "peer_connection_configuration.h"
-
-#define DEBUG_MODULE "peer-connection-configuration"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
 
 /*
  * Destructor for an existing peer connection configuration.
@@ -23,6 +19,7 @@ static void rawrtc_peer_connection_configuration_destroy(
 
 /*
  * Create a new peer connection configuration.
+ * `*configurationp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_create(
         struct rawrtc_peer_connection_configuration** const configurationp, // de-referenced
@@ -107,6 +104,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_ice_server(
 
 /*
  * Get ICE servers from the peer connection configuration.
+ * `*serversp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_get_ice_servers(
         struct rawrtc_ice_servers** const serversp, // de-referenced
@@ -154,6 +152,7 @@ enum rawrtc_code rawrtc_peer_connection_configuration_add_certificate(
 
 /*
  * Get certificates from the peer connection configuration.
+ * `*certificatesp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_get_certificates(
         struct rawrtc_certificates** const certificatesp, // de-referenced

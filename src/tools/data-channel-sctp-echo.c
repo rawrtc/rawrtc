@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
@@ -287,8 +288,7 @@ out:
 
         // Stop client & bye
         client_stop(client);
-        before_exit();
-        exit(0);
+        re_cancel();
     }
 }
 
@@ -370,7 +370,7 @@ int main(int argc, char* argv[argc + 1]) {
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
     // Initialise
-    EOE(rawrtc_init());
+    EOE(rawrtc_init(true));
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);

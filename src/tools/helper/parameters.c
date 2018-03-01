@@ -129,9 +129,8 @@ void set_dtls_parameters(
 
     // Get and set fingerprints
     EOE(rawrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters));
-    for (i = 0; i < parameters->fingerprints->n_fingerprints; ++i) {
-        struct rawrtc_dtls_fingerprint* const fingerprint =
-                parameters->fingerprints->fingerprints[i];
+    for (i = 0; i < fingerprints->n_fingerprints; ++i) {
+        struct rawrtc_dtls_fingerprint* const fingerprint = fingerprints->fingerprints[i];
         enum rawrtc_certificate_sign_algorithm sign_algorithm;
         char* value;
         char* key;

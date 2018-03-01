@@ -1,4 +1,10 @@
 #pragma once
+#include <rawrtc.h>
+
+struct rawrtc_ice_gather_options {
+    enum rawrtc_ice_gather_policy gather_policy;
+    struct list ice_servers;
+};
 
 enum rawrtc_code rawrtc_ice_gather_options_add_server_internal(
     struct rawrtc_ice_gather_options* const configuration,

@@ -1,4 +1,5 @@
 #include <rawrtc.h>
+#include "ice_gatherer.h"
 #include "candidate_helper.h"
 
 /*

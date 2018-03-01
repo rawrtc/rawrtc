@@ -37,3 +37,5 @@
 # Build folder
 /build*
 
+# Generated files
+/src/include/rawrtc_internal.h

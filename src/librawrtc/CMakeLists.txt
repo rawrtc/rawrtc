@@ -1,38 +1,43 @@
 # Library sources
 set(rawrtc_SOURCES
         candidate_helper.c
-        certificate.c
-        data_channel.c
-        data_channel_options.c
-        data_channel_parameters.c
-        data_transport.c
+        config.c
         diffie_hellman_parameters.c
         dtls_parameters.c
         dtls_transport.c
         ice_candidate.c
-        ice_gatherer.c
         ice_gather_options.c
+        ice_gatherer.c
         ice_parameters.c
         ice_server.c
         ice_transport.c
         main.c
-        message_buffer.c
         peer_connection.c
         peer_connection_configuration.c
         peer_connection_description.c
         peer_connection_ice_candidate.c
         peer_connection_states.c
-        sctp_capabilities.c
-        sctp_transport.c
-        utils.c)
+        sctp_transport.c)
 
-# If we are building the SCTP redirect transport tool
-if (SCTP_REDIRECT_TRANSPORT)
-    # Add the relevant source files
-    list(APPEND rawrtc_SOURCES
-            crc32c.c
-            sctp_redirect_transport.c)
-endif ()
+# Library internal headers
+set(rawrtc_HEADERS
+        candidate_helper.h
+        config.h
+        dtls_parameters.h
+        dtls_transport.h
+        ice_candidate.h
+        ice_gather_options.h
+        ice_gatherer.h
+        ice_parameters.h
+        ice_server.h
+        ice_transport.h
+        main.h
+        peer_connection.h
+        peer_connection_configuration.h
+        peer_connection_description.h
+        peer_connection_ice_candidate.h
+        peer_connection_states.h
+        sctp_transport.h)
 
 # Setup library (link & install)
 add_library(rawrtc SHARED ${rawrtc_SOURCES})
@@ -44,11 +49,19 @@ target_link_libraries(rawrtc-static
 install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
 
-if (SCTP_REDIRECT_TRANSPORT)
-    # And set the preprocessor variable
-    target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
-    target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
-endif ()
+# Generate internal headers & install them
+set(internal_header_file "${CMAKE_SOURCE_DIR}/src/include/rawrtc_internal.h")
+set(rawrtc_HEADERS_INCLUDE "")
+foreach (header IN LISTS rawrtc_HEADERS)
+    string(CONCAT rawrtc_HEADERS_INCLUDE
+            ${rawrtc_HEADERS_INCLUDE}
+            "#include <rawrtc/internal/"
+            ${header} ">\n")
+endforeach ()
+configure_file(${CMAKE_SOURCE_DIR}/src/include/rawrtc_internal.h.cmakein
+        ${internal_header_file} @ONLY)
+install(FILES ${rawrtc_HEADERS} DESTINATION include/rawrtc/internal)
+install(FILES ${internal_header_file} DESTINATION include)
 
 # Generate pkg-config file & install it
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pkg-config.pc.cmakein

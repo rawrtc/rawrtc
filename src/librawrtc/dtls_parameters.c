@@ -15,6 +15,7 @@ static void rawrtc_dtls_fingerprint_destroy(
 
 /*
  * Create a new DTLS fingerprint instance.
+ * `*fingerprintp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_fingerprint_create(
         struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced
@@ -141,6 +142,7 @@ out:
 
 /*
  * Create a new DTLS parameters instance.
+ * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_parameters_create(
         struct rawrtc_dtls_parameters** const parametersp, // de-referenced
