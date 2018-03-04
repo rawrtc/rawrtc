@@ -1,4 +1,5 @@
 #include <stdlib.h> // exit
+#include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
@@ -146,6 +147,9 @@ int main(int argc, char* argv[argc + 1]) {
     client_start(&a, &b);
     client_start(&b, &a);
 
+    // Listen on stdin
+    EOR(fd_listen(STDIN_FILENO, FD_READ, stop_on_return_handler, NULL));
+
     // Start main loop
     // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
@@ -153,6 +157,9 @@ int main(int argc, char* argv[argc + 1]) {
     // Stop clients
     client_stop(&a);
     client_stop(&b);
+
+    // Stop listening on STDIN
+    fd_close(STDIN_FILENO);
 
     // Free
     mem_deref(gather_options);
