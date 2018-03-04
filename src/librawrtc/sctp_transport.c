@@ -32,7 +32,7 @@ static enum rawrtc_code dtls_transport_state_getter(
  * Outbound data handler of the SCTP transport.
  * `buffer` will be a fake `mbuf` structure.
  */
-enum rawrtc_code sctp_transport_outbound_handler(
+static enum rawrtc_code sctp_transport_outbound_handler(
         struct mbuf* const buffer,
         uint8_t const tos,
         uint8_t const set_df,
@@ -171,6 +171,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     if (error) {
         goto out;
     }
+
+    // TODO: Set MTU (1200|1280 (IPv4|IPv6) - UDP - DTLS (cipher suite dependent) - SCTP (12)
 
     // Attach to DTLS transport
     DEBUG_PRINTF("Attaching as data transport\n");
