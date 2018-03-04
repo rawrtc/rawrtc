@@ -290,10 +290,18 @@ static void parameters_destroy(
 static void client_stop(
         struct data_channel_sctp_client* const client
 ) {
-    EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
-    EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
-    EOE(rawrtc_ice_transport_stop(client->ice_transport));
-    EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    if (client->sctp_transport) {
+        EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
+    }
+    if (client->dtls_transport) {
+        EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
+    }
+    if (client->ice_transport) {
+        EOE(rawrtc_ice_transport_stop(client->ice_transport));
+    }
+    if (client->gatherer) {
+        EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    }
 
     // Un-reference & close
     parameters_destroy(&client->remote_parameters);
