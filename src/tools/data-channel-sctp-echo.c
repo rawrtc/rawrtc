@@ -377,12 +377,12 @@ int main(int argc, char* argv[argc + 1]) {
     struct data_channel_sctp_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init(true));
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Check arguments length
     if (argc < 2) {

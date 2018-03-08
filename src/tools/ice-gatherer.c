@@ -29,12 +29,12 @@ int main(int argc, char* argv[argc + 1]) {
     char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct client client = {0};
 
-    // Initialise
-    EOE(rawrtc_init(true));
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
