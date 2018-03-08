@@ -96,7 +96,7 @@ Note: We assume that you are in the `build` directory.
     export PATH=${PWD}/prefix/bin:${PATH}
 
 Most of the tools have required or optional arguments which are shared among
-tools. Below is a description for the various arguments:
+tools. Below is a description for the various shared arguments:
 
 #### offering
 
@@ -113,20 +113,6 @@ Determines the ICE role to be used by the ICE transport, where `0` means
 
 Only used by ORTC API tools.
 
-#### redirect-ip
-
-The IP address on which an SCTP stack is listening.
-
-Used in conjunction with `redirect-port`. Only used by the SCTP redirect
-transport.
-
-#### redirect-port
-
-The port number on which an SCTP stack is listening.
-
-Used in conjunction with `redirect-ip`. Only used by the SCTP redirect
-transport.
-
 #### sctp-port
 
 The port number the internal SCTP stack is supposed to use. Defaults to `5000`.
@@ -136,14 +122,6 @@ debug SCTP messages. In this case, it's easier to distinguish the peers by
 their port numbers.
 
 Only used by ORTC API tools.
-
-#### maximum-message-size
-
-The maximum message size of an SCTP message the external SCTP stack is able to
-handle. `0` indicates that messages of arbitrary size can be handled. Defaults
-to `0`.
-
-Only used by the SCTP redirect transport.
 
 #### ice-candidate-type
 
@@ -259,6 +237,14 @@ Usage:
                             [<sctp-port>] [<maximum-message-size>]
                             [<ice-candidate-type> ...]
 
+Special arguments:
+
+* `redirect-ip`: The IP address on which the external SCTP stack is listening.
+* `redirect-port` The port on which the external SCTP stack is listening.
+* `maximum-message-size`: The maximum message size of a data channel message
+  the external SCTP stack is able to handle. `0` indicates that messages of
+  arbitrary size can be handled. Defaults to `0`.
+
 ### data-channel-sctp-loopback
 
 API: ORTC
@@ -355,6 +341,32 @@ described for the [data-channel-sctp](#data-channel-sctp) tool.
 Usage:
 
     data-channel-sctp-echo <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
+    
+### data-channel-sctp-throughput
+
+API: ORTC
+
+The data channel SCTP throughput tool allows you to test throughput by sending
+one or more message. It will report the amount of seconds elapsed and the
+throughput in Mbit/s.
+
+The necessary peer connection establishment steps are identical to the ones
+described for the [data-channel-sctp](#data-channel-sctp) tool. However,
+be aware that this tool has no browser counterpart at the moment, so it only
+makes sense to use two instances of this tool for throughput testing.
+
+Usage:
+
+    data-channel-sctp-throughput <0|1 (ice-role)> <message-size> [<n-times>]
+                                 [<sctp-port>] [<ice-candidate-type> ...]
+
+Special arguments:
+
+* `message-size`: Is the message size used for throughput testing. The
+  controlling peer will determine the message size for both peers, so this
+  argument is being ignored for the controlled peer.
+* `n-times`: Is the amount of times the message will be sent. Again, this
+  value is being ignored for the controlled peer.
 
 ### peer-connection
 

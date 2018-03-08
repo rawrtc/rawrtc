@@ -154,12 +154,12 @@ int main(int argc, char* argv[argc + 1]) {
     (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
     (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init(true));
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Get enabled ICE candidate types to be added (optional)
     if (argc > 1) {
