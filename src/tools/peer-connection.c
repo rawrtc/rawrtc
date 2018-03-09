@@ -133,7 +133,7 @@ static void connection_state_change_handler(
 
         // Create data channel
         EOE(rawrtc_peer_connection_create_data_channel(
-                &client->data_channel->channel, client->connection, channel_parameters, NULL,
+                &client->data_channel->channel, client->connection, channel_parameters,
                 data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
                 default_data_channel_error_handler, default_data_channel_close_handler,
                 default_data_channel_message_handler, client->data_channel));
@@ -184,8 +184,7 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_peer_connection_create_data_channel(
-            &client->data_channel_negotiated->channel, client->connection,
-            channel_parameters, NULL,
+            &client->data_channel_negotiated->channel, client->connection, channel_parameters,
             data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
