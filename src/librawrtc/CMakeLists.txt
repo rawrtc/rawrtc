@@ -17,6 +17,7 @@ set(rawrtc_SOURCES
         peer_connection_description.c
         peer_connection_ice_candidate.c
         peer_connection_states.c
+        sctp_common.c
         sctp_transport.c)
 
 # Library internal headers
@@ -37,7 +38,16 @@ set(rawrtc_HEADERS
         peer_connection_description.h
         peer_connection_ice_candidate.h
         peer_connection_states.h
+        sctp_common.h
         sctp_transport.h)
+
+# Optional: SCTP redirect transport tool sources
+if (SCTP_REDIRECT_TRANSPORT)
+    list(APPEND rawrtc_SOURCES
+            sctp_redirect_transport.c)
+    list(APPEND rawrtc_HEADERS
+            sctp_redirect_transport.h)
+endif ()
 
 # Setup library (link & install)
 add_library(rawrtc SHARED ${rawrtc_SOURCES})
@@ -48,6 +58,13 @@ target_link_libraries(rawrtc-static
         ${rawrtc_DEP_LIBRARIES})
 install(TARGETS rawrtc rawrtc-static
         DESTINATION lib)
+
+# Optional: SCTP redirect transport tool definitions
+if (SCTP_REDIRECT_TRANSPORT)
+    # And set the preprocessor variable
+    target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
+    target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
+endif ()
 
 # Generate internal headers & install them
 set(internal_header_file "${CMAKE_SOURCE_DIR}/src/include/rawrtc_internal.h")
