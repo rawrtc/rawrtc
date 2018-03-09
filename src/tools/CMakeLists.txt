@@ -77,6 +77,15 @@ target_link_libraries(data-channel-sctp-echo
 install(TARGETS data-channel-sctp-echo
         DESTINATION bin)
 
+# Tool: data-channel-sctp-streamed
+add_executable(data-channel-sctp-streamed
+        data-channel-sctp-streamed.c)
+target_link_libraries(data-channel-sctp-streamed
+        rawrtc
+        rawrtc-helper)
+install(TARGETS data-channel-sctp-streamed
+        DESTINATION bin)
+
 # Tool: data-channel-sctp-throughput
 add_executable(data-channel-sctp-throughput
         data-channel-sctp-throughput.c)

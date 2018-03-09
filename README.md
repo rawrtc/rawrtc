@@ -328,6 +328,22 @@ Usage:
 
     data-channel-sctp <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
 
+### data-channel-sctp-streamed
+
+API: ORTC
+
+The data channel SCTP streamed tool is the counterpart to the *normal* data
+channel SCTP tool but uses the streaming mode. **Be aware this tool and the
+streaming mode is currently experimental and incomplete.**
+
+The necessary peer connection establishment steps are identical to the ones
+described for the [data-channel-sctp](#data-channel-sctp) tool.
+
+Usage:
+
+    data-channel-sctp-streamed <0|1 (ice-role)> [<sctp-port>]
+                               [<ice-candidate-type> ...]
+
 ### data-channel-sctp-echo
 
 API: ORTC
@@ -340,7 +356,8 @@ described for the [data-channel-sctp](#data-channel-sctp) tool.
 
 Usage:
 
-    data-channel-sctp-echo <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]
+    data-channel-sctp-echo <0|1 (ice-role)> [<sctp-port>]
+                           [<ice-candidate-type> ...]
     
 ### data-channel-sctp-throughput
 
