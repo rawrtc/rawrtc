@@ -975,7 +975,6 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
  * TODO (from RTCIceTransport interface)
  * rawrtc_certificate_list_*
  * rawrtc_dtls_transport_get_certificates
- * rawrtc_dtls_transport_get_transport
  */
 
 /*
@@ -1024,6 +1023,28 @@ enum rawrtc_code rawrtc_str_to_dtls_role(
     enum rawrtc_dtls_role* const rolep, // de-referenced
     char const* const str
 );
+
+#ifdef SCTP_REDIRECT_TRANSPORT
+/*
+ * Create an SCTP redirect transport.
+ * `*transportp` must be unreferenced.
+ *
+ * `port` defaults to `5000` if set to `0`.
+ * `redirect_ip` is the target IP SCTP packets will be redirected to
+ *  and must be a IPv4 address.
+ * `redirect_port` is the target SCTP port packets will be redirected
+ *  to.
+ */
+enum rawrtc_code rawrtc_sctp_redirect_transport_create(
+    struct rawrtc_sctp_redirect_transport** const transportp, // de-referenced
+    struct rawrtc_dtls_transport* const dtls_transport, // referenced
+    uint16_t const port, // zeroable
+    char* const redirect_ip, // copied
+    uint16_t const redirect_port,
+    rawrtc_sctp_redirect_transport_state_change_handler* const state_change_handler, // nullable
+    void* const arg // nullable
+);
+#endif
 
 /*
  * Create an SCTP transport.

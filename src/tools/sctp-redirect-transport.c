@@ -85,7 +85,8 @@ static void client_init(
     // Create SCTP redirect transport
     EOE(rawrtc_sctp_redirect_transport_create(
             &client->sctp_redirect_transport, client->dtls_transport,
-            0, client->redirect_ip, client->redirect_port));
+            0, client->redirect_ip, client->redirect_port,
+            default_sctp_redirect_transport_state_change_handler, client));
 }
 
 static void client_start_gathering(
