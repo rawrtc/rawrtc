@@ -175,6 +175,34 @@ void default_data_channel_close_handler(
     DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, channel->label);
 }
 
+char const* const separator = ", ";
+
+int debug_data_channel_message_flags(
+        struct re_printf* const pf,
+        enum rawrtc_data_channel_message_flag const flags
+) {
+    int err = 0;
+    char const* prefix = "";
+
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_ABORTED) {
+        err |= re_hprintf(pf, "%saborted", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE) {
+        err |= re_hprintf(pf, "%scomplete", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_STRING) {
+        err |= re_hprintf(pf, "%sstring", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY) {
+        err |= re_hprintf(pf, "%sbinary", prefix);
+    }
+
+    return err;
+}
+
 /*
  * Print the data channel's received message's size.
  */
@@ -185,9 +213,9 @@ void default_data_channel_message_handler(
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
-    (void) flags;
-    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes\n",
-                 client->name, channel->label, mbuf_get_left(buffer));
+    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes; flags=(%H)\n",
+                 client->name, channel->label, mbuf_get_left(buffer),
+                 debug_data_channel_message_flags, flags);
 }
 
 /*
