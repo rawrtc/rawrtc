@@ -176,8 +176,7 @@ static void dtls_transport_state_change_handler(
 
             // Create data channel
             EOE(rawrtc_data_channel_create(
-                    &client->data_channel->channel, client->data_transport,
-                    channel_parameters, NULL,
+                    &client->data_channel->channel, client->data_transport, channel_parameters,
                     data_channel_open_handler,
                     default_data_channel_buffered_amount_low_handler,
                     default_data_channel_error_handler, default_data_channel_close_handler,
@@ -237,8 +236,7 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_data_channel_create(
-            &client->data_channel_negotiated->channel, client->data_transport,
-            channel_parameters, NULL,
+            &client->data_channel_negotiated->channel, client->data_transport, channel_parameters,
             data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));

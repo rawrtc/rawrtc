@@ -1486,7 +1486,6 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
         struct rawrtc_data_channel** const channelp, // de-referenced
         struct rawrtc_peer_connection* const connection,
         struct rawrtc_data_channel_parameters* const parameters, // referenced
-        struct rawrtc_data_channel_options* const options, // nullable, referenced
         rawrtc_data_channel_open_handler* const open_handler, // nullable
         rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
         rawrtc_data_channel_error_handler* const error_handler, // nullable
@@ -1524,7 +1523,7 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     // Create data channel
     // TODO: Fix data channel cannot be created before transports have been started
     error = rawrtc_data_channel_create(
-            &channel, context.data_transport, parameters, options, open_handler,
+            &channel, context.data_transport, parameters, open_handler,
             buffered_amount_low_handler, error_handler, close_handler, message_handler, arg);
     if (error) {
         goto out;

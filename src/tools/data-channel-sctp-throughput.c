@@ -6,7 +6,7 @@
 #include "helper/handler.h"
 #include "helper/parameters.h"
 
-#define DEBUG_MODULE "data-channel-sctp-app"
+#define DEBUG_MODULE "data-channel-sctp-throughput-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
@@ -235,8 +235,7 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_data_channel_create(
-            &client->data_channel->channel, client->data_transport,
-            channel_parameters, NULL,
+            &client->data_channel->channel, client->data_transport, channel_parameters,
             data_channel_open_handler, data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             data_channel_message_handler, client->data_channel));
