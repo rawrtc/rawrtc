@@ -34,8 +34,8 @@ static void rawrtc_ice_transport_destroy(
 enum rawrtc_code rawrtc_ice_transport_create(
         struct rawrtc_ice_transport** const transportp, // de-referenced
         struct rawrtc_ice_gatherer* const gatherer, // referenced, nullable
-        rawrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
-        rawrtc_ice_transport_candidate_pair_change_handler* const candidate_pair_change_handler, // nullable
+        rawrtc_ice_transport_state_change_handler const state_change_handler, // nullable
+        rawrtc_ice_transport_candidate_pair_change_handler const candidate_pair_change_handler, // nullable
         void* const arg // nullable
 ) {
     struct rawrtc_ice_transport* transport;

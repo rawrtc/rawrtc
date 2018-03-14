@@ -9,9 +9,9 @@ enum {
 struct rawrtc_ice_gatherer {
     enum rawrtc_ice_gatherer_state state;
     struct rawrtc_ice_gather_options* options; // referenced
-    rawrtc_ice_gatherer_state_change_handler* state_change_handler; // nullable
-    rawrtc_ice_gatherer_error_handler* error_handler; // nullable
-    rawrtc_ice_gatherer_local_candidate_handler* local_candidate_handler; // nullable
+    rawrtc_ice_gatherer_state_change_handler state_change_handler; // nullable
+    rawrtc_ice_gatherer_error_handler error_handler; // nullable
+    rawrtc_ice_gatherer_local_candidate_handler local_candidate_handler; // nullable
     void* arg; // nullable
     struct list buffered_messages; // TODO: Can this be added to the candidates list?
     struct list local_candidates; // TODO: Hash list instead?

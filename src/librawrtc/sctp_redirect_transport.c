@@ -61,7 +61,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
         uint16_t const port, // zeroable
         char* const redirect_ip, // copied
         uint16_t const redirect_port,
-        rawrtc_sctp_redirect_transport_state_change_handler* const state_change_handler, // nullable
+        rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler, // nullable
         void* const arg // nullable
 ) {
     enum rawrtc_code error;

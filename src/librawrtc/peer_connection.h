@@ -22,14 +22,14 @@ struct rawrtc_peer_connection {
     enum rawrtc_peer_connection_state connection_state;
     enum rawrtc_signaling_state signaling_state;
     struct rawrtc_peer_connection_configuration* configuration; // referenced
-    rawrtc_negotiation_needed_handler* negotiation_needed_handler; // nullable
-    rawrtc_peer_connection_local_candidate_handler* local_candidate_handler; // nullable
-    rawrtc_peer_connection_local_candidate_error_handler* local_candidate_error_handler; // nullable
-    rawrtc_signaling_state_change_handler* signaling_state_change_handler; // nullable
-    rawrtc_ice_transport_state_change_handler* ice_connection_state_change_handler; // nullable
-    rawrtc_ice_gatherer_state_change_handler* ice_gathering_state_change_handler; // nullable
-    rawrtc_peer_connection_state_change_handler* connection_state_change_handler; // nullable
-    rawrtc_data_channel_handler* data_channel_handler; // nullable
+    rawrtc_negotiation_needed_handler negotiation_needed_handler; // nullable
+    rawrtc_peer_connection_local_candidate_handler local_candidate_handler; // nullable
+    rawrtc_peer_connection_local_candidate_error_handler local_candidate_error_handler; // nullable
+    rawrtc_signaling_state_change_handler signaling_state_change_handler; // nullable
+    rawrtc_ice_transport_state_change_handler ice_connection_state_change_handler; // nullable
+    rawrtc_ice_gatherer_state_change_handler ice_gathering_state_change_handler; // nullable
+    rawrtc_peer_connection_state_change_handler connection_state_change_handler; // nullable
+    rawrtc_data_channel_handler data_channel_handler; // nullable
     enum rawrtc_data_transport_type data_transport_type;
     struct rawrtc_peer_connection_description* local_description; // referenced
     struct rawrtc_peer_connection_description* remote_description; // referenced

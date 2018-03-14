@@ -57,9 +57,9 @@ static void rawrtc_ice_gatherer_destroy(
 enum rawrtc_code rawrtc_ice_gatherer_create(
         struct rawrtc_ice_gatherer** const gathererp, // de-referenced
         struct rawrtc_ice_gather_options* const options, // referenced
-        rawrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
-        rawrtc_ice_gatherer_error_handler* const error_handler, // nullable
-        rawrtc_ice_gatherer_local_candidate_handler* const local_candidate_handler, // nullable
+        rawrtc_ice_gatherer_state_change_handler const state_change_handler, // nullable
+        rawrtc_ice_gatherer_error_handler const error_handler, // nullable
+        rawrtc_ice_gatherer_local_candidate_handler const local_candidate_handler, // nullable
         void* const arg // nullable
 ) {
     struct rawrtc_ice_gatherer* gatherer;
