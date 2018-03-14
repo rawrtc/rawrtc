@@ -15,10 +15,10 @@ struct rawrtc_config rawrtc_default_config = {
     .ice_server_secure_transport = RAWRTC_ICE_SERVER_TRANSPORT_TLS,
     .stun_keepalive_interval = 25,
     .stun_config = {
-        STUN_DEFAULT_RTO,
-        STUN_DEFAULT_RC,
-        STUN_DEFAULT_RM,
-        STUN_DEFAULT_TI,
-        0x00
+        .rto = STUN_DEFAULT_RTO,
+        .rc = STUN_DEFAULT_RC,
+        .rm = STUN_DEFAULT_RM,
+        .ti = STUN_DEFAULT_TI,
+        .tos = 0x00,
     }
 };

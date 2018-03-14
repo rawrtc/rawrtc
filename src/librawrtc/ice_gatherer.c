@@ -435,7 +435,6 @@ static void reflexive_candidate_handler(
     struct rawrtc_ice_gatherer* const gatherer = candidate->gatherer;
     struct ice_lcand* const re_candidate = candidate->candidate;
     struct ice_lcand* re_other_candidate;
-    bool remove_session = false;
     uint32_t priority;
     struct ice_lcand* srflx_candidate;
     enum rawrtc_code error;
@@ -459,11 +458,6 @@ static void reflexive_candidate_handler(
     if (re_other_candidate) {
         DEBUG_PRINTF("Ignoring server reflexive candidate with same base %J and public IP %j (%s)"
                      "\n", &re_candidate->attr.addr, address, session->url->url);
-
-        // Remove session
-        // Note: Removing is delayed here as we still need the references the session has
-        //       until the end of the function.
-        remove_session = true;
         goto out;
     }
 
@@ -496,10 +490,10 @@ out:
     --candidate->srflx_pending_count;
     check_gathering_complete(gatherer);
 
-    // Remove session if requested
-    if (remove_session) {
-        mem_deref(session);
-    }
+    // Remove STUN keepalive session
+    // Note: We only needed the remote address, so this session can be teared down.
+    //       This also makes sure the handler is only called once.
+    mem_deref(session);
 }
 
 /*
@@ -516,6 +510,13 @@ static enum rawrtc_code gather_reflexive_candidates(
     enum rawrtc_ice_candidate_type type;
     char const* type_str;
     struct rawrtc_candidate_helper_stun_session* session = NULL;
+    struct stun_conf stun_config = { // TODO: Make this configurable!
+            .rto = STUN_DEFAULT_RTO,
+            .rc = 3, // Send at: 0ms, 500ms, 1500ms
+            .rm = 3, // Additional wait: 3000ms
+            .ti = 4500, // Total timeout: 4500ms
+            .tos = 0x00,
+    };
     struct stun_keepalive* stun_keepalive = NULL;
 
     // Ensure the candidate's protocol matches the server address's protocol
@@ -546,7 +547,7 @@ static enum rawrtc_code gather_reflexive_candidates(
                  url->url);
     error = rawrtc_error_to_code(stun_keepalive_alloc(
             &stun_keepalive, re_candidate->attr.proto, re_candidate->us, RAWRTC_LAYER_STUN,
-            server_address, &rawrtc_default_config.stun_config, reflexive_candidate_handler,
+            server_address, &stun_config, reflexive_candidate_handler,
             session));
     if (error) {
         goto out;
@@ -854,7 +855,11 @@ static void dns_query_handler(
 
     // Handle error (if any)
     if (err) {
-        DEBUG_WARNING("Could not query DNS record, reason: %m\n", err);
+        DEBUG_WARNING("Could not query DNS record for '%r', reason: %m\n", &context->url->host);
+        goto out;
+    } else if (header->rcode != 0) {
+        DEBUG_NOTICE("DNS record query for '%r' unsuccessful: %s (%"PRIu8")\n",
+                      &context->url->host, dns_hdr_rcodename(header->rcode), header->rcode);
         goto out;
     }
 
@@ -862,6 +867,7 @@ static void dns_query_handler(
     dns_rrlist_apply2(answer_records, NULL, DNS_TYPE_A, DNS_TYPE_AAAA, DNS_CLASS_IN, true,
                       dns_record_result_handler, context);
 
+out:
     // Remove context from URL depending on DNS type
     switch (context->dns_type) {
         case DNS_TYPE_A:
@@ -881,7 +887,6 @@ static void dns_query_handler(
     // Check if gathering is complete
     check_gathering_complete(context->gatherer);
 
-out:
     // Un-reference context
     mem_deref(context);
 }
