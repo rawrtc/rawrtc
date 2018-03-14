@@ -564,8 +564,8 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
         struct rawrtc_dtls_transport** const transportp, // de-referenced
         struct rawrtc_ice_transport* const ice_transport, // referenced
         struct list* certificates, // de-referenced, copied (shallow)
-        rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
-        rawrtc_dtls_transport_error_handler* const error_handler, // nullable
+        rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
+        rawrtc_dtls_transport_error_handler const error_handler, // nullable
         void* const arg // nullable
 ) {
     struct rawrtc_dtls_transport* transport;
@@ -710,8 +710,8 @@ enum rawrtc_code rawrtc_dtls_transport_create(
         struct rawrtc_ice_transport* const ice_transport, // referenced
         struct rawrtc_certificate* const certificates[], // copied (each item)
         size_t const n_certificates,
-        rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
-        rawrtc_dtls_transport_error_handler* const error_handler, // nullable
+        rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
+        rawrtc_dtls_transport_error_handler const error_handler, // nullable
         void* const arg // nullable
 ) {
     enum rawrtc_code error;
@@ -946,7 +946,7 @@ static bool intermediate_receive_handler(
  */
 enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
         struct rawrtc_dtls_transport* const transport,
-        rawrtc_dtls_transport_receive_handler* const receive_handler,
+        rawrtc_dtls_transport_receive_handler const receive_handler,
         void* const arg
 ) {
     enum rawrtc_code error;

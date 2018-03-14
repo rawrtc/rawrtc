@@ -261,7 +261,7 @@ enum {
 /*
  * ICE gatherer state change handler.
  */
-typedef void (rawrtc_ice_gatherer_state_change_handler)(
+typedef void (*rawrtc_ice_gatherer_state_change_handler)(
     enum rawrtc_ice_gatherer_state const state, // read-only
     void* const arg
 );
@@ -269,7 +269,7 @@ typedef void (rawrtc_ice_gatherer_state_change_handler)(
 /*
  * ICE gatherer error handler.
  */
-typedef void (rawrtc_ice_gatherer_error_handler)(
+typedef void (*rawrtc_ice_gatherer_error_handler)(
     struct rawrtc_ice_candidate* const candidate, // read-only, nullable
     char const * const url, // read-only
     uint16_t const error_code, // read-only
@@ -282,7 +282,7 @@ typedef void (rawrtc_ice_gatherer_error_handler)(
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
  * 'url' will be NULL in case a host candidate has been gathered.
  */
-typedef void (rawrtc_ice_gatherer_local_candidate_handler)(
+typedef void (*rawrtc_ice_gatherer_local_candidate_handler)(
     struct rawrtc_ice_candidate* const candidate,
     char const * const url, // read-only
     void* const arg
@@ -291,7 +291,7 @@ typedef void (rawrtc_ice_gatherer_local_candidate_handler)(
 /*
  * ICE transport state change handler.
  */
-typedef void (rawrtc_ice_transport_state_change_handler)(
+typedef void (*rawrtc_ice_transport_state_change_handler)(
     enum rawrtc_ice_transport_state const state,
     void* const arg
 );
@@ -299,7 +299,7 @@ typedef void (rawrtc_ice_transport_state_change_handler)(
 /*
  * ICE transport pair change handler.
  */
-typedef void (rawrtc_ice_transport_candidate_pair_change_handler)(
+typedef void (*rawrtc_ice_transport_candidate_pair_change_handler)(
     struct rawrtc_ice_candidate* const local, // read-only
     struct rawrtc_ice_candidate* const remote, // read-only
     void* const arg
@@ -308,7 +308,7 @@ typedef void (rawrtc_ice_transport_candidate_pair_change_handler)(
 /*
  * DTLS transport state change handler.
  */
-typedef void (rawrtc_dtls_transport_state_change_handler)(
+typedef void (*rawrtc_dtls_transport_state_change_handler)(
     enum rawrtc_dtls_transport_state const state,
     void* const arg
 );
@@ -316,7 +316,7 @@ typedef void (rawrtc_dtls_transport_state_change_handler)(
 /*
  * DTLS transport error handler.
  */
-typedef void (rawrtc_dtls_transport_error_handler)(
+typedef void (*rawrtc_dtls_transport_error_handler)(
     /* TODO: error.message (probably from OpenSSL) */
     void* const arg
 );
@@ -324,7 +324,7 @@ typedef void (rawrtc_dtls_transport_error_handler)(
 /*
  * Peer connection state change handler.
  */
-typedef void (rawrtc_peer_connection_state_change_handler)(
+typedef void (*rawrtc_peer_connection_state_change_handler)(
     enum rawrtc_peer_connection_state const state, // read-only
     void* const arg
 );
@@ -332,7 +332,7 @@ typedef void (rawrtc_peer_connection_state_change_handler)(
 /*
  * Negotiation needed handler.
  */
-typedef void (rawrtc_negotiation_needed_handler)(
+typedef void (*rawrtc_negotiation_needed_handler)(
     void* const arg
 );
 
@@ -341,7 +341,7 @@ typedef void (rawrtc_negotiation_needed_handler)(
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
  * 'url' will be NULL in case a host candidate has been gathered.
  */
-typedef void (rawrtc_peer_connection_local_candidate_handler)(
+typedef void (*rawrtc_peer_connection_local_candidate_handler)(
     struct rawrtc_peer_connection_ice_candidate* const candidate,
     char const * const url, // read-only
     void* const arg
@@ -352,7 +352,7 @@ typedef void (rawrtc_peer_connection_local_candidate_handler)(
  * Note: 'candidate' and 'url' will be NULL in case gathering is complete.
  * 'url' will be NULL in case a host candidate has been gathered.
  */
-typedef void (rawrtc_peer_connection_local_candidate_error_handler)(
+typedef void (*rawrtc_peer_connection_local_candidate_error_handler)(
     struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
     char const * const url, // read-only
     uint16_t const error_code, // read-only
@@ -363,7 +363,7 @@ typedef void (rawrtc_peer_connection_local_candidate_error_handler)(
 /*
  * Signaling state handler.
  */
-typedef void (rawrtc_signaling_state_change_handler)(
+typedef void (*rawrtc_signaling_state_change_handler)(
     enum rawrtc_signaling_state const state, // read-only
     void* const arg
 );
@@ -707,9 +707,9 @@ enum rawrtc_code rawrtc_str_to_ice_gather_policy(
 enum rawrtc_code rawrtc_ice_gatherer_create(
     struct rawrtc_ice_gatherer** const gathererp, // de-referenced
     struct rawrtc_ice_gather_options* const options, // referenced
-    rawrtc_ice_gatherer_state_change_handler* const state_change_handler, // nullable
-    rawrtc_ice_gatherer_error_handler* const error_handler, // nullable
-    rawrtc_ice_gatherer_local_candidate_handler* const local_candidate_handler, // nullable
+    rawrtc_ice_gatherer_state_change_handler const state_change_handler, // nullable
+    rawrtc_ice_gatherer_error_handler const error_handler, // nullable
+    rawrtc_ice_gatherer_local_candidate_handler const local_candidate_handler, // nullable
     void* const arg // nullable
 );
 
@@ -781,8 +781,8 @@ char const * const rawrtc_ice_gatherer_state_to_name(
 enum rawrtc_code rawrtc_ice_transport_create(
     struct rawrtc_ice_transport** const transportp, // de-referenced
     struct rawrtc_ice_gatherer* const gatherer, // referenced, nullable
-    rawrtc_ice_transport_state_change_handler* const state_change_handler, // nullable
-    rawrtc_ice_transport_candidate_pair_change_handler* const candidate_pair_change_handler, // nullable
+    rawrtc_ice_transport_state_change_handler const state_change_handler, // nullable
+    rawrtc_ice_transport_candidate_pair_change_handler const candidate_pair_change_handler, // nullable
     void* const arg // nullable
 );
 
@@ -953,8 +953,8 @@ enum rawrtc_code rawrtc_dtls_transport_create(
     struct rawrtc_ice_transport* const ice_transport, // referenced
     struct rawrtc_certificate* const certificates[], // copied (each item)
     size_t const n_certificates,
-    rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
-    rawrtc_dtls_transport_error_handler* const error_handler, // nullable
+    rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
+    rawrtc_dtls_transport_error_handler const error_handler, // nullable
     void* const arg // nullable
 );
 
@@ -1043,7 +1043,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
     uint16_t const port, // zeroable
     char* const redirect_ip, // copied
     uint16_t const redirect_port,
-    rawrtc_sctp_redirect_transport_state_change_handler* const state_change_handler, // nullable
+    rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler, // nullable
     void* const arg // nullable
 );
 #endif
@@ -1056,8 +1056,8 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     struct rawrtc_sctp_transport** const transportp, // de-referenced
     struct rawrtc_dtls_transport* const dtls_transport, // referenced
     uint16_t const port, // zeroable
-    rawrtc_data_channel_handler* const data_channel_handler, // nullable
-    rawrtc_sctp_transport_state_change_handler* const state_change_handler, // nullable
+    rawrtc_data_channel_handler const data_channel_handler, // nullable
+    rawrtc_sctp_transport_state_change_handler const state_change_handler, // nullable
     void* const arg // nullable
 );
 
@@ -1258,14 +1258,14 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_ortc_candidate(
 enum rawrtc_code rawrtc_peer_connection_create(
     struct rawrtc_peer_connection** const connectionp, // de-referenced
     struct rawrtc_peer_connection_configuration* configuration, // referenced
-    rawrtc_negotiation_needed_handler* const negotiation_needed_handler, // nullable
-    rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler, // nullable
-    rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler, // nullable
-    rawrtc_signaling_state_change_handler* const signaling_state_change_handler, // nullable
-    rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler, // nullable
-    rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler, // nullable
-    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler, //nullable
-    rawrtc_data_channel_handler* const data_channel_handler, // nullable
+    rawrtc_negotiation_needed_handler const negotiation_needed_handler, // nullable
+    rawrtc_peer_connection_local_candidate_handler const local_candidate_handler, // nullable
+    rawrtc_peer_connection_local_candidate_error_handler const local_candidate_error_handler, // nullable
+    rawrtc_signaling_state_change_handler const signaling_state_change_handler, // nullable
+    rawrtc_ice_transport_state_change_handler const ice_connection_state_change_handler, // nullable
+    rawrtc_ice_gatherer_state_change_handler const ice_gathering_state_change_handler, // nullable
+    rawrtc_peer_connection_state_change_handler const connection_state_change_handler, //nullable
+    rawrtc_data_channel_handler const data_channel_handler, // nullable
     void* const arg // nullable
 );
 
@@ -1394,11 +1394,11 @@ enum rawrtc_code rawrtc_peer_connection_create_data_channel(
     struct rawrtc_data_channel** const channelp, // de-referenced
     struct rawrtc_peer_connection* const connection,
     struct rawrtc_data_channel_parameters* const parameters, // referenced
-    rawrtc_data_channel_open_handler* const open_handler, // nullable
-    rawrtc_data_channel_buffered_amount_low_handler* const buffered_amount_low_handler, // nullable
-    rawrtc_data_channel_error_handler* const error_handler, // nullable
-    rawrtc_data_channel_close_handler* const close_handler, // nullable
-    rawrtc_data_channel_message_handler* const message_handler, // nullable
+    rawrtc_data_channel_open_handler const open_handler, // nullable
+    rawrtc_data_channel_buffered_amount_low_handler const buffered_amount_low_handler, // nullable
+    rawrtc_data_channel_error_handler const error_handler, // nullable
+    rawrtc_data_channel_close_handler const close_handler, // nullable
+    rawrtc_data_channel_message_handler const message_handler, // nullable
     void* const arg // nullable
 );
 
@@ -1414,7 +1414,7 @@ enum rawrtc_code rawrtc_peer_connection_unset_handlers(
  */
 enum rawrtc_code rawrtc_peer_connection_set_negotiation_needed_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_negotiation_needed_handler* const negotiation_needed_handler // nullable
+    rawrtc_negotiation_needed_handler const negotiation_needed_handler // nullable
 );
 
 /*
@@ -1422,7 +1422,7 @@ enum rawrtc_code rawrtc_peer_connection_set_negotiation_needed_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
-    rawrtc_negotiation_needed_handler** const negotiation_needed_handlerp, // de-referenced
+    rawrtc_negotiation_needed_handler* const negotiation_needed_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1431,7 +1431,7 @@ enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_peer_connection_local_candidate_handler* const local_candidate_handler // nullable
+    rawrtc_peer_connection_local_candidate_handler const local_candidate_handler // nullable
 );
 
 /*
@@ -1439,7 +1439,7 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
-    rawrtc_peer_connection_local_candidate_handler** const local_candidate_handlerp, // de-referenced
+    rawrtc_peer_connection_local_candidate_handler* const local_candidate_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1448,7 +1448,7 @@ enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handler // nullable
+    rawrtc_peer_connection_local_candidate_error_handler const local_candidate_error_handler // nullable
 );
 
 /*
@@ -1456,7 +1456,7 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
-    rawrtc_peer_connection_local_candidate_error_handler** const local_candidate_error_handlerp, // de-referenced
+    rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1465,7 +1465,7 @@ enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_signaling_state_change_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_signaling_state_change_handler* const signaling_state_change_handler // nullable
+    rawrtc_signaling_state_change_handler const signaling_state_change_handler // nullable
 );
 
 /*
@@ -1473,7 +1473,7 @@ enum rawrtc_code rawrtc_peer_connection_set_signaling_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_signaling_state_change_handler(
-    rawrtc_signaling_state_change_handler** const signaling_state_change_handlerp, // de-referenced
+    rawrtc_signaling_state_change_handler* const signaling_state_change_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1482,7 +1482,7 @@ enum rawrtc_code rawrtc_peer_connection_get_signaling_state_change_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_ice_connection_state_change_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handler // nullable
+    rawrtc_ice_transport_state_change_handler const ice_connection_state_change_handler // nullable
 );
 
 /*
@@ -1490,7 +1490,7 @@ enum rawrtc_code rawrtc_peer_connection_set_ice_connection_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state_change_handler(
-    rawrtc_ice_transport_state_change_handler** const ice_connection_state_change_handlerp, // de-referenced
+    rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1499,7 +1499,7 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state_change_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_ice_gathering_state_change_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handler // nullable
+    rawrtc_ice_gatherer_state_change_handler const ice_gathering_state_change_handler // nullable
 );
 
 /*
@@ -1507,7 +1507,7 @@ enum rawrtc_code rawrtc_peer_connection_set_ice_gathering_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state_change_handler(
-    rawrtc_ice_gatherer_state_change_handler** const ice_gathering_state_change_handlerp, // de-referenced
+    rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1516,7 +1516,7 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state_change_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_connection_state_change_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_peer_connection_state_change_handler* const connection_state_change_handler // nullable
+    rawrtc_peer_connection_state_change_handler const connection_state_change_handler // nullable
 );
 
 /*
@@ -1524,7 +1524,7 @@ enum rawrtc_code rawrtc_peer_connection_set_connection_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_connection_state_change_handler(
-    rawrtc_peer_connection_state_change_handler** const connection_state_change_handlerp, // de-referenced
+    rawrtc_peer_connection_state_change_handler* const connection_state_change_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );
 
@@ -1533,7 +1533,7 @@ enum rawrtc_code rawrtc_peer_connection_get_connection_state_change_handler(
  */
 enum rawrtc_code rawrtc_peer_connection_set_data_channel_handler(
     struct rawrtc_peer_connection* const connection,
-    rawrtc_data_channel_handler* const data_channel_handler // nullable
+    rawrtc_data_channel_handler const data_channel_handler // nullable
 );
 
 /*
@@ -1541,6 +1541,6 @@ enum rawrtc_code rawrtc_peer_connection_set_data_channel_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_data_channel_handler(
-    rawrtc_data_channel_handler** const data_channel_handlerp, // de-referenced
+    rawrtc_data_channel_handler* const data_channel_handlerp, // de-referenced
     struct rawrtc_peer_connection* const connection
 );

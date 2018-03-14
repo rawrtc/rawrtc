@@ -4,7 +4,7 @@
 /*
  * Handle inbound application data.
  */
-typedef void (rawrtc_dtls_transport_receive_handler)(
+typedef void (*rawrtc_dtls_transport_receive_handler)(
     struct mbuf* const buffer,
     void* const arg
 );
@@ -13,8 +13,8 @@ struct rawrtc_dtls_transport {
     enum rawrtc_dtls_transport_state state;
     struct rawrtc_ice_transport* ice_transport; // referenced
     struct list certificates; // deep-copied
-    rawrtc_dtls_transport_state_change_handler* state_change_handler; // nullable
-    rawrtc_dtls_transport_error_handler* error_handler; // nullable
+    rawrtc_dtls_transport_state_change_handler state_change_handler; // nullable
+    rawrtc_dtls_transport_error_handler error_handler; // nullable
     void* arg; // nullable
     struct rawrtc_dtls_parameters* remote_parameters; // referenced
     enum rawrtc_dtls_role role;
@@ -25,7 +25,7 @@ struct rawrtc_dtls_transport {
     struct tls* context;
     struct dtls_sock* socket;
     struct tls_conn* connection;
-    rawrtc_dtls_transport_receive_handler* receive_handler;
+    rawrtc_dtls_transport_receive_handler receive_handler;
     void* receive_handler_arg;
 };
 
@@ -33,8 +33,8 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     struct rawrtc_dtls_transport** const transportp, // de-referenced
     struct rawrtc_ice_transport* const ice_transport, // referenced
     struct list* certificates, // de-referenced, copied (shallow)
-    rawrtc_dtls_transport_state_change_handler* const state_change_handler, // nullable
-    rawrtc_dtls_transport_error_handler* const error_handler, // nullable
+    rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
+    rawrtc_dtls_transport_error_handler const error_handler, // nullable
     void* const arg // nullable
 );
 
@@ -50,7 +50,7 @@ enum rawrtc_code rawrtc_dtls_transport_have_data_transport(
 
 enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
     struct rawrtc_dtls_transport* const transport,
-    rawrtc_dtls_transport_receive_handler* const receive_handler,
+    rawrtc_dtls_transport_receive_handler const receive_handler,
     void* const arg
 );
 
