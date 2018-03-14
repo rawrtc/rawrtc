@@ -507,6 +507,7 @@ static enum rawrtc_code gather_reflexive_candidates(
     enum rawrtc_code error;
     struct ice_lcand* const re_candidate = candidate->candidate;
     struct ice_cand_attr* const attribute = &candidate->candidate->attr;
+    int const af = sa_af(&attribute->addr);
     enum rawrtc_ice_candidate_type type;
     char const* type_str;
     struct rawrtc_candidate_helper_stun_session* session = NULL;
@@ -519,8 +520,14 @@ static enum rawrtc_code gather_reflexive_candidates(
     };
     struct stun_keepalive* stun_keepalive = NULL;
 
-    // Ensure the candidate's protocol matches the server address's protocol
-    if (sa_af(&attribute->addr) != sa_af(server_address)) {
+    // Ignore IPv6 addresses
+    // Note: If you have a use case for IPv6 server reflexive candidates, let me know.
+    if (af == AF_INET6) {
+        return RAWRTC_CODE_SUCCESS;
+    }
+
+    // Ensure the candidate's IP version matches the server address's IP version
+    if (af != sa_af(server_address)) {
         return RAWRTC_CODE_SUCCESS;
     }
 
