@@ -616,6 +616,12 @@ static void gather_candidates_using_server(
 
     for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
         struct rawrtc_candidate_helper* const candidate = le->data;
+        struct sa* const address = &candidate->candidate->attr.addr;
+
+        // Ignore loopback and link-local addresses
+        if (sa_is_linklocal(address) || sa_is_loopback(address)) {
+            continue;
+        }
 
         // Gather candidates
         gather_candidates(candidate, server_address, url);
@@ -751,9 +757,9 @@ static bool interface_handler(
         return true; // Don't continue gathering
     }
 
-    // Ignore loopback and link-local addresses
+    // Ignore loopback addresses
     // TODO: Make this configurable
-    if (sa_is_linklocal(address) || sa_is_loopback(address)) {
+    if (sa_is_loopback(address)) {
         return false; // Continue gathering
     }
 
