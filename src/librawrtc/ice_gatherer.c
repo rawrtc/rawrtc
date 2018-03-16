@@ -626,6 +626,7 @@ static void gather_candidates_using_server(
         struct sa* const address = &candidate->candidate->attr.addr;
 
         // Ignore loopback and link-local addresses
+        // See: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-5.1.1.1
         if (sa_is_linklocal(address) || sa_is_loopback(address)) {
             continue;
         }
