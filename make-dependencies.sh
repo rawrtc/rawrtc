@@ -184,3 +184,5 @@ if [ -z "$SKIP_LIBREW" ]; then
     ${re_make} install-static
     cd ${MAIN_DIR}
 fi
+
+# TODO: Build RAWRTCDC (implicitly builds RAWRTCC)
