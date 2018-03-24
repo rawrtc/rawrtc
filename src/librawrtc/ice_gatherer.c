@@ -8,27 +8,13 @@
 #include "candidate_helper.h"
 #include "ice_gather_options.h"
 #include "ice_gatherer.h"
+#include "ice_server_url_address.h"
+#include "ice_server_url_resolver.h"
 
 #define DEBUG_MODULE "ice-gatherer"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include <rawrtcc/internal/debug.h>
-
-/*
- * Get the corresponding address family name for an DNS type.
- */
-static char const * const dns_type_to_address_family_name(
-        uint_fast16_t const dns_type
-) {
-    switch (dns_type) {
-        case DNS_TYPE_A:
-            return "IPv4";
-        case DNS_TYPE_AAAA:
-            return "IPv6";
-        default:
-            return "???";
-    }
-}
 
 /*
  * Destructor for an existing ICE gatherer.
@@ -47,6 +33,8 @@ static void rawrtc_ice_gatherer_destroy(
     mem_deref(gatherer->ice);
     list_flush(&gatherer->local_candidates);
     list_flush(&gatherer->buffered_messages);
+    list_flush(&gatherer->url_resolvers);
+    list_flush(&gatherer->url_addresses);
     mem_deref(gatherer->options);
 }
 
@@ -86,6 +74,8 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     gatherer->error_handler = error_handler;
     gatherer->local_candidate_handler = local_candidate_handler;
     gatherer->arg = arg;
+    list_init(&gatherer->url_addresses);
+    list_init(&gatherer->url_resolvers);
     list_init(&gatherer->buffered_messages);
     list_init(&gatherer->local_candidates);
 
@@ -187,9 +177,11 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
     // Flush local candidate helpers
     list_flush(&gatherer->local_candidates);
 
-    // Remove ICE server URL DNS context's
-    // TODO: Does this stop the resolving process?
-    rawrtc_ice_gather_options_destroy_url_dns_contexts(gatherer->options);
+    // Remove ICE server URL resolvers
+    list_flush(&gatherer->url_resolvers);
+
+    // Remove ICE server URL addresses
+    list_flush(&gatherer->url_addresses);
 
     // Stop ICE checklist (if running)
     trice_checklist_stop(gatherer->ice);
@@ -287,26 +279,13 @@ static void check_gathering_complete(
         return;
     }
 
-    // Ensure no DNS queries are in flight
-    for (le = list_head(&gatherer->options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
-        struct rawrtc_ice_server_url* url;
-        bool pending_dns_queries;
-
-        // Check for pending DNS queries
-        error = rawrtc_ice_server_dns_queries_pending(&url, &pending_dns_queries, server);
-        if (error) {
-            DEBUG_WARNING("Unable to check for pending DNS queries, reason: %s\n",
-                          rawrtc_code_to_str(error));
-        }
-
-        // Handle pending DNS queries
-        if (pending_dns_queries) {
-            // Nope
-            DEBUG_PRINTF("Gathering still in progress, pending DNS record queries (%s)\n",
-                         url->url);
-            return;
-        }
+    // Ensure no URL resolvers are in flight
+    if (!list_isempty(&gatherer->url_resolvers)) {
+        struct rawrtc_ice_server_url_resolver* const resolver =
+                list_head(&gatherer->url_resolvers)->data;
+        DEBUG_PRINTF("Gathering still in progress, resolving URL (%s [%s])\n",
+                     resolver->url->url, dns_rr_typename(resolver->dns_type));
+        return;
     }
 
     // Ensure every local candidate has no pending srflx/relay candidates
@@ -408,17 +387,17 @@ static struct ice_lcand* find_candidate(
  */
 static enum rawrtc_code gather_relay_candidates(
         struct rawrtc_candidate_helper* const candidate, // not checked
-        struct sa* server_address, // not checked
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url_address* const server_address // not checked
 ) {
     // Check ICE server is enabled for TURN
-    if (url->type != RAWRTC_ICE_SERVER_TYPE_TURN) {
+    if (server_address->url->type != RAWRTC_ICE_SERVER_TYPE_TURN) {
         return RAWRTC_CODE_SUCCESS;
     }
 
     // TODO: Create TURN request
     (void) candidate;
-    DEBUG_NOTICE("TODO: Gather relay candidates using server %J (%s)\n", server_address, url->url);
+    DEBUG_NOTICE("TODO: Gather relay candidates using server %J (%s)\n", &server_address->address,
+                 server_address->url->url);
     return RAWRTC_CODE_SUCCESS;
 }
 
@@ -501,8 +480,7 @@ out:
  */
 static enum rawrtc_code gather_reflexive_candidates(
         struct rawrtc_candidate_helper* const candidate, // not checked
-        struct sa* server_address, // not checked
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url_address* const server_address // not checked
 ) {
     enum rawrtc_code error;
     struct ice_lcand* const re_candidate = candidate->candidate;
@@ -527,7 +505,7 @@ static enum rawrtc_code gather_reflexive_candidates(
     }
 
     // Ensure the candidate's IP version matches the server address's IP version
-    if (af != sa_af(server_address)) {
+    if (af != sa_af(&server_address->address)) {
         return RAWRTC_CODE_SUCCESS;
     }
 
@@ -542,7 +520,7 @@ static enum rawrtc_code gather_reflexive_candidates(
     // TODO: Handle TCP/TLS/DTLS transports
 
     // Create STUN session
-    error = rawrtc_candidate_helper_stun_session_create(&session, url);
+    error = rawrtc_candidate_helper_stun_session_create(&session, server_address->url);
     if (error) {
         goto out;
     }
@@ -550,11 +528,11 @@ static enum rawrtc_code gather_reflexive_candidates(
     // Create STUN keep-alive session
     // TODO: We're using the candidate's protocol which conflicts with the ICE server URL transport
     DEBUG_PRINTF("Creating STUN request for %s %s candidate %J using ICE server %J (%s)\n",
-                 net_proto2name(attribute->proto), type_str, &attribute->addr, server_address,
-                 url->url);
+                 net_proto2name(attribute->proto), type_str, &attribute->addr,
+                 &server_address->address, server_address->url->url);
     error = rawrtc_error_to_code(stun_keepalive_alloc(
             &stun_keepalive, re_candidate->attr.proto, re_candidate->us, RAWRTC_LAYER_STUN,
-            server_address, &stun_config, reflexive_candidate_handler,
+            &server_address->address, &stun_config, reflexive_candidate_handler,
             session));
     if (error) {
         goto out;
@@ -588,13 +566,37 @@ out:
  */
 static void gather_candidates(
         struct rawrtc_candidate_helper* const candidate, // not checked
-        struct sa* server_address, // not checked
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_server_url_address* const server_address // not checked
 ) {
+    struct sa* const address = &candidate->candidate->attr.addr;
+    int af;
     enum rawrtc_code error;
 
+    // Skip IPv4, IPv6 (server [!] addresses)?
+    // TODO: Get config from struct
+    af = sa_af(&server_address->address);
+    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
+        || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
+        DEBUG_PRINTF("Ignoring ICE server address %j (family disabled)\n",
+                     &server_address->address);
+        return;
+    }
+
+    // Ignore 'any', loopback and link-local server (!) addresses
+    if (sa_is_any(&server_address->address) || sa_is_loopback(&server_address->address)
+        || sa_is_linklocal(&server_address->address)) {
+        DEBUG_NOTICE("Ignoring ICE server address %j\n", &server_address->address);
+        return;
+    }
+
+    // Ignore loopback and link-local candidate (!) addresses (there is no mapped NAT address since
+    // the addresses aren't reachable from outside of the local network)
+    if (sa_is_linklocal(address) || sa_is_loopback(address)) {
+        return;
+    }
+
     // Gather reflexive candidates
-    error = gather_reflexive_candidates(candidate, server_address, url);
+    error = gather_reflexive_candidates(candidate, server_address);
     if (error) {
         DEBUG_WARNING("Could not gather server reflexive candidates, reason: %s",
                       rawrtc_code_to_str(error));
@@ -602,7 +604,7 @@ static void gather_candidates(
     }
 
     // Gather relay candidates
-    error = gather_relay_candidates(candidate, server_address, url);
+    error = gather_relay_candidates(candidate, server_address);
     if (error) {
         DEBUG_WARNING("Could not gather relay candidates, reason: %s",
                       rawrtc_code_to_str(error));
@@ -612,56 +614,23 @@ static void gather_candidates(
 
 /*
  * Gather server reflexive and relay candidates using a newly resolved
- * ICE server.
+ * ICE server URL address.
  */
 static void gather_candidates_using_server(
-        struct rawrtc_ice_gatherer* const gatherer,
-        struct sa* server_address,
-        struct rawrtc_ice_server_url* const url // not checked
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        struct rawrtc_ice_server_url_address* const address // not checked
 ) {
     struct le* le;
-
     for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
         struct rawrtc_candidate_helper* const candidate = le->data;
-        struct sa* const address = &candidate->candidate->attr.addr;
-
-        // Ignore loopback and link-local addresses
-        // See: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-20#section-5.1.1.1
-        if (sa_is_linklocal(address) || sa_is_loopback(address)) {
-            continue;
-        }
 
         // Gather candidates
-        gather_candidates(candidate, server_address, url);
+        gather_candidates(candidate, address);
     }
+
+    // Gathering complete?
+    check_gathering_complete(gatherer);
 }
-
-/*
- * Gather server reflexive candidates of a local candidate using
- * an already resolved ICE server.
- */
-static void gather_candidates_using_resolved_server(
-        struct rawrtc_ice_server* const server, // not checked
-        struct rawrtc_candidate_helper* const candidate // not checked
-) {
-    struct le* le;
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // IPv4
-        if (rawrtc_default_config.ipv4_enable && !sa_is_any(&url->ipv4_address)) {
-            // Gather candidates
-            gather_candidates(candidate, &url->ipv4_address, url);
-        }
-
-        // IPv6
-        if (rawrtc_default_config.ipv6_enable && !sa_is_any(&url->ipv6_address)) {
-            // Gather candidates
-            gather_candidates(candidate, &url->ipv6_address, url);
-        }
-    }
-}
-
 
 /*
  * Gather server reflexive candidates of a local candidate using
@@ -672,12 +641,15 @@ static void gather_candidates_using_resolved_servers(
         struct rawrtc_candidate_helper* const candidate // not checked
 ) {
     struct le* le;
-    for (le = list_head(&gatherer->options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
+    for (le = list_head(&gatherer->url_addresses); le != NULL; le = le->next) {
+        struct rawrtc_ice_server_url_address* const address = le->data;
 
-        // Gather on resolved server
-        gather_candidates_using_resolved_server(server, candidate);
+        // Gather candidates
+        gather_candidates(candidate, address);
     }
+
+    // Gathering complete?
+    check_gathering_complete(gatherer);
 }
 
 /*
@@ -765,9 +737,23 @@ static bool interface_handler(
         return true; // Don't continue gathering
     }
 
-    // Ignore loopback addresses
+    // Ignore 'any' address
+    if (sa_is_any(address)) {
+        DEBUG_PRINTF("Ignoring gathered 'any' address %j\n", address);
+        return false; // Continue gathering
+    }
+
+    // Ignore loopback address
     // TODO: Make this configurable
     if (sa_is_loopback(address)) {
+        DEBUG_PRINTF("Ignoring gathered loopback address %j\n", address);
+        return false; // Continue gathering
+    }
+
+    // Ignore link-local address
+    // TODO: Make this configurable
+    if (sa_is_linklocal(address)) {
+        DEBUG_PRINTF("Ignoring gathered link-local address %j\n", address);
         return false; // Continue gathering
     }
 
@@ -776,6 +762,7 @@ static bool interface_handler(
     af = sa_af(address);
     if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
             || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
+        DEBUG_PRINTF("Ignoring gathered address %j (family disabled)\n", address);
         return false; // Continue gathering
     }
 
@@ -815,166 +802,40 @@ out:
 }
 
 /*
- * DNS A or AAAA record handler.
+ * ICE server URL address resolved handler.
  */
-static bool dns_record_result_handler(
-    struct dnsrr* resource_record,
-    void* arg
+static bool ice_server_url_address_result_handler(
+        struct rawrtc_ice_server_url_address* const address, // not checked, referenced
+        void* const arg // not checked
 ) {
-    struct rawrtc_ice_server_url_dns_context* const context = arg;
-    struct rawrtc_ice_server_url* const url = context->url;
-    struct sa* server_address;
-    DEBUG_PRINTF("DNS resource record: %H\n", dns_rr_print, resource_record);
+    struct rawrtc_ice_gatherer* const gatherer = arg;
+    DEBUG_PRINTF("Resolved URL %s to address %J\n", address->url->url, &address->address);
 
-    // Set IP address
-    switch (resource_record->type) {
-        case DNS_TYPE_A:
-            // Set IPv4 address
-            server_address = &url->ipv4_address;
-            sa_set_in(server_address, resource_record->rdata.a.addr, sa_port(server_address));
-            break;
+    // Append to list of URL addresses
+    list_append(&gatherer->url_addresses, &address->le, mem_ref(address));
 
-        case DNS_TYPE_AAAA:
-            // Set IPv6 address
-            server_address = &url->ipv6_address;
-            sa_set_in6(server_address, resource_record->rdata.aaaa.addr, sa_port(server_address));
-            break;
+    // Gather on the newly created address
+    gather_candidates_using_server(gatherer, address);
 
-        default:
-            DEBUG_WARNING("Invalid DNS resource record, expected A/AAAA record, got: %H\n",
-                          dns_rr_print, resource_record);
-            return true; // stop traversing
-    }
-
-    // Start gathering candidates using the resolved ICE server
-    gather_candidates_using_server(context->gatherer, server_address, url);
-
-    // Done, stop traversing, one IP is sufficient
+    // Done, stop traversing, one address per family is sufficient
     return true;
 }
 
 /*
- * DNS query result handler.
- */
-static void dns_query_handler(
-        int err,
-        struct dnshdr const* header,
-        struct list* answer_records,
-        struct list* authoritive_records,
-        struct list* additional_records,
-        void* arg
-) {
-    struct rawrtc_ice_server_url_dns_context* const context = arg;
-    (void) header; (void) authoritive_records; (void) additional_records;
-
-    // Handle error (if any)
-    if (err) {
-        DEBUG_WARNING("Could not query DNS record for '%r', reason: %m\n", &context->url->host);
-        goto out;
-    } else if (header->rcode != 0) {
-        DEBUG_NOTICE("DNS record query for '%r' unsuccessful: %s (%"PRIu8")\n",
-                      &context->url->host, dns_hdr_rcodename(header->rcode), header->rcode);
-        goto out;
-    }
-
-    // Handle A or AAAA record
-    dns_rrlist_apply2(answer_records, NULL, DNS_TYPE_A, DNS_TYPE_AAAA, DNS_CLASS_IN, true,
-                      dns_record_result_handler, context);
-
-out:
-    // Remove context from URL depending on DNS type
-    switch (context->dns_type) {
-        case DNS_TYPE_A:
-            context->url->dns_a_context = NULL;
-            break;
-
-        case DNS_TYPE_AAAA:
-            context->url->dns_aaaa_context = NULL;
-            break;
-
-        default:
-            DEBUG_WARNING("Invalid DNS type, expected A/AAAA, got %s\n",
-                          dns_rr_typename((uint16_t) context->dns_type));
-            break;
-    }
-
-    // Check if gathering is complete
-    check_gathering_complete(context->gatherer);
-
-    // Un-reference context
-    mem_deref(context);
-}
-
-/*
- * Query A or AAAA record.
- */
-static enum rawrtc_code query_a_or_aaaa_record(
-        struct rawrtc_ice_server_url_dns_context** const contextp, // de-referenced, not checked
-        struct sa* const server_address, // not checked
-        uint_fast16_t const dns_type,
-        struct rawrtc_ice_server_url* const url, // not checked
-        struct rawrtc_ice_gatherer* const gatherer // referenced, not checked
-) {
-    bool const resolved = !sa_is_any(server_address);
-    enum rawrtc_code error;
-    struct rawrtc_ice_server_url_dns_context* context;
-    char* host_str = NULL;
-
-    // Check if already resolved
-    if (resolved) {
-        DEBUG_PRINTF("Hostname (%s) already resolved\n", dns_type_to_address_family_name(dns_type));
-        return RAWRTC_CODE_SUCCESS;
-    }
-
-    // Create ICE server URL DNS context
-    error = rawrtc_ice_server_url_dns_context_create(&context, dns_type, url, gatherer);
-    if (error) {
-        return error;
-    }
-
-    // Copy URL to str
-    error = rawrtc_error_to_code(pl_strdup(&host_str, &url->host));
-    if (error) {
-        goto out;
-    }
-
-    // Query A or AAAA record
-    error = rawrtc_error_to_code(dnsc_query(
-            &context->dns_query, gatherer->dns_client, host_str, (uint16_t) dns_type,
-            DNS_CLASS_IN, true, dns_query_handler, context));
-    if (error) {
-        goto out;
-    }
-
-    // Done
-    error = RAWRTC_CODE_SUCCESS;
-
-out:
-    if (error) {
-        // Un-reference context
-        mem_deref(context);
-    } else {
-        // Set pointer
-        *contextp = context;
-    }
-
-    // Un-reference & done
-    mem_deref(host_str);
-    return error;
-}
-
-/*
- * Cancel if already resolving
- */
-
-/*
  * Resolve ICE server IP addresses.
  */
-static enum rawrtc_code resolve_ice_servers_address(
+static enum rawrtc_code resolve_ice_server_addresses(
         struct rawrtc_ice_gatherer* const gatherer, // not checked
         struct rawrtc_ice_gather_options* const options // not checked
 ) {
     struct le* le;
+
+    // Remove all ICE server URL resolvers
+    // Note: This will cancel pending URL resolve processes
+    list_flush(&gatherer->url_resolvers);
+
+    // Remove all resolved ICE server URL addresses
+    list_flush(&gatherer->url_addresses);
 
     for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
         struct rawrtc_ice_server* const ice_server = le->data;
@@ -983,34 +844,51 @@ static enum rawrtc_code resolve_ice_servers_address(
 
         for (url_le = list_head(&ice_server->urls); url_le != NULL; url_le = url_le->next) {
             struct rawrtc_ice_server_url* const url = url_le->data;
+            // URL already resolved (decoded IP address)?
+            if (!sa_is_any(&url->resolved_address)) {
+                struct rawrtc_ice_server_url_address* address;
 
-            // Cancel pending DNS resolve processes
-            // TODO: Does this stop the resolving process?
-            error = rawrtc_ice_server_url_destroy_dns_contexts(url);
-            if (error) {
-                DEBUG_WARNING("Unable to destroy previous DNS context for ICE server URL, reason: "
-                              "%s\n", rawrtc_code_to_str(error));
-            }
-
-            // Query A record (if IPv4 is enabled)
-            if (rawrtc_default_config.ipv4_enable) {
-                error = query_a_or_aaaa_record(
-                        &url->dns_a_context, &url->ipv4_address, DNS_TYPE_A, url, gatherer);
+                // Create URL address from resolved URL
+                error = rawrtc_ice_server_url_address_create(&address, url, &url->resolved_address);
                 if (error) {
-                    DEBUG_WARNING("Unable to query A record, reason: %s\n",
+                    DEBUG_WARNING("Unable to create ICE server URL address, reason: %s\n",
                                   rawrtc_code_to_str(error));
                     // Continue - not considered critical
+                } else {
+                    // Append to list of URL addresses
+                    list_append(&gatherer->url_addresses, &address->le, address);
                 }
-            }
+            } else {
+                // Create URL resolver for A record (if enabled)
+                if (rawrtc_default_config.ipv4_enable) {
+                    struct rawrtc_ice_server_url_resolver* resolver;
+                    error = rawrtc_ice_server_url_resolver_create(
+                            &resolver, gatherer->dns_client, DNS_TYPE_A, url,
+                            ice_server_url_address_result_handler, gatherer);
+                    if (error) {
+                        DEBUG_WARNING("Unable to query A record for URL %s, reason: %s\n",
+                                      url->url, rawrtc_code_to_str(error));
+                        // Continue - not considered critical
+                    } else {
+                        // Append to list of URL resolvers
+                        list_append(&gatherer->url_resolvers, &resolver->le, resolver);
+                    }
+                }
 
-            // Query AAAA record (if IPv6 is enabled)
-            if (rawrtc_default_config.ipv6_enable) {
-                error = query_a_or_aaaa_record(
-                        &url->dns_aaaa_context, &url->ipv6_address, DNS_TYPE_AAAA, url, gatherer);
-                if (error) {
-                    DEBUG_WARNING("Unable to query AAAA record, reason: %s\n",
-                                  rawrtc_code_to_str(error));
-                    // Continue - not considered critical
+                // Create URL resolver for AAAA record (if enabled)
+                if (rawrtc_default_config.ipv6_enable) {
+                    struct rawrtc_ice_server_url_resolver* resolver;
+                    error = rawrtc_ice_server_url_resolver_create(
+                            &resolver, gatherer->dns_client, DNS_TYPE_AAAA, url,
+                            ice_server_url_address_result_handler, gatherer);
+                    if (error) {
+                        DEBUG_WARNING("Unable to query AAAA record for URL %s, reason: %s\n",
+                                      url->url, rawrtc_code_to_str(error));
+                        // Continue - not considered critical
+                    } else {
+                        // Append to list of URL resolvers
+                        list_append(&gatherer->url_resolvers, &resolver->le, resolver);
+                    }
                 }
             }
         }
@@ -1048,7 +926,7 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     }
 
     // Resolve ICE server IP addresses
-    error = resolve_ice_servers_address(gatherer, options);
+    error = resolve_ice_server_addresses(gatherer, options);
     if (error) {
         return error;
     }
@@ -1061,7 +939,7 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
         net_if_apply(interface_handler, gatherer);
     }
 
-    // Gathering complete
+    // Gathering complete?
     check_gathering_complete(gatherer);
 
     // Done
