@@ -27,8 +27,8 @@ LIBRE_BRANCH="rawrtc-patched"
 LIBRE_COMMIT="7d837903ac78bbfbc56e2efb21315665d1834f1e"
 LIBRE_PATH="re"
 LIBREW_GIT="https://github.com/rawrtc/rew.git"
-LIBREW_BRANCH="master"
-LIBREW_COMMIT="9ce0a928b919a31382b1952625db3ecdd9fd7bfe"
+LIBREW_BRANCH="pairing-improvements"
+LIBREW_COMMIT="7067a1a57b1a0249083fd7ac4de00d2439ce12c6"
 LIBREW_PATH="rew"
 
 # Prefix
