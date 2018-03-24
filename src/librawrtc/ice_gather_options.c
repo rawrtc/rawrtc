@@ -2,10 +2,6 @@
 #include "ice_server.h"
 #include "ice_gather_options.h"
 
-#define DEBUG_MODULE "ice-gather-options"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include <rawrtcc/internal/debug.h>
-
 /*
  * Destructor for an existing ICE gather options instance.
  */
@@ -153,34 +149,6 @@ enum rawrtc_code rawrtc_str_to_ice_gather_policy(
     }
 
     return RAWRTC_CODE_NO_VALUE;
-}
-
-/*
- * Destroy all ICE server URL DNS contexts.
- */
-enum rawrtc_code rawrtc_ice_gather_options_destroy_url_dns_contexts(
-        struct rawrtc_ice_gather_options* const options
-) {
-    // Check arguments
-    if (!options) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Destroy all URL DNS contexts
-    struct le* le;
-    for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
-
-        // Destroy DNS contexts
-        enum rawrtc_code const error = rawrtc_ice_server_destroy_dns_contexts(server);
-        if (error) {
-            DEBUG_WARNING("Unable to destroy DNS contexts of server, reason: %s\n",
-                          rawrtc_code_to_str(error));
-        }
-    }
-
-    // Done
-    return RAWRTC_CODE_SUCCESS;
 }
 
 /*

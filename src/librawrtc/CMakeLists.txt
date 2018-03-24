@@ -9,6 +9,8 @@ set(rawrtc_SOURCES
         ice_gatherer.c
         ice_parameters.c
         ice_server.c
+        ice_server_url_address.c
+        ice_server_url_resolver.c
         ice_transport.c
         main.c
         peer_connection.c
@@ -30,6 +32,8 @@ set(rawrtc_HEADERS
         ice_gatherer.h
         ice_parameters.h
         ice_server.h
+        ice_server_url_address.h
+        ice_server_url_resolver.h
         ice_transport.h
         main.h
         peer_connection.h
