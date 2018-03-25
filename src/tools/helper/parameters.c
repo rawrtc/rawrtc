@@ -269,7 +269,7 @@ enum rawrtc_code get_ice_candidates(
     struct le* le;
 
     // Get length
-    n = list_count(&dict->lst);
+    n = list_count(&dict->lst) + 1;
 
     // Allocate & set length immediately
     // Note: We allocate more than we need in case ICE candidate types are being filtered but... meh
@@ -334,6 +334,9 @@ enum rawrtc_code get_ice_candidates(
             mem_deref(candidate);
         }
     }
+
+    // End-of-candidates
+    candidates->candidates[candidates->n_candidates++] = NULL;
 
 out:
     if (error) {

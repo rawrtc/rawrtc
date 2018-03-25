@@ -13,6 +13,7 @@ struct rawrtc_ice_gatherer {
     rawrtc_ice_gatherer_error_handler error_handler; // nullable
     rawrtc_ice_gatherer_local_candidate_handler local_candidate_handler; // nullable
     void* arg; // nullable
+    struct tmr timeout_timer;
     struct list url_addresses;
     struct list url_resolvers;
     struct list buffered_messages; // TODO: Can this be added to the candidates list?

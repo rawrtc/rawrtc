@@ -23,6 +23,7 @@ struct rawrtc_candidate_helper_stun_session {
     struct rawrtc_candidate_helper* candidate_helper;
     struct stun_keepalive* stun_keepalive;
     struct rawrtc_ice_server_url* url;
+    bool pending;
 };
 
 enum rawrtc_code rawrtc_candidate_helper_create(
