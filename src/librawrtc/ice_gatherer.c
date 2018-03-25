@@ -169,6 +169,9 @@ enum rawrtc_code rawrtc_ice_gatherer_close(
 
     // TODO: Stop ICE transport
 
+    // Stop timeout timer
+    tmr_cancel(&gatherer->timeout_timer);
+
     // Remove STUN sessions from local candidate helpers
     // Note: Needed to purge remaining references to the gatherer so it can be free'd.
     list_apply(&gatherer->local_candidates, true,
@@ -244,6 +247,12 @@ static enum rawrtc_code announce_candidate(
 ) {
     enum rawrtc_code error;
 
+    // Don't announce in the completed state
+    if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_COMPLETE) {
+        DEBUG_PRINTF("Not announcing candidate, gathering state is complete\n");
+        return RAWRTC_CODE_SUCCESS;
+    }
+
     // Create ICE candidate
     if (gatherer->local_candidate_handler) {
         struct rawrtc_ice_candidate* ice_candidate = NULL;
@@ -269,7 +278,8 @@ static enum rawrtc_code announce_candidate(
  * Check if the gathering process is complete.
  */
 static void check_gathering_complete(
-        struct rawrtc_ice_gatherer* const gatherer // not checked
+        struct rawrtc_ice_gatherer* const gatherer, // not checked
+        bool const force_complete
 ) {
     struct le* le;
     enum rawrtc_code error;
@@ -279,29 +289,38 @@ static void check_gathering_complete(
         return;
     }
 
-    // Ensure no URL resolvers are in flight
-    if (!list_isempty(&gatherer->url_resolvers)) {
-        struct rawrtc_ice_server_url_resolver* const resolver =
-                list_head(&gatherer->url_resolvers)->data;
-        DEBUG_PRINTF("Gathering still in progress, resolving URL (%s [%s])\n",
-                     resolver->url->url, dns_rr_typename(resolver->dns_type));
-        return;
-    }
-
-    // Ensure every local candidate has no pending srflx/relay candidates
-    for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
-        struct rawrtc_candidate_helper* const candidate = le->data;
-
-        // Check counters
-        if (candidate->srflx_pending_count > 0 || candidate->relay_pending_count > 0) {
-            // Nope
-            DEBUG_PRINTF(
-                    "Gathering still in progress at candidate %j, #srflx=%"PRIuFAST8", #relay=%"
-                    PRIuFAST8"\n", &candidate->candidate->attr.addr,
-                    candidate->srflx_pending_count, candidate->relay_pending_count);
+    // Check or force completion?
+    if (!force_complete) {
+        // Ensure no URL resolvers are in flight
+        if (!list_isempty(&gatherer->url_resolvers)) {
+            struct rawrtc_ice_server_url_resolver* const resolver =
+                    list_head(&gatherer->url_resolvers)->data;
+            (void) resolver;
+            DEBUG_PRINTF("Gathering still in progress, resolving URL (%s [%s])\n",
+                         resolver->url->url, dns_rr_typename(resolver->dns_type));
             return;
         }
+
+        // Ensure every local candidate has no pending srflx/relay candidates
+        for (le = list_head(&gatherer->local_candidates); le != NULL; le = le->next) {
+            struct rawrtc_candidate_helper* const candidate = le->data;
+
+            // Check counters
+            if (candidate->srflx_pending_count > 0 || candidate->relay_pending_count > 0) {
+                // Nope
+                DEBUG_PRINTF(
+                        "Gathering still in progress at candidate %j, #srflx=%"PRIuFAST8", #relay=%"
+                        PRIuFAST8"\n", &candidate->candidate->attr.addr,
+                        candidate->srflx_pending_count, candidate->relay_pending_count);
+                return;
+            }
+        }
     }
+
+    // Stop timeout timer
+    tmr_cancel(&gatherer->timeout_timer);
+
+    // TODO: Skip the remaining code below when using continuous gathering
 
     // Announce candidate gathering complete
     error = announce_candidate(gatherer, NULL, NULL);
@@ -315,8 +334,10 @@ static void check_gathering_complete(
     }
 
     // Update state & done
-    DEBUG_PRINTF("Gathering complete:\n%H", trice_debug, gatherer->ice);
-    set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_COMPLETE);
+    if (gatherer->state != RAWRTC_ICE_GATHERER_STATE_COMPLETE) {
+        DEBUG_PRINTF("Gathering complete:\n%H", trice_debug, gatherer->ice);
+        set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_COMPLETE);
+    }
 }
 
 /*
@@ -466,13 +487,11 @@ static void reflexive_candidate_handler(
 
 out:
     // Decrease counter & check if done gathering
-    --candidate->srflx_pending_count;
-    check_gathering_complete(gatherer);
-
-    // Remove STUN keepalive session
-    // Note: We only needed the remote address, so this session can be teared down.
-    //       This also makes sure the handler is only called once.
-    mem_deref(session);
+    if (session->pending) {
+        --candidate->srflx_pending_count;
+        session->pending = false;
+    }
+    check_gathering_complete(gatherer, false);
 }
 
 /*
@@ -490,9 +509,9 @@ static enum rawrtc_code gather_reflexive_candidates(
     char const* type_str;
     struct rawrtc_candidate_helper_stun_session* session = NULL;
     struct stun_conf stun_config = { // TODO: Make this configurable!
-            .rto = STUN_DEFAULT_RTO,
+            .rto = STUN_DEFAULT_RTO, // 500ms
             .rc = 3, // Send at: 0ms, 500ms, 1500ms
-            .rm = 3, // Additional wait: 3000ms
+            .rm = 6, // Additional wait: 3000ms
             .ti = 4500, // Total timeout: 4500ms
             .tos = 0x00,
     };
@@ -629,7 +648,7 @@ static void gather_candidates_using_server(
     }
 
     // Gathering complete?
-    check_gathering_complete(gatherer);
+    check_gathering_complete(gatherer, false);
 }
 
 /*
@@ -649,7 +668,7 @@ static void gather_candidates_using_resolved_servers(
     }
 
     // Gathering complete?
-    check_gathering_complete(gatherer);
+    check_gathering_complete(gatherer, false);
 }
 
 /*
@@ -694,8 +713,6 @@ static enum rawrtc_code add_candidate(
     DEBUG_PRINTF("Added %s host candidate for interface %j\n", rawrtc_ice_protocol_to_str(protocol),
                  address);
 
-    // TODO: Start STUN keep-alive (?)
-
     // Announce host candidate to handler
     error = announce_candidate(gatherer, re_candidate, NULL);
     if (error) {
@@ -705,7 +722,6 @@ static enum rawrtc_code add_candidate(
     }
 
     // Check state
-    // TODO: 'gatherer' might be free'd here
     if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
         return RAWRTC_CODE_SUCCESS;
     }
@@ -809,7 +825,7 @@ static bool ice_server_url_address_result_handler(
         void* const arg // not checked
 ) {
     struct rawrtc_ice_gatherer* const gatherer = arg;
-    DEBUG_PRINTF("Resolved URL %s to address %J\n", address->url->url, &address->address);
+    DEBUG_INFO("Resolved URL %s to address %J\n", address->url->url, &address->address);
 
     // Append to list of URL addresses
     list_append(&gatherer->url_addresses, &address->le, mem_ref(address));
@@ -899,6 +915,19 @@ static enum rawrtc_code resolve_ice_server_addresses(
 };
 
 /*
+ * Gathering timeout handler.
+ * Note: This timeout has no effect when using continuous gathering.
+ */
+static void gather_timeout_handler(
+        void* arg
+) {
+    struct rawrtc_ice_gatherer* const gatherer = arg;
+
+    // Force gathering complete
+    check_gathering_complete(gatherer, true);
+}
+
+/*
  * Start gathering using an ICE gatherer.
  */
 enum rawrtc_code rawrtc_ice_gatherer_gather(
@@ -934,13 +963,17 @@ enum rawrtc_code rawrtc_ice_gatherer_gather(
     // Update state
     set_state(gatherer, RAWRTC_ICE_GATHERER_STATE_GATHERING);
 
+    // Start timeout timer
+    // TODO: Make the timeout configurable
+    tmr_start(&gatherer->timeout_timer, 6000, gather_timeout_handler, gatherer);
+
     // Start gathering host candidates
     if (options->gather_policy != RAWRTC_ICE_GATHER_POLICY_NOHOST) {
         net_if_apply(interface_handler, gatherer);
     }
 
     // Gathering complete?
-    check_gathering_complete(gatherer);
+    check_gathering_complete(gatherer, false);
 
     // Done
     return RAWRTC_CODE_SUCCESS;

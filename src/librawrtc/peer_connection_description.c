@@ -572,6 +572,9 @@ static enum rawrtc_code get_ice_candidate_attributes(
         bool* const end_of_candidatesp, // de-referenced, not checked
         struct pl* const line // not checked
 ) {
+    bool add_candidate_line = false;
+    struct pl* use_line = NULL;
+
     // ICE candidate
     if (line->l >= sdp_ice_candidate_head_length) {
         struct pl candidate_pl = {
@@ -579,33 +582,39 @@ static enum rawrtc_code get_ice_candidate_attributes(
                 .l = sdp_ice_candidate_head_length - 1,
         };
         if (pl_strcmp(&candidate_pl, sdp_ice_candidate_head) == 0) {
-            struct candidate_line* candidate_line;
-
-            // Create candidate line
-            candidate_line = mem_zalloc(sizeof(*candidate_line), NULL);
-            if (!candidate_line) {
-                DEBUG_WARNING("Unable to create candidate line, no memory\n");
-                return RAWRTC_CODE_NO_MEMORY;
-            }
-
-            // Set fields
-            // Warning: The line is NOT copied - it's just a pointer to some memory provided by
-            //          the caller!
-            candidate_line->line = *line;
-
-            // Add candidate line to list
-            list_append(candidate_lines, &candidate_line->le, candidate_line);
+            add_candidate_line = true;
+            use_line = line;
         }
     }
 
     // End of candidates
-    if (pl_strcmp(line, sdp_ice_end_of_candidates) == 0) {
+    if (!add_candidate_line && pl_strcmp(line, sdp_ice_end_of_candidates) == 0) {
+        add_candidate_line = true;
+        use_line = NULL;
         *end_of_candidatesp = true;
-        return RAWRTC_CODE_SUCCESS;
     }
 
-    // Done
-    return RAWRTC_CODE_NO_VALUE;
+    // Create candidate line (if any)
+    if (add_candidate_line) {
+        struct candidate_line* const candidate_line = mem_zalloc(sizeof(*candidate_line), NULL);
+        if (!candidate_line) {
+            DEBUG_WARNING("Unable to create candidate line, no memory\n");
+            return RAWRTC_CODE_NO_MEMORY;
+        }
+
+        // Set fields
+        // Warning: The line is NOT copied - it's just a pointer to some memory provided by
+        //          the caller!
+        if (use_line) {
+            candidate_line->line = *use_line;
+        }
+
+        // Add candidate line to list & done
+        list_append(candidate_lines, &candidate_line->le, candidate_line);
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_NO_VALUE;
+    }
 }
 
 /*

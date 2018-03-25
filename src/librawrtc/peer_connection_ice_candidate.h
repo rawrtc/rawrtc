@@ -20,7 +20,7 @@ int rawrtc_peer_connection_ice_candidate_debug(
 
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
     struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
-    struct rawrtc_ice_candidate* const ortc_candidate,
+    struct rawrtc_ice_candidate* const ortc_candidate, // nullable
     char* const mid, // nullable, referenced
     uint8_t const* const media_line_index, // nullable, copied
     char* const username_fragment // nullable, referenced

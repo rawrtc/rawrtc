@@ -72,7 +72,7 @@ static void rawrtc_peer_connection_ice_candidate_destroy(
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
         struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
-        struct rawrtc_ice_candidate* const ortc_candidate,
+        struct rawrtc_ice_candidate* const ortc_candidate, // nullable
         char* const mid, // nullable, referenced
         uint8_t const* const media_line_index, // nullable, copied
         char* const username_fragment // nullable, referenced
@@ -142,7 +142,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
     struct rawrtc_peer_connection_ice_candidate* candidate;
 
     // Check arguments
-    if (!candidatep || !pl_isset(sdp)) {
+    if (!candidatep || !sdp) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
@@ -151,69 +151,74 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // Get mandatory ICE candidate fields
-    if (re_regex(
-            sdp->p, sdp->l, sdp_ice_candidate_regex, &foundation_pl, &component_id_pl,
-            &protocol_pl, &priority_pl, &ip_pl, &port_pl, &type_pl, &optional)) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Get optional ICE candidate fields
-    re_regex(
-            optional.p, optional.l, sdp_ice_candidate_related_address_regex,
-            NULL, &related_address_pl);
-    re_regex(optional.p, optional.l, sdp_ice_candidate_related_port_regex, NULL, &related_port_pl);
-    re_regex(optional.p, optional.l, sdp_ice_candidate_tcp_type_regex, NULL, &tcp_type_pl);
-
-    // Component ID
-    // TODO: Handle
-    (void) component_id_pl;
-
-    // Protocol
-    error = rawrtc_pl_to_ice_protocol(&protocol, &protocol_pl);
-    if (error) {
-        return error;
-    }
-
-    // Priority
-    priority = pl_u32(&priority_pl);
-
-    // Port
-    value_u32 = pl_u32(&port_pl);
-    if (value_u32 > UINT16_MAX) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-    port = (uint16_t) value_u32;
-
-    // Type
-    error = rawrtc_pl_to_ice_candidate_type(&type, &type_pl);
-    if (error) {
-        return error;
-    }
-
-    // Related port (if any)
-    if (pl_isset(&related_port_pl)) {
-        value_u32 = pl_u32(&related_port_pl);
-        if (value_u32 > UINT16_MAX) {
+    if (pl_isset(sdp)) {
+        // Get mandatory ICE candidate fields
+        if (re_regex(
+                sdp->p, sdp->l, sdp_ice_candidate_regex, &foundation_pl, &component_id_pl,
+                &protocol_pl, &priority_pl, &ip_pl, &port_pl, &type_pl, &optional)) {
             return RAWRTC_CODE_INVALID_ARGUMENT;
         }
-        related_port = (uint16_t) value_u32;
-    }
 
-    // TCP type (if any)
-    if (pl_isset(&tcp_type_pl)) {
-        error = rawrtc_pl_to_ice_tcp_candidate_type(&tcp_type, &tcp_type_pl);
+        // Get optional ICE candidate fields
+        re_regex(
+                optional.p, optional.l, sdp_ice_candidate_related_address_regex,
+                NULL, &related_address_pl);
+        re_regex(optional.p, optional.l, sdp_ice_candidate_related_port_regex, NULL,
+                 &related_port_pl);
+        re_regex(optional.p, optional.l, sdp_ice_candidate_tcp_type_regex, NULL, &tcp_type_pl);
+
+        // Component ID
+        // TODO: Handle
+        (void) component_id_pl;
+
+        // Protocol
+        error = rawrtc_pl_to_ice_protocol(&protocol, &protocol_pl);
         if (error) {
             return error;
         }
-    }
 
-    // Create (ORTC) ICE candidate
-    error = rawrtc_ice_candidate_create_internal(
-            &ortc_candidate, &foundation_pl, priority, &ip_pl, protocol, port, type, tcp_type,
-            &related_address_pl, related_port);
-    if (error) {
-        return error;
+        // Priority
+        priority = pl_u32(&priority_pl);
+
+        // Port
+        value_u32 = pl_u32(&port_pl);
+        if (value_u32 > UINT16_MAX) {
+            return RAWRTC_CODE_INVALID_ARGUMENT;
+        }
+        port = (uint16_t) value_u32;
+
+        // Type
+        error = rawrtc_pl_to_ice_candidate_type(&type, &type_pl);
+        if (error) {
+            return error;
+        }
+
+        // Related port (if any)
+        if (pl_isset(&related_port_pl)) {
+            value_u32 = pl_u32(&related_port_pl);
+            if (value_u32 > UINT16_MAX) {
+                return RAWRTC_CODE_INVALID_ARGUMENT;
+            }
+            related_port = (uint16_t) value_u32;
+        }
+
+        // TCP type (if any)
+        if (pl_isset(&tcp_type_pl)) {
+            error = rawrtc_pl_to_ice_tcp_candidate_type(&tcp_type, &tcp_type_pl);
+            if (error) {
+                return error;
+            }
+        }
+
+        // Create (ORTC) ICE candidate
+        error = rawrtc_ice_candidate_create_internal(
+                &ortc_candidate, &foundation_pl, priority, &ip_pl, protocol, port, type, tcp_type,
+                &related_address_pl, related_port);
+        if (error) {
+            return error;
+        }
+    } else {
+        ortc_candidate = NULL;
     }
 
     // Create ICE candidate

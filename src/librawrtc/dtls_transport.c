@@ -426,11 +426,13 @@ static int send_handler(
     // Note: No need to check if closed as only non-application data may be sent if the
     //       transport is already closed.
 
-    // Get selected candidate pair
+    // Get candidate pair with highest priority
+    // Note: This ignores whatever is nominated
+    // TODO: Should we rather use the nominated candidate pair?
     struct ice_candpair* const candidate_pair = list_ledata(list_head(trice_validl(ice)));
     if (!candidate_pair) {
         if (!closed) {
-            DEBUG_WARNING("Cannot send message, no selected candidate pair\n");
+            DEBUG_WARNING("Cannot send message, no valid candidate pair\n");
         }
         return ECONNRESET;
     }

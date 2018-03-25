@@ -7,8 +7,10 @@ struct rawrtc_ice_transport {
     rawrtc_ice_transport_state_change_handler state_change_handler; // nullable
     rawrtc_ice_transport_candidate_pair_change_handler candidate_pair_change_handler; // nullable
     void* arg; // nullable
+    struct stun* stun_client;
     struct rawrtc_ice_parameters* remote_parameters; // referenced
     struct rawrtc_dtls_transport* dtls_transport; // referenced, nullable
+    bool remote_end_of_candidates;
 };
 
 enum ice_role rawrtc_ice_role_to_re_ice_role(
