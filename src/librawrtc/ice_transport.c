@@ -177,7 +177,7 @@ static void ice_established_handler(
 
     // Ignore if completed or failed
     if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED
-        || transport->state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
+        || transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
         return;
     }
 
@@ -223,7 +223,7 @@ static void ice_failed_handler(
 
     // Ignore if completed or failed
     if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED
-        || transport->state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
+        || transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
         return;
     }
 
