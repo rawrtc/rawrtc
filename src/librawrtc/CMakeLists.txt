@@ -54,20 +54,18 @@ if (SCTP_REDIRECT_TRANSPORT)
 endif ()
 
 # Setup library (link & install)
-add_library(rawrtc SHARED ${rawrtc_SOURCES})
+add_library(rawrtc ${rawrtc_SOURCES})
+set_property(TARGET rawrtc
+        PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(rawrtc
         ${rawrtc_DEP_LIBRARIES})
-add_library(rawrtc-static STATIC ${rawrtc_SOURCES})
-target_link_libraries(rawrtc-static
-        ${rawrtc_DEP_LIBRARIES})
-install(TARGETS rawrtc rawrtc-static
+install(TARGETS rawrtc
         DESTINATION lib)
 
 # Optional: SCTP redirect transport tool definitions
 if (SCTP_REDIRECT_TRANSPORT)
     # And set the preprocessor variable
     target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
-    target_compile_definitions(rawrtc-static PRIVATE SCTP_REDIRECT_TRANSPORT)
 endif ()
 
 # Generate internal headers & install them

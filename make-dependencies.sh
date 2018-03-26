@@ -30,6 +30,9 @@ LIBREW_GIT="https://github.com/rawrtc/rew.git"
 LIBREW_BRANCH="pairing-improvements"
 LIBREW_COMMIT="7067a1a57b1a0249083fd7ac4de00d2439ce12c6"
 LIBREW_PATH="rew"
+RAWRTCDC_GIT="https://github.com/rawrtc/rawrtc-data-channel.git"
+RAWRTCDC_BRANCH="master"
+RAWRTCDC_PATH="rawrtcdc"
 
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
@@ -134,6 +137,23 @@ if [ -z "$SKIP_LIBREW" ]; then
     cd ${MAIN_DIR}
 fi
 
+# Get RAWRTCDC
+if [ -z "$SKIP_RAWRTCDC" ]; then
+    if [ ! -d "${RAWRTCDC_PATH}" ]; then
+        echo "Cloning RAWRTCDC"
+        git clone -b ${RAWRTCDC_BRANCH} ${RAWRTCDC_GIT} ${RAWRTCDC_PATH}
+        cd ${RAWRTCDC_PATH}
+    elif [ "$offline" = false ]; then
+        cd ${RAWRTCDC_PATH}
+        echo "Pulling RAWRTCDC"
+        git pull
+    else
+        cd ${RAWRTCDC_PATH}
+    fi
+    git checkout ${RAWRTCDC_BRANCH}
+    cd ${MAIN_DIR}
+fi
+
 # Build openssl
 if [ "$need_openssl" = true ]; then
     cd ${OPENSSL_PATH}
@@ -185,4 +205,21 @@ if [ -z "$SKIP_LIBREW" ]; then
     cd ${MAIN_DIR}
 fi
 
-# TODO: Build RAWRTCDC (implicitly builds RAWRTCC)
+# Build RAWRTCDC (and dependencies, implicitly builds RAWRTCC)
+if [ -z "$SKIP_RAWRTCDC" ]; then
+    cd ${RAWRTCDC_PATH}
+    if [ ! -d "build" ]; then
+        mkdir build
+    fi
+    echo "Building RAWRTCDC dependencies"
+    SKIP_LIBRE=1 ./make-dependencies.sh
+    cd build
+    echo "Configuring RAWRTCDC"
+    cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DBUILD_SHARED_LIBS=OFF \
+    ..
+    echo "Cleaning RAWRTCDC"
+    make clean
+    echo "Building & installing RAWRTCDC"
+    make install -j${THREADS}
+    cd ${MAIN_DIR}
+fi
