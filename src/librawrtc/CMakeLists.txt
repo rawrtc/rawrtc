@@ -67,19 +67,8 @@ if (SCTP_REDIRECT_TRANSPORT)
     target_compile_definitions(rawrtc PRIVATE SCTP_REDIRECT_TRANSPORT)
 endif ()
 
-# Generate internal headers & install them
-set(internal_header_file "${CMAKE_SOURCE_DIR}/src/include/rawrtc_internal.h")
-set(rawrtc_HEADERS_INCLUDE "")
-foreach (header IN LISTS rawrtc_HEADERS)
-    string(CONCAT rawrtc_HEADERS_INCLUDE
-            ${rawrtc_HEADERS_INCLUDE}
-            "#include <rawrtc/internal/"
-            ${header} ">\n")
-endforeach ()
-configure_file(${CMAKE_SOURCE_DIR}/src/include/rawrtc_internal.h.cmakein
-        ${internal_header_file} @ONLY)
+# Install internal headers
 install(FILES ${rawrtc_HEADERS} DESTINATION include/rawrtc/internal)
-install(FILES ${internal_header_file} DESTINATION include)
 
 # Generate pkg-config file & install it
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pkg-config.pc.cmakein
