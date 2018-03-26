@@ -1179,6 +1179,8 @@ enum rawrtc_code rawrtc_dtls_transport_get_external_state(
         case RAWRTC_DTLS_TRANSPORT_STATE_FAILED:
             *statep = RAWRTC_EXTERNAL_DTLS_TRANSPORT_STATE_CLOSED_OR_FAILED;
             return RAWRTC_CODE_SUCCESS;
+        default:
+            return RAWRTC_CODE_UNKNOWN_ERROR;
     }
 }
 
