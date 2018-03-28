@@ -2067,4 +2067,4 @@ const struct odict_entry *rawrtc_odict_lookup(const struct odict *o, const char 
 
 void rawrtc_dbg_info(const char *fmt, ...);
 
-int webrtc_upcall_handler(struct socket* socket, void* arg, int flags, int ignore);
+int webrtc_upcall_handler(struct socket* socket, void* arg, int flags);

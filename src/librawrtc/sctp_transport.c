@@ -1729,12 +1729,12 @@ static int write_event_handler(
             case RAWRTC_CODE_STOP_ITERATION:
                 // We either sent all pending messages or could not send all messages, so there's
                 // no reason to react to further write events in this iteration
-                return SCTP_EVENT_WRITE;
+                return RAWRTC_SCTP_EVENT_NONE;
             default:
                 // TODO: What now? Close?
                 DEBUG_WARNING("Could not send deferred messages, reason: %s\n",
                               rawrtc_code_to_str(error));
-                return SCTP_EVENT_WRITE;
+                return RAWRTC_SCTP_EVENT_NONE;
         }
     } else {
         DEBUG_WARNING("Sending still in progress!\n");
@@ -1811,13 +1811,12 @@ void upcall_handler_helper(
     rawrtc_thread_leave();
 }
 
-int webrtc_upcall_handler(struct socket* socket, void* arg, int flags, int ignore)
+int webrtc_upcall_handler(struct socket* socket, void* arg, int flags)
 {
     int events = usrsctp_get_events(socket);
     struct rawrtc_sctp_transport* const transport = arg;
-   // int ignore_events = RAWRTC_SCTP_EVENT_NONE;
     int event = -1;
-    (void) flags; // TODO: What does this indicate?
+
     // Lock event loop mutex
     rawrtc_thread_enter();
 
@@ -2158,7 +2157,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         error = rawrtc_error_to_code(errno);
         goto out;
     }
-
+usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
     // Determine chunk size
     if (rawrtc_global.usrsctp_initialized == 1) {
         socklen_t option_size = sizeof(int); // PD point is int according to spec
