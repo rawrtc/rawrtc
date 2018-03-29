@@ -37,7 +37,7 @@ LIBREW_PATH="rew"
 USRSCTP_VERSION="1.0.0"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
-USRSCTP_COMMIT="eabbea6cfb4dac224e082fc021b568ec9a731c0b"
+USRSCTP_COMMIT="005db8982a6304109aacffc70b16059bf17fee32"
 USRSCTP_PATH="usrsctp"
 
 # Prefix

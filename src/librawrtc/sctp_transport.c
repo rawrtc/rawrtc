@@ -2157,7 +2157,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         error = rawrtc_error_to_code(errno);
         goto out;
     }
-usrsctp_sysctl_set_sctp_debug_on(SCTP_DEBUG_ALL);
+
     // Determine chunk size
     if (rawrtc_global.usrsctp_initialized == 1) {
         socklen_t option_size = sizeof(int); // PD point is int according to spec
