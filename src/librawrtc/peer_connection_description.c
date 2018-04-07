@@ -35,7 +35,7 @@ static enum rawrtc_dtls_role const map_enum_dtls_role[] = {
     RAWRTC_DTLS_ROLE_SERVER,
 };
 static char const * const map_str_dtls_role[] = {
-    "actpass"
+    "actpass",
     "active",
     "passive",
 };
