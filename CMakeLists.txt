@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.2)
 # TODO: Find a way to keep this in sync with the one in rawrtc.h
 project(librawrtc
-        VERSION 0.2.1)
+        VERSION 0.2.2)
 set(PROJECT_DESCRIPTION
         "A WebRTC and ORTC library with a small footprint that runs everywhere.")
 set(PROJECT_URL
