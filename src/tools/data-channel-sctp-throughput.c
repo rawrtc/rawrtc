@@ -2,6 +2,7 @@
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
+#include <usrsctp.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
 #include "helper/parameters.h"
@@ -23,6 +24,8 @@ struct data_channel_sctp_throughput_client {
     char** ice_candidate_types;
     size_t n_ice_candidate_types;
     uint64_t message_size;
+    uint64_t sctp_send_space;
+    uint64_t sctp_receive_space;
     uint16_t n_times_left;
     struct rawrtc_ice_gather_options* gather_options;
     enum rawrtc_ice_role role;
@@ -219,6 +222,14 @@ static void client_init(
             &client->sctp_transport, client->dtls_transport,
             client->local_parameters.sctp_parameters.port,
             default_data_channel_handler, default_sctp_transport_state_change_handler, client));
+
+    // Set usrsctp buffer sizes for sending/receiving
+    if (client->sctp_send_space > 0) {
+        usrsctp_sysctl_set_sctp_sendspace((uint32_t) client->sctp_send_space);
+    }
+    if (client->sctp_receive_space > 0) {
+        usrsctp_sysctl_set_sctp_recvspace((uint32_t) client->sctp_receive_space);
+    }
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(
@@ -457,8 +468,9 @@ static void print_local_parameters(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <message-size> [<n-times>] [<sctp-port>] "
-                          "[<ice-candidate-type> ...]\n", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <message-size> [<n-times>] [<sctp-send-space>]"
+                          "[<sctp-receive-space>]] [<sctp-port>] [<ice-candidate-type> ...]\n",
+                  program);
     exit(1);
 }
 
@@ -498,17 +510,29 @@ int main(int argc, char* argv[argc + 1]) {
         exit_with_usage(argv[0]);
     }
 
+    // SCTP send buffer size
+    if (argc >= 5 && (!str_to_uint64(&client.sctp_send_space, argv[4])
+                      || client.sctp_send_space > UINT32_MAX)) {
+        exit_with_usage(argv[0]);
+    }
+
+    // SCTP receive buffer size
+    if (argc >= 6 && (!str_to_uint64(&client.sctp_receive_space, argv[5])
+                      || client.sctp_receive_space > UINT32_MAX)) {
+        exit_with_usage(argv[0]);
+    }
+
     // TODO: Add possibility to turn checksum generation/validation on or off
 
     // Get SCTP port (optional)
-    if (argc >= 5 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[4])) {
+    if (argc >= 7 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[6])) {
         exit_with_usage(argv[0]);
     }
 
     // Get enabled ICE candidate types to be added (optional)
-    if (argc >= 6) {
-        ice_candidate_types = &argv[5];
-        n_ice_candidate_types = (size_t) argc - 5;
+    if (argc >= 8) {
+        ice_candidate_types = &argv[7];
+        n_ice_candidate_types = (size_t) argc - 7;
     }
 
     // Create ICE gather options
