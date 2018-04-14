@@ -231,6 +231,9 @@ static void client_init(
         usrsctp_sysctl_set_sctp_recvspace((uint32_t) client->sctp_receive_space);
     }
 
+    DEBUG_INFO("SCTP send space: %"PRIu32"\n", usrsctp_sysctl_get_sctp_sendspace());
+    DEBUG_INFO("SCTP receive space: %"PRIu32"\n", usrsctp_sysctl_get_sctp_recvspace());
+
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(
             &client->data_transport, client->sctp_transport));
