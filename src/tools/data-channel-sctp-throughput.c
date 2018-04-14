@@ -1,7 +1,9 @@
 #include <stdlib.h> // exit
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
+#include <limits.h> // INT_MAX
 #include <rawrtc.h>
+#include <rawrtcdc/internal/sctp_transport.h>
 #include <usrsctp.h>
 #include "helper/utils.h"
 #include "helper/handler.h"
@@ -193,6 +195,8 @@ static void client_init(
         struct data_channel_sctp_throughput_client* const client
 ) {
     struct rawrtc_certificate* certificates[1];
+    int option_value;
+    socklen_t option_size;
     struct rawrtc_data_channel_parameters* channel_parameters;
 
     // Generate certificates
@@ -225,14 +229,27 @@ static void client_init(
 
     // Set usrsctp buffer sizes for sending/receiving
     if (client->sctp_send_space > 0) {
-        usrsctp_sysctl_set_sctp_sendspace((uint32_t) client->sctp_send_space);
+        option_value = (int) client->sctp_send_space;
+        EOP(usrsctp_setsockopt(
+                client->sctp_transport->socket, SOL_SOCKET, SO_SNDBUF,
+                &option_value, sizeof(option_value)));
     }
     if (client->sctp_receive_space > 0) {
-        usrsctp_sysctl_set_sctp_recvspace((uint32_t) client->sctp_receive_space);
+        option_value = (int) client->sctp_receive_space;
+        EOP(usrsctp_setsockopt(
+                client->sctp_transport->socket, SOL_SOCKET, SO_RCVBUF,
+                &option_value, sizeof(option_value)));
     }
 
-    DEBUG_INFO("SCTP send space: %"PRIu32"\n", usrsctp_sysctl_get_sctp_sendspace());
-    DEBUG_INFO("SCTP receive space: %"PRIu32"\n", usrsctp_sysctl_get_sctp_recvspace());
+    // Print usrsctp buffer sizes for sending/receiving
+    option_size = sizeof(option_value);
+    EOP(usrsctp_getsockopt(
+            client->sctp_transport->socket, SOL_SOCKET, SO_SNDBUF, &option_value, &option_size));
+    DEBUG_INFO("SCTP send space: %d\n", option_value);
+    option_size = sizeof(option_value);
+    EOP(usrsctp_getsockopt(
+            client->sctp_transport->socket, SOL_SOCKET, SO_RCVBUF, &option_value, &option_size));
+    DEBUG_INFO("SCTP receive space: %d\n", option_value);
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(
@@ -515,13 +532,13 @@ int main(int argc, char* argv[argc + 1]) {
 
     // SCTP send buffer size
     if (argc >= 5 && (!str_to_uint64(&client.sctp_send_space, argv[4])
-                      || client.sctp_send_space > UINT32_MAX)) {
+                      || client.sctp_send_space > INT_MAX)) {
         exit_with_usage(argv[0]);
     }
 
     // SCTP receive buffer size
     if (argc >= 6 && (!str_to_uint64(&client.sctp_receive_space, argv[5])
-                      || client.sctp_receive_space > UINT32_MAX)) {
+                      || client.sctp_receive_space > INT_MAX)) {
         exit_with_usage(argv[0]);
     }
 
