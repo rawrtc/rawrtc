@@ -458,7 +458,7 @@ static void print_local_parameters(
 
 static void exit_with_usage(char* program) {
     DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <message-size> [<n-times>] [<sctp-port>] "
-                          "[<ice-candidate-type> ...]", program);
+                          "[<ice-candidate-type> ...]\n", program);
     exit(1);
 }
 
