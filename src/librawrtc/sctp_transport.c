@@ -81,6 +81,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         .outbound_handler = rawrtc_sctp_common_sctp_transport_outbound_handler,
         .detach_handler = rawrtc_sctp_common_sctp_transport_detach_handler,
         .destroyed_handler = rawrtc_sctp_transport_destroy,
+        .trace_packets = false, // TODO: Make this configurable
         .arg = mem_ref(dtls_transport),
     };
 
