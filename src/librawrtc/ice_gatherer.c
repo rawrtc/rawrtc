@@ -1,5 +1,7 @@
+#ifndef _WIN32
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
+#endif
 #include <string.h> // memcpy
 #include <rawrtc.h>
 #include "utils.h"
@@ -14,6 +16,7 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
 #include "debug.h"
+
 
 /*
  * Get the corresponding name for an ICE gatherer state.
@@ -740,14 +743,14 @@ static enum rawrtc_code add_candidate(
  * TODO: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-01
   */
 static bool interface_handler(
-        char const* interface, // not checked
+        char const* iface, // not checked
         struct sa const* address, // not checked
         void* arg // not checked
 ) {
     int af;
     struct rawrtc_ice_gatherer* const gatherer = arg;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
-    (void) interface;
+    (void) iface;
 
     // Check state
     if (gatherer->state == RAWRTC_ICE_GATHERER_STATE_CLOSED) {
@@ -758,6 +761,11 @@ static bool interface_handler(
     // TODO: Make this configurable
     if (sa_is_linklocal(address) || sa_is_loopback(address)) {
         return false; // Continue gathering
+    }
+
+    // Ignore 0.0.0.0
+    if(sa_af(address) == AF_INET && address->u.in.sin_addr.s_addr == 0) {
+        return false;
     }
 
     // Skip IPv4, IPv6?

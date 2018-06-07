@@ -1,6 +1,8 @@
 #include <stdio.h> // sprintf
 #include <string.h> // strlen
+#ifndef _WIN32
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
+#endif
 #include <stdarg.h>
 #include <openssl/evp.h> // EVP_MD, evp_*
 #include <rawrtc.h>
