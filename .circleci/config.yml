@@ -1,0 +1,126 @@
+version: 2.0
+
+shared: &shared
+  working_directory: ~/rawrtc
+  steps:
+  - checkout
+
+  # Diagnostics
+  - run:
+      name: Show versions
+      command: |
+        $CC -v
+        cmake --version
+        openssl version
+
+  # Build library dependencies
+  - run:
+      name: Build dependencies
+      command: ./make-dependencies.sh
+
+  # Set pkg-config path, dynamic library path and binary path (since we prefix)
+  - run:
+      name: "Setup environment variables"
+      command: |
+        echo 'export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig:${PKG_CONFIG_PATH}' >> ${BASH_ENV}
+        echo 'export LD_LIBRARY_PATH=${PWD}/build/prefix/lib:${LD_LIBRARY_PATH}' >> ${BASH_ENV}
+        echo 'export PATH=${PWD}/build/prefix/bin:${PATH}' >> ${BASH_ENV}
+
+  # Build library
+  - run:
+      name: Build
+      command: |
+        cd build
+        cmake \
+          -DCMAKE_INSTALL_PREFIX=${PWD}/prefix \
+          -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function" \
+          ..
+        make install
+
+  # Run ICE gatherer
+  - run:
+      name: Run ICE gatherer
+      command: |
+        ulimit -c unlimited -S
+        ice-gatherer
+
+  # Store core dumps on failure
+  - run:
+      command: |
+        mkdir -p /tmp/core_dumps
+        cp core.* /tmp/core_dumps
+      when: on_fail
+
+  - store_artifacts:
+      path: /tmp/core_dumps
+
+
+jobs:
+  # Ubuntu 14.04 LTS
+  trusty-gcc:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:trusty
+    environment:
+      CC: gcc
+  trusty-clang:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:trusty
+    environment:
+      CC: clang
+
+  # Ubuntu 16.04 LTS
+  xenial-gcc:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:xenial
+    environment:
+      CC: gcc
+  xenial-clang:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:xenial
+    environment:
+      CC: clang
+
+  # Ubuntu 18.04 LTS
+  bionic-gcc:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:bionic
+    environment:
+      CC: gcc
+  bionic-clang:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:bionic
+    environment:
+      CC: clang
+
+  # Arch Linux Latest
+  archlinux-gcc:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:archlinux
+    environment:
+      CC: gcc
+  archlinux-clang:
+    <<: *shared
+    docker:
+    - image: rawrtc/ci-image:archlinux
+    environment:
+      CC: clang
+
+workflows:
+  version: 2
+  build:
+    jobs:
+    - trusty-gcc
+    - trusty-clang
+    - xenial-gcc
+    - xenial-clang
+    - bionic-gcc
+    - bionic-clang
+    - archlinux-gcc
+    - archlinux-clang

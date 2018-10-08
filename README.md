@@ -1,6 +1,7 @@
 # RAWRTC
 
-[![Build Status][travis-ci-badge]][travis-ci-url]
+[![CircleCI build status][circleci-badge]][circleci-url]
+[![Travis CI build status][travis-ci-badge]][travis-ci-url]
 
 A WebRTC and ORTC library with a small footprint that runs everywhere.
 
@@ -422,6 +423,8 @@ Usage:
 
 
 
+[circleci-badge]: https://circleci.com/gh/rawrtc/rawrtc.svg?style=svg
+[circleci-url]: https://circleci.com/gh/rawrtc/rawrtc
 [travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
 [travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
 
