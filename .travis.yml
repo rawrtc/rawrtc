@@ -1,109 +1,41 @@
-# Use container system
-sudo: false
-
-# Cache OpenSSL build
-cache:
-  directories:
-# TODO: Re-enable once we figured out why this happens:
-#       https://s3.amazonaws.com/archive.travis-ci.org/jobs/213620911/log.txt
-#  - $HOME/build/rawrtc/rawrtc/build/dependencies/openssl
-#  - $HOME/build/rawrtc/rawrtc/build/prefix/lib
-
 # Build matrix
 language: c
 matrix:
   include:
-    - os: linux
-      dist: precise
-      compiler: gcc
-      addons:
-        apt:
-          sources:
-            - george-edison55-precise-backports
-          packages:
-            - cmake
-            - cmake-data
-# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: precise
-#      compiler: gcc
-#      env: ENFORCE_OPENSSL=1
-    - os: linux
-      dist: precise
-      compiler: clang
-      addons:
-        apt:
-          sources:
-            - george-edison55-precise-backports
-          packages:
-            - cmake
-            - cmake-data
-# TODO: Re-enable once precise upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: precise
-#      compiler: clang
-#      env: ENFORCE_OPENSSL=1
-    - os: linux
-      dist: trusty
-      compiler: gcc
-# TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: trusty
-#      compiler: gcc
-#      env: ENFORCE_OPENSSL=1
-    - os: linux
-      dist: trusty
-      compiler: clang
-# TODO: Re-enable once trusty upgraded to OpenSSL >= 1.0.2
-#    - os: linux
-#      dist: trusty
-#      compiler: clang
-#      env: ENFORCE_OPENSSL=1
+    # OS X 10.11
     - os: osx
       osx_image: xcode7.3
       compiler: clang
-    - os: osx
-      osx_image: xcode7.3
-      compiler: clang
-      env: ENFORCE_OPENSSL=1
+
+    # OS X 10.12
     - os: osx
       osx_image: xcode8.3
       compiler: clang
+
+    # OS X 10.13
     - os: osx
-      osx_image: xcode8.3
+      osx_image: xcode9.4
       compiler: clang
-      env: ENFORCE_OPENSSL=1
 
-# Linux dependencies
-addons:
-  apt:
-    packages:
-      - git
-      - pkg-config
-      - libssl-dev
-
-# OSX dependencies
+# Build dependencies & diagnostics
 before_install:
-  - >
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      brew update || travis_terminate 1;
-      cmake --version || brew install cmake || travis_terminate 1;
-      brew install --force openssl || travis_terminate 1;
-      export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
-    fi
+  - brew update
+  - cmake --version || brew install cmake
+  - brew install --force openssl
+  - export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
 
-# Make library dependencies
+# Build library dependencies
 install:
   - ./make-dependencies.sh
 
-# Set environment vars & enable core dumps
+# Set pkg-config path, dynamic library path and binary path (since we prefix) & enable core dumps
 before_script:
   - export BUILD_PATH=$HOME/build/rawrtc/rawrtc/build
   - export LD_LIBRARY_PATH=${BUILD_PATH}/prefix/lib:${LD_LIBRARY_PATH}
   - export PATH=${BUILD_PATH}/prefix/bin:${PATH}
   - ulimit -c unlimited -S
 
-# Install library and run tests
+# Build library and run ICE gatherer
 script:
   - cd build
   - >
@@ -112,18 +44,11 @@ script:
     -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
     .. && make install
   - ice-gatherer
-#  - make test
 
 # Find core dump and print traceback on failure
 after_failure:
   - >
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      pip install six  # OSX with xcode7.3 needs six
-      for f in $(find /cores -maxdepth 1 -name 'core.*' -print); do
-        lldb --core $f --batch --one-line "bt"
-      done;
-    else
-      for f in $(find ./ -maxdepth 1 -name 'core*' -print); do
-        gdb ${PWD}/ice-gatherer $f -ex "thread apply all bt" -ex "set pagination 0" --batch;
-      done;
-    fi;
+    pip install six  # OSX with xcode7.3 needs six
+    for f in $(find /cores -maxdepth 1 -name 'core.*' -print); do
+      lldb --core $f --batch --one-line "bt"
+    done;
