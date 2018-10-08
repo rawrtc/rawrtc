@@ -6,6 +6,7 @@ set(rawrtc_SOURCES
         data_channel_options.c
         data_channel_parameters.c
         data_transport.c
+        diffie_hellman_parameters.c
         dtls_parameters.c
         dtls_transport.c
         ice_candidate.c
