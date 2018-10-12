@@ -5,6 +5,7 @@
 #include "message_buffer.h"
 #include "candidate_helper.h"
 #include "certificate.h"
+#include "diffie_hellman_parameters.h"
 #include "utils.h"
 
 #define DEBUG_MODULE "dtls-transport"
@@ -657,10 +658,19 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     }
 
     // Set Diffie-Hellman parameters
+    // TODO: Get whether to apply DH parameters from config
     // TODO: Get DH params from config
     DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
-    error = rawrtc_error_to_code(tls_set_dh_params_der(
-            transport->context, rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length));
+    error = rawrtc_set_dh_parameters_der(
+            transport->context, rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length);
+    if (error) {
+        goto out;
+    }
+
+    // Enable elliptic-curve Diffie-Hellman
+    // TODO: Get whether to enable ECDH from config
+    DEBUG_PRINTF("Enabling ECDH on DTLS context\n");
+    error = rawrtc_enable_ecdh(transport->context);
     if (error) {
         goto out;
     }

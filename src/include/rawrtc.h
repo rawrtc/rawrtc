@@ -17,6 +17,8 @@
 
 #define RAWRTC_DEBUG_LEVEL 5
 
+// TODO: Can we get rid of these hacky defines?
+#define USE_OPENSSL
 #define HAVE_INTTYPES_H
 #include <re.h>
 #include <rew.h>
