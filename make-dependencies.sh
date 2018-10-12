@@ -32,7 +32,7 @@ LIBREW_COMMIT="9ce0a928b919a31382b1952625db3ecdd9fd7bfe"
 LIBREW_PATH="rew"
 USRSCTP_GIT="https://github.com/rawrtc/usrsctp.git"
 USRSCTP_BRANCH="usrsctp-for-rawrtc"
-USRSCTP_COMMIT="eabbea6cfb4dac224e082fc021b568ec9a731c0b"
+USRSCTP_COMMIT="5edfaf1b8e17faabf2b1b6e559b042a088ce6c2c"
 USRSCTP_PATH="usrsctp"
 
 # Prefix
@@ -172,16 +172,19 @@ echo "OpenSSL DTLS 1.2 support: $have_dtls_1_2"
 openssl_sysroot=`pkg-config --variable=prefix openssl`
 echo "Using OpenSSL sysroot: $openssl_sysroot"
 
-# Build usrsctp
 cd ${USRSCTP_PATH}
 if [ ! -d "build" ]; then
     mkdir build
 fi
 cd build
 echo "Configuring usrsctp"
-# TODO: Disable "-Wno-address-of-packed-member" once usrsctp has fixed this
-CFLAGS="-fPIC -Wno-unknown-warning-option -Wno-address-of-packed-member" \
-cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} -DSCTP_DEBUG=1 ..
+# SCTP_DEBUG: We need this since this is a compile time flag in RAWRTCDC
+# THREAD_SUPPORT: We explicitly don't want any threads running
+CFLAGS="-fPIC" \
+cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+-Dsctp_debug=ON \
+-Dsctp_thread_support=OFF \
+..
 echo "Cleaning usrsctp"
 make clean
 echo "Building & installing usrsctp"
