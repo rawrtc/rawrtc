@@ -423,7 +423,7 @@ Usage:
 
 
 
-[circleci-badge]: https://circleci.com/gh/rawrtc/rawrtc.svg?style=svg
+[circleci-badge]: https://circleci.com/gh/rawrtc/rawrtc.svg?style=shield
 [circleci-url]: https://circleci.com/gh/rawrtc/rawrtc
 [travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
 [travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
