@@ -64,7 +64,7 @@ fi
 # Extra cflags when using clang
 clang_extra_cflags=""
 if [ "${CC}" = "clang" ]; then
-    clang_extra_cflags=" -Wno-error=unused-command-line-argument"
+    clang_extra_cflags=" -Wno-error=unused-command-line-argument -Wno-pedantic -Wno-strict-prototypes"
 fi
 
 # Check for DTLS 1.2 suppport in openssl
