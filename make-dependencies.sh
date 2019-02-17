@@ -180,7 +180,7 @@ cd build
 echo "Configuring usrsctp"
 # SCTP_DEBUG: We need this since this is a compile time flag in RAWRTCDC
 # THREAD_SUPPORT: We explicitly don't want any threads running
-CFLAGS="-Wno-error=format-truncation -fPIC" \
+CFLAGS="-fPIC" \
 cmake -DCMAKE_INSTALL_PREFIX=${PREFIX} \
 -Dsctp_debug=ON \
 -Dsctp_thread_support=OFF \
