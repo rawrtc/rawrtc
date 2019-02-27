@@ -29,7 +29,7 @@ RAWRTCDC_PATH="rawrtcdc"
 
 # Prefix
 export PREFIX=${BUILD_PATH}/prefix
-export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PREFIX}/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}
 echo "Environment vars:"
 echo "PREFIX: ${PREFIX}"
 echo "PKG_CONFIG_PATH: ${PKG_CONFIG_PATH}"

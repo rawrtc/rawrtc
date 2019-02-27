@@ -9,7 +9,7 @@ set(PROJECT_URL
         "https://github.com/rawrtc/rawrtc")
 
 # Use prefix pkgconfig
-set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/:$ENV{PKG_CONFIG_PATH}")
+set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig:${CMAKE_INSTALL_PREFIX}/lib/x86_64-linux-gnu/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 # Dependency versions
 set(LIB_RE_VERSION "libre >= 0.6.0")
