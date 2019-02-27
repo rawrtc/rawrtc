@@ -184,32 +184,6 @@ Usage:
 
     dtls-transport-loopback [<ice-candidate-type> ...]
 
-### sctp-transport-loopback
-
-API: ORTC
-
-The SCTP transport loopback tool starts two SCTP transport instances which
-work on top of an established DTLS transport connection. As soon as the SCTP
-connection has been established, it uses an internal interface to send raw data
-on the SCTP transport to the other peer.
-
-To verify that the SCTP connection establishes, wait for the following line for
-both clients *A* and *B*:
-
-    (<client>) SCTP transport state change: connected
-    
-The tool will output a warning (four times) in case the data has been
-transmitted successfully:
-
-    Ignored incoming DCEP control message with unknown type: 72
-
-This warning is entirely valid as this tool sends invalid DCEP messages for
-testing purposes.
-
-Usage:
-
-    sctp-transport-loopback [<ice-candidate-type> ...]
-
 ### sctp-redirect-transport
 
 API: ORTC

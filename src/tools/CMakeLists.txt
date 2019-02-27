@@ -41,15 +41,6 @@ if (SCTP_REDIRECT_TRANSPORT)
   target_compile_definitions(sctp-redirect-transport PRIVATE SCTP_REDIRECT_TRANSPORT)
 endif ()
 
-# Tool: sctp-transport-loopback
-add_executable(sctp-transport-loopback
-        sctp-transport-loopback.c)
-target_link_libraries(sctp-transport-loopback
-        rawrtc
-        rawrtc-helper)
-install(TARGETS sctp-transport-loopback
-        DESTINATION bin)
-
 # Tool: data-channel-sctp-loopback
 add_executable(data-channel-sctp-loopback
         data-channel-sctp-loopback.c)
