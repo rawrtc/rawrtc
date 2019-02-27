@@ -1,8 +1,8 @@
-#include <rawrtcc/internal/certificate.h>
-#include <rawrtcc/internal/utils.h>
 #include <rawrtc.h>
+#include "certificate.h"
 #include "ice_server.h"
 #include "peer_connection_configuration.h"
+#include "utils.h"
 
 /*
  * Destructor for an existing peer connection configuration.

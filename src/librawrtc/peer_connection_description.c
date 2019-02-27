@@ -1,5 +1,4 @@
 #include <string.h> // strlen
-#include <rawrtcdc/internal/sctp_capabilities.h>
 #include <rawrtc.h>
 #include "ice_parameters.h"
 #include "dtls_parameters.h"
@@ -10,7 +9,7 @@
 
 #define DEBUG_MODULE "peer-connection-description"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include <rawrtcc/internal/debug.h>
+#include <rawrtcc/debug.h>
 
 // Constants
 static uint16_t const discard_port = 9;

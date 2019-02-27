@@ -12,10 +12,10 @@ set(PROJECT_URL
 set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig/:$ENV{PKG_CONFIG_PATH}")
 
 # Dependency versions
-set(LIB_RE_VERSION "libre >= 0.5.7")
+set(LIB_RE_VERSION "libre >= 0.6.0")
 set(LIB_REW_VERSION "librew >= 0.5.0")
-set(LIB_RAWRTCC_VERSION "librawrtcc >= 0.0.1")
-set(LIB_RAWRTCDC_VERSION "librawrtcdc >= 0.0.1")
+set(LIB_RAWRTCC_VERSION "rawrtcc >= 0.0.1")
+set(LIB_RAWRTCDC_VERSION "rawrtcdc >= 0.0.1")
 # Note: This MUST be here as cmake 3.5.0 overwrites LIB_RE_VERSION for some reason...
 set(DEPENDENCY_VERSIONS "${LIB_RE_VERSION}, ${LIB_REW_VERSION}, ${LIB_RAWRTCC_VERSION}, ${LIB_RAWRTCDC_VERSION}")
 

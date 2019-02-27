@@ -1,6 +1,7 @@
 # Library sources
 set(rawrtc_SOURCES
         candidate_helper.c
+        certificate.c
         config.c
         diffie_hellman_parameters.c
         dtls_parameters.c
@@ -20,11 +21,13 @@ set(rawrtc_SOURCES
         peer_connection_ice_candidate.c
         peer_connection_states.c
         sctp_common.c
-        sctp_transport.c)
+        sctp_transport.c
+        utils.c)
 
 # Library internal headers
 set(rawrtc_HEADERS
         candidate_helper.h
+        certificate.h
         config.h
         dtls_parameters.h
         dtls_transport.h
@@ -43,7 +46,8 @@ set(rawrtc_HEADERS
         peer_connection_ice_candidate.h
         peer_connection_states.h
         sctp_common.h
-        sctp_transport.h)
+        sctp_transport.h
+        utils.h)
 
 # Optional: SCTP redirect transport tool sources
 if (SCTP_REDIRECT_TRANSPORT)

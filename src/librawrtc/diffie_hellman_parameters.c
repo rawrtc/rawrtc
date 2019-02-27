@@ -9,7 +9,7 @@
 #define DEBUG_MODULE "diffie-hellman-parameters"
 // Note: Always log level 7 as logging is only used in tool functions.
 #define RAWRTC_DEBUG_MODULE_LEVEL 7
-#include "debug.h"
+#include <rawrtcc/debug.h>
 
 /*
  * Apply Diffie-Hellman parameters on an OpenSSL context.

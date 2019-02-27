@@ -5,7 +5,7 @@
 
 #define DEBUG_MODULE "sctp-transport"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include <rawrtcc/internal/debug.h>
+#include <rawrtcc/debug.h>
 
 /*
  * Pass DTLS application data to the SCTP transport as inbound data.

@@ -5,7 +5,7 @@
 // Note: Although shared with the redirect transport, this name is accurate enough for both.
 #define DEBUG_MODULE "sctp-transport"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include <rawrtcc/internal/debug.h>
+#include <rawrtcc/debug.h>
 
 // TODO: Remove sanity check once https://github.com/NEAT-project/usrsctp-neat/issues/12
 //       has been resolved.

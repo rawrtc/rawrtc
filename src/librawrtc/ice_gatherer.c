@@ -1,7 +1,6 @@
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <netinet/in.h> // IPPROTO_UDP, IPPROTO_TCP
 #include <string.h> // memcpy
-#include <rawrtcc/internal/message_buffer.h>
 #include <rawrtc.h>
 #include "config.h"
 #include "ice_candidate.h"
@@ -14,7 +13,7 @@
 #define DEBUG_MODULE "ice-gatherer"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #define RAWRTC_DEBUG_ICE_GATHERER 0 // TODO: Remove
-#include <rawrtcc/internal/debug.h>
+#include <rawrtcc/debug.h>
 
 /*
  * Destructor for an existing ICE gatherer.
@@ -85,11 +84,12 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
 
     // Set ICE configuration and create trice instance
     // TODO: Add parameters to function arguments?
+    gatherer->ice_config.nom = ICE_NOMINATION_AGGRESSIVE;
     gatherer->ice_config.debug = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.ansi = true;
-    gatherer->ice_config.enable_prflx = false;
-    gatherer->ice_config.nom = ICE_NOMINATION_AGGRESSIVE;
+    gatherer->ice_config.enable_prflx = true;
+    gatherer->ice_config.optimize_loopback_pairing = true;
     err = trice_alloc(
             &gatherer->ice, &gatherer->ice_config, ICE_ROLE_UNKNOWN,
             gatherer->ice_username_fragment, gatherer->ice_password);

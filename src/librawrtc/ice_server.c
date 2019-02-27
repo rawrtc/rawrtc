@@ -5,7 +5,7 @@
 
 #define DEBUG_MODULE "ice-server"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include <rawrtcc/internal/debug.h>
+#include <rawrtcc/debug.h>
 
 /*
  * ICE server URL-related regular expressions.
