@@ -190,8 +190,8 @@ static void ice_established_handler(
             DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
                           rawrtc_code_to_str(error));
 
-            // Remove candidate pair
-            mem_deref(candidate_pair);
+            // Important: Removing a candidate pair can lead to segfaults due to STUN transaction
+            //            timers looking up the pair. Don't do it!
         }
     }
 
@@ -230,10 +230,8 @@ static void ice_failed_handler(
     // ICE checklist process complete?
     check_ice_checklist_complete(transport);
 
-    // Remove failed candidate pair
-    // Note: This MUST be the last function of the handler or you may see segfaults!
-    //       For example, don't call `trice_debug` unless it's delayed.
-    mem_deref(candidate_pair);
+    // Important: Removing the failed candidate pair can lead to segfaults due to STUN transaction
+    //            timers looking up the pair. Don't do it!
 }
 
 /*
