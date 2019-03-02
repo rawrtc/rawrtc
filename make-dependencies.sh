@@ -24,7 +24,8 @@ LIBREW_BRANCH="meson"
 LIBREW_COMMIT="92e5e6190281fd1003ea629a2baa394e0673b2c0"
 LIBREW_PATH="rew"
 RAWRTCDC_GIT="https://github.com/rawrtc/rawrtc-data-channel.git"
-RAWRTCDC_BRANCH="meson"
+RAWRTCDC_BRANCH="master"
+RAWRTCDC_COMMIT="2062657e89b09890497685001615e1ed31371d46"
 RAWRTCDC_PATH="rawrtcdc"
 
 # Prefix
@@ -75,6 +76,7 @@ if [ -z "$SKIP_RAWRTCDC" ]; then
         cd ${RAWRTCDC_PATH}
     fi
     git checkout ${RAWRTCDC_BRANCH}
+    git reset --hard ${RAWRTCDC_COMMIT}
     cd ${MAIN_DIR}
 fi
 
