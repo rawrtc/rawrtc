@@ -21,7 +21,7 @@
  *
  * TODO: Find a way to keep this in sync with the one in CMakeLists.txt
  */
-#define RAWRTC_VERSION "0.2.2"
+#define RAWRTC_VERSION "0.3.0"
 
 /*
  * SDP type.
