@@ -2,8 +2,9 @@
 
 [![CircleCI build status][circleci-badge]][circleci-url]
 [![Travis CI build status][travis-ci-badge]][travis-ci-url]
+[![Join our chat on Gitter][gitter-icon]][gitter]
 
-A WebRTC and ORTC library with a small footprint that runs everywhere.
+A WebRTC and ORTC library with a small footprint.
 
 ## Features
 
@@ -33,15 +34,32 @@ Features with a check mark are already implemented.
   - [x] WebRTC C-API based on the [W3C WebRTC API][w3c-webrtc] and
     [[draft-ietf-rtcweb-jsep-24]][jsep]
   - [x] ORTC C-API based on the [W3C CG ORTC API][w3c-ortc]
-* Other
-  - [ ] IP Address Handling [[draft-ietf-rtcweb-ip-handling-03]][ip-handling]
-  - [ ] DNS-based STUN/TURN server discovery
+
+## Threading
+
+1. *Does this use multiple threads?*
+
+   No, this library is single-threaded and uses an event loop underneath.
+
+2. *Can I use it in a threaded environment?*
+
+   Yes. Just make sure you're always calling it from the same thread the event
+   loop is running on, or either [lock/unlock the event loop thread][re-lock]
+   or [use the message queues provided by re][re-mqueue] to exchange data with
+   the event loop thread. However, it is important that you only run one *re*
+   event loop in one thread.
+
+3. *I only want a data channel implementation for my SFU!*
+
+   Check out [RAWRTCDC][rawrtcdc].
 
 ## Prerequisites
 
 The following packages are required:
 
 * [git][git]
+* [ninja][ninja] >= 1.5
+* [meson][meson] >= 0.46.0
 * [cmake][cmake] >= 3.2
 * pkg-config (`pkgconf` for newer FreeBSD versions)
 * SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and FreeBSD)
@@ -54,30 +72,30 @@ the necessary dependencies and this library system-wide.
 
 ### Dependencies
 
-    cd <path-to-rawrtc>
-    ./make-dependencies.sh
+```bash
+cd <path-to-rawrtc>
+./make-dependencies.sh
+```
 
 ### Package Configuration Path
 
 The following environment variable is required for both Meson and CMake to find
 the previously built dependencies:
 
-    export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig
+```bash
+export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig
+```
 
 Note that this command will need to be repeated once the terminal has been
 closed.
 
 ### Compile
 
-#### CMake
-
-    cd <path-to-rawrtc>/build
-    cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
-    make install
-
-#### Meson
-
-    Will be added later. Use Cmake for now.
+```bash
+cd <path-to-rawrtc>/build
+cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
+make install
+```
 
 ## Run
 
@@ -93,8 +111,10 @@ path to run the various binaries. To be able to find the shared library
 when running a binary, the library path has to be set as well.
 Note: We assume that you are in the `build` directory.
 
-    export LD_LIBRARY_PATH=${PWD}/prefix/lib:${LD_LIBRARY_PATH}
-    export PATH=${PWD}/prefix/bin:${PATH}
+```bash
+export LD_LIBRARY_PATH=${PWD}/prefix/lib:${LD_LIBRARY_PATH}
+export PATH=${PWD}/prefix/bin:${PATH}
+```
 
 Most of the tools have required or optional arguments which are shared among
 tools. Below is a description for the various shared arguments:
@@ -198,10 +218,12 @@ Building:
 
 This tool is not built by default. In order to build it, set the environment
 variable `SCTP_REDIRECT_TRANSPORT` to `ON` when building:
-    
-    cd <path-to-rawrtc>/build
-    cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
-    make install
+
+```bash
+cd <path-to-rawrtc>/build
+cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
+make install
+```
     
 Note, that this tool will not build on systems that do not have SSE 4.2 support
 such as ARM.
@@ -430,6 +452,8 @@ Usage:
 [circleci-url]: https://circleci.com/gh/rawrtc/rawrtc
 [travis-ci-badge]: https://travis-ci.org/rawrtc/rawrtc.svg?branch=master
 [travis-ci-url]: https://travis-ci.org/rawrtc/rawrtc
+[gitter]: https://gitter.im/rawrtc/Lobby
+[gitter-icon]: https://badges.gitter.im/rawrtc/Lobby.svg
 
 [ice]: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-08
 [trickle-ice]: https://tools.ietf.org/html/draft-ietf-ice-trickle-07
@@ -441,10 +465,14 @@ Usage:
 [jsep]: https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-19
 [w3c-webrtc]: https://www.w3.org/TR/webrtc/
 [w3c-ortc]: http://draft.ortc.org
-[sdp]: https://tools.ietf.org/html/draft-ietf-rtcweb-sdp-04
-[ip-handling]: https://tools.ietf.org/html/draft-ietf-rtcweb-ip-handling-03
+
+[re-lock]: http://www.creytiv.com/doxygen/re-dox/html/re__main_8h.html#ad335fcaa56e36b39cb1192af1a6b9904
+[re-mqueue]: http://www.creytiv.com/doxygen/re-dox/html/re__mqueue_8h.html
+[rawrtcdc]: https://github.com/rawrtc/rawrtc-data-channel
 
 [git]: (https://git-scm.com)
+[meson]: https://mesonbuild.com
+[ninja]: https://ninja-build.org
 [cmake]: https://cmake.org
 
 [webrtc-ortc-example]: http://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
