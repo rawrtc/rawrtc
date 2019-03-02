@@ -1,11 +1,11 @@
 #include <string.h> // strlen
 #include <rawrtc.h>
-#include "utils.h"
+#include "config.h"
 #include "ice_server.h"
 
 #define DEBUG_MODULE "ice-server"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
+#include <rawrtcc/debug.h>
 
 /*
  * ICE server URL-related regular expressions.
@@ -77,10 +77,10 @@ static char const * const ice_credential_type_to_name(
  * `ice_server_scheme_port_mapping` if changed.
  */
 static char const* const ice_server_schemes[] = {
-        "stun",
-        "stuns",
-        "turn",
-        "turns"
+    "stun",
+    "stuns",
+    "turn",
+    "turns"
 };
 static size_t const ice_server_schemes_length = ARRAY_SIZE(ice_server_schemes);
 
@@ -88,30 +88,30 @@ static size_t const ice_server_schemes_length = ARRAY_SIZE(ice_server_schemes);
  * ICE server scheme to server type mapping.
  */
 static enum rawrtc_ice_server_type ice_server_scheme_type_mapping[] = {
-        RAWRTC_ICE_SERVER_TYPE_STUN,
-        RAWRTC_ICE_SERVER_TYPE_STUN,
-        RAWRTC_ICE_SERVER_TYPE_TURN,
-        RAWRTC_ICE_SERVER_TYPE_TURN
+    RAWRTC_ICE_SERVER_TYPE_STUN,
+    RAWRTC_ICE_SERVER_TYPE_STUN,
+    RAWRTC_ICE_SERVER_TYPE_TURN,
+    RAWRTC_ICE_SERVER_TYPE_TURN
 };
 
 /*
  * ICE server scheme to secure mapping.
  */
 static bool ice_server_scheme_secure_mapping[] = {
-        false,
-        true,
-        false,
-        true
+    false,
+    true,
+    false,
+    true
 };
 
 /*
  * ICE server scheme to default port mapping.
  */
 static uint_fast16_t ice_server_scheme_port_mapping[] = {
-        3478,
-        5349,
-        3478,
-        5349
+    3478,
+    5349,
+    3478,
+    5349
 };
 
 /*
@@ -121,8 +121,8 @@ static uint_fast16_t ice_server_scheme_port_mapping[] = {
  * `ice_server_transport_secure_transport_mapping` if changed.
  */
 static char const* const ice_server_transports[] = {
-        "udp",
-        "tcp"
+    "udp",
+    "tcp"
 };
 static size_t const ice_server_transports_length = ARRAY_SIZE(ice_server_transports);
 
@@ -130,16 +130,16 @@ static size_t const ice_server_transports_length = ARRAY_SIZE(ice_server_transpo
  * ICE server transport to non-secure transport mapping.
  */
 static enum rawrtc_ice_server_transport ice_server_transport_normal_transport_mapping[] = {
-        RAWRTC_ICE_SERVER_TRANSPORT_UDP,
-        RAWRTC_ICE_SERVER_TRANSPORT_TCP
+    RAWRTC_ICE_SERVER_TRANSPORT_UDP,
+    RAWRTC_ICE_SERVER_TRANSPORT_TCP
 };
 
 /*
  * ICE server transport to secure transport mapping.
  */
 static enum rawrtc_ice_server_transport ice_server_transport_secure_transport_mapping[] = {
-        RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
-        RAWRTC_ICE_SERVER_TRANSPORT_TLS
+    RAWRTC_ICE_SERVER_TRANSPORT_DTLS,
+    RAWRTC_ICE_SERVER_TRANSPORT_TLS
 };
 
 /*
@@ -240,8 +240,7 @@ static enum rawrtc_code decode_ice_server_url(
     }
 
     // Set default address
-    sa_set_in(&url->ipv4_address, INADDR_ANY, (uint16_t) port);
-    sa_set_in6(&url->ipv6_address, (uint8_t const*) &in6addr_any, (uint16_t) port);
+    sa_set_in(&url->resolved_address, INADDR_ANY, (uint16_t) port);
 
     // Decode host: Either IPv4 or IPv6 including the port (if any)
     // Try IPv6 first, then normal hostname/IPv4.
@@ -255,9 +254,17 @@ static enum rawrtc_code decode_ice_server_url(
                           url->url, &host_port);
             goto out;
         }
+
+        // Try decoding IPv4
+        sa_set(&url->resolved_address, &url->host, (uint16_t) port);
     } else {
-        // Set IPv6 directly
-        sa_set(&url->ipv6_address, &url->host, (uint16_t) port);
+        // Try decoding IPv6
+        error = rawrtc_error_to_code(sa_set(&url->resolved_address, &url->host, (uint16_t) port));
+        if (error) {
+            DEBUG_WARNING("Invalid IPv6 address in ICE server URL (%s): %r\n",
+                          url->url, &host_port);
+            goto out;
+        }
     }
 
     // Decode port (if any)
@@ -274,8 +281,7 @@ static enum rawrtc_code decode_ice_server_url(
         }
 
         // Set port
-        sa_set_port(&url->ipv4_address, (uint16_t) port_u32);
-        sa_set_port(&url->ipv6_address, (uint16_t) port_u32);
+        sa_set_port(&url->resolved_address, (uint16_t) port_u32);
     }
 
     // Translate transport (if any) & secure flag to ICE server transport
@@ -313,8 +319,6 @@ static void rawrtc_ice_server_url_destroy(
     list_unlink(&url->le);
 
     // Un-reference
-    mem_deref(url->dns_aaaa_context);
-    mem_deref(url->dns_a_context);
     mem_deref(url->url);
 }
 
@@ -501,130 +505,6 @@ out:
 }
 
 /*
- * Destroy both ICE server URL DNS contexts (IPv4 and IPv6).
- */
-enum rawrtc_code rawrtc_ice_server_url_destroy_dns_contexts(
-        struct rawrtc_ice_server_url* const url
-) {
-    // Check arguments
-    if (!url) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Destroy URL DNS IPv4 context (if any)
-    if (url->dns_a_context) {
-        url->dns_a_context = mem_deref(url->dns_a_context);
-    }
-
-    // Destroy URL DNS IPv6 context (if any)
-    if (url->dns_aaaa_context) {
-        url->dns_aaaa_context = mem_deref(url->dns_aaaa_context);
-    }
-
-    // Done
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Destroy ICE server DNS contexts of all URLs.
- */
-enum rawrtc_code rawrtc_ice_server_destroy_dns_contexts(
-        struct rawrtc_ice_server* const server
-) {
-    // Check arguments
-    if (!server) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    struct le* le;
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // Destroy URL DNS contexts (if any)
-        enum rawrtc_code const error = rawrtc_ice_server_url_destroy_dns_contexts(url);
-        if (error) {
-            DEBUG_WARNING("Unable to destroy URL DNS context, reason: %s\n",
-                          rawrtc_code_to_str(error));
-        }
-    }
-
-    // Done
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Destructor for URLs of the ICE gatherer.
- */
-static void rawrtc_ice_server_url_dns_context_destroy(
-        void* arg
-) {
-    struct rawrtc_ice_server_url_dns_context* const context = arg;
-
-    // Un-reference
-    mem_deref(context->dns_query);
-    mem_deref(context->gatherer);
-    mem_deref(context->url);
-}
-
-/*
- * Create an ICE server URL DNS context for handling DNS queries.
- */
-enum rawrtc_code rawrtc_ice_server_url_dns_context_create(
-        struct rawrtc_ice_server_url_dns_context** const contextp,
-        uint_fast16_t const dns_type,
-        struct rawrtc_ice_server_url* const url,
-        struct rawrtc_ice_gatherer* const gatherer // referenced
-) {
-    struct rawrtc_ice_server_url_dns_context* context;
-
-    // Check arguments
-    if (!contextp || !url || !gatherer) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
-
-    // Allocate
-    context = mem_zalloc(sizeof(*context), rawrtc_ice_server_url_dns_context_destroy);
-    if (!context) {
-        return RAWRTC_CODE_NO_MEMORY;
-    }
-
-    // Set fields/reference
-    context->dns_type = dns_type;
-    context->url = mem_ref(url);
-    context->gatherer = mem_ref(gatherer);
-
-    // Set pointer
-    *contextp = context;
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
- * Check if there are pending DNS queries for an ICE server.
- */
-enum rawrtc_code rawrtc_ice_server_dns_queries_pending(
-        struct rawrtc_ice_server_url** const urlp, // de-referenced
-        bool* const pendingp, // de-referenced
-        struct rawrtc_ice_server* const server
-) {
-    struct le* le;
-    for (le = list_head(&server->urls); le != NULL; le = le->next) {
-        struct rawrtc_ice_server_url* const url = le->data;
-
-        // DNS queries pending?
-        if (url->dns_a_context || url->dns_aaaa_context) {
-            // Set pointer
-            *urlp = url;
-            *pendingp = true;
-            return RAWRTC_CODE_SUCCESS;
-        }
-    }
-
-    // No pending DNS queries
-    *pendingp = false;
-    return RAWRTC_CODE_SUCCESS;
-}
-
-/*
  * Print debug information for an ICE server.
  */
 int rawrtc_ice_server_debug(
@@ -671,7 +551,7 @@ int rawrtc_ice_server_debug(
                 pf, "    URL=\"%s\" type=%s transport=%s resolved=%s\n",
                 url->url, ice_server_type_to_name(url->type),
                 ice_server_transport_to_name(url->transport),
-                url->dns_a_context && url->dns_aaaa_context ? "yes" : "no");
+                sa_is_any(&url->resolved_address) ? "no" : "yes");
     }
 
     // Done

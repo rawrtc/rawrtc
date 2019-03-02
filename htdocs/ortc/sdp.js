@@ -259,7 +259,7 @@ SDPUtils.getSctpPort = function(mediaSection, sessionpart) {
   var port = lines.filter(function(line) {
     return line.indexOf('a=sctp-port:') === 0;
   });
-  port = port.length ? port[0].substr(12) : 5000;
+  port = port.length ? parseInt(port[0].substr(12), 10) : 5000;
   return port;
 };
 

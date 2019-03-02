@@ -1,5 +1,8 @@
+#include <stdlib.h> // exit
+#include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
-#include "../librawrtc/dtls_transport.h" /* TODO: Replace with <rawrtc_internal/dtls_transport.h> */
+// Note: You should use <rawrtc/internal/dtls_transport.h> if you want to do the same
+#include "../librawrtc/dtls_transport.h"
 #include "helper/utils.h"
 #include "helper/handler.h"
 
@@ -151,12 +154,12 @@ int main(int argc, char* argv[argc + 1]) {
     (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
     (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init());
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Get enabled ICE candidate types to be added (optional)
     if (argc > 1) {
@@ -200,6 +203,9 @@ int main(int argc, char* argv[argc + 1]) {
     client_start(&a, &b);
     client_start(&b, &a);
 
+    // Listen on stdin
+    EOR(fd_listen(STDIN_FILENO, FD_READ, stop_on_return_handler, NULL));
+
     // Start main loop
     // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
@@ -207,6 +213,9 @@ int main(int argc, char* argv[argc + 1]) {
     // Stop clients
     client_stop(&a);
     client_stop(&b);
+
+    // Stop listening on STDIN
+    fd_close(STDIN_FILENO);
 
     // Free
     mem_deref(gather_options);

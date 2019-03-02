@@ -6,7 +6,7 @@
 #include "helper/handler.h"
 #include "helper/parameters.h"
 
-#define DEBUG_MODULE "data-channel-sctp-echo-app"
+#define DEBUG_MODULE "data-channel-sctp-throughput-app"
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
@@ -18,33 +18,164 @@ struct parameters {
 };
 
 // Note: Shadows struct client
-struct data_channel_sctp_client {
+struct data_channel_sctp_throughput_client {
     char* name;
     char** ice_candidate_types;
     size_t n_ice_candidate_types;
+    uint64_t message_size;
+    uint16_t n_times_left;
     struct rawrtc_ice_gather_options* gather_options;
     enum rawrtc_ice_role role;
+    struct mbuf* start_buffer;
+    struct mbuf* throughput_buffer;
     struct rawrtc_certificate* certificate;
     struct rawrtc_ice_gatherer* gatherer;
     struct rawrtc_ice_transport* ice_transport;
     struct rawrtc_dtls_transport* dtls_transport;
     struct rawrtc_sctp_transport* sctp_transport;
     struct rawrtc_data_transport* data_transport;
-    struct list data_channels;
+    struct data_channel_helper* data_channel;
     struct parameters local_parameters;
     struct parameters remote_parameters;
+    uint64_t start_time;
 };
 
 static void print_local_parameters(
-        struct data_channel_sctp_client *client
+    struct data_channel_sctp_throughput_client *client
 );
+
+static struct tmr timer = {{0}};
+
+static void timer_handler(
+        void* arg
+) {
+    struct data_channel_helper* const channel = arg;
+    struct data_channel_sctp_throughput_client* const client =
+            (struct data_channel_sctp_throughput_client*) channel->client;
+    enum rawrtc_code error;
+    enum rawrtc_dtls_role role;
+
+    // Send start indicator
+    mbuf_set_pos(client->start_buffer, 0);
+    DEBUG_PRINTF("(%s) Sending start indicator\n", client->name);
+    error = rawrtc_data_channel_send(channel->channel, client->start_buffer, false);
+    if (error) {
+        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+        goto out;
+    }
+
+    // Send message
+    DEBUG_PRINTF("(%s) Sending %zu bytes\n",
+                 client->name, mbuf_get_left(client->throughput_buffer));
+    error = rawrtc_data_channel_send(channel->channel, client->throughput_buffer, true);
+    if (error) {
+        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
+        goto out;
+    }
+
+out:
+    // Get DTLS role
+    EOE(rawrtc_dtls_parameters_get_role(&role, client->local_parameters.dtls_parameters));
+    if (role == RAWRTC_DTLS_ROLE_CLIENT) {
+        // Close bear-noises
+        DEBUG_PRINTF("(%s) Closing channel\n", client->name, channel->label);
+        EOR(rawrtc_data_channel_close(client->data_channel->channel));
+    }
+}
+
+static void data_channel_message_handler(
+        struct mbuf* const buffer,
+        enum rawrtc_data_channel_message_flag const flags,
+        void* const arg
+) {
+    struct data_channel_helper* const channel = arg;
+    struct data_channel_sctp_throughput_client* const client =
+            (struct data_channel_sctp_throughput_client*) channel->client;
+    size_t const length = mbuf_get_left(buffer);
+
+    // Check role
+    if (client->role != RAWRTC_ICE_ROLE_CONTROLLED) {
+        DEBUG_WARNING("(%s) Unexpected message on data channel %s of size %zu\n",
+                      client->name, channel->label, length);
+    }
+
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_STRING) {
+        // Start indicator message
+        uint64_t expected_size;
+
+        // Check size
+        if (mbuf_get_left(buffer) < 8) {
+            EOE(RAWRTC_CODE_INVALID_MESSAGE);
+        }
+
+        // Parse message
+        expected_size = sys_ntohll(mbuf_read_u64(buffer));
+        EOE(expected_size > 0 ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_INVALID_MESSAGE);
+        client->start_time = tmr_jiffies();
+        DEBUG_INFO("(%s) Started throughput test of %.2f MiB\n",
+                   client->name, ((double) expected_size) / 1048576);
+        return;
+    } else if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY) {
+        // Check expected message size and print results
+        double const delta = ((double) (tmr_jiffies() - client->start_time)) / 1000;
+        DEBUG_INFO("(%s) Completed throughput test after %.2f seconds: %.2f Mbit/s\n",
+                   client->name, delta, ((double) length) / 131072 / delta);
+
+        // Check size
+        if (length != client->message_size) {
+            DEBUG_WARNING("(%s) Expected %zu bytes, received %zu bytes\n", client->name,
+                          client->message_size, length);
+            return;
+        }
+    }
+}
+
+static void start_throughput_test(
+        struct data_channel_helper* const channel
+) {
+    struct data_channel_sctp_throughput_client* const client =
+            (struct data_channel_sctp_throughput_client*) channel->client;
+
+    // Start throughput test delayed (if controlling)
+    if (client->role == RAWRTC_ICE_ROLE_CONTROLLING && client->n_times_left > 0) {
+        mbuf_set_pos(client->throughput_buffer, 0);
+        DEBUG_INFO("Starting throughput test of %.2f MiB in 1 second\n",
+                   ((double) mbuf_get_left(client->throughput_buffer)) / 1048576);
+        tmr_start(&timer, 1000, timer_handler, channel);
+        --client->n_times_left;
+    }
+}
+
+static void data_channel_buffered_amount_low_handler(
+        void* const arg
+) {
+    struct data_channel_helper* const channel = arg;
+
+    // Print buffered amount low event
+    default_data_channel_buffered_amount_low_handler(arg);
+
+    // Restart throughput test
+    start_throughput_test(channel);
+}
+
+static void data_channel_open_handler(
+        void* const arg
+) {
+    struct data_channel_helper* const channel = arg;
+
+    // Print open event
+    default_data_channel_open_handler(arg);
+
+    // Start throughput test
+    start_throughput_test(channel);
+}
 
 static void ice_gatherer_local_candidate_handler(
         struct rawrtc_ice_candidate* const candidate,
         char const * const url, // read-only
         void* const arg
 ) {
-    struct data_channel_sctp_client* const client = arg;
+    struct data_channel_sctp_throughput_client* const client = arg;
 
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
@@ -55,66 +186,11 @@ static void ice_gatherer_local_candidate_handler(
     }
 }
 
-/*
- * Print the data channel's received message's size and echo the
- * message back.
- */
-void data_channel_message_handler(
-        struct mbuf* const buffer,
-        enum rawrtc_data_channel_message_flag const flags,
-        void* const arg // will be casted to `struct data_channel_helper*`
-) {
-    struct data_channel_helper* const channel = arg;
-    struct data_channel_sctp_client* const client =
-            (struct data_channel_sctp_client*) channel->client;
-    enum rawrtc_code error;
-    (void) flags;
-
-    // Print message size
-    default_data_channel_message_handler(buffer, flags, arg);
-
-    // Send message
-    DEBUG_PRINTF("(%s) Sending %zu bytes\n", client->name, mbuf_get_left(buffer));
-    error = rawrtc_data_channel_send(
-            channel->channel, buffer,
-            flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY ? true : false);
-    if (error) {
-        DEBUG_WARNING("Could not send, reason: %s\n", rawrtc_code_to_str(error));
-    }
-}
-
-/*
- * Handle the newly created data channel.
- */
-void data_channel_handler(
-        struct rawrtc_data_channel* const channel, // read-only, MUST be referenced when used
-        void* const arg // will be casted to `struct client*`
-) {
-    struct data_channel_sctp_client* const client = arg;
-    struct data_channel_helper* channel_helper;
-
-    // Print channel
-    default_data_channel_handler(channel, arg);
-
-    // Create data channel helper instance & add to list
-    // Note: In this case we need to reference the channel because we have not created it
-    data_channel_helper_create_from_channel(&channel_helper, mem_ref(channel), arg, NULL);
-    list_append(&client->data_channels, &channel_helper->le, channel_helper);
-
-    // Set handler argument & handlers
-    EOE(rawrtc_data_channel_set_arg(channel, channel_helper));
-    EOE(rawrtc_data_channel_set_open_handler(channel, default_data_channel_open_handler));
-    EOE(rawrtc_data_channel_set_buffered_amount_low_handler(
-            channel, default_data_channel_buffered_amount_low_handler));
-    EOE(rawrtc_data_channel_set_error_handler(channel, default_data_channel_error_handler));
-    EOE(rawrtc_data_channel_set_close_handler(channel, default_data_channel_close_handler));
-    EOE(rawrtc_data_channel_set_message_handler(channel, data_channel_message_handler));
-}
-
 static void client_init(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
     struct rawrtc_certificate* certificates[1];
+    struct rawrtc_data_channel_parameters* channel_parameters;
 
     // Generate certificates
     EOE(rawrtc_certificate_generate(&client->certificate, NULL));
@@ -142,22 +218,41 @@ static void client_init(
     EOE(rawrtc_sctp_transport_create(
             &client->sctp_transport, client->dtls_transport,
             client->local_parameters.sctp_parameters.port,
-            data_channel_handler, default_sctp_transport_state_change_handler, client));
+            default_data_channel_handler, default_sctp_transport_state_change_handler, client));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(
             &client->data_transport, client->sctp_transport));
+
+    // Create data channel helper
+    data_channel_helper_create(
+            &client->data_channel, (struct client *) client, "throughput");
+
+    // Create data channel parameters
+    EOE(rawrtc_data_channel_parameters_create(
+            &channel_parameters, client->data_channel->label,
+            RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED, 0, NULL, true, 0));
+
+    // Create pre-negotiated data channel
+    EOE(rawrtc_data_channel_create(
+            &client->data_channel->channel, client->data_transport, channel_parameters,
+            data_channel_open_handler, data_channel_buffered_amount_low_handler,
+            default_data_channel_error_handler, default_data_channel_close_handler,
+            data_channel_message_handler, client->data_channel));
+
+    // Un-reference
+    mem_deref(channel_parameters);
 }
 
 static void client_start_gathering(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
     // Start gathering
     EOE(rawrtc_ice_gatherer_gather(client->gatherer, NULL));
 }
 
 static void client_start_transports(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
     struct parameters* const remote_parameters = &client->remote_parameters;
 
@@ -190,12 +285,8 @@ static void parameters_destroy(
 }
 
 static void client_stop(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
-    // Clear data channels
-    list_flush(&client->data_channels);
-
-    // Stop all transports & gatherer
     if (client->sctp_transport) {
         EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
     }
@@ -212,12 +303,15 @@ static void client_stop(
     // Un-reference & close
     parameters_destroy(&client->remote_parameters);
     parameters_destroy(&client->local_parameters);
+    client->data_channel = mem_deref(client->data_channel);
     client->data_transport = mem_deref(client->data_transport);
     client->sctp_transport = mem_deref(client->sctp_transport);
     client->dtls_transport = mem_deref(client->dtls_transport);
     client->ice_transport = mem_deref(client->ice_transport);
     client->gatherer = mem_deref(client->gatherer);
     client->certificate = mem_deref(client->certificate);
+    client->throughput_buffer = mem_deref(client->throughput_buffer);
+    client->start_buffer = mem_deref(client->start_buffer);
     client->gather_options = mem_deref(client->gather_options);
 
     // Stop listening on STDIN
@@ -225,7 +319,7 @@ static void client_stop(
 }
 
 static void client_set_parameters(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
     struct parameters* const remote_parameters = &client->remote_parameters;
 
@@ -239,7 +333,7 @@ static void parse_remote_parameters(
         int flags,
         void* arg
 ) {
-    struct data_channel_sctp_client* const client = arg;
+    struct data_channel_sctp_throughput_client* const client = arg;
     enum rawrtc_code error;
     struct odict* dict = NULL;
     struct odict* node = NULL;
@@ -282,26 +376,27 @@ static void parse_remote_parameters(
     DEBUG_INFO("Applying remote parameters\n");
     client_set_parameters(client);
     client_start_transports(client);
-
+    
 out:
     // Un-reference
     mem_deref(dtls_parameters);
     mem_deref(ice_candidates);
     mem_deref(ice_parameters);
     mem_deref(dict);
-
+    
     // Exit?
     if (error == RAWRTC_CODE_NO_VALUE) {
         DEBUG_NOTICE("Exiting\n");
 
         // Stop client & bye
         client_stop(client);
+        tmr_cancel(&timer);
         re_cancel();
     }
 }
 
 static void client_get_parameters(
-        struct data_channel_sctp_client* const client
+        struct data_channel_sctp_throughput_client* const client
 ) {
     struct parameters* const local_parameters = &client->local_parameters;
 
@@ -325,7 +420,7 @@ static void client_get_parameters(
 }
 
 static void print_local_parameters(
-        struct data_channel_sctp_client *client
+        struct data_channel_sctp_throughput_client *client
 ) {
     struct odict* dict;
     struct odict* node;
@@ -362,7 +457,8 @@ static void print_local_parameters(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> [<sctp-port>] [<ice-candidate-type> ...]", program);
+    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <message-size> [<n-times>] [<sctp-port>] "
+                          "[<ice-candidate-type> ...]\n", program);
     exit(1);
 }
 
@@ -371,10 +467,7 @@ int main(int argc, char* argv[argc + 1]) {
     size_t n_ice_candidate_types = 0;
     enum rawrtc_ice_role role;
     struct rawrtc_ice_gather_options* gather_options;
-    char* const stun_google_com_urls[] = {"stun:stun.l.google.com:19302",
-                                          "stun:stun1.l.google.com:19302"};
-    char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
-    struct data_channel_sctp_client client = {0};
+    struct data_channel_sctp_throughput_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
     // Debug
@@ -385,7 +478,7 @@ int main(int argc, char* argv[argc + 1]) {
     EOE(rawrtc_init(true));
 
     // Check arguments length
-    if (argc < 2) {
+    if (argc < 3) {
         exit_with_usage(argv[0]);
     }
 
@@ -394,28 +487,32 @@ int main(int argc, char* argv[argc + 1]) {
         exit_with_usage(argv[0]);
     }
 
+    // Get message size
+    if (!str_to_uint64(&client.message_size, argv[2])) {
+        exit_with_usage(argv[0]);
+    }
+
+    // Get number of times the test should run (optional)
+    client.n_times_left = 1;
+    if (argc >= 4 && !str_to_uint16(&client.n_times_left, argv[3])) {
+        exit_with_usage(argv[0]);
+    }
+
+    // TODO: Add possibility to turn checksum generation/validation on or off
+
     // Get SCTP port (optional)
-    if (argc >= 3 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[2])) {
+    if (argc >= 5 && !str_to_uint16(&client.local_parameters.sctp_parameters.port, argv[4])) {
         exit_with_usage(argv[0]);
     }
 
     // Get enabled ICE candidate types to be added (optional)
-    if (argc >= 4) {
-        ice_candidate_types = &argv[3];
-        n_ice_candidate_types = (size_t) argc - 3;
+    if (argc >= 6) {
+        ice_candidate_types = &argv[5];
+        n_ice_candidate_types = (size_t) argc - 5;
     }
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
-
-    // Add ICE servers to ICE gather options
-    EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
-    EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
-            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
-            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Set client fields
     client.name = "A";
@@ -423,7 +520,19 @@ int main(int argc, char* argv[argc + 1]) {
     client.n_ice_candidate_types = n_ice_candidate_types;
     client.gather_options = gather_options;
     client.role = role;
-    list_init(&client.data_channels);
+
+    // Pre-generate messages (if 'controlling')
+    if (role == RAWRTC_ICE_ROLE_CONTROLLING) {
+        // Start indicator
+        client.start_buffer = mbuf_alloc(8);
+        EOE(client.start_buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
+        EOR(mbuf_write_u64(client.start_buffer, sys_htonll(client.message_size)));
+
+        // Throughput test buffer
+        client.throughput_buffer = mbuf_alloc(client.message_size);
+        EOE(client.throughput_buffer ? RAWRTC_CODE_SUCCESS : RAWRTC_CODE_NO_MEMORY);
+        EOR(mbuf_fill(client.throughput_buffer, 0x01, mbuf_get_space(client.throughput_buffer)));
+    }
 
     // Setup client
     client_init(&client);

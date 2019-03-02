@@ -1,4 +1,5 @@
 #include <rawrtc.h>
+#include "ice_gatherer.h"
 #include "candidate_helper.h"
 
 /*
@@ -168,6 +169,7 @@ enum rawrtc_code rawrtc_candidate_helper_stun_session_create(
 
     // Set fields/reference
     session->url = mem_ref(url);
+    session->pending = true;
 
     // Set pointer & done
     *sessionp = session;

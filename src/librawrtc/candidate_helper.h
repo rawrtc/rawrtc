@@ -1,14 +1,6 @@
 #pragma once
-
-/*
- * STUN keep-alive session.
- */
-struct rawrtc_candidate_helper_stun_session {
-    struct le le;
-    struct rawrtc_candidate_helper* candidate_helper;
-    struct stun_keepalive* stun_keepalive;
-    struct rawrtc_ice_server_url* url;
-};
+#include <rawrtc.h>
+#include "ice_server.h"
 
 /*
  * Local candidate helper.
@@ -21,6 +13,17 @@ struct rawrtc_candidate_helper {
     uint_fast8_t srflx_pending_count;
     struct list stun_sessions;
     uint_fast8_t relay_pending_count;
+};
+
+/*
+ * STUN keep-alive session.
+ */
+struct rawrtc_candidate_helper_stun_session {
+    struct le le;
+    struct rawrtc_candidate_helper* candidate_helper;
+    struct stun_keepalive* stun_keepalive;
+    struct rawrtc_ice_server_url* url;
+    bool pending;
 };
 
 enum rawrtc_code rawrtc_candidate_helper_create(

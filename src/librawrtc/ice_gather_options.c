@@ -2,10 +2,6 @@
 #include "ice_server.h"
 #include "ice_gather_options.h"
 
-#define DEBUG_MODULE "ice-gather-options"
-//#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
-#include "debug.h"
-
 /*
  * Destructor for an existing ICE gather options instance.
  */
@@ -20,6 +16,7 @@ static void rawrtc_ice_gather_options_destroy(
 
 /*
  * Create a new ICE gather options instance.
+ * `*optionsp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_gather_options_create(
         struct rawrtc_ice_gather_options** const optionsp, // de-referenced
@@ -99,32 +96,59 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server(
     return rawrtc_ice_gather_options_add_server_internal(options, server);
 }
 
+static enum rawrtc_ice_gather_policy const map_enum_ice_gather_policy[] = {
+    RAWRTC_ICE_GATHER_POLICY_ALL,
+    RAWRTC_ICE_GATHER_POLICY_NOHOST,
+    RAWRTC_ICE_GATHER_POLICY_RELAY
+};
+
+static char const * const map_str_ice_gather_policy[] = {
+    "all",
+    "nohost",
+    "relay"
+};
+
+static size_t const map_ice_gather_policy_length = ARRAY_SIZE(map_enum_ice_gather_policy);
+
 /*
- * Destroy all ICE server URL DNS contexts.
+ * Translate an ICE gather policy to str.
  */
-enum rawrtc_code rawrtc_ice_gather_options_destroy_url_dns_contexts(
-        struct rawrtc_ice_gather_options* const options
+char const * rawrtc_ice_gather_policy_to_str(
+        enum rawrtc_ice_gather_policy const policy
 ) {
-    // Check arguments
-    if (!options) {
-        return RAWRTC_CODE_INVALID_ARGUMENT;
-    }
+    size_t i;
 
-    // Destroy all URL DNS contexts
-    struct le* le;
-    for (le = list_head(&options->ice_servers); le != NULL; le = le->next) {
-        struct rawrtc_ice_server* const server = le->data;
-
-        // Destroy DNS contexts
-        enum rawrtc_code const error = rawrtc_ice_server_destroy_dns_contexts(server);
-        if (error) {
-            DEBUG_WARNING("Unable to destroy DNS contexts of server, reason: %s\n",
-                          rawrtc_code_to_str(error));
+    for (i = 0; i < map_ice_gather_policy_length; ++i) {
+        if (map_enum_ice_gather_policy[i] == policy) {
+            return map_str_ice_gather_policy[i];
         }
     }
 
-    // Done
-    return RAWRTC_CODE_SUCCESS;
+    return "???";
+}
+
+/*
+ * Translate a str to an ICE gather policy (case-insensitive).
+ */
+enum rawrtc_code rawrtc_str_to_ice_gather_policy(
+        enum rawrtc_ice_gather_policy* const policyp, // de-referenced
+        char const* const str
+) {
+    size_t i;
+
+    // Check arguments
+    if (!policyp || !str) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < map_ice_gather_policy_length; ++i) {
+        if (str_casecmp(map_str_ice_gather_policy[i], str) == 0) {
+            *policyp = map_enum_ice_gather_policy[i];
+            return RAWRTC_CODE_SUCCESS;
+        }
+    }
+
+    return RAWRTC_CODE_NO_VALUE;
 }
 
 /*

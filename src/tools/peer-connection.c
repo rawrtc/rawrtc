@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
 #include "helper/utils.h"
@@ -132,7 +133,7 @@ static void connection_state_change_handler(
 
         // Create data channel
         EOE(rawrtc_peer_connection_create_data_channel(
-                &client->data_channel->channel, client->connection, channel_parameters, NULL,
+                &client->data_channel->channel, client->connection, channel_parameters,
                 data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
                 default_data_channel_error_handler, default_data_channel_close_handler,
                 default_data_channel_message_handler, client->data_channel));
@@ -183,8 +184,7 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_peer_connection_create_data_channel(
-            &client->data_channel_negotiated->channel, client->connection,
-            channel_parameters, NULL,
+            &client->data_channel_negotiated->channel, client->connection, channel_parameters,
             data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
@@ -274,10 +274,8 @@ out:
         DEBUG_NOTICE("Exiting\n");
 
         // Stop client & bye
-        client_stop(client);
         tmr_cancel(&timer);
-        before_exit();
-        exit(0);
+        re_cancel();
     }
 }
 
@@ -326,12 +324,12 @@ int main(int argc, char* argv[argc + 1]) {
     struct peer_connection_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init());
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Check arguments length
     if (argc < 2) {

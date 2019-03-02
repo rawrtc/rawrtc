@@ -1,6 +1,25 @@
 #pragma once
+#include <rawrtc.h>
 
 #define RAWRTC_PEER_CONNECTION_DESCRIPTION_MID "rawrtc-sctp-dc"
+
+struct rawrtc_peer_connection_description {
+    struct rawrtc_peer_connection* connection;
+    enum rawrtc_sdp_type type;
+    bool trickle_ice;
+    char* bundled_mids;
+    char* remote_media_line;
+    uint8_t media_line_index;
+    char* mid;
+    bool sctp_sdp_05;
+    bool end_of_candidates;
+    struct list ice_candidates;
+    struct rawrtc_ice_parameters* ice_parameters;
+    struct rawrtc_dtls_parameters* dtls_parameters;
+    struct rawrtc_sctp_capabilities* sctp_capabilities;
+    uint16_t sctp_port;
+    struct mbuf* sdp;
+};
 
 enum {
     RAWRTC_PEER_CONNECTION_DESCRIPTION_DEFAULT_SIZE = 1024,

@@ -65,6 +65,16 @@ void default_dtls_transport_error_handler(
     void* const arg // will be casted to `struct client*`
 );
 
+#ifdef SCTP_REDIRECT_TRANSPORT
+/*
+ * Print the SCTP redirect transport's state.
+ */
+void default_sctp_redirect_transport_state_change_handler(
+    enum rawrtc_sctp_redirect_transport_state const state,
+    void* const arg // will be casted to `struct client*`
+);
+#endif
+
 /*
  * Print the SCTP transport's state.
  */

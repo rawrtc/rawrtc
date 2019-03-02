@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
@@ -175,8 +176,7 @@ static void dtls_transport_state_change_handler(
 
             // Create data channel
             EOE(rawrtc_data_channel_create(
-                    &client->data_channel->channel, client->data_transport,
-                    channel_parameters, NULL,
+                    &client->data_channel->channel, client->data_transport, channel_parameters,
                     data_channel_open_handler,
                     default_data_channel_buffered_amount_low_handler,
                     default_data_channel_error_handler, default_data_channel_close_handler,
@@ -236,8 +236,7 @@ static void client_init(
 
     // Create pre-negotiated data channel
     EOE(rawrtc_data_channel_create(
-            &client->data_channel_negotiated->channel, client->data_transport,
-            channel_parameters, NULL,
+            &client->data_channel_negotiated->channel, client->data_transport, channel_parameters,
             data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, client->data_channel_negotiated));
@@ -289,10 +288,18 @@ static void parameters_destroy(
 static void client_stop(
         struct data_channel_sctp_client* const client
 ) {
-    EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
-    EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
-    EOE(rawrtc_ice_transport_stop(client->ice_transport));
-    EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    if (client->sctp_transport) {
+        EOE(rawrtc_sctp_transport_stop(client->sctp_transport));
+    }
+    if (client->dtls_transport) {
+        EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
+    }
+    if (client->ice_transport) {
+        EOE(rawrtc_ice_transport_stop(client->ice_transport));
+    }
+    if (client->gatherer) {
+        EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    }
 
     // Un-reference & close
     parameters_destroy(&client->remote_parameters);
@@ -384,8 +391,7 @@ out:
         // Stop client & bye
         client_stop(client);
         tmr_cancel(&timer);
-        before_exit();
-        exit(0);
+        re_cancel();
     }
 }
 
@@ -466,12 +472,12 @@ int main(int argc, char* argv[argc + 1]) {
     struct data_channel_sctp_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init());
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Check arguments length
     if (argc < 2) {

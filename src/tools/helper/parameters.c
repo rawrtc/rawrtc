@@ -129,9 +129,8 @@ void set_dtls_parameters(
 
     // Get and set fingerprints
     EOE(rawrtc_dtls_parameters_get_fingerprints(&fingerprints, parameters));
-    for (i = 0; i < parameters->fingerprints->n_fingerprints; ++i) {
-        struct rawrtc_dtls_fingerprint* const fingerprint =
-                parameters->fingerprints->fingerprints[i];
+    for (i = 0; i < fingerprints->n_fingerprints; ++i) {
+        struct rawrtc_dtls_fingerprint* const fingerprint = fingerprints->fingerprints[i];
         enum rawrtc_certificate_sign_algorithm sign_algorithm;
         char* value;
         char* key;
@@ -270,7 +269,7 @@ enum rawrtc_code get_ice_candidates(
     struct le* le;
 
     // Get length
-    n = list_count(&dict->lst);
+    n = list_count(&dict->lst) + 1;
 
     // Allocate & set length immediately
     // Note: We allocate more than we need in case ICE candidate types are being filtered but... meh
@@ -335,6 +334,9 @@ enum rawrtc_code get_ice_candidates(
             mem_deref(candidate);
         }
     }
+
+    // End-of-candidates
+    candidates->candidates[candidates->n_candidates++] = NULL;
 
 out:
     if (error) {

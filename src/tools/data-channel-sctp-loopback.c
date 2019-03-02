@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
 #include "helper/utils.h"
@@ -150,8 +151,7 @@ static void dtls_transport_state_change_handler(
 
             // Create data channel
             EOE(rawrtc_data_channel_create(
-                    &client->data_channel->channel, client->data_transport,
-                    channel_parameters, NULL,
+                    &client->data_channel->channel, client->data_transport, channel_parameters,
                     data_channel_open_handler,
                     default_data_channel_buffered_amount_low_handler,
                     default_data_channel_error_handler, default_data_channel_close_handler,
@@ -214,8 +214,8 @@ static void client_init(
     // Create pre-negotiated data channel
     EOE(rawrtc_data_channel_create(
             &local->data_channel_negotiated->channel, local->data_transport,
-            channel_parameters, NULL,
-            data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
+            channel_parameters, data_channel_open_handler,
+            default_data_channel_buffered_amount_low_handler,
             default_data_channel_error_handler, default_data_channel_close_handler,
             default_data_channel_message_handler, local->data_channel_negotiated));
 
@@ -295,12 +295,12 @@ int main(int argc, char* argv[argc + 1]) {
     (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
     (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init());
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Get enabled ICE candidate types to be added (optional)
     if (argc > 1) {

@@ -1,3 +1,4 @@
+#include <stdlib.h> // exit
 #include <string.h> // memcpy
 #include <unistd.h> // STDIN_FILENO
 #include <rawrtc.h>
@@ -84,7 +85,8 @@ static void client_init(
     // Create SCTP redirect transport
     EOE(rawrtc_sctp_redirect_transport_create(
             &client->sctp_redirect_transport, client->dtls_transport,
-            0, client->redirect_ip, client->redirect_port));
+            0, client->redirect_ip, client->redirect_port,
+            default_sctp_redirect_transport_state_change_handler, client));
 }
 
 static void client_start_gathering(
@@ -141,10 +143,18 @@ static void parameters_destroy(
 static void client_stop(
         struct sctp_redirect_transport_client* const client
 ) {
-    EOE(rawrtc_sctp_redirect_transport_stop(client->sctp_redirect_transport));
-    EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
-    EOE(rawrtc_ice_transport_stop(client->ice_transport));
-    EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    if (client->sctp_redirect_transport) {
+        EOE(rawrtc_sctp_redirect_transport_stop(client->sctp_redirect_transport));
+    }
+    if (client->dtls_transport) {
+        EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
+    }
+    if (client->ice_transport) {
+        EOE(rawrtc_ice_transport_stop(client->ice_transport));
+    }
+    if (client->gatherer) {
+        EOE(rawrtc_ice_gatherer_close(client->gatherer));
+    }
 
     // Un-reference & close
     parameters_destroy(&client->remote_parameters);
@@ -221,8 +231,7 @@ out:
 
         // Stop client & bye
         client_stop(client);
-        before_exit();
-        exit(0);
+        re_cancel();
     }
 }
 
@@ -305,12 +314,12 @@ int main(int argc, char* argv[argc + 1]) {
     struct sctp_redirect_transport_client client = {0};
     (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
 
-    // Initialise
-    EOE(rawrtc_init());
-
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
     DEBUG_PRINTF("Init\n");
+
+    // Initialise
+    EOE(rawrtc_init(true));
 
     // Check arguments length
     if (argc < 4) {

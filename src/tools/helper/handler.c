@@ -99,6 +99,20 @@ void default_dtls_transport_error_handler(
     DEBUG_WARNING("(%s) DTLS transport error: %s\n", client->name, "???");
 }
 
+#ifdef SCTP_REDIRECT_TRANSPORT
+/*
+ * Print the SCTP redirect transport's state.
+ */
+void default_sctp_redirect_transport_state_change_handler(
+        enum rawrtc_sctp_redirect_transport_state const state,
+        void* const arg // will be casted to `struct client*`
+) {
+    struct client* const client = arg;
+    char const * const state_name = rawrtc_sctp_redirect_transport_state_to_name(state);
+    DEBUG_PRINTF("(%s) SCTP redirect transport state change: %s\n", client->name, state_name);
+}
+#endif
+
 /*
  * Print the SCTP transport's state.
  */
@@ -175,6 +189,34 @@ void default_data_channel_close_handler(
     DEBUG_PRINTF("(%s) Data channel closed: %s\n", client->name, channel->label);
 }
 
+char const* const separator = ", ";
+
+int debug_data_channel_message_flags(
+        struct re_printf* const pf,
+        enum rawrtc_data_channel_message_flag const flags
+) {
+    int err = 0;
+    char const* prefix = "";
+
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_ABORTED) {
+        err |= re_hprintf(pf, "%saborted", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_COMPLETE) {
+        err |= re_hprintf(pf, "%scomplete", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_STRING) {
+        err |= re_hprintf(pf, "%sstring", prefix);
+        prefix = separator;
+    }
+    if (flags & RAWRTC_DATA_CHANNEL_MESSAGE_FLAG_IS_BINARY) {
+        err |= re_hprintf(pf, "%sbinary", prefix);
+    }
+
+    return err;
+}
+
 /*
  * Print the data channel's received message's size.
  */
@@ -185,9 +227,9 @@ void default_data_channel_message_handler(
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
-    (void) flags;
-    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes\n",
-                 client->name, channel->label, mbuf_get_left(buffer));
+    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes; flags=(%H)\n",
+                 client->name, channel->label, mbuf_get_left(buffer),
+                 debug_data_channel_message_flags, flags);
 }
 
 /*
