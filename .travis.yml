@@ -21,32 +21,26 @@ addons:
       - openssl
     update: true
 
-# Build library dependencies
-install:
-  - export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
-  - ./make-dependencies.sh
-
-# Set pkg-config path, dynamic library path and binary path (since we prefix) & enable core dumps
+# Setup prefix & enable core dumps
 before_script:
-  - export BUILD_PATH=$HOME/build/rawrtc/rawrtc/build
-  - export LD_LIBRARY_PATH=${BUILD_PATH}/prefix/lib:${LD_LIBRARY_PATH}
-  - export PATH=${BUILD_PATH}/prefix/bin:${PATH}
+  - export PREFIX=/tmp/prefix
+  - export LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  - export PATH=${PREFIX}/bin:${PATH}
+  - export PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig:${PKG_CONFIG_PATH}
   - ulimit -c unlimited -S
 
 # Build library and run ICE gatherer
 script:
-  - cd build
-  - >
-    cmake
-    -DCMAKE_INSTALL_PREFIX=${BUILD_PATH}/prefix
-    -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function"
-    .. && make install
+  - |
+    mkdir build
+    meson build --prefix ${PREFIX}
+    cd build
+    ninja install
   - ice-gatherer
 
 # Find core dump and print traceback on failure
 after_failure:
-  - >
-    pip install six  # OSX with xcode7.3 needs six
+  - |
     for f in $(find /cores -maxdepth 1 -name 'core.*' -print); do
       lldb --core $f --batch --one-line "bt"
     done;

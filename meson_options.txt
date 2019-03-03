@@ -1,0 +1,6 @@
+option('debug_level', type: 'integer', min: 0, max: 7, value: 5,
+    description: 'Global debug level')
+option('build_tools', type: 'boolean', value: true,
+    description: 'Build RAWRTC tools')
+option('sctp_redirect_transport', type: 'boolean', value: false,
+    description: 'Build SCTP redirect transport')

@@ -190,10 +190,7 @@ Usage:
 API: ORTC
 
 The DTLS transport loopback tool starts two DTLS transport instances which
-work on top of an established ICE transport connection. As soon as the DTLS
-connection has been established, it uses an internal interface to send raw data
-on the DTLS transport to the other peer. There's currently no way to verify
-that the data has been received but you can trace the packets using Wireshark.
+work on top of an established ICE transport connection.
 
 To verify that the DTLS connection establishes, wait for the following line for
 both clients *A* and *B*:
