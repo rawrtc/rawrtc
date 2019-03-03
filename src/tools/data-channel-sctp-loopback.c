@@ -350,7 +350,6 @@ int main(int argc, char* argv[argc + 1]) {
     EOR(fd_listen(STDIN_FILENO, FD_READ, stop_on_return_handler, NULL));
 
     // Start main loop
-    // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
 
     // Stop clients

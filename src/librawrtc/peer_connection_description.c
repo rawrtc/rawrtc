@@ -673,9 +673,6 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 
-    // TODO: Create a more sophisticated SDP mechanism based on
-    //       https://github.com/nils-ohlmeier/rsdparsa
-
     // Allocate
     local_description = mem_zalloc(
             sizeof(*local_description), rawrtc_peer_connection_description_destroy);

@@ -67,7 +67,6 @@ int main(int argc, char* argv[argc + 1]) {
     EOE(rawrtc_ice_gatherer_gather(gatherer, NULL));
 
     // Start main loop
-    // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
 
     // Close gatherer

@@ -238,8 +238,9 @@ static void verify_certificate(
 //    }
 //    DEBUG_PRINTF("Peer's certificate verified\n");
 
-    // Check if any of the fingerprints provided matches
-    // TODO: Is this correct?
+    // Check if *any* of the fingerprints provided matches
+    // Note: We don't verify the peer's certificate since it will almost always
+    //       be self-signed.
     for (i = 0; i < transport->remote_parameters->fingerprints->n_fingerprints; ++i) {
         struct rawrtc_dtls_fingerprint* const fingerprint =
                 transport->remote_parameters->fingerprints->fingerprints[i];
@@ -293,7 +294,6 @@ static void verify_certificate(
         }
 
         // Compare fingerprints
-        // TODO: Constant-time equality comparison needed?
         if (memcmp(expected_fingerprint, actual_fingerprint, length) == 0) {
             DEBUG_PRINTF("Peer's certificate fingerprint is valid\n");
             valid = true;
@@ -483,8 +483,7 @@ static bool udp_receive_handler(
     struct sa* source = context;
     struct sa const* peer;
 
-    // TODO: Check if DTLS or SRTP packet
-    // TODO: This handler should also be moved into ICE transport
+    // TODO: This handler should be moved into ICE transport
     // https://tools.ietf.org/search/rfc7983#section-7
 
     // Update remote peer address (if changed and connection exists)
@@ -1060,8 +1059,6 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
     // Update state
     set_state(transport, RAWRTC_DTLS_TRANSPORT_STATE_CLOSED);
     return RAWRTC_CODE_SUCCESS;
-
-    // TODO: Anything missing?
 }
 
 /*

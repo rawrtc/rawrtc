@@ -529,7 +529,6 @@ int main(int argc, char* argv[argc + 1]) {
     EOR(fd_listen(STDIN_FILENO, FD_READ, parse_remote_parameters, &client));
 
     // Start main loop
-    // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
 
     // Stop client & bye

@@ -241,7 +241,7 @@ static enum rawrtc_code generate_self_signed_certificate(
     }
 
     // Set x509 version
-    // TODO: Why '2'?
+    // Note: '2' maps to version 3
     if (!X509_set_version(certificate, 2)) {
         DEBUG_WARNING("Could not set x509 version\n");
         goto out;

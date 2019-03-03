@@ -16,10 +16,6 @@ static void sctp_redirect_transport_inbound_handler(
         void* const arg // not checked
 ) {
     struct rawrtc_sctp_redirect_transport* const transport = arg;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("sctp_redirect_transport_inbound_handler called from different thread: %u\n",
-                      pthread_self());
-    }
 
     // Feed data
     enum rawrtc_code const error = rawrtc_sctp_redirect_transport_feed_inbound(transport, buffer);
@@ -36,10 +32,6 @@ static void rawrtc_sctp_redirect_transport_destroy(
         void* const arg
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("rawrtc_sctp_redirect_transport_destroy called from different thread: %u\n",
-                      pthread_self());
-    }
 
     // Un-reference
     mem_deref(dtls_transport);
@@ -67,10 +59,6 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
     enum rawrtc_code error;
     bool have_data_transport;
     struct rawrtc_sctp_redirect_transport* transport = NULL;
-
-    // Remember current thread
-    // TODO: This is a sanity-check that's going to be removed soon.
-    rawrtc_sctp_common_main_thread = pthread_self();
 
     // Check if a data transport is already registered
     error = rawrtc_dtls_transport_have_data_transport(&have_data_transport, dtls_transport);

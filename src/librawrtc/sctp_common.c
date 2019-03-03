@@ -7,10 +7,6 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include <rawrtcc/debug.h>
 
-// TODO: Remove sanity check once https://github.com/NEAT-project/usrsctp-neat/issues/12
-//       has been resolved.
-pthread_t rawrtc_sctp_common_main_thread;
-
 /*
  * External DTLS role getter.
  * Warning: `rolep` and `arg` will not be validated.
@@ -20,9 +16,6 @@ enum rawrtc_code rawrtc_sctp_common_dtls_role_getter(
         void* const arg // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("dtls_role_getter called from different thread: %u\n", pthread_self());
-    }
     return rawrtc_dtls_transport_get_external_role(rolep, dtls_transport);
 }
 
@@ -35,10 +28,6 @@ enum rawrtc_code rawrtc_sctp_common_dtls_transport_state_getter(
         void* const arg // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("dtls_transport_state_getter called from different thread: %u\n",
-                      pthread_self());
-    }
     return rawrtc_dtls_transport_get_external_state(statep, dtls_transport);
 }
 
@@ -56,10 +45,6 @@ enum rawrtc_code rawrtc_sctp_common_sctp_transport_outbound_handler(
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
     enum rawrtc_code error;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("sctp_transport_outbound_handler called from different thread: %u\n",
-                      pthread_self());
-    }
 
     // TODO: Handle
     (void) tos; (void) set_df;
@@ -112,10 +97,6 @@ void rawrtc_sctp_common_sctp_transport_detach_handler(
         void* const arg // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
-    if (pthread_self() != rawrtc_sctp_common_main_thread) {
-        DEBUG_WARNING("sctp_transport_detach_handler called from different thread: %u\n",
-                      pthread_self());
-    }
 
     // Detach from DTLS transport
     enum rawrtc_code error = rawrtc_dtls_transport_clear_data_transport(dtls_transport);

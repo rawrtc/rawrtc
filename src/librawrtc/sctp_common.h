@@ -1,11 +1,6 @@
 #pragma once
 #include <rawrtc.h>
 
-// TODO: Remove sanity check once https://github.com/NEAT-project/usrsctp-neat/issues/12
-//       has been resolved.
-#include <pthread.h>
-extern pthread_t rawrtc_sctp_common_main_thread;
-
 enum rawrtc_code rawrtc_sctp_common_dtls_role_getter(
     enum rawrtc_external_dtls_role* const rolep, // de-referenced, not checked
     void* const arg // not checked

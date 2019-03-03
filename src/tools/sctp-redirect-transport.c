@@ -345,7 +345,6 @@ int main(int argc, char* argv[argc + 1]) {
     if (argc >= 6 && !str_to_uint64(&maximum_message_size, argv[5])) {
         exit_with_usage(argv[0]);
     } else {
-        // TODO: Find out what dctt can handle
         maximum_message_size = 0;
     }
 
@@ -390,7 +389,6 @@ int main(int argc, char* argv[argc + 1]) {
     EOR(fd_listen(STDIN_FILENO, FD_READ, parse_remote_parameters, &client));
 
     // Start main loop
-    // TODO: Wrap re_main?
     EOR(re_main(default_signal_handler));
 
     // Stop client & bye

@@ -83,7 +83,7 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
     rand_str(gatherer->ice_password, sizeof(gatherer->ice_password));
 
     // Set ICE configuration and create trice instance
-    // TODO: Add parameters to function arguments?
+    // TODO: Get from config
     gatherer->ice_config.nom = ICE_NOMINATION_AGGRESSIVE;
     gatherer->ice_config.debug = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
     gatherer->ice_config.trace = RAWRTC_DEBUG_ICE_GATHERER ? true : false;
@@ -782,7 +782,7 @@ static bool interface_handler(
         return false; // Continue gathering
     }
 
-    // TODO: Ignore interfaces gatherered twice
+    // TODO: Ignore interfaces gathered twice
 
     DEBUG_PRINTF("Gathered local interface %j\n", address);
 

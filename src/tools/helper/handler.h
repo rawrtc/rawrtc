@@ -61,7 +61,7 @@ void default_dtls_transport_state_change_handler(
  * Print the DTLS transport's error event.
  */
 void default_dtls_transport_error_handler(
-    /* TODO: error.message (probably from OpenSSL) */
+    // TODO: error.message (probably from OpenSSL)
     void* const arg // will be casted to `struct client*`
 );
 
