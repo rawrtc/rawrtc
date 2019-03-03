@@ -85,7 +85,7 @@ static enum rawrtc_code generate_key_rsa(
     }
 
     // Allocate BIGNUM
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(OPENSSL_IS_BORINGSSL)
     bn = BN_secure_new();
 #else
     bn = BN_new();
@@ -653,7 +653,7 @@ enum rawrtc_code rawrtc_certificate_get_pem(
     error = RAWRTC_CODE_UNKNOWN_ERROR;
 
     // Create bio structure
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(OPENSSL_IS_BORINGSSL)
     bio = BIO_new(BIO_s_secmem());
 #else
     bio = BIO_new(BIO_s_mem());

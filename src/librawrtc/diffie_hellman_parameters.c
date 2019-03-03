@@ -3,6 +3,11 @@
 #include <openssl/err.h> // ERR_clear_error
 #include <openssl/pem.h> // PEM_read_bio_DHparams
 #include <openssl/ssl.h> // SSL_CTX_set_tmp_dh, SSL_CTX_set_ecdh_auto
+
+#ifdef OPENSSL_IS_BORINGSSL
+#include <limits.h>
+#endif
+
 #include <rawrtc.h>
 #include "diffie_hellman_parameters.h"
 
@@ -21,7 +26,7 @@ static enum rawrtc_code set_dh_parameters(
     int codes;
 
     // Check that the parameters are "likely enough to be valid"
-#if OPENSSL_VERSION_NUMBER < 0x1010000fL
+#if OPENSSL_VERSION_NUMBER < 0x1010000fL || defined(OPENSSL_IS_BORINGSSL)
     if (!DH_check(dh, &codes)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
