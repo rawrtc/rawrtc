@@ -732,6 +732,46 @@ enum rawrtc_code rawrtc_dtls_transport_create(
 }
 
 /*
+ * Handle received UDP messages.
+ */
+static bool ice_udp_receive_handler(
+        struct sa * source,
+        struct mbuf* buffer,
+        void* arg
+) {
+    struct rawrtc_ice_gatherer* const gatherer = arg;
+    enum rawrtc_code error;
+
+    // Allocate context and copy source address
+    void* const context = mem_zalloc(sizeof(*source), NULL);
+    if (!context) {
+        error = RAWRTC_CODE_NO_MEMORY;
+        goto out;
+    }
+    memcpy(context, source, sizeof(*source));
+
+    // Buffer message
+    error = rawrtc_message_buffer_append(&gatherer->buffered_messages, buffer, context);
+    if (error) {
+        goto out;
+    }
+
+    // Done
+    DEBUG_PRINTF("Buffered UDP packet of size %zu\n", mbuf_get_left(buffer));
+
+out:
+    if (error) {
+        DEBUG_WARNING("Could not buffer UDP packet, reason: %s\n", rawrtc_code_to_str(error));
+    }
+
+    // Un-reference
+    mem_deref(context);
+
+    // Handled
+    return true;
+}
+
+/*
  * Let the DTLS transport attach itself to a candidate pair.
  * TODO: Separate ICE transport and DTLS transport properly (like data transport)
  */
@@ -759,9 +799,24 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
             &candidate_helper, &transport->ice_transport->gatherer->local_candidates,
             candidate_pair->lcand);
     if (error) {
-        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
+        DEBUG_PRINTF("Could not find matching candidate helper for candidate pair, reason: %s\n",
                       rawrtc_code_to_str(error));
-        goto out;
+
+		
+		struct rawrtc_candidate_helper* candidate;
+
+		// Create candidate helper (attaches receive handler)
+		error = rawrtc_candidate_helper_create(&candidate, transport->ice_transport->gatherer, candidate_pair->lcand, ice_udp_receive_handler, transport->ice_transport->gatherer);
+		if (error) {
+	   		DEBUG_WARNING("Could not create candidate helper, reason: %s\n", rawrtc_code_to_str(error));
+			return error;
+		}
+        	
+		// Add to local candidates list
+	   	list_append(&(transport->ice_transport->gatherer->local_candidates), &candidate->le, candidate);
+	    DEBUG_PRINTF("Added %s host candidate for interface %j\n", rawrtc_ice_protocol_to_str(protocol), address);
+		
+		candidate_helper = candidate;
     }
 
     // Receive buffered packets
