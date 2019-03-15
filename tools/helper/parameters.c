@@ -13,10 +13,7 @@
 /*
  * Set ICE parameters in dictionary.
  */
-void set_ice_parameters(
-        struct rawrtc_ice_parameters* const parameters,
-        struct odict* const dict
-) {
+void set_ice_parameters(struct rawrtc_ice_parameters* const parameters, struct odict* const dict) {
     char* username_fragment;
     char* password;
     bool ice_lite;
@@ -39,10 +36,7 @@ void set_ice_parameters(
 /*
  * Set ICE candidates in dictionary.
  */
-void set_ice_candidates(
-        struct rawrtc_ice_candidates* const parameters,
-        struct odict* const array
-) {
+void set_ice_candidates(struct rawrtc_ice_candidates* const parameters, struct odict* const array) {
     size_t i;
     struct odict* node;
 
@@ -86,8 +80,8 @@ void set_ice_candidates(
         EOR(odict_entry_add(node, "port", ODICT_INT, (int64_t) port));
         EOR(odict_entry_add(node, "type", ODICT_STRING, rawrtc_ice_candidate_type_to_str(type)));
         if (protocol == RAWRTC_ICE_PROTOCOL_TCP) {
-            EOR(odict_entry_add(node, "tcpType", ODICT_STRING,
-                                rawrtc_ice_tcp_candidate_type_to_str(tcp_type)));
+            EOR(odict_entry_add(
+                node, "tcpType", ODICT_STRING, rawrtc_ice_tcp_candidate_type_to_str(tcp_type)));
         }
         if (related_address) {
             EOR(odict_entry_add(node, "relatedAddress", ODICT_STRING, related_address));
@@ -113,9 +107,7 @@ void set_ice_candidates(
  * Set DTLS parameters in dictionary.
  */
 void set_dtls_parameters(
-        struct rawrtc_dtls_parameters* const parameters,
-        struct odict* const dict
-) {
+    struct rawrtc_dtls_parameters* const parameters, struct odict* const dict) {
     enum rawrtc_dtls_role role;
     struct odict* array;
     struct odict* node;
@@ -145,8 +137,9 @@ void set_dtls_parameters(
         EOE(rawrtc_dtls_fingerprint_get_value(&value, fingerprint));
 
         // Set fingerprint values
-        EOR(odict_entry_add(node, "algorithm", ODICT_STRING,
-                            rawrtc_certificate_sign_algorithm_to_str(sign_algorithm)));
+        EOR(odict_entry_add(
+            node, "algorithm", ODICT_STRING,
+            rawrtc_certificate_sign_algorithm_to_str(sign_algorithm)));
         EOR(odict_entry_add(node, "value", ODICT_STRING, value));
 
         // Add to array
@@ -171,10 +164,9 @@ void set_dtls_parameters(
  * Set SCTP parameters in dictionary.
  */
 void set_sctp_parameters(
-        struct rawrtc_sctp_transport* const transport,
-        struct sctp_parameters* const parameters,
-        struct odict* const dict
-) {
+    struct rawrtc_sctp_transport* const transport,
+    struct sctp_parameters* const parameters,
+    struct odict* const dict) {
     uint64_t max_message_size;
     uint16_t port;
 
@@ -197,10 +189,9 @@ void set_sctp_parameters(
  * Set SCTP redirect parameters in dictionary.
  */
 void set_sctp_redirect_parameters(
-        struct rawrtc_sctp_redirect_transport* const transport,
-        struct sctp_parameters* const parameters,
-        struct odict* const dict
-) {
+    struct rawrtc_sctp_redirect_transport* const transport,
+    struct sctp_parameters* const parameters,
+    struct odict* const dict) {
     uint64_t max_message_size;
     uint16_t port;
 
@@ -223,9 +214,7 @@ void set_sctp_redirect_parameters(
  * Get ICE parameters from dictionary.
  */
 enum rawrtc_code get_ice_parameters(
-        struct rawrtc_ice_parameters** const parametersp,
-        struct odict* const dict
-) {
+    struct rawrtc_ice_parameters** const parametersp, struct odict* const dict) {
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     char* username_fragment;
     char* password;
@@ -243,9 +232,7 @@ enum rawrtc_code get_ice_parameters(
     return rawrtc_ice_parameters_create(parametersp, username_fragment, password, ice_lite);
 }
 
-static void ice_candidates_destroy(
-        void* arg
-) {
+static void ice_candidates_destroy(void* arg) {
     struct rawrtc_ice_candidates* const candidates = arg;
     size_t i;
 
@@ -261,10 +248,9 @@ static void ice_candidates_destroy(
  * non-NULL.
  */
 enum rawrtc_code get_ice_candidates(
-        struct rawrtc_ice_candidates** const candidatesp,
-        struct odict* const dict,
-        struct client* const client
-) {
+    struct rawrtc_ice_candidates** const candidatesp,
+    struct odict* const dict,
+    struct client* const client) {
     size_t n;
     struct rawrtc_ice_candidates* candidates;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
@@ -275,8 +261,8 @@ enum rawrtc_code get_ice_candidates(
 
     // Allocate & set length immediately
     // Note: We allocate more than we need in case ICE candidate types are being filtered but... meh
-    candidates = mem_zalloc(sizeof(*candidates) + (sizeof(struct rawrtc_ice_candidate*) * n),
-                            ice_candidates_destroy);
+    candidates = mem_zalloc(
+        sizeof(*candidates) + (sizeof(struct rawrtc_ice_candidate*) * n), ice_candidates_destroy);
     if (!candidates) {
         EWE("No memory to allocate ICE candidates array");
     }
@@ -320,8 +306,8 @@ enum rawrtc_code get_ice_candidates(
 
         // Create and add ICE candidate
         error = rawrtc_ice_candidate_create(
-                &candidate, foundation, priority, ip, protocol, port, type,
-                tcp_type, related_address, related_port);
+            &candidate, foundation, priority, ip, protocol, port, type, tcp_type, related_address,
+            related_port);
         if (error) {
             goto out;
         }
@@ -350,9 +336,7 @@ out:
     return error;
 }
 
-static void dtls_fingerprints_destroy(
-        void* arg
-) {
+static void dtls_fingerprints_destroy(void* arg) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
 
@@ -366,9 +350,7 @@ static void dtls_fingerprints_destroy(
  * Get DTLS parameters from dictionary.
  */
 enum rawrtc_code get_dtls_parameters(
-        struct rawrtc_dtls_parameters** const parametersp,
-        struct odict* const dict
-) {
+    struct rawrtc_dtls_parameters** const parametersp, struct odict* const dict) {
     size_t n;
     struct rawrtc_dtls_parameters* parameters = NULL;
     struct rawrtc_dtls_fingerprints* fingerprints;
@@ -388,8 +370,8 @@ enum rawrtc_code get_dtls_parameters(
 
     // Allocate & set length immediately
     fingerprints = mem_zalloc(
-            sizeof(*fingerprints) + (sizeof(struct rawrtc_dtls_fingerprints*) * n),
-            dtls_fingerprints_destroy);
+        sizeof(*fingerprints) + (sizeof(struct rawrtc_dtls_fingerprints*) * n),
+        dtls_fingerprints_destroy);
     if (!fingerprints) {
         EWE("No memory to allocate DTLS fingerprint array");
     }
@@ -426,7 +408,7 @@ enum rawrtc_code get_dtls_parameters(
 
     // Create DTLS parameters
     error = rawrtc_dtls_parameters_create(
-            &parameters, role, fingerprints->fingerprints, fingerprints->n_fingerprints);
+        &parameters, role, fingerprints->fingerprints, fingerprints->n_fingerprints);
 
 out:
     mem_deref(fingerprints);
@@ -444,9 +426,7 @@ out:
  * Get SCTP parameters from dictionary.
  */
 enum rawrtc_code get_sctp_parameters(
-        struct sctp_parameters* const parameters,
-        struct odict* const dict
-) {
+    struct sctp_parameters* const parameters, struct odict* const dict) {
     enum rawrtc_code error;
     uint64_t max_message_size;
 

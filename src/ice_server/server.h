@@ -15,9 +15,9 @@ enum rawrtc_ice_server_type {
 
 struct rawrtc_ice_server {
     struct le le;
-    struct list urls; // deep-copied
-    char* username; // copied
-    char* credential; // copied
+    struct list urls;  // deep-copied
+    char* username;  // copied
+    char* credential;  // copied
     enum rawrtc_ice_credential_type credential_type;
 };
 
@@ -26,28 +26,24 @@ struct rawrtc_ice_server {
  */
 struct rawrtc_ice_server_url {
     struct le le;
-    char* url; // copied
-    struct pl host; // points inside `url`
+    char* url;  // copied
+    struct pl host;  // points inside `url`
     enum rawrtc_ice_server_type type;
     enum rawrtc_ice_server_transport transport;
     struct sa resolved_address;
 };
 
 enum rawrtc_code rawrtc_ice_server_create(
-    struct rawrtc_ice_server** const serverp, // de-referenced
-    char* const * const urls, // copied
+    struct rawrtc_ice_server** const serverp,  // de-referenced
+    char* const* const urls,  // copied
     size_t const n_urls,
-    char* const username, // nullable, copied
-    char* const credential, // nullable, copied
-    enum rawrtc_ice_credential_type const credential_type
-);
+    char* const username,  // nullable, copied
+    char* const credential,  // nullable, copied
+    enum rawrtc_ice_credential_type const credential_type);
 
 enum rawrtc_code rawrtc_ice_server_copy(
-    struct rawrtc_ice_server** const serverp, // de-referenced
-    struct rawrtc_ice_server* const source_server
-);
+    struct rawrtc_ice_server** const serverp,  // de-referenced
+    struct rawrtc_ice_server* const source_server);
 
 int rawrtc_ice_server_debug(
-    struct re_printf* const pf,
-    struct rawrtc_ice_server const* const server
-);
+    struct re_printf* const pf, struct rawrtc_ice_server const* const server);

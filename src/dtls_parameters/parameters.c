@@ -8,9 +8,7 @@
 /*
  * Destructor for an existing DTLS parameter's fingerprints instance.
  */
-static void rawrtc_dtls_parameters_fingerprints_destroy(
-        void* arg
-) {
+static void rawrtc_dtls_parameters_fingerprints_destroy(void* arg) {
     struct rawrtc_dtls_fingerprints* const fingerprints = arg;
     size_t i;
 
@@ -23,9 +21,7 @@ static void rawrtc_dtls_parameters_fingerprints_destroy(
 /*
  * Destructor for an existing DTLS parameters instance.
  */
-static void rawrtc_dtls_parameters_destroy(
-        void* arg
-) {
+static void rawrtc_dtls_parameters_destroy(void* arg) {
     struct rawrtc_dtls_parameters* const parameters = arg;
 
     // Un-reference
@@ -36,10 +32,9 @@ static void rawrtc_dtls_parameters_destroy(
  * Common code to allocate a DTLS parameters instance.
  */
 static enum rawrtc_code rawrtc_dtls_parameters_allocate(
-        struct rawrtc_dtls_parameters** const parametersp, // de-referenced
-        enum rawrtc_dtls_role const role,
-        size_t const n_fingerprints
-) {
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
+    enum rawrtc_dtls_role const role,
+    size_t const n_fingerprints) {
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     struct rawrtc_dtls_parameters* parameters;
     size_t fingerprints_size;
@@ -56,7 +51,7 @@ static enum rawrtc_code rawrtc_dtls_parameters_allocate(
     // Allocate fingerprints array & set length immediately
     fingerprints_size = sizeof(*parameters) * n_fingerprints;
     parameters->fingerprints = mem_zalloc(
-            sizeof(*parameters) + fingerprints_size, rawrtc_dtls_parameters_fingerprints_destroy);
+        sizeof(*parameters) + fingerprints_size, rawrtc_dtls_parameters_fingerprints_destroy);
     if (!parameters->fingerprints) {
         error = RAWRTC_CODE_NO_MEMORY;
         goto out;
@@ -78,11 +73,10 @@ out:
  * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_parameters_create(
-        struct rawrtc_dtls_parameters** const parametersp, // de-referenced
-        enum rawrtc_dtls_role const role,
-        struct rawrtc_dtls_fingerprint* const fingerprints[], // referenced (each item)
-        size_t const n_fingerprints
-) {
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
+    enum rawrtc_dtls_role const role,
+    struct rawrtc_dtls_fingerprint* const fingerprints[],  // referenced (each item)
+    size_t const n_fingerprints) {
     struct rawrtc_dtls_parameters* parameters;
     enum rawrtc_code error;
     size_t i;
@@ -131,10 +125,9 @@ out:
  * instance.
  */
 enum rawrtc_code rawrtc_dtls_parameters_create_internal(
-        struct rawrtc_dtls_parameters** const parametersp, // de-referenced
-        enum rawrtc_dtls_role const role,
-        struct list* const fingerprints
-) {
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
+    enum rawrtc_dtls_role const role,
+    struct list* const fingerprints) {
     size_t n_fingerprints;
     struct rawrtc_dtls_parameters* parameters;
     enum rawrtc_code error;

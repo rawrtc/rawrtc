@@ -15,9 +15,8 @@
  * `*descriptionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_description(
-        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    struct rawrtc_peer_connection_description** const descriptionp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!descriptionp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -39,9 +38,8 @@ enum rawrtc_code rawrtc_peer_connection_get_local_description(
  * `*descriptionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_get_remote_description(
-        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    struct rawrtc_peer_connection_description** const descriptionp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!descriptionp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -60,9 +58,8 @@ enum rawrtc_code rawrtc_peer_connection_get_remote_description(
  * Get the current signalling state of a peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_get_signaling_state(
-        enum rawrtc_signaling_state* const statep, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    enum rawrtc_signaling_state* const statep,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!statep || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -77,9 +74,8 @@ enum rawrtc_code rawrtc_peer_connection_get_signaling_state(
  * Get the current ICE gathering state of a peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state(
-        enum rawrtc_ice_gatherer_state* const statep, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    enum rawrtc_ice_gatherer_state* const statep,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!statep || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -101,9 +97,8 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state(
  * Get the current ICE connection state of a peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state(
-        enum rawrtc_ice_transport_state* const statep, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    enum rawrtc_ice_transport_state* const statep,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!statep || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -123,9 +118,8 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state(
  * Get the current (peer) connection state of the peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_get_connection_state(
-        enum rawrtc_peer_connection_state* const statep, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    enum rawrtc_peer_connection_state* const statep,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!statep || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -144,9 +138,8 @@ enum rawrtc_code rawrtc_peer_connection_get_connection_state(
  * set.
  */
 enum rawrtc_code rawrtc_peer_connection_can_trickle_ice_candidates(
-        bool* const can_trickle_ice_candidatesp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    bool* const can_trickle_ice_candidatesp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!can_trickle_ice_candidatesp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -165,8 +158,7 @@ enum rawrtc_code rawrtc_peer_connection_can_trickle_ice_candidates(
  * Unset the handler argument and all handlers of the peer connection.
  */
 enum rawrtc_code rawrtc_peer_connection_unset_handlers(
-        struct rawrtc_peer_connection* const connection
-) {
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -193,8 +185,8 @@ enum rawrtc_code rawrtc_peer_connection_unset_handlers(
  * Set the peer connection's negotiation needed handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_negotiation_needed_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_negotiation_needed_handler const negotiation_needed_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_negotiation_needed_handler const negotiation_needed_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -211,9 +203,8 @@ enum rawrtc_code rawrtc_peer_connection_set_negotiation_needed_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
-        rawrtc_negotiation_needed_handler* const negotiation_needed_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_negotiation_needed_handler* const negotiation_needed_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!negotiation_needed_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -232,8 +223,8 @@ enum rawrtc_code rawrtc_peer_connection_get_negotiation_needed_handler(
  * Set the peer connection's ICE local candidate handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_peer_connection_local_candidate_handler const local_candidate_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_local_candidate_handler const local_candidate_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -250,9 +241,9 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
-        rawrtc_peer_connection_local_candidate_handler* const local_candidate_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_peer_connection_local_candidate_handler* const
+        local_candidate_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!local_candidate_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -271,8 +262,9 @@ enum rawrtc_code rawrtc_peer_connection_get_local_candidate_handler(
  * Set the peer connection's ICE local candidate error handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_peer_connection_local_candidate_error_handler const local_candidate_error_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_local_candidate_error_handler const
+        local_candidate_error_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -289,9 +281,9 @@ enum rawrtc_code rawrtc_peer_connection_set_local_candidate_error_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
-        rawrtc_peer_connection_local_candidate_error_handler* const local_candidate_error_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_peer_connection_local_candidate_error_handler* const
+        local_candidate_error_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!local_candidate_error_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -310,8 +302,8 @@ enum rawrtc_code rawrtc_peer_connection_get_local_candidate_error_handler(
  * Set the peer connection's signaling state change handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_signaling_state_change_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_signaling_state_change_handler const signaling_state_change_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_signaling_state_change_handler const signaling_state_change_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -328,9 +320,8 @@ enum rawrtc_code rawrtc_peer_connection_set_signaling_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_signaling_state_change_handler(
-        rawrtc_signaling_state_change_handler* const signaling_state_change_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_signaling_state_change_handler* const signaling_state_change_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!signaling_state_change_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -349,8 +340,8 @@ enum rawrtc_code rawrtc_peer_connection_get_signaling_state_change_handler(
  * Set the peer connection's ice connection state change handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_ice_connection_state_change_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_ice_transport_state_change_handler const ice_connection_state_change_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_ice_transport_state_change_handler const ice_connection_state_change_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -367,9 +358,9 @@ enum rawrtc_code rawrtc_peer_connection_set_ice_connection_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state_change_handler(
-        rawrtc_ice_transport_state_change_handler* const ice_connection_state_change_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_ice_transport_state_change_handler* const
+        ice_connection_state_change_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!ice_connection_state_change_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -388,8 +379,8 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_connection_state_change_handler(
  * Set the peer connection's ice gathering state change handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_ice_gathering_state_change_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_ice_gatherer_state_change_handler const ice_gathering_state_change_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_ice_gatherer_state_change_handler const ice_gathering_state_change_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -406,9 +397,9 @@ enum rawrtc_code rawrtc_peer_connection_set_ice_gathering_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state_change_handler(
-        rawrtc_ice_gatherer_state_change_handler* const ice_gathering_state_change_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_ice_gatherer_state_change_handler* const
+        ice_gathering_state_change_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!ice_gathering_state_change_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -427,8 +418,8 @@ enum rawrtc_code rawrtc_peer_connection_get_ice_gathering_state_change_handler(
  * Set the peer connection's (peer) connection state change handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_connection_state_change_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_peer_connection_state_change_handler const connection_state_change_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_peer_connection_state_change_handler const connection_state_change_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -445,9 +436,9 @@ enum rawrtc_code rawrtc_peer_connection_set_connection_state_change_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_connection_state_change_handler(
-        rawrtc_peer_connection_state_change_handler* const connection_state_change_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_peer_connection_state_change_handler* const
+        connection_state_change_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!connection_state_change_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -466,8 +457,8 @@ enum rawrtc_code rawrtc_peer_connection_get_connection_state_change_handler(
  * Set the peer connection's data channel handler.
  */
 enum rawrtc_code rawrtc_peer_connection_set_data_channel_handler(
-        struct rawrtc_peer_connection* const connection,
-        rawrtc_data_channel_handler const data_channel_handler // nullable
+    struct rawrtc_peer_connection* const connection,
+    rawrtc_data_channel_handler const data_channel_handler  // nullable
 ) {
     // Check arguments
     if (!connection) {
@@ -484,9 +475,8 @@ enum rawrtc_code rawrtc_peer_connection_set_data_channel_handler(
  * Returns `RAWRTC_CODE_NO_VALUE` in case no handler has been set.
  */
 enum rawrtc_code rawrtc_peer_connection_get_data_channel_handler(
-        rawrtc_data_channel_handler* const data_channel_handlerp, // de-referenced
-        struct rawrtc_peer_connection* const connection
-) {
+    rawrtc_data_channel_handler* const data_channel_handlerp,  // de-referenced
+    struct rawrtc_peer_connection* const connection) {
     // Check arguments
     if (!data_channel_handlerp || !connection) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

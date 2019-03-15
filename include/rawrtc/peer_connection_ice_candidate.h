@@ -19,11 +19,11 @@ struct rawrtc_peer_connection_ice_candidate;
  *       specification.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_create(
-    struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
+    struct rawrtc_peer_connection_ice_candidate** const candidatep,  // de-referenced
     char* const sdp,
-    char* const mid, // nullable, copied
-    uint8_t const* const media_line_index, // nullable, copied
-    char* const username_fragment // nullable, copied
+    char* const mid,  // nullable, copied
+    uint8_t const* const media_line_index,  // nullable, copied
+    char* const username_fragment  // nullable, copied
 );
 
 /*
@@ -35,9 +35,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create(
  *       WebRTC specification's `RTCIceCandidateInit`.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
-    char** const sdpp, // de-referenced
-    struct rawrtc_peer_connection_ice_candidate* const candidate
-);
+    char** const sdpp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate);
 
 /*
  * Get the media stream identification tag the ICE candidate is
@@ -50,9 +49,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
  * be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
-    char** const midp, // de-referenced
-    struct rawrtc_peer_connection_ice_candidate* const candidate
-);
+    char** const midp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate);
 
 /*
  * Get the media stream line index the ICE candidate is associated to.
@@ -60,9 +58,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
  * set.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
-    uint8_t* const media_line_index, // de-referenced
-    struct rawrtc_peer_connection_ice_candidate* const candidate
-);
+    uint8_t* const media_line_index,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate);
 
 /*
  * Get the username fragment the ICE candidate is associated to.
@@ -74,15 +71,13 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
  * `*username_fragmentp* must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
-    char** const username_fragmentp, // de-referenced
-    struct rawrtc_peer_connection_ice_candidate* const candidate
-);
+    char** const username_fragmentp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate);
 
 /*
  * Get the underlying ORTC ICE candidate from the ICE candidate.
  * `*ortc_candidatep` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_ortc_candidate(
-    struct rawrtc_ice_candidate** const ortc_candidatep, // de-referenced
-    struct rawrtc_peer_connection_ice_candidate* const candidate
-);
+    struct rawrtc_ice_candidate** const ortc_candidatep,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate);

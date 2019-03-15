@@ -8,9 +8,7 @@
 /*
  * Destructor for an existing DTLS fingerprint instance.
  */
-static void rawrtc_dtls_fingerprint_destroy(
-        void* arg
-) {
+static void rawrtc_dtls_fingerprint_destroy(void* arg) {
     struct rawrtc_dtls_fingerprint* const fingerprint = arg;
 
     // Un-reference
@@ -22,9 +20,9 @@ static void rawrtc_dtls_fingerprint_destroy(
  * `*fingerprintp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_fingerprint_create(
-        struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced
-        enum rawrtc_certificate_sign_algorithm const algorithm,
-        char* const value // copied
+    struct rawrtc_dtls_fingerprint** const fingerprintp,  // de-referenced
+    enum rawrtc_certificate_sign_algorithm const algorithm,
+    char* const value  // copied
 ) {
     struct rawrtc_dtls_fingerprint* fingerprint;
     enum rawrtc_code error;
@@ -57,9 +55,8 @@ out:
  * The caller MUST set the `value` field after creation.
  */
 enum rawrtc_code rawrtc_dtls_fingerprint_create_empty(
-        struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced
-        enum rawrtc_certificate_sign_algorithm const algorithm
-) {
+    struct rawrtc_dtls_fingerprint** const fingerprintp,  // de-referenced
+    enum rawrtc_certificate_sign_algorithm const algorithm) {
     struct rawrtc_dtls_fingerprint* fingerprint;
 
     // Allocate

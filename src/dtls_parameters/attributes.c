@@ -9,9 +9,8 @@
  * Get the DTLS parameter's role value.
  */
 enum rawrtc_code rawrtc_dtls_parameters_get_role(
-        enum rawrtc_dtls_role* rolep, // de-referenced
-        struct rawrtc_dtls_parameters* const parameters
-) {
+    enum rawrtc_dtls_role* rolep,  // de-referenced
+    struct rawrtc_dtls_parameters* const parameters) {
     // Check arguments
     if (!rolep || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -27,9 +26,8 @@ enum rawrtc_code rawrtc_dtls_parameters_get_role(
  * `*fingerprintsp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_parameters_get_fingerprints(
-        struct rawrtc_dtls_fingerprints** const fingerprintsp, // de-referenced
-        struct rawrtc_dtls_parameters* const parameters
-) {
+    struct rawrtc_dtls_fingerprints** const fingerprintsp,  // de-referenced
+    struct rawrtc_dtls_parameters* const parameters) {
     // Check arguments
     if (!fingerprintsp || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

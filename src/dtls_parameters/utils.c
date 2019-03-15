@@ -9,9 +9,7 @@
  * Print debug information for DTLS parameters.
  */
 int rawrtc_dtls_parameters_debug(
-        struct re_printf* const pf,
-        struct rawrtc_dtls_parameters const* const parameters
-) {
+    struct re_printf* const pf, struct rawrtc_dtls_parameters const* const parameters) {
     int err = 0;
     struct rawrtc_dtls_fingerprints* fingerprints;
     size_t i;
@@ -32,9 +30,9 @@ int rawrtc_dtls_parameters_debug(
     for (i = 0; i < fingerprints->n_fingerprints; ++i) {
         // Fingerprint
         err |= re_hprintf(
-                pf, "      algorithm=%s value=%s\n",
-                rawrtc_certificate_sign_algorithm_to_str(fingerprints->fingerprints[i]->algorithm),
-                fingerprints->fingerprints[i]->value);
+            pf, "      algorithm=%s value=%s\n",
+            rawrtc_certificate_sign_algorithm_to_str(fingerprints->fingerprints[i]->algorithm),
+            fingerprints->fingerprints[i]->value);
     }
 
     // Done

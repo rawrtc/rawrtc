@@ -5,7 +5,7 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <string.h> // strlen
+#include <string.h>  // strlen
 
 #define DEBUG_MODULE "helper-handler"
 #define DEBUG_LEVEL 7
@@ -15,11 +15,11 @@
  * Print the ICE gatherer's state.
  */
 void default_ice_gatherer_state_change_handler(
-        enum rawrtc_ice_gatherer_state const state, // read-only
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_ice_gatherer_state const state,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_ice_gatherer_state_to_name(state);
+    char const* const state_name = rawrtc_ice_gatherer_state_to_name(state);
     (void) arg;
     DEBUG_PRINTF("(%s) ICE gatherer state: %s\n", client->name, state_name);
 }
@@ -28,14 +28,16 @@ void default_ice_gatherer_state_change_handler(
  * Print the ICE gatherer's error event.
  */
 void default_ice_gatherer_error_handler(
-        struct rawrtc_ice_candidate* const candidate, // read-only, nullable
-        char const * const url, // read-only
-        uint16_t const error_code, // read-only
-        char const * const error_text, // read-only
-        void* const arg // will be casted to `struct client*`
+    struct rawrtc_ice_candidate* const candidate,  // read-only, nullable
+    char const* const url,  // read-only
+    uint16_t const error_code,  // read-only
+    char const* const error_text,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) candidate; (void) error_code; (void) arg;
+    (void) candidate;
+    (void) error_code;
+    (void) arg;
     DEBUG_NOTICE("(%s) ICE gatherer error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
@@ -43,9 +45,9 @@ void default_ice_gatherer_error_handler(
  * Print the newly gathered local candidate.
  */
 void default_ice_gatherer_local_candidate_handler(
-        struct rawrtc_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg // will be casted to `struct client*`
+    struct rawrtc_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
     (void) arg;
@@ -56,11 +58,11 @@ void default_ice_gatherer_local_candidate_handler(
  * Print the ICE transport's state.
  */
 void default_ice_transport_state_change_handler(
-        enum rawrtc_ice_transport_state const state,
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_ice_transport_state const state,
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_ice_transport_state_to_name(state);
+    char const* const state_name = rawrtc_ice_transport_state_to_name(state);
     (void) arg;
     DEBUG_PRINTF("(%s) ICE transport state: %s\n", client->name, state_name);
 }
@@ -69,12 +71,13 @@ void default_ice_transport_state_change_handler(
  * Print the ICE candidate pair change event.
  */
 void default_ice_transport_candidate_pair_change_handler(
-        struct rawrtc_ice_candidate* const local, // read-only
-        struct rawrtc_ice_candidate* const remote, // read-only
-        void* const arg // will be casted to `struct client*`
+    struct rawrtc_ice_candidate* const local,  // read-only
+    struct rawrtc_ice_candidate* const remote,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) local; (void) remote;
+    (void) local;
+    (void) remote;
     DEBUG_PRINTF("(%s) ICE transport candidate pair change\n", client->name);
 }
 
@@ -82,11 +85,11 @@ void default_ice_transport_candidate_pair_change_handler(
  * Print the DTLS transport's state.
  */
 void default_dtls_transport_state_change_handler(
-        enum rawrtc_dtls_transport_state const state, // read-only
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_dtls_transport_state const state,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_dtls_transport_state_to_name(state);
+    char const* const state_name = rawrtc_dtls_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) DTLS transport state change: %s\n", client->name, state_name);
 }
 
@@ -94,8 +97,8 @@ void default_dtls_transport_state_change_handler(
  * Print the DTLS transport's error event.
  */
 void default_dtls_transport_error_handler(
-        // TODO: error.message (probably from OpenSSL)
-        void* const arg // will be casted to `struct client*`
+    // TODO: error.message (probably from OpenSSL)
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
     // TODO: Print error message
@@ -107,11 +110,11 @@ void default_dtls_transport_error_handler(
  * Print the SCTP redirect transport's state.
  */
 void default_sctp_redirect_transport_state_change_handler(
-        enum rawrtc_sctp_redirect_transport_state const state,
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_sctp_redirect_transport_state const state,
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_sctp_redirect_transport_state_to_name(state);
+    char const* const state_name = rawrtc_sctp_redirect_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) SCTP redirect transport state change: %s\n", client->name, state_name);
 }
 #endif
@@ -120,11 +123,11 @@ void default_sctp_redirect_transport_state_change_handler(
  * Print the SCTP transport's state.
  */
 void default_sctp_transport_state_change_handler(
-        enum rawrtc_sctp_transport_state const state,
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_sctp_transport_state const state,
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_sctp_transport_state_to_name(state);
+    char const* const state_name = rawrtc_sctp_transport_state_to_name(state);
     DEBUG_PRINTF("(%s) SCTP transport state change: %s\n", client->name, state_name);
 }
 
@@ -132,8 +135,8 @@ void default_sctp_transport_state_change_handler(
  * Print the newly created data channel's parameter.
  */
 void default_data_channel_handler(
-        struct rawrtc_data_channel* const channel, // read-only, MUST be referenced when used
-        void* const arg // will be casted to `struct client*`
+    struct rawrtc_data_channel* const channel,  // read-only, MUST be referenced when used
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
     struct rawrtc_data_channel_parameters* parameters;
@@ -152,7 +155,7 @@ void default_data_channel_handler(
  * Print the data channel open event.
  */
 void default_data_channel_open_handler(
-        void* const arg // will be casted to `struct data_channel_helper*`
+    void* const arg  // will be casted to `struct data_channel_helper*`
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
@@ -163,7 +166,7 @@ void default_data_channel_open_handler(
  * Print the data channel buffered amount low event.
  */
 void default_data_channel_buffered_amount_low_handler(
-        void* const arg // will be casted to `struct data_channel_helper*`
+    void* const arg  // will be casted to `struct data_channel_helper*`
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
@@ -174,7 +177,7 @@ void default_data_channel_buffered_amount_low_handler(
  * Print the data channel error event.
  */
 void default_data_channel_error_handler(
-        void* const arg // will be casted to `struct data_channel_helper*`
+    void* const arg  // will be casted to `struct data_channel_helper*`
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
@@ -185,7 +188,7 @@ void default_data_channel_error_handler(
  * Print the data channel close event.
  */
 void default_data_channel_close_handler(
-        void* const arg // will be casted to `struct data_channel_helper*`
+    void* const arg  // will be casted to `struct data_channel_helper*`
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
@@ -195,9 +198,7 @@ void default_data_channel_close_handler(
 char const* const separator = ", ";
 
 static int debug_data_channel_message_flags(
-        struct re_printf* const pf,
-        enum rawrtc_data_channel_message_flag const flags
-) {
+    struct re_printf* const pf, enum rawrtc_data_channel_message_flag const flags) {
     int err = 0;
     char const* prefix = "";
 
@@ -224,23 +225,21 @@ static int debug_data_channel_message_flags(
  * Print the data channel's received message's size.
  */
 void default_data_channel_message_handler(
-        struct mbuf* const buffer,
-        enum rawrtc_data_channel_message_flag const flags,
-        void* const arg // will be casted to `struct data_channel_helper*`
+    struct mbuf* const buffer,
+    enum rawrtc_data_channel_message_flag const flags,
+    void* const arg  // will be casted to `struct data_channel_helper*`
 ) {
     struct data_channel_helper* const channel = arg;
     struct client* const client = channel->client;
-    DEBUG_PRINTF("(%s) Incoming message for data channel %s: %zu bytes; flags=(%H)\n",
-                 client->name, channel->label, mbuf_get_left(buffer),
-                 debug_data_channel_message_flags, flags);
+    DEBUG_PRINTF(
+        "(%s) Incoming message for data channel %s: %zu bytes; flags=(%H)\n", client->name,
+        channel->label, mbuf_get_left(buffer), debug_data_channel_message_flags, flags);
 }
 
 /*
  * Print negotiation needed (duh!)
  */
-void default_negotiation_needed_handler(
-        void* const arg
-) {
+void default_negotiation_needed_handler(void* const arg) {
     struct client* const client = arg;
     DEBUG_PRINTF("(%s) Negotiation needed\n", client->name);
 }
@@ -249,11 +248,11 @@ void default_negotiation_needed_handler(
  * Print the peer connection's state.
  */
 void default_peer_connection_state_change_handler(
-        enum rawrtc_peer_connection_state const state, // read-only
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_peer_connection_state const state,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_peer_connection_state_to_name(state);
+    char const* const state_name = rawrtc_peer_connection_state_to_name(state);
     DEBUG_PRINTF("(%s) Peer connection state change: %s\n", client->name, state_name);
 }
 
@@ -261,10 +260,9 @@ void default_peer_connection_state_change_handler(
  * Print the newly gathered local candidate (peer connection variant).
  */
 void default_peer_connection_local_candidate_handler(
-        struct rawrtc_peer_connection_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg
-) {
+    struct rawrtc_peer_connection_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    void* const arg) {
     struct client* const client = arg;
     struct rawrtc_ice_candidate* ortc_candidate = NULL;
 
@@ -282,14 +280,16 @@ void default_peer_connection_local_candidate_handler(
  * Print the peer connections local candidate error event.
  */
 void default_peer_connection_local_candidate_error_handler(
-        struct rawrtc_peer_connection_ice_candidate* const candidate, // read-only, nullable
-        char const * const url, // read-only
-        uint16_t const error_code, // read-only
-        char const * const error_text, // read-only
-        void* const arg // will be casted to `struct client*`
+    struct rawrtc_peer_connection_ice_candidate* const candidate,  // read-only, nullable
+    char const* const url,  // read-only
+    uint16_t const error_code,  // read-only
+    char const* const error_text,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     struct client* const client = arg;
-    (void) candidate; (void) error_code; (void) arg;
+    (void) candidate;
+    (void) error_code;
+    (void) arg;
     DEBUG_NOTICE("(%s) ICE candidate error, URL: %s, reason: %s\n", client->name, url, error_text);
 }
 
@@ -297,20 +297,17 @@ void default_peer_connection_local_candidate_error_handler(
  * Print the signaling state.
  */
 void default_signaling_state_change_handler(
-        enum rawrtc_signaling_state const state, // read-only
-        void* const arg
-) {
+    enum rawrtc_signaling_state const state,  // read-only
+    void* const arg) {
     struct client* const client = arg;
-    char const * const state_name = rawrtc_signaling_state_to_name(state);
+    char const* const state_name = rawrtc_signaling_state_to_name(state);
     DEBUG_PRINTF("(%s) Signaling state change: %s\n", client->name, state_name);
 }
 
 /*
  * Stop the main loop.
  */
-void default_signal_handler(
-        int sig
-) {
+void default_signal_handler(int sig) {
     DEBUG_INFO("Got signal: %d, terminating...\n", sig);
     re_cancel();
 }
@@ -319,10 +316,7 @@ void default_signal_handler(
  * FD-listener that stops the main loop in case the input buffer
  * contains a line feed or a carriage return.
  */
-void stop_on_return_handler(
-        int flags,
-        void* arg
-) {
+void stop_on_return_handler(int flags, void* arg) {
     char buffer[128];
     size_t length;
     (void) flags;

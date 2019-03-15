@@ -3,9 +3,7 @@
 /*
  * Get the corresponding name for an ICE gatherer state.
  */
-char const * rawrtc_ice_gatherer_state_to_name(
-        enum rawrtc_ice_gatherer_state const state
-) {
+char const* rawrtc_ice_gatherer_state_to_name(enum rawrtc_ice_gatherer_state const state) {
     switch (state) {
         case RAWRTC_ICE_GATHERER_STATE_NEW:
             return "new";

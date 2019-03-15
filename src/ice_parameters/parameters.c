@@ -7,9 +7,7 @@
 /*
  * Destructor for an existing ICE parameters instance.
  */
-static void rawrtc_ice_parameters_destroy(
-        void* arg
-) {
+static void rawrtc_ice_parameters_destroy(void* arg) {
     struct rawrtc_ice_parameters* const parameters = arg;
 
     // Un-reference
@@ -22,11 +20,10 @@ static void rawrtc_ice_parameters_destroy(
  * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_parameters_create(
-        struct rawrtc_ice_parameters** const parametersp, // de-referenced
-        char* const username_fragment, // copied
-        char* const password, // copied
-        bool const ice_lite
-) {
+    struct rawrtc_ice_parameters** const parametersp,  // de-referenced
+    char* const username_fragment,  // copied
+    char* const password,  // copied
+    bool const ice_lite) {
     struct rawrtc_ice_parameters* parameters;
     enum rawrtc_code error;
 

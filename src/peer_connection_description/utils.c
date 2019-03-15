@@ -14,22 +14,19 @@ static enum rawrtc_sdp_type const map_enum_sdp_type[] = {
     RAWRTC_SDP_TYPE_ROLLBACK,
 };
 
-static char const * const map_str_sdp_type[] = {
+static char const* const map_str_sdp_type[] = {
     "offer",
     "pranswer",
     "answer",
     "rollback",
 };
 
-static size_t const map_sdp_type_length =
-    ARRAY_SIZE(map_enum_sdp_type);
+static size_t const map_sdp_type_length = ARRAY_SIZE(map_enum_sdp_type);
 
 /*
  * Translate an SDP type to str.
  */
-char const * rawrtc_sdp_type_to_str(
-        enum rawrtc_sdp_type const type
-) {
+char const* rawrtc_sdp_type_to_str(enum rawrtc_sdp_type const type) {
     size_t i;
 
     for (i = 0; i < map_sdp_type_length; ++i) {
@@ -45,9 +42,8 @@ char const * rawrtc_sdp_type_to_str(
  * Translate a str to an SDP type.
  */
 enum rawrtc_code rawrtc_str_to_sdp_type(
-        enum rawrtc_sdp_type* const typep, // de-referenced
-        char const* const str
-) {
+    enum rawrtc_sdp_type* const typep,  // de-referenced
+    char const* const str) {
     size_t i;
 
     // Check arguments
@@ -69,9 +65,7 @@ enum rawrtc_code rawrtc_str_to_sdp_type(
  * Print debug information for a peer connection description.
  */
 int rawrtc_peer_connection_description_debug(
-        struct re_printf* const pf,
-        struct rawrtc_peer_connection_description* const description
-) {
+    struct re_printf* const pf, struct rawrtc_peer_connection_description* const description) {
     int err = 0;
     struct le* le;
 
@@ -103,7 +97,7 @@ int rawrtc_peer_connection_description_debug(
     } else {
         err |= re_hprintf(pf, "n/a\n");
     }
-    err |= re_hprintf(pf, "  media_line_index=%"PRIu8"\n", description->media_line_index);
+    err |= re_hprintf(pf, "  media_line_index=%" PRIu8 "\n", description->media_line_index);
     err |= re_hprintf(pf, "  mid=");
     if (description->mid) {
         err |= re_hprintf(pf, "\"%s\"\n", description->mid);
@@ -111,8 +105,8 @@ int rawrtc_peer_connection_description_debug(
         err |= re_hprintf(pf, "n/a\n");
     }
     err |= re_hprintf(pf, "  sctp_sdp_05=%s\n", description->sctp_sdp_05 ? "yes" : "no");
-    err |= re_hprintf(
-            pf, "  end_of_candidates=%s\n", description->end_of_candidates ? "yes" : "no");
+    err |=
+        re_hprintf(pf, "  end_of_candidates=%s\n", description->end_of_candidates ? "yes" : "no");
 
     // Print ICE parameters
     if (description->ice_parameters) {
@@ -125,7 +119,7 @@ int rawrtc_peer_connection_description_debug(
     le = list_head(&description->ice_candidates);
     if (le) {
         for (; le != NULL; le = le->next) {
-            struct rawrtc_peer_connection_ice_candidate *const candidate = le->data;
+            struct rawrtc_peer_connection_ice_candidate* const candidate = le->data;
             err |= re_hprintf(pf, "%H", rawrtc_peer_connection_ice_candidate_debug, candidate);
         }
     } else {
@@ -145,8 +139,7 @@ int rawrtc_peer_connection_description_debug(
     } else {
         err |= re_hprintf(pf, "  SCTP Capabilities <n/a>\n");
     }
-    err |= re_hprintf(
-            pf, "  sctp_port=%"PRIu16"\n", description->sctp_port);
+    err |= re_hprintf(pf, "  sctp_port=%" PRIu16 "\n", description->sctp_port);
 
     // Print SDP
     err |= re_hprintf(pf, "  sdp=\n%b", description->sdp->buf, description->sdp->end);

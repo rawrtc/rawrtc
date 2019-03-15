@@ -21,9 +21,7 @@
 /*
  * Destructor for an existing ICE transport.
  */
-static void rawrtc_ice_transport_destroy(
-        void* arg
-) {
+static void rawrtc_ice_transport_destroy(void* arg) {
     struct rawrtc_ice_transport* const transport = arg;
 
     // Stop transport
@@ -41,18 +39,20 @@ static void rawrtc_ice_transport_destroy(
  * `*transportp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_transport_create(
-        struct rawrtc_ice_transport** const transportp, // de-referenced
-        struct rawrtc_ice_gatherer* const gatherer, // referenced, nullable
-        rawrtc_ice_transport_state_change_handler const state_change_handler, // nullable
-        rawrtc_ice_transport_candidate_pair_change_handler const candidate_pair_change_handler, // nullable
-        void* const arg // nullable
+    struct rawrtc_ice_transport** const transportp,  // de-referenced
+    struct rawrtc_ice_gatherer* const gatherer,  // referenced, nullable
+    rawrtc_ice_transport_state_change_handler const state_change_handler,  // nullable
+    rawrtc_ice_transport_candidate_pair_change_handler const
+        candidate_pair_change_handler,  // nullable
+    void* const arg  // nullable
 ) {
     struct rawrtc_ice_transport* transport;
-    struct stun_conf stun_config = { // TODO: Make this configurable!
-        .rto = 100, // 100ms
-        .rc = 7, // Send at: 0ms, 100ms, 300ms, 700ms, 1500ms, 3100ms, 6300ms
-        .rm = 60, // Additional wait: 60*100 -> 6000ms
-        .ti = 12300, // Timeout after: 12300ms
+    struct stun_conf stun_config = {
+        // TODO: Make this configurable!
+        .rto = 100,  // 100ms
+        .rc = 7,  // Send at: 0ms, 100ms, 300ms, 700ms, 1500ms, 3100ms, 6300ms
+        .rm = 60,  // Additional wait: 60*100 -> 6000ms
+        .ti = 12300,  // Timeout after: 12300ms
         .tos = 0x00,
     };
     enum rawrtc_code error;
@@ -75,7 +75,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
     }
 
     // Set fields/reference
-    transport->state = RAWRTC_ICE_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
+    transport->state = RAWRTC_ICE_TRANSPORT_STATE_NEW;  // TODO: Raise state (delayed)?
     transport->gatherer = mem_ref(gatherer);
     transport->state_change_handler = state_change_handler;
     transport->candidate_pair_change_handler = candidate_pair_change_handler;
@@ -103,9 +103,7 @@ out:
  * Will call the corresponding handler.
  */
 static void set_state(
-        struct rawrtc_ice_transport* const transport,
-        enum rawrtc_ice_transport_state const state
-) {
+    struct rawrtc_ice_transport* const transport, enum rawrtc_ice_transport_state const state) {
     // Set state
     transport->state = state;
 
@@ -119,7 +117,7 @@ static void set_state(
  * Check if the ICE checklist process is complete.
  */
 static void check_ice_checklist_complete(
-        struct rawrtc_ice_transport* const transport // not checked
+    struct rawrtc_ice_transport* const transport  // not checked
 ) {
     struct trice* const ice = transport->gatherer->ice;
 
@@ -135,12 +133,13 @@ static void check_ice_checklist_complete(
 
         // Remove STUN and TURN sessions from local candidate helpers since the keep-alive
         // mechanism now moves over to the peers themselves.
-        list_apply(&transport->gatherer->local_candidates, true,
-                   rawrtc_candidate_helper_remove_stun_sessions_handler, NULL);
+        list_apply(
+            &transport->gatherer->local_candidates, true,
+            rawrtc_candidate_helper_remove_stun_sessions_handler, NULL);
 
         // Start keep-alive for active candidate pairs
         // TODO: Implement!
-//        start_keepalive(transport);
+        //        start_keepalive(transport);
 
         // Do we have one candidate pair that succeeded?
         if (!list_isempty(trice_validl(ice))) {
@@ -161,10 +160,7 @@ static void check_ice_checklist_complete(
  * ICE connection established callback.
  */
 static void ice_established_handler(
-        struct ice_candpair* candidate_pair,
-        struct stun_msg const* message,
-        void* arg
-) {
+    struct ice_candpair* candidate_pair, struct stun_msg const* message, void* arg) {
     struct rawrtc_ice_transport* const transport = arg;
     enum rawrtc_code error;
     (void) message;
@@ -183,19 +179,19 @@ static void ice_established_handler(
     }
 
     // Ignore if completed or failed
-    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED
-        || transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED ||
+        transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
         return;
     }
 
     // Offer candidate pair to DTLS transport (if any)
     // TODO: Offer to whatever transport lays above so we are SRTP/QUIC compatible
     if (transport->dtls_transport) {
-        error = rawrtc_dtls_transport_add_candidate_pair(
-                transport->dtls_transport, candidate_pair);
+        error = rawrtc_dtls_transport_add_candidate_pair(transport->dtls_transport, candidate_pair);
         if (error) {
-            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "DTLS transport could not attach to candidate pair, reason: %s\n",
+                rawrtc_code_to_str(error));
 
             // Important: Removing a candidate pair can lead to segfaults due to STUN transaction
             //            timers looking up the pair. Don't do it!
@@ -212,16 +208,15 @@ static void ice_established_handler(
  * ICE connection failed callback.
  */
 static void ice_failed_handler(
-        int err,
-        uint16_t stun_code,
-        struct ice_candpair* candidate_pair,
-        void* arg
-) {
+    int err, uint16_t stun_code, struct ice_candpair* candidate_pair, void* arg) {
     struct rawrtc_ice_transport* const transport = arg;
-    (void) err; (void) stun_code; (void) candidate_pair;
+    (void) err;
+    (void) stun_code;
+    (void) candidate_pair;
 
-    DEBUG_PRINTF("Candidate pair failed: %H (%m %"PRIu16")\n",
-                 trice_candpair_debug, candidate_pair, err, stun_code);
+    DEBUG_PRINTF(
+        "Candidate pair failed: %H (%m %" PRIu16 ")\n", trice_candpair_debug, candidate_pair, err,
+        stun_code);
 
     // Ignore if closed
     if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED) {
@@ -229,8 +224,8 @@ static void ice_failed_handler(
     }
 
     // Ignore if completed or failed
-    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED
-        || transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED ||
+        transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED) {
         return;
     }
 
@@ -246,11 +241,10 @@ static void ice_failed_handler(
  * TODO https://github.com/w3c/ortc/issues/607
  */
 enum rawrtc_code rawrtc_ice_transport_start(
-        struct rawrtc_ice_transport* const transport,
-        struct rawrtc_ice_gatherer* const gatherer, // referenced
-        struct rawrtc_ice_parameters* const remote_parameters, // referenced
-        enum rawrtc_ice_role const role
-) {
+    struct rawrtc_ice_transport* const transport,
+    struct rawrtc_ice_gatherer* const gatherer,  // referenced
+    struct rawrtc_ice_parameters* const remote_parameters,  // referenced
+    enum rawrtc_ice_role const role) {
     bool ice_transport_closed;
     bool ice_gatherer_closed;
     enum ice_role translated_role;
@@ -301,13 +295,13 @@ enum rawrtc_code rawrtc_ice_transport_start(
     // New/first remote parameters?
     if (transport->remote_parameters != remote_parameters) {
         // Apply username fragment and password on trice
-        error = rawrtc_error_to_code(trice_set_remote_ufrag(
-                transport->gatherer->ice, remote_parameters->username_fragment));
+        error = rawrtc_error_to_code(
+            trice_set_remote_ufrag(transport->gatherer->ice, remote_parameters->username_fragment));
         if (error) {
             return error;
         }
-        error = rawrtc_error_to_code(trice_set_remote_pwd(
-                transport->gatherer->ice, remote_parameters->password));
+        error = rawrtc_error_to_code(
+            trice_set_remote_pwd(transport->gatherer->ice, remote_parameters->password));
         if (error) {
             return error;
         }
@@ -326,9 +320,8 @@ enum rawrtc_code rawrtc_ice_transport_start(
         // TODO: Get config from struct
         DEBUG_INFO("Starting checklist due to start event\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, transport->stun_client,
-                rawrtc_default_config.pacing_interval,
-                ice_established_handler, ice_failed_handler, transport));
+            transport->gatherer->ice, transport->stun_client, rawrtc_default_config.pacing_interval,
+            ice_established_handler, ice_failed_handler, transport));
         if (error) {
             return error;
         }
@@ -341,9 +334,7 @@ enum rawrtc_code rawrtc_ice_transport_start(
 /*
  * Stop and close the ICE transport.
  */
-enum rawrtc_code rawrtc_ice_transport_stop(
-        struct rawrtc_ice_transport* const transport
-) {
+enum rawrtc_code rawrtc_ice_transport_stop(struct rawrtc_ice_transport* const transport) {
     // Check arguments
     if (!transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -372,8 +363,8 @@ enum rawrtc_code rawrtc_ice_transport_stop(
  * remote site finished gathering.
  */
 enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
-        struct rawrtc_ice_transport* const transport,
-        struct rawrtc_ice_candidate* candidate // nullable
+    struct rawrtc_ice_transport* const transport,
+    struct rawrtc_ice_candidate* candidate  // nullable
 ) {
     struct ice_rcand* re_candidate = NULL;
     enum rawrtc_code error;
@@ -394,21 +385,22 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     }
 
     // Check ICE transport state
-    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED
-            || transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED
-            || transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
+    if (transport->state == RAWRTC_ICE_TRANSPORT_STATE_CLOSED ||
+        transport->state == RAWRTC_ICE_TRANSPORT_STATE_FAILED ||
+        transport->state == RAWRTC_ICE_TRANSPORT_STATE_COMPLETED) {
         return RAWRTC_CODE_INVALID_STATE;
     }
 
     // Remote site completed gathering?
     if (!candidate) {
         if (!transport->remote_end_of_candidates) {
-            DEBUG_PRINTF("Remote site gathering complete\n%H", trice_debug, transport->gatherer->ice);
+            DEBUG_PRINTF(
+                "Remote site gathering complete\n%H", trice_debug, transport->gatherer->ice);
 
             // Transition to 'complete' if the checklist is done
             // Note: 'completed' and 'failed' states are covered in checks above
-            if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW
-                    && !trice_checklist_isrunning(transport->gatherer->ice)) {
+            if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW &&
+                !trice_checklist_isrunning(transport->gatherer->ice)) {
                 set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_COMPLETED);
             }
 
@@ -443,8 +435,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     // Skip IPv4, IPv6 if requested
     // TODO: Get config from struct
     af = sa_af(&address);
-    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6)
-            || (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
+    if ((!rawrtc_default_config.ipv6_enable && af == AF_INET6) ||
+        (!rawrtc_default_config.ipv4_enable && af == AF_INET)) {
         DEBUG_PRINTF("Skipping remote candidate due to IP version: %J\n", &address);
         goto out;
     }
@@ -457,8 +449,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
 
     // Skip UDP/TCP if requested
     // TODO: Get config from struct
-    if ((!rawrtc_default_config.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP)
-            || (!rawrtc_default_config.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP)) {
+    if ((!rawrtc_default_config.udp_enable && protocol == RAWRTC_ICE_PROTOCOL_UDP) ||
+        (!rawrtc_default_config.tcp_enable && protocol == RAWRTC_ICE_PROTOCOL_TCP)) {
         DEBUG_PRINTF("Skipping remote candidate due to protocol: %J\n", &address);
         goto out;
     }
@@ -495,10 +487,10 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     // Add remote candidate
     // TODO: Set correct component ID
     error = rawrtc_error_to_code(trice_rcand_add(
-            &re_candidate, transport->gatherer->ice, 1, foundation,
-            rawrtc_ice_protocol_to_ipproto(protocol), priority, &address,
-            rawrtc_ice_candidate_type_to_ice_cand_type(type),
-            rawrtc_ice_tcp_candidate_type_to_ice_tcptype(tcp_type)));
+        &re_candidate, transport->gatherer->ice, 1, foundation,
+        rawrtc_ice_protocol_to_ipproto(protocol), priority, &address,
+        rawrtc_ice_candidate_type_to_ice_cand_type(type),
+        rawrtc_ice_tcp_candidate_type_to_ice_tcptype(tcp_type)));
     if (error) {
         goto out;
     }
@@ -508,8 +500,8 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
     if (!error) {
         error = rawrtc_ice_candidate_get_related_port(&port, candidate);
         if (!error) {
-            error = rawrtc_error_to_code(sa_set_str(
-                    &re_candidate->attr.rel_addr, related_address, port));
+            error = rawrtc_error_to_code(
+                sa_set_str(&re_candidate->attr.rel_addr, related_address, port));
             if (error) {
                 goto out;
             }
@@ -527,15 +519,14 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
 
     // Start checklist (if not new, not started and not completed or failed)
     // TODO: Get config from struct
-    if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW
-            && transport->state != RAWRTC_ICE_TRANSPORT_STATE_COMPLETED
-            && transport->state != RAWRTC_ICE_TRANSPORT_STATE_FAILED
-            && !trice_checklist_isrunning(transport->gatherer->ice)) {
+    if (transport->state != RAWRTC_ICE_TRANSPORT_STATE_NEW &&
+        transport->state != RAWRTC_ICE_TRANSPORT_STATE_COMPLETED &&
+        transport->state != RAWRTC_ICE_TRANSPORT_STATE_FAILED &&
+        !trice_checklist_isrunning(transport->gatherer->ice)) {
         DEBUG_INFO("Starting checklist due to new remote candidate\n");
         error = rawrtc_error_to_code(trice_checklist_start(
-                transport->gatherer->ice, transport->stun_client,
-                rawrtc_default_config.pacing_interval,
-                ice_established_handler, ice_failed_handler, transport));
+            transport->gatherer->ice, transport->stun_client, rawrtc_default_config.pacing_interval,
+            ice_established_handler, ice_failed_handler, transport));
         if (error) {
             DEBUG_WARNING("Could not start checklist, reason: %s\n", rawrtc_code_to_str(error));
             goto out;
@@ -544,7 +535,7 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
 
 out:
     if (error) {
-        mem_deref(re_candidate); // TODO: Not entirely sure about that
+        mem_deref(re_candidate);  // TODO: Not entirely sure about that
     }
 
     // Free vars
@@ -560,10 +551,9 @@ out:
  * existing remote candidates.
  */
 enum rawrtc_code rawrtc_ice_transport_set_remote_candidates(
-        struct rawrtc_ice_transport* const transport,
-        struct rawrtc_ice_candidate* const candidates[], // referenced (each item)
-        size_t const n_candidates
-) {
+    struct rawrtc_ice_transport* const transport,
+    struct rawrtc_ice_candidate* const candidates[],  // referenced (each item)
+    size_t const n_candidates) {
     size_t i;
     enum rawrtc_code error;
 

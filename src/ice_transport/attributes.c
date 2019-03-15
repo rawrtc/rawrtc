@@ -11,9 +11,8 @@
  * determined yet.
  */
 enum rawrtc_code rawrtc_ice_transport_get_role(
-        enum rawrtc_ice_role* const rolep, // de-referenced
-        struct rawrtc_ice_transport* const transport
-) {
+    enum rawrtc_ice_role* const rolep,  // de-referenced
+    struct rawrtc_ice_transport* const transport) {
     enum ice_role re_role;
     enum rawrtc_code error;
     enum rawrtc_ice_role role;
@@ -46,9 +45,8 @@ enum rawrtc_code rawrtc_ice_transport_get_role(
  * Get the current state of the ICE transport.
  */
 enum rawrtc_code rawrtc_ice_transport_get_state(
-        enum rawrtc_ice_transport_state* const statep, // de-referenced
-        struct rawrtc_ice_transport* const transport
-) {
+    enum rawrtc_ice_transport_state* const statep,  // de-referenced
+    struct rawrtc_ice_transport* const transport) {
     // Check arguments
     if (!statep || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

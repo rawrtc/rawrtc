@@ -13,8 +13,8 @@
  * Print the ICE gatherer's state. Stop once complete.
  */
 static void gatherer_state_change_handler(
-        enum rawrtc_ice_gatherer_state const state, // read-only
-        void* const arg // will be casted to `struct client*`
+    enum rawrtc_ice_gatherer_state const state,  // read-only
+    void* const arg  // will be casted to `struct client*`
 ) {
     default_ice_gatherer_state_change_handler(state, arg);
     if (state == RAWRTC_ICE_GATHERER_STATE_COMPLETE) {
@@ -45,27 +45,26 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_zwuenf_org_ipv4_urls, ARRAY_SIZE(turn_zwuenf_org_ipv4_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, turn_zwuenf_org_ipv4_urls, ARRAY_SIZE(turn_zwuenf_org_ipv4_urls), NULL,
+        NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_ipv6_urls, ARRAY_SIZE(turn_threema_ch_ipv6_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, turn_threema_ch_ipv6_urls, ARRAY_SIZE(turn_threema_ch_ipv6_urls), NULL,
+        NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls), NULL, NULL,
+        RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
-            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
-            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
+        gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls), "threema-angular",
+        "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+        RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Setup client
     client.name = "A";
 
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
-            &gatherer, gather_options,
-            gatherer_state_change_handler, default_ice_gatherer_error_handler,
-            default_ice_gatherer_local_candidate_handler, &client));
+        &gatherer, gather_options, gatherer_state_change_handler,
+        default_ice_gatherer_error_handler, default_ice_gatherer_local_candidate_handler, &client));
 
     // Start gathering
     EOE(rawrtc_ice_gatherer_gather(gatherer, NULL));

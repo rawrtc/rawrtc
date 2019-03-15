@@ -5,20 +5,20 @@
 #include <rawrtcc/code.h>
 #include <rawrtcc/utils.h>
 #include <re.h>
-#include <openssl/err.h>
-#include <openssl/rsa.h>
-#include <openssl/bn.h>
-#include <openssl/objects.h>
-#include <openssl/ec.h>
-#include <openssl/evp.h>
-#include <openssl/x509.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
-#include <openssl/crypto.h>
 #include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/crypto.h>
+#include <openssl/ec.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/objects.h>
 #include <openssl/pem.h>
-#include <string.h> // strlen
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
 #include <limits.h>
+#include <string.h>  // strlen
 
 #define DEBUG_MODULE "certificate"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -30,7 +30,7 @@
 struct rawrtc_certificate_options rawrtc_default_certificate_options = {
     .key_type = RAWRTC_CERTIFICATE_KEY_TYPE_EC,
     .common_name = "anonymous@rawrtc.org",
-    .valid_until = 3600 * 24 * 30, // 30 days
+    .valid_until = 3600 * 24 * 30,  // 30 days
     .sign_algorithm = RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256,
     .named_curve = "prime256v1",
     .modulus_length = 3072,
@@ -39,11 +39,7 @@ struct rawrtc_certificate_options rawrtc_default_certificate_options = {
 /*
  * Print and flush the OpenSSL error queue.
  */
-static int print_openssl_error(
-        char const * message,
-        size_t length,
-        void* arg
-) {
+static int print_openssl_error(char const* message, size_t length, void* arg) {
     (void) arg;
     DEBUG_WARNING("%b", message, length);
 
@@ -56,9 +52,8 @@ static int print_openssl_error(
  * Caller must call `EVP_PKEY_free(*keyp)` when done.
  */
 static enum rawrtc_code generate_key_rsa(
-        EVP_PKEY** const keyp, // de-referenced
-        uint_fast32_t const modulus_length
-) {
+    EVP_PKEY** const keyp,  // de-referenced
+    uint_fast32_t const modulus_length) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
     EVP_PKEY* key = NULL;
     RSA* rsa = NULL;
@@ -138,9 +133,8 @@ out:
  * Caller must call `EVP_PKEY_free(*keyp)` when done.
  */
 static enum rawrtc_code generate_key_ecc(
-        EVP_PKEY** const keyp, // de-referenced
-        char* const named_curve
-) {
+    EVP_PKEY** const keyp,  // de-referenced
+    char* const named_curve) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
     EVP_PKEY* key = NULL;
     int curve_group_nid;
@@ -210,12 +204,11 @@ out:
  * Caller must call `X509_free(*certificatep)` when done.
  */
 static enum rawrtc_code generate_self_signed_certificate(
-        X509** const certificatep, // de-referenced
-        EVP_PKEY* const key,
-        char* const common_name,
-        uint_fast32_t const valid_until,
-        enum rawrtc_certificate_sign_algorithm const sign_algorithm
-) {
+    X509** const certificatep,  // de-referenced
+    EVP_PKEY* const key,
+    char* const common_name,
+    uint_fast32_t const valid_until,
+    enum rawrtc_certificate_sign_algorithm const sign_algorithm) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
     X509* certificate = NULL;
     X509_NAME* name = NULL;
@@ -266,22 +259,20 @@ static enum rawrtc_code generate_self_signed_certificate(
 
     // Set common name field on X509_NAME structure
     if (!X509_NAME_add_entry_by_txt(
-            name, "CN", MBSTRING_ASC, (uint8_t*) common_name,
-            (int) strlen(common_name), -1, 0)) {
+            name, "CN", MBSTRING_ASC, (uint8_t*) common_name, (int) strlen(common_name), -1, 0)) {
         DEBUG_WARNING("Could not apply common name (%s) on certificate\n", common_name);
         goto out;
     }
 
     // Set issuer and subject name
-    if (!X509_set_issuer_name(certificate, name)
-        || !X509_set_subject_name(certificate, name)) {
+    if (!X509_set_issuer_name(certificate, name) || !X509_set_subject_name(certificate, name)) {
         DEBUG_WARNING("Could not set issuer name on certificate\n");
         goto out;
     }
 
     // Certificate is valid from now (-1 day) until whatever has been provided in parameters
-    if (!X509_gmtime_adj(X509_get_notBefore(certificate), -3600 * 24)
-        || !X509_gmtime_adj(X509_get_notAfter(certificate), (long) valid_until)) {
+    if (!X509_gmtime_adj(X509_get_notBefore(certificate), -3600 * 24) ||
+        !X509_gmtime_adj(X509_get_notAfter(certificate), (long) valid_until)) {
         DEBUG_WARNING("Could not apply lifetime range to certificate\n");
         goto out;
     }
@@ -319,9 +310,7 @@ out:
 /*
  * Destructor for existing certificate options.
  */
-static void rawrtc_certificate_options_destroy(
-        void* arg
-) {
+static void rawrtc_certificate_options_destroy(void* arg) {
     struct rawrtc_certificate_options* const options = arg;
 
     // Un-reference
@@ -347,13 +336,13 @@ static void rawrtc_certificate_options_destroy(
  * `sign_algorithm` if it has been set to `NONE`.
  */
 enum rawrtc_code rawrtc_certificate_options_create(
-        struct rawrtc_certificate_options** const optionsp, // de-referenced
-        enum rawrtc_certificate_key_type const key_type,
-        char* common_name, // nullable, copied
-        uint_fast32_t valid_until,
-        enum rawrtc_certificate_sign_algorithm sign_algorithm,
-        char* named_curve, // nullable, copied, ignored for RSA
-        uint_fast32_t modulus_length // ignored for ECC
+    struct rawrtc_certificate_options** const optionsp,  // de-referenced
+    enum rawrtc_certificate_key_type const key_type,
+    char* common_name,  // nullable, copied
+    uint_fast32_t valid_until,
+    enum rawrtc_certificate_sign_algorithm sign_algorithm,
+    char* named_curve,  // nullable, copied, ignored for RSA
+    uint_fast32_t modulus_length  // ignored for ECC
 ) {
     struct rawrtc_certificate_options* options;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
@@ -459,9 +448,7 @@ out:
 /*
  * Destructor for existing certificate.
  */
-static void rawrtc_certificate_destroy(
-        void* arg
-) {
+static void rawrtc_certificate_destroy(void* arg) {
     struct rawrtc_certificate* const certificate = arg;
 
     // Free
@@ -482,8 +469,8 @@ static void rawrtc_certificate_destroy(
  * `*certificatep` must be unreferenced.
  */
 enum rawrtc_code rawrtc_certificate_generate(
-        struct rawrtc_certificate** const certificatep,
-        struct rawrtc_certificate_options* options // nullable
+    struct rawrtc_certificate** const certificatep,
+    struct rawrtc_certificate_options* options  // nullable
 ) {
     struct rawrtc_certificate* certificate;
     enum rawrtc_code error;
@@ -521,8 +508,8 @@ enum rawrtc_code rawrtc_certificate_generate(
 
     // Generate certificate
     error = generate_self_signed_certificate(
-            &certificate->certificate, certificate->key,
-            options->common_name, options->valid_until, options->sign_algorithm);
+        &certificate->certificate, certificate->key, options->common_name, options->valid_until,
+        options->sign_algorithm);
     if (error) {
         goto out;
     }
@@ -545,11 +532,10 @@ out:
  * References the x509 certificate and private key.
  */
 enum rawrtc_code rawrtc_certificate_copy(
-        struct rawrtc_certificate** const certificatep, // de-referenced
-        struct rawrtc_certificate* const source_certificate
-) {
+    struct rawrtc_certificate** const certificatep,  // de-referenced
+    struct rawrtc_certificate* const source_certificate) {
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
-    struct rawrtc_certificate *certificate;
+    struct rawrtc_certificate* certificate;
 
     // Check arguments
     if (!certificatep || !source_certificate) {
@@ -600,9 +586,9 @@ out:
 }
 
 static enum rawrtc_code what_to_encode(
-        enum rawrtc_certificate_encode const to_encode,
-        bool* encode_certificatep,  // de-referenced
-        bool* encode_keyp  // de-referenced
+    enum rawrtc_certificate_encode const to_encode,
+    bool* encode_certificatep,  // de-referenced
+    bool* encode_keyp  // de-referenced
 ) {
     *encode_certificatep = false;
     *encode_keyp = false;
@@ -632,11 +618,10 @@ static enum rawrtc_code what_to_encode(
  * *pemp will NOT be null-terminated!
  */
 enum rawrtc_code rawrtc_certificate_get_pem(
-        char** const pemp,  // de-referenced
-        size_t* const pem_lengthp,  // de-referenced
-        struct rawrtc_certificate* const certificate,
-        enum rawrtc_certificate_encode const to_encode
-) {
+    char** const pemp,  // de-referenced
+    size_t* const pem_lengthp,  // de-referenced
+    struct rawrtc_certificate* const certificate,
+    enum rawrtc_certificate_encode const to_encode) {
     bool encode_certificate;
     bool encode_key;
     enum rawrtc_code error;
@@ -714,11 +699,10 @@ out:
  * *derp will NOT be null-terminated!
  */
 enum rawrtc_code rawrtc_certificate_get_der(
-        uint8_t** const derp,  // de-referenced
-        size_t* const der_lengthp,  // de-referenced
-        struct rawrtc_certificate* const certificate,
-        enum rawrtc_certificate_encode const to_encode
-) {
+    uint8_t** const derp,  // de-referenced
+    size_t* const der_lengthp,  // de-referenced
+    struct rawrtc_certificate* const certificate,
+    enum rawrtc_certificate_encode const to_encode) {
     bool encode_certificate;
     bool encode_key;
     enum rawrtc_code error;
@@ -753,7 +737,7 @@ enum rawrtc_code rawrtc_certificate_get_der(
             return RAWRTC_CODE_UNKNOWN_ERROR;
         }
     }
-    length = (size_t) (length_certificate + length_key);
+    length = (size_t)(length_certificate + length_key);
     der = mem_alloc(length, NULL);
     if (!der) {
         error = RAWRTC_CODE_NO_MEMORY;
@@ -792,11 +776,10 @@ out:
  * `RAWRTC_FINGERPRINT_MAX_SIZE_HEX` bytes
  */
 enum rawrtc_code rawrtc_certificate_get_fingerprint(
-        char** const fingerprint, // de-referenced
-        struct rawrtc_certificate* const certificate,
-        enum rawrtc_certificate_sign_algorithm const algorithm
-) {
-    EVP_MD const * sign_function;
+    char** const fingerprint,  // de-referenced
+    struct rawrtc_certificate* const certificate,
+    enum rawrtc_certificate_sign_algorithm const algorithm) {
+    EVP_MD const* sign_function;
     uint8_t bytes_buffer[RAWRTC_FINGERPRINT_MAX_SIZE_HEX];
     uint_least32_t length;
 
@@ -827,8 +810,8 @@ enum rawrtc_code rawrtc_certificate_get_fingerprint(
  * Copy and append a certificate to a list.
  */
 static enum rawrtc_code copy_and_append_certificate(
-        struct list* const certificate_list, // de-referenced, not checked
-        struct rawrtc_certificate* const certificate // copied
+    struct list* const certificate_list,  // de-referenced, not checked
+    struct rawrtc_certificate* const certificate  // copied
 ) {
     enum rawrtc_code error;
     struct rawrtc_certificate* copied_certificate;
@@ -855,10 +838,9 @@ static enum rawrtc_code copy_and_append_certificate(
  * Warning: The list will be flushed on error.
  */
 enum rawrtc_code rawrtc_certificate_array_to_list(
-        struct list* const certificate_list, // de-referenced, copied into
-        struct rawrtc_certificate* const certificates[], // copied (each item)
-        size_t const n_certificates
-) {
+    struct list* const certificate_list,  // de-referenced, copied into
+    struct rawrtc_certificate* const certificates[],  // copied (each item)
+    size_t const n_certificates) {
     size_t i;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
 
@@ -887,8 +869,8 @@ out:
  * Warning: The destination list will be flushed on error.
  */
 enum rawrtc_code rawrtc_certificate_list_copy(
-        struct list* const destination_list, // de-referenced, copied into
-        struct list* const source_list // de-referenced, copied (each item)
+    struct list* const destination_list,  // de-referenced, copied into
+    struct list* const source_list  // de-referenced, copied (each item)
 ) {
     struct le* le;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;

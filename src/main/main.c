@@ -14,14 +14,13 @@ struct rawrtc_global rawrtc_global;
 /*
  * Handle RAWRTCDC timer tick expired.
  */
-static inline void rawrtcdc_timer_tick_expired_handler(
-        void* arg
-) {
+static inline void rawrtcdc_timer_tick_expired_handler(void* arg) {
     (void) arg;
 
     // Restart timer
-    tmr_start(&rawrtc_global.rawrtcdc_timer, (uint64_t) rawrtc_global.rawrtcdc_timer_interval,
-              rawrtcdc_timer_tick_expired_handler, NULL);
+    tmr_start(
+        &rawrtc_global.rawrtcdc_timer, (uint64_t) rawrtc_global.rawrtcdc_timer_interval,
+        rawrtcdc_timer_tick_expired_handler, NULL);
 
     // Handle timer tick
     rawrtcdc_timer_tick(rawrtc_global.rawrtcdc_timer_interval);
@@ -31,15 +30,14 @@ static inline void rawrtcdc_timer_tick_expired_handler(
  * RAWRTCDC timer handler.
  */
 static inline enum rawrtc_code rawrtcdc_timer_tick_handler(
-        bool const on,
-        uint_fast16_t const interval
-) {
+    bool const on, uint_fast16_t const interval) {
     // Start or stop timer?
     if (on) {
         // Store interval, initialise & start timer
         rawrtc_global.rawrtcdc_timer_interval = interval;
-        tmr_start(&rawrtc_global.rawrtcdc_timer, (uint64_t) rawrtc_global.rawrtcdc_timer_interval,
-                  rawrtcdc_timer_tick_expired_handler, NULL);
+        tmr_start(
+            &rawrtc_global.rawrtcdc_timer, (uint64_t) rawrtc_global.rawrtcdc_timer_interval,
+            rawrtcdc_timer_tick_expired_handler, NULL);
         DEBUG_PRINTF("Started RAWRTCDC timer\n");
     } else {
         tmr_cancel(&rawrtc_global.rawrtcdc_timer);
@@ -57,9 +55,7 @@ static inline enum rawrtc_code rawrtcdc_timer_tick_handler(
  * Note: In case `init_re` is not set to `true`, you MUST initialise
  *       re yourselves before calling this function.
  */
-enum rawrtc_code rawrtc_init(
-        bool const init_re
-) {
+enum rawrtc_code rawrtc_init(bool const init_re) {
     // Initialise timer
     tmr_init(&rawrtc_global.rawrtcdc_timer);
 
@@ -73,9 +69,7 @@ enum rawrtc_code rawrtc_init(
  * Note: In case `close_re` is not set to `true`, you MUST close
  *       re yourselves.
  */
-enum rawrtc_code rawrtc_close(
-        bool const close_re
-) {
+enum rawrtc_code rawrtc_close(bool const close_re) {
     // Close RAWRTCDC
     return rawrtcdc_close(close_re);
 }

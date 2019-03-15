@@ -1,8 +1,8 @@
 #include "transport.h"
 #include "../certificate/certificate.h"
+#include "../diffie_hellman_parameters/parameters.h"
 #include "../dtls_fingerprint/fingerprint.h"
 #include "../dtls_parameters/parameters.h"
-#include "../diffie_hellman_parameters/parameters.h"
 #include "../ice_candidate/helper.h"
 #include "../ice_gatherer/gatherer.h"
 #include "../ice_transport/transport.h"
@@ -18,7 +18,7 @@
 #include <rawrtcc/utils.h>
 #include <re.h>
 #include <rew.h>
-#include <string.h> // memcmp
+#include <string.h>  // memcmp
 
 #define DEBUG_MODULE "dtls-transport"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -28,29 +28,23 @@
  * Embedded DH parameters in DER encoding (bits: 2048)
  */
 uint8_t const rawrtc_default_dh_parameters[] = {
-    0x30, 0x82, 0x01, 0x08, 0x02, 0x82, 0x01, 0x01, 0x00, 0xaa, 0x4c, 0x1f,
-    0x1e, 0xc9, 0xed, 0xfe, 0x5c, 0x50, 0x2d, 0xff, 0xf4, 0x95, 0xf4, 0x80,
-    0x69, 0xcf, 0xc3, 0x84, 0x29, 0x87, 0xd5, 0x2c, 0x4f, 0xf6, 0x9e, 0x88,
-    0xa2, 0x5b, 0x61, 0xd2, 0x7d, 0x78, 0x97, 0xce, 0x47, 0x39, 0x9d, 0xc0,
-    0x95, 0x14, 0x98, 0x1f, 0xa9, 0xa3, 0x42, 0x93, 0x58, 0x49, 0x3d, 0xad,
-    0xeb, 0x6c, 0x3d, 0x79, 0x2d, 0x27, 0x94, 0x67, 0x4c, 0xdc, 0x94, 0x31,
-    0xbf, 0xc1, 0x00, 0x9d, 0x96, 0x4a, 0x91, 0xa7, 0x4f, 0xab, 0x48, 0x44,
-    0xcc, 0x54, 0x1a, 0x4e, 0x2a, 0x8e, 0xa1, 0x81, 0x4b, 0xeb, 0xea, 0xc3,
-    0xba, 0xd6, 0x03, 0xfb, 0xf2, 0x9a, 0x48, 0x1f, 0xc8, 0xba, 0x73, 0x89,
-    0x86, 0x25, 0x2e, 0xba, 0x10, 0x80, 0x2a, 0xeb, 0xf9, 0xe2, 0x28, 0xf1,
-    0xcf, 0x85, 0x0d, 0xeb, 0x2f, 0x61, 0x51, 0x11, 0xe1, 0xe7, 0x82, 0xe5,
-    0xa7, 0x5d, 0x71, 0x0a, 0xef, 0x8a, 0xe1, 0x97, 0x48, 0x41, 0xac, 0xd7,
-    0xc5, 0xf7, 0xce, 0xd5, 0xcd, 0x66, 0x1e, 0x6b, 0x0e, 0x82, 0x4e, 0x77,
-    0x5d, 0x89, 0x3b, 0xe2, 0x94, 0x7a, 0x10, 0xee, 0x5b, 0x5d, 0x36, 0x07,
-    0x29, 0x8b, 0x06, 0xb6, 0x49, 0x1e, 0x17, 0x17, 0x57, 0xc8, 0xc1, 0x80,
-    0x24, 0x15, 0x22, 0x9c, 0xb8, 0x59, 0x55, 0x08, 0x41, 0x67, 0x07, 0xca,
-    0xa8, 0x54, 0x1a, 0xd1, 0xb7, 0x91, 0x2f, 0x41, 0x78, 0xc0, 0xcd, 0x2f,
-    0x07, 0x49, 0x4b, 0xb9, 0x05, 0xf4, 0xea, 0x72, 0x3a, 0xcf, 0x04, 0x69,
-    0xcb, 0x5b, 0xe4, 0xcb, 0x4f, 0x72, 0x40, 0xe4, 0x56, 0x1f, 0xca, 0xee,
-    0x33, 0x2b, 0x29, 0x1a, 0x80, 0xda, 0x01, 0x3f, 0x03, 0xa6, 0xbf, 0x32,
-    0x02, 0x6c, 0xfb, 0xb1, 0xb5, 0x81, 0xda, 0x32, 0x6f, 0xa1, 0x4b, 0x9f,
-    0x42, 0x2e, 0x17, 0xc9, 0x95, 0x30, 0xda, 0x16, 0xb7, 0x9a, 0x7c, 0xf4,
-    0x83, 0x02, 0x01, 0x02,
+    0x30, 0x82, 0x01, 0x08, 0x02, 0x82, 0x01, 0x01, 0x00, 0xaa, 0x4c, 0x1f, 0x1e, 0xc9, 0xed, 0xfe,
+    0x5c, 0x50, 0x2d, 0xff, 0xf4, 0x95, 0xf4, 0x80, 0x69, 0xcf, 0xc3, 0x84, 0x29, 0x87, 0xd5, 0x2c,
+    0x4f, 0xf6, 0x9e, 0x88, 0xa2, 0x5b, 0x61, 0xd2, 0x7d, 0x78, 0x97, 0xce, 0x47, 0x39, 0x9d, 0xc0,
+    0x95, 0x14, 0x98, 0x1f, 0xa9, 0xa3, 0x42, 0x93, 0x58, 0x49, 0x3d, 0xad, 0xeb, 0x6c, 0x3d, 0x79,
+    0x2d, 0x27, 0x94, 0x67, 0x4c, 0xdc, 0x94, 0x31, 0xbf, 0xc1, 0x00, 0x9d, 0x96, 0x4a, 0x91, 0xa7,
+    0x4f, 0xab, 0x48, 0x44, 0xcc, 0x54, 0x1a, 0x4e, 0x2a, 0x8e, 0xa1, 0x81, 0x4b, 0xeb, 0xea, 0xc3,
+    0xba, 0xd6, 0x03, 0xfb, 0xf2, 0x9a, 0x48, 0x1f, 0xc8, 0xba, 0x73, 0x89, 0x86, 0x25, 0x2e, 0xba,
+    0x10, 0x80, 0x2a, 0xeb, 0xf9, 0xe2, 0x28, 0xf1, 0xcf, 0x85, 0x0d, 0xeb, 0x2f, 0x61, 0x51, 0x11,
+    0xe1, 0xe7, 0x82, 0xe5, 0xa7, 0x5d, 0x71, 0x0a, 0xef, 0x8a, 0xe1, 0x97, 0x48, 0x41, 0xac, 0xd7,
+    0xc5, 0xf7, 0xce, 0xd5, 0xcd, 0x66, 0x1e, 0x6b, 0x0e, 0x82, 0x4e, 0x77, 0x5d, 0x89, 0x3b, 0xe2,
+    0x94, 0x7a, 0x10, 0xee, 0x5b, 0x5d, 0x36, 0x07, 0x29, 0x8b, 0x06, 0xb6, 0x49, 0x1e, 0x17, 0x17,
+    0x57, 0xc8, 0xc1, 0x80, 0x24, 0x15, 0x22, 0x9c, 0xb8, 0x59, 0x55, 0x08, 0x41, 0x67, 0x07, 0xca,
+    0xa8, 0x54, 0x1a, 0xd1, 0xb7, 0x91, 0x2f, 0x41, 0x78, 0xc0, 0xcd, 0x2f, 0x07, 0x49, 0x4b, 0xb9,
+    0x05, 0xf4, 0xea, 0x72, 0x3a, 0xcf, 0x04, 0x69, 0xcb, 0x5b, 0xe4, 0xcb, 0x4f, 0x72, 0x40, 0xe4,
+    0x56, 0x1f, 0xca, 0xee, 0x33, 0x2b, 0x29, 0x1a, 0x80, 0xda, 0x01, 0x3f, 0x03, 0xa6, 0xbf, 0x32,
+    0x02, 0x6c, 0xfb, 0xb1, 0xb5, 0x81, 0xda, 0x32, 0x6f, 0xa1, 0x4b, 0x9f, 0x42, 0x2e, 0x17, 0xc9,
+    0x95, 0x30, 0xda, 0x16, 0xb7, 0x9a, 0x7c, 0xf4, 0x83, 0x02, 0x01, 0x02,
 };
 size_t const rawrtc_default_dh_parameters_length = ARRAY_SIZE(rawrtc_default_dh_parameters);
 
@@ -60,7 +54,7 @@ size_t const rawrtc_default_dh_parameters_length = ARRAY_SIZE(rawrtc_default_dh_
 char const* rawrtc_default_dtls_cipher_suites[] = {
     "ECDHE-ECDSA-CHACHA20-POLY1305",
     "ECDHE-RSA-CHACHA20-POLY1305",
-    "ECDHE-ECDSA-AES128-GCM-SHA256", // recommended
+    "ECDHE-ECDSA-AES128-GCM-SHA256",  // recommended
     "ECDHE-RSA-AES128-GCM-SHA256",
     "ECDHE-ECDSA-AES256-GCM-SHA384",
     "ECDHE-RSA-AES256-GCM-SHA384",
@@ -68,7 +62,7 @@ char const* rawrtc_default_dtls_cipher_suites[] = {
     "DHE-RSA-AES256-GCM-SHA384",
     "ECDHE-ECDSA-AES128-SHA256",
     "ECDHE-RSA-AES128-SHA256",
-    "ECDHE-ECDSA-AES128-SHA", // required
+    "ECDHE-ECDSA-AES128-SHA",  // required
     "ECDHE-RSA-AES256-SHA384",
     "ECDHE-RSA-AES128-SHA",
     "ECDHE-ECDSA-AES256-SHA384",
@@ -86,10 +80,7 @@ size_t const rawrtc_default_dtls_cipher_suites_length =
  * Handle outgoing buffered DTLS messages.
  */
 static bool dtls_outgoing_buffer_handler(
-        struct mbuf* const buffer,
-        void* const context,
-        void* const arg
-) {
+    struct mbuf* const buffer, void* const context, void* const arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     enum rawrtc_code error;
     (void) context;
@@ -97,8 +88,7 @@ static bool dtls_outgoing_buffer_handler(
     // Send
     error = rawrtc_dtls_transport_send(transport, buffer);
     if (error) {
-        DEBUG_WARNING("Could not send buffered packet, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING("Could not send buffered packet, reason: %s\n", rawrtc_code_to_str(error));
     }
 
     // Continue iterating through message queue
@@ -111,12 +101,10 @@ static bool dtls_outgoing_buffer_handler(
  * Caller MUST ensure that the same state is not set twice.
  */
 static void set_state(
-        struct rawrtc_dtls_transport* const transport,
-        enum rawrtc_dtls_transport_state const state
-) {
+    struct rawrtc_dtls_transport* const transport, enum rawrtc_dtls_transport_state const state) {
     // Closed or failed: Remove connection
-    if (state == RAWRTC_DTLS_TRANSPORT_STATE_CLOSED
-            || state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
+    if (state == RAWRTC_DTLS_TRANSPORT_STATE_CLOSED ||
+        state == RAWRTC_DTLS_TRANSPORT_STATE_FAILED) {
         // Remove connection
         transport->connection = mem_deref(transport->connection);
 
@@ -131,10 +119,10 @@ static void set_state(
     if (state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
         // Send buffered outgoing DTLS messages
         enum rawrtc_code const error = rawrtc_message_buffer_clear(
-                &transport->buffered_messages_out, dtls_outgoing_buffer_handler, transport);
+            &transport->buffered_messages_out, dtls_outgoing_buffer_handler, transport);
         if (error) {
-            DEBUG_WARNING("Could not send buffered messages, reason: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "Could not send buffered messages, reason: %s\n", rawrtc_code_to_str(error));
         }
     }
 
@@ -147,8 +135,7 @@ static void set_state(
 /*
  * Check if the state is 'closed' or 'failed'.
  */
-static bool is_closed(
-        struct rawrtc_dtls_transport* const transport // not checked
+static bool is_closed(struct rawrtc_dtls_transport* const transport  // not checked
 ) {
     switch (transport->state) {
         case RAWRTC_DTLS_TRANSPORT_STATE_CLOSED:
@@ -162,10 +149,7 @@ static bool is_closed(
 /*
  * DTLS connection closed handler.
  */
-static void close_handler(
-        int err,
-        void* arg
-) {
+static void close_handler(int err, void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     enum rawrtc_code error;
 
@@ -181,22 +165,20 @@ static void close_handler(
         // Stop
         error = rawrtc_dtls_transport_stop(transport);
         if (error) {
-            DEBUG_WARNING("DTLS connection closed, could not stop transport: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "DTLS connection closed, could not stop transport: %s\n",
+                rawrtc_code_to_str(error));
         }
     } else {
-        DEBUG_PRINTF("DTLS connection closed (but state is already closed anyway), reason: %m\n",
-                     err);
+        DEBUG_PRINTF(
+            "DTLS connection closed (but state is already closed anyway), reason: %m\n", err);
     }
 }
 
 /*
  * Handle incoming DTLS messages.
  */
-static void dtls_receive_handler(
-        struct mbuf* buffer,
-        void* arg
-) {
+static void dtls_receive_handler(struct mbuf* buffer, void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     enum rawrtc_code error;
 
@@ -217,8 +199,7 @@ static void dtls_receive_handler(
     // Buffer message
     error = rawrtc_message_buffer_append(&transport->buffered_messages_in, buffer, NULL);
     if (error) {
-        DEBUG_WARNING("Could not buffer incoming packet, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING("Could not buffer incoming packet, reason: %s\n", rawrtc_code_to_str(error));
     } else {
         DEBUG_PRINTF("Buffered incoming packet of size %zu\n", mbuf_get_left(buffer));
     }
@@ -230,8 +211,7 @@ static void dtls_receive_handler(
  * The caller MUST make sure that remote parameters are available and
  * that the state is NOT 'closed' or 'failed'!
  */
-static void verify_certificate(
-        struct rawrtc_dtls_transport* const transport // not checked
+static void verify_certificate(struct rawrtc_dtls_transport* const transport  // not checked
 ) {
     size_t i;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
@@ -242,24 +222,24 @@ static void verify_certificate(
 
     // Verify the peer's certificate
     // TODO: Fix this. Testing the fingerprint alone is okay for now though.
-//    error = rawrtc_error_to_code(tls_peer_verify(transport->connection));
-//    if (error) {
-//        goto out;
-//    }
-//    DEBUG_PRINTF("Peer's certificate verified\n");
+    // error = rawrtc_error_to_code(tls_peer_verify(transport->connection));
+    // if (error) {
+    //     goto out;
+    // }
+    // DEBUG_PRINTF("Peer's certificate verified\n");
 
     // Check if *any* of the fingerprints provided matches
     // Note: We don't verify the peer's certificate since it will almost always
     //       be self-signed.
     for (i = 0; i < transport->remote_parameters->fingerprints->n_fingerprints; ++i) {
         struct rawrtc_dtls_fingerprint* const fingerprint =
-                transport->remote_parameters->fingerprints->fingerprints[i];
+            transport->remote_parameters->fingerprints->fingerprints[i];
         size_t length;
         size_t bytes_written;
 
         // Get algorithm
         error = rawrtc_certificate_sign_algorithm_to_tls_fingerprint(
-                &algorithm, fingerprint->algorithm);
+            &algorithm, fingerprint->algorithm);
         if (error) {
             if (error == RAWRTC_CODE_UNSUPPORTED_ALGORITHM) {
                 continue;
@@ -278,27 +258,29 @@ static void verify_certificate(
 
         // Convert hex-encoded value to binary
         error = rawrtc_colon_hex_to_bin(
-                &bytes_written, expected_fingerprint, length, fingerprint->value);
+            &bytes_written, expected_fingerprint, length, fingerprint->value);
         if (error) {
             if (error == RAWRTC_CODE_INSUFFICIENT_SPACE) {
                 DEBUG_WARNING("Hex-encoded fingerprint exceeds buffer size!\n");
             } else {
-                DEBUG_WARNING("Could not convert hex-encoded fingerprint to binary, reason: %s\n",
-                        rawrtc_code_to_str(error));
+                DEBUG_WARNING(
+                    "Could not convert hex-encoded fingerprint to binary, reason: %s\n",
+                    rawrtc_code_to_str(error));
             }
             continue;
         }
 
         // Validate length
         if (bytes_written != length) {
-            DEBUG_WARNING("Hex-encoded fingerprint should have been %zu bytes but was %zu bytes\n",
-                    length, bytes_written);
+            DEBUG_WARNING(
+                "Hex-encoded fingerprint should have been %zu bytes but was %zu bytes\n", length,
+                bytes_written);
             continue;
         }
 
         // Get remote fingerprint
         error = rawrtc_error_to_code(tls_peer_fingerprint(
-                transport->connection, algorithm, actual_fingerprint, sizeof(actual_fingerprint)));
+            transport->connection, algorithm, actual_fingerprint, sizeof(actual_fingerprint)));
         if (error) {
             goto out;
         }
@@ -320,8 +302,9 @@ out:
         // Stop
         error = rawrtc_dtls_transport_stop(transport);
         if (error) {
-            DEBUG_WARNING("DTLS connection closed, could not stop transport: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "DTLS connection closed, could not stop transport: %s\n",
+                rawrtc_code_to_str(error));
         }
     } else {
         // Connected
@@ -332,9 +315,7 @@ out:
 /*
  * Handle DTLS connection established event.
  */
-static void establish_handler(
-        void* arg
-) {
+static void establish_handler(void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
 
     // Check state
@@ -357,10 +338,7 @@ static void establish_handler(
 /*
  * Handle incoming DTLS connection.
  */
-static void connect_handler(
-        const struct sa* peer,
-        void* arg
-) {
+static void connect_handler(const struct sa* peer, void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     bool role_is_server;
     bool have_connection;
@@ -378,7 +356,7 @@ static void connect_handler(
         DEBUG_PRINTF("Switching role 'auto' -> 'server'\n");
         transport->role = RAWRTC_DTLS_ROLE_SERVER;
     }
-    
+
     // Accept?
     role_is_server = transport->role == RAWRTC_DTLS_ROLE_SERVER;
     have_connection = transport->connection != NULL;
@@ -390,8 +368,9 @@ static void connect_handler(
 
         // Accept and create connection
         DEBUG_PRINTF("Accepting incoming DTLS connection from %J\n", peer);
-        err = dtls_accept(&transport->connection, transport->context, transport->socket,
-                          establish_handler, dtls_receive_handler, close_handler, transport);
+        err = dtls_accept(
+            &transport->connection, transport->context, transport->socket, establish_handler,
+            dtls_receive_handler, close_handler, transport);
         if (err) {
             DEBUG_WARNING("Could not accept incoming DTLS connection, reason: %m\n", err);
         }
@@ -409,32 +388,27 @@ static void connect_handler(
  * Initiate a DTLS connect.
  */
 static enum rawrtc_code do_connect(
-        struct rawrtc_dtls_transport* const transport,
-        const struct sa* const peer
-) {
+    struct rawrtc_dtls_transport* const transport, const struct sa* const peer) {
     // Connect
     DEBUG_PRINTF("Starting DTLS connection to %J\n", peer);
     return rawrtc_error_to_code(dtls_connect(
-            &transport->connection, transport->context, transport->socket, peer,
-            establish_handler, dtls_receive_handler, close_handler, transport));
+        &transport->connection, transport->context, transport->socket, peer, establish_handler,
+        dtls_receive_handler, close_handler, transport));
 }
 
 /*
  * Handle outgoing DTLS messages.
  */
 static int send_handler(
-        struct tls_conn* tc,
-        struct sa const* original_destination,
-        struct mbuf* buffer,
-        void* arg
-) {
+    struct tls_conn* tc, struct sa const* original_destination, struct mbuf* buffer, void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct trice* const ice = transport->ice_transport->gatherer->ice;
     bool closed = is_closed(transport);
     struct ice_candpair* candidate_pair;
     struct udp_sock* udp_socket;
     int err;
-    (void) tc; (void) original_destination;
+    (void) tc;
+    (void) original_destination;
 
     // Note: No need to check if closed as only non-application data may be sent if the
     //       transport is already closed.
@@ -462,9 +436,9 @@ static int send_handler(
 
     // Send
     // TODO: Is destination correct?
-    DEBUG_PRINTF("Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n",
-                 mbuf_get_left(buffer), &candidate_pair->rcand->attr.addr, original_destination,
-                 &candidate_pair->lcand->attr.addr);
+    DEBUG_PRINTF(
+        "Sending DTLS message (%zu bytes) to %J (originally: %J) from %J\n", mbuf_get_left(buffer),
+        &candidate_pair->rcand->attr.addr, original_destination, &candidate_pair->lcand->attr.addr);
     err = udp_send(udp_socket, &candidate_pair->rcand->attr.addr, buffer);
     if (err) {
         DEBUG_WARNING("Could not send, error: %m\n", err);
@@ -475,11 +449,9 @@ static int send_handler(
 /*
  * Handle MTU queries.
  */
-static size_t mtu_handler(
-        struct tls_conn* tc,
-        void* arg
-) {
-    (void) tc; (void) arg;
+static size_t mtu_handler(struct tls_conn* tc, void* arg) {
+    (void) tc;
+    (void) arg;
     // TODO: Choose a sane value.
     return 1400;
 }
@@ -487,11 +459,7 @@ static size_t mtu_handler(
 /*
  * Handle received UDP messages.
  */
-static bool udp_receive_handler(
-        struct mbuf* const buffer,
-        void* const context,
-        void* const arg
-) {
+static bool udp_receive_handler(struct mbuf* const buffer, void* const context, void* const arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct sa* source = context;
     struct sa const* peer;
@@ -526,11 +494,7 @@ static bool udp_receive_handler(
 /*
  * Handle received UDP messages (UDP receive helper).
  */
-static bool udp_receive_helper(
-        struct sa* source,
-        struct mbuf* buffer,
-        void* arg
-) {
+static bool udp_receive_helper(struct sa* source, struct mbuf* buffer, void* arg) {
     // Receive
     udp_receive_handler(buffer, source, arg);
 
@@ -541,9 +505,7 @@ static bool udp_receive_helper(
 /*
  * Destructor for an existing DTLS transport.
  */
-static void rawrtc_dtls_transport_destroy(
-        void* arg
-) {
+static void rawrtc_dtls_transport_destroy(void* arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     struct le* le;
 
@@ -552,8 +514,8 @@ static void rawrtc_dtls_transport_destroy(
     rawrtc_dtls_transport_stop(transport);
 
     // TODO: Remove once ICE transport and DTLS transport have been separated properly
-    for (le = list_head(&transport->ice_transport->gatherer->local_candidates);
-         le != NULL; le = le->next) {
+    for (le = list_head(&transport->ice_transport->gatherer->local_candidates); le != NULL;
+         le = le->next) {
         struct rawrtc_candidate_helper* const candidate_helper = le->data;
         mem_deref(candidate_helper->udp_helper);
         // TODO: Be aware that UDP packets go to nowhere now...
@@ -575,12 +537,12 @@ static void rawrtc_dtls_transport_destroy(
  * Create a new DTLS transport (internal)
  */
 enum rawrtc_code rawrtc_dtls_transport_create_internal(
-        struct rawrtc_dtls_transport** const transportp, // de-referenced
-        struct rawrtc_ice_transport* const ice_transport, // referenced
-        struct list* certificates, // de-referenced, copied (shallow)
-        rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
-        rawrtc_dtls_transport_error_handler const error_handler, // nullable
-        void* const arg // nullable
+    struct rawrtc_dtls_transport** const transportp,  // de-referenced
+    struct rawrtc_ice_transport* const ice_transport,  // referenced
+    struct list* certificates,  // de-referenced, copied (shallow)
+    rawrtc_dtls_transport_state_change_handler const state_change_handler,  // nullable
+    rawrtc_dtls_transport_error_handler const error_handler,  // nullable
+    void* const arg  // nullable
 ) {
     struct rawrtc_dtls_transport* transport;
     enum rawrtc_code error;
@@ -613,7 +575,7 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     }
 
     // Set fields/reference
-    transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW; // TODO: Raise state (delayed)?
+    transport->state = RAWRTC_DTLS_TRANSPORT_STATE_NEW;  // TODO: Raise state (delayed)?
     transport->ice_transport = mem_ref(ice_transport);
     transport->certificates = *certificates;
     transport->state_change_handler = state_change_handler;
@@ -636,7 +598,7 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // TODO: Which certificate should we use?
     certificate = list_ledata(list_head(&transport->certificates));
     error = rawrtc_certificate_get_der(
-            &certificate_der, &certificate_der_length, certificate, RAWRTC_CERTIFICATE_ENCODE_BOTH);
+        &certificate_der, &certificate_der_length, certificate, RAWRTC_CERTIFICATE_ENCODE_BOTH);
     if (error) {
         goto out;
     }
@@ -644,8 +606,8 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // Set certificate
     DEBUG_PRINTF("Setting certificate on DTLS context\n");
     error = rawrtc_error_to_code(tls_set_certificate_der(
-            transport->context, rawrtc_certificate_key_type_to_tls_keytype(certificate->key_type),
-            certificate_der, certificate_der_length, NULL, 0));
+        transport->context, rawrtc_certificate_key_type_to_tls_keytype(certificate->key_type),
+        certificate_der, certificate_der_length, NULL, 0));
     mem_deref(certificate_der);
     if (error) {
         goto out;
@@ -656,7 +618,7 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // TODO: Get DH params from config
     DEBUG_PRINTF("Setting DH parameters on DTLS context\n");
     error = rawrtc_set_dh_parameters_der(
-            transport->context, rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length);
+        transport->context, rawrtc_default_dh_parameters, rawrtc_default_dh_parameters_length);
     if (error) {
         goto out;
     }
@@ -673,8 +635,8 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // TODO: Get cipher suites from config
     DEBUG_PRINTF("Setting cipher suites on DTLS context\n");
     error = rawrtc_error_to_code(tls_set_ciphers(
-            transport->context, rawrtc_default_dtls_cipher_suites,
-            rawrtc_default_dtls_cipher_suites_length));
+        transport->context, rawrtc_default_dtls_cipher_suites,
+        rawrtc_default_dtls_cipher_suites_length));
     if (error) {
         goto out;
     }
@@ -685,7 +647,7 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
     // Create DTLS socket
     DEBUG_PRINTF("Creating DTLS socket\n");
     error = rawrtc_error_to_code(dtls_socketless(
-            &transport->socket, 1, connect_handler, send_handler, mtu_handler, transport));
+        &transport->socket, 1, connect_handler, send_handler, mtu_handler, transport));
     if (error) {
         goto out;
     }
@@ -695,8 +657,9 @@ enum rawrtc_code rawrtc_dtls_transport_create_internal(
         struct ice_candpair* candidate_pair = le->data;
         error = rawrtc_dtls_transport_add_candidate_pair(transport, candidate_pair);
         if (error) {
-            DEBUG_WARNING("DTLS transport could not attach to candidate pair, reason: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "DTLS transport could not attach to candidate pair, reason: %s\n",
+                rawrtc_code_to_str(error));
             goto out;
         }
     }
@@ -720,13 +683,13 @@ out:
  * `*transport` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_transport_create(
-        struct rawrtc_dtls_transport** const transportp, // de-referenced
-        struct rawrtc_ice_transport* const ice_transport, // referenced
-        struct rawrtc_certificate* const certificates[], // copied (each item)
-        size_t const n_certificates,
-        rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
-        rawrtc_dtls_transport_error_handler const error_handler, // nullable
-        void* const arg // nullable
+    struct rawrtc_dtls_transport** const transportp,  // de-referenced
+    struct rawrtc_ice_transport* const ice_transport,  // referenced
+    struct rawrtc_certificate* const certificates[],  // copied (each item)
+    size_t const n_certificates,
+    rawrtc_dtls_transport_state_change_handler const state_change_handler,  // nullable
+    rawrtc_dtls_transport_error_handler const error_handler,  // nullable
+    void* const arg  // nullable
 ) {
     enum rawrtc_code error;
     struct list certificates_list = LIST_INIT;
@@ -739,8 +702,7 @@ enum rawrtc_code rawrtc_dtls_transport_create(
 
     // Create DTLS transport
     return rawrtc_dtls_transport_create_internal(
-            transportp, ice_transport, &certificates_list, state_change_handler, error_handler,
-            arg);
+        transportp, ice_transport, &certificates_list, state_change_handler, error_handler, arg);
 }
 
 /*
@@ -748,12 +710,10 @@ enum rawrtc_code rawrtc_dtls_transport_create(
  * TODO: Separate ICE transport and DTLS transport properly (like data transport)
  */
 enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
-        struct rawrtc_dtls_transport* const transport,
-        struct ice_candpair* const candidate_pair
-) {
+    struct rawrtc_dtls_transport* const transport, struct ice_candpair* const candidate_pair) {
     enum rawrtc_code error;
     struct rawrtc_candidate_helper* candidate_helper = NULL;
-    
+
     // Check arguments
     if (!transport || !candidate_pair) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -768,29 +728,32 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
 
     // Find candidate helper
     error = rawrtc_candidate_helper_find(
-            &candidate_helper, &transport->ice_transport->gatherer->local_candidates,
-            candidate_pair->lcand);
+        &candidate_helper, &transport->ice_transport->gatherer->local_candidates,
+        candidate_pair->lcand);
     if (error) {
-        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Could not find matching candidate helper for candidate pair, reason: %s\n",
+            rawrtc_code_to_str(error));
         goto out;
     }
 
     // Receive buffered packets
     error = rawrtc_message_buffer_clear(
-            &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
+        &transport->ice_transport->gatherer->buffered_messages, udp_receive_handler, transport);
     if (error) {
-        DEBUG_WARNING("Could not handle buffered packets on candidate pair, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Could not handle buffered packets on candidate pair, reason: %s\n",
+            rawrtc_code_to_str(error));
         goto out;
     }
 
     // Attach this transport's receive handler
     error = rawrtc_candidate_helper_set_receive_handler(
-            candidate_helper, udp_receive_helper, transport);
+        candidate_helper, udp_receive_helper, transport);
     if (error) {
-        DEBUG_WARNING("Could not find matching candidate helper for candidate pair, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Could not find matching candidate helper for candidate pair, reason: %s\n",
+            rawrtc_code_to_str(error));
         goto out;
     }
 
@@ -798,8 +761,9 @@ enum rawrtc_code rawrtc_dtls_transport_add_candidate_pair(
     if (transport->role == RAWRTC_DTLS_ROLE_CLIENT && !transport->connection) {
         error = do_connect(transport, &candidate_pair->rcand->attr.addr);
         if (error) {
-            DEBUG_WARNING("Could not start DTLS connection for candidate pair, reason: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "Could not start DTLS connection for candidate pair, reason: %s\n",
+                rawrtc_code_to_str(error));
             goto out;
         }
     }
@@ -815,8 +779,8 @@ out:
  * Start the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_start(
-        struct rawrtc_dtls_transport* const transport,
-        struct rawrtc_dtls_parameters* const remote_parameters // referenced
+    struct rawrtc_dtls_transport* const transport,
+    struct rawrtc_dtls_parameters* const remote_parameters  // referenced
 ) {
     enum rawrtc_code error;
     enum rawrtc_ice_role ice_role;
@@ -886,8 +850,8 @@ enum rawrtc_code rawrtc_dtls_transport_start(
         }
 
         // Get selected candidate pair
-        candidate_pair = list_ledata(list_head(trice_validl(
-                transport->ice_transport->gatherer->ice)));
+        candidate_pair =
+            list_ledata(list_head(trice_validl(transport->ice_transport->gatherer->ice)));
 
         // Do connect (if we have a valid candidate pair)
         if (candidate_pair) {
@@ -918,10 +882,7 @@ out:
  * different signature.
  */
 static bool intermediate_receive_handler(
-        struct mbuf* const buffer,
-        void* const context,
-        void* const arg
-) {
+    struct mbuf* const buffer, void* const context, void* const arg) {
     struct rawrtc_dtls_transport* const transport = arg;
     (void) context;
 
@@ -940,10 +901,9 @@ static bool intermediate_receive_handler(
  * Set a data transport on the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
-        struct rawrtc_dtls_transport* const transport,
-        rawrtc_dtls_transport_receive_handler const receive_handler,
-        void* const arg
-) {
+    struct rawrtc_dtls_transport* const transport,
+    rawrtc_dtls_transport_receive_handler const receive_handler,
+    void* const arg) {
     enum rawrtc_code error;
     bool have_data_transport;
 
@@ -967,7 +927,7 @@ enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
 
     // Receive buffered messages
     error = rawrtc_message_buffer_clear(
-            &transport->buffered_messages_in, intermediate_receive_handler, transport);
+        &transport->buffered_messages_in, intermediate_receive_handler, transport);
     if (error) {
         return error;
     }
@@ -980,8 +940,7 @@ enum rawrtc_code rawrtc_dtls_transport_set_data_transport(
  * Remove an existing data transport from the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_clear_data_transport(
-        struct rawrtc_dtls_transport* const transport
-) {
+    struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -1001,9 +960,7 @@ enum rawrtc_code rawrtc_dtls_transport_clear_data_transport(
  * Send a data message over the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_send(
-        struct rawrtc_dtls_transport* const transport,
-        struct mbuf* const buffer
-) {
+    struct rawrtc_dtls_transport* const transport, struct mbuf* const buffer) {
     enum rawrtc_code error;
 
     // Check arguments
@@ -1024,8 +981,7 @@ enum rawrtc_code rawrtc_dtls_transport_send(
     // Buffer message
     error = rawrtc_message_buffer_append(&transport->buffered_messages_out, buffer, NULL);
     if (error) {
-        DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING("Could not buffer outgoing packet, reason: %s\n", rawrtc_code_to_str(error));
         return error;
     }
 
@@ -1037,9 +993,7 @@ enum rawrtc_code rawrtc_dtls_transport_send(
 /*
  * Stop and close the DTLS transport.
  */
-enum rawrtc_code rawrtc_dtls_transport_stop(
-        struct rawrtc_dtls_transport* const transport
-) {
+enum rawrtc_code rawrtc_dtls_transport_stop(struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -1059,9 +1013,8 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
  * Get local DTLS parameters of a transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
-        struct rawrtc_dtls_parameters** const parametersp, // de-referenced
-        struct rawrtc_dtls_transport* const transport
-) {
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
+    struct rawrtc_dtls_transport* const transport) {
     // TODO: Get config from struct
     enum rawrtc_certificate_sign_algorithm const algorithm = rawrtc_default_config.sign_algorithm;
     struct le* le;
@@ -1102,5 +1055,5 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
 
     // Create and return DTLS parameters instance
     return rawrtc_dtls_parameters_create_internal(
-            parametersp, transport->role, &transport->fingerprints);
+        parametersp, transport->role, &transport->fingerprints);
 }

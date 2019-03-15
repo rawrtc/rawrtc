@@ -14,9 +14,8 @@
  *       WebRTC specification's `RTCIceCandidateInit`.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
-        char** const sdpp, // de-referenced
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    char** const sdpp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate) {
     enum rawrtc_code error;
     char* foundation = NULL;
     uint16_t component_id = 1;
@@ -84,8 +83,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
 
     // Encode candidate's mandatory fields
     error = rawrtc_error_to_code(mbuf_printf(
-            sdp, "candidate:%s %"PRIu16" %s %"PRIu32" %s %"PRIu16" typ %s",
-            foundation, component_id, protocol_str, priority, ip, port, type_str));
+        sdp, "candidate:%s %" PRIu16 " %s %" PRIu32 " %s %" PRIu16 " typ %s", foundation,
+        component_id, protocol_str, priority, ip, port, type_str));
     if (error) {
         goto out;
     }
@@ -96,7 +95,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
         }
     }
     if (related_port > 0) {
-        error = rawrtc_error_to_code(mbuf_printf(sdp, " rport %"PRIu16, related_port));
+        error = rawrtc_error_to_code(mbuf_printf(sdp, " rport %" PRIu16, related_port));
         if (error) {
             goto out;
         }
@@ -121,7 +120,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
         goto out;
     }
 
-    out:
+out:
     // Un-reference
     mem_deref(related_address);
     mem_deref(sdp);
@@ -141,9 +140,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp(
  * be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
-        char** const midp, // de-referenced
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    char** const midp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate) {
     // Check arguments
     if (!midp || !candidate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -163,9 +161,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_mid(
  * set.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
-        uint8_t* const media_line_index, // de-referenced
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    uint8_t* const media_line_index,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate) {
     // Check arguments
     if (!media_line_index || !candidate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -190,9 +187,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
  * `*username_fragmentp* must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
-        char** const username_fragmentp, // de-referenced
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    char** const username_fragmentp,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate) {
     // Check arguments
     if (!username_fragmentp || !candidate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -211,9 +207,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_username_fragment(
  * `*ortc_candidatep` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_get_ortc_candidate(
-        struct rawrtc_ice_candidate** const ortc_candidatep, // de-referenced
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    struct rawrtc_ice_candidate** const ortc_candidatep,  // de-referenced
+    struct rawrtc_peer_connection_ice_candidate* const candidate) {
     // Check arguments
     if (!ortc_candidatep || !candidate) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

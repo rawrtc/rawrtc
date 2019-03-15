@@ -77,13 +77,13 @@ struct rawrtc_certificates {
  * `sign_algorithm` if it has been set to `NONE`.
  */
 enum rawrtc_code rawrtc_certificate_options_create(
-    struct rawrtc_certificate_options** const optionsp, // de-referenced
+    struct rawrtc_certificate_options** const optionsp,  // de-referenced
     enum rawrtc_certificate_key_type const key_type,
-    char* common_name, // nullable, copied
+    char* common_name,  // nullable, copied
     uint_fast32_t valid_until,
     enum rawrtc_certificate_sign_algorithm sign_algorithm,
-    char* named_curve, // nullable, copied, ignored for RSA
-    uint_fast32_t modulus_length // ignored for ECC
+    char* named_curve,  // nullable, copied, ignored for RSA
+    uint_fast32_t modulus_length  // ignored for ECC
 );
 
 /*
@@ -96,7 +96,7 @@ enum rawrtc_code rawrtc_certificate_options_create(
  */
 enum rawrtc_code rawrtc_certificate_generate(
     struct rawrtc_certificate** const certificatep,
-    struct rawrtc_certificate_options* options // nullable
+    struct rawrtc_certificate_options* options  // nullable
 );
 
 /*
@@ -110,14 +110,12 @@ enum rawrtc_code rawrtc_certificate_generate(
 /*
  * Translate a certificate sign algorithm to str.
  */
-char const * rawrtc_certificate_sign_algorithm_to_str(
-    enum rawrtc_certificate_sign_algorithm const algorithm
-);
+char const* rawrtc_certificate_sign_algorithm_to_str(
+    enum rawrtc_certificate_sign_algorithm const algorithm);
 
 /*
  * Translate a str to a certificate sign algorithm (case-insensitive).
  */
 enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
-    enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
-    char const * const str
-);
+    enum rawrtc_certificate_sign_algorithm* const algorithmp,  // de-referenced
+    char const* const str);

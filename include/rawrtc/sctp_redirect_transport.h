@@ -17,11 +17,11 @@ struct rawrtc_dtls_transport;
  *  to.
  */
 enum rawrtc_code rawrtc_sctp_redirect_transport_create(
-    struct rawrtc_sctp_redirect_transport** const transportp, // de-referenced
-    struct rawrtc_dtls_transport* const dtls_transport, // referenced
-    uint16_t const port, // zeroable
-    char* const redirect_ip, // copied
+    struct rawrtc_sctp_redirect_transport** const transportp,  // de-referenced
+    struct rawrtc_dtls_transport* const dtls_transport,  // referenced
+    uint16_t const port,  // zeroable
+    char* const redirect_ip,  // copied
     uint16_t const redirect_port,
-    rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler, // nullable
-    void* const arg // nullable
+    rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler,  // nullable
+    void* const arg  // nullable
 );

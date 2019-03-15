@@ -4,8 +4,8 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <stdlib.h> // exit
-#include <unistd.h> // STDIN_FILENO
+#include <stdlib.h>  // exit
+#include <unistd.h>  // STDIN_FILENO
 
 #define DEBUG_MODULE "peer-connection-app"
 #define DEBUG_LEVEL 7
@@ -23,15 +23,11 @@ struct peer_connection_client {
     struct data_channel_helper* data_channel;
 };
 
-static void print_local_description(
-    struct peer_connection_client* const client
-);
+static void print_local_description(struct peer_connection_client* const client);
 
 static struct tmr timer = {0};
 
-static void timer_handler(
-        void* arg
-) {
+static void timer_handler(void* arg) {
     struct data_channel_helper* const channel = arg;
     struct peer_connection_client* const client = (struct peer_connection_client*) channel->client;
     struct mbuf* buffer;
@@ -59,9 +55,7 @@ static void timer_handler(
     }
 }
 
-static void data_channel_open_handler(
-        void* const arg
-) {
+static void data_channel_open_handler(void* const arg) {
     struct data_channel_helper* const channel = arg;
     struct peer_connection_client* const client = (struct peer_connection_client*) channel->client;
     struct mbuf* buffer;
@@ -91,9 +85,7 @@ static void data_channel_open_handler(
     mem_deref(buffer);
 }
 
-static void negotiation_needed_handler(
-        void* const arg
-) {
+static void negotiation_needed_handler(void* const arg) {
     struct peer_connection_client* const client = arg;
 
     // Print negotiation needed
@@ -109,9 +101,8 @@ static void negotiation_needed_handler(
 }
 
 static void connection_state_change_handler(
-        enum rawrtc_peer_connection_state const state, // read-only
-        void* const arg
-) {
+    enum rawrtc_peer_connection_state const state,  // read-only
+    void* const arg) {
     struct peer_connection_client* const client = arg;
 
     // Print state
@@ -126,20 +117,19 @@ static void connection_state_change_handler(
         char* const label = client->offering ? "bear-noises" : "lion-noises";
 
         // Create data channel helper for in-band negotiated data channel
-        data_channel_helper_create(
-                &client->data_channel, (struct client *) client, label);
+        data_channel_helper_create(&client->data_channel, (struct client*) client, label);
 
         // Create data channel parameters
         EOE(rawrtc_data_channel_parameters_create(
-                &channel_parameters, client->data_channel->label,
-                RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
+            &channel_parameters, client->data_channel->label,
+            RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_UNORDERED, 0, NULL, false, 0));
 
         // Create data channel
         EOE(rawrtc_peer_connection_create_data_channel(
-                &client->data_channel->channel, client->connection, channel_parameters,
-                data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
-                default_data_channel_error_handler, default_data_channel_close_handler,
-                default_data_channel_message_handler, client->data_channel));
+            &client->data_channel->channel, client->connection, channel_parameters,
+            data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
+            default_data_channel_error_handler, default_data_channel_close_handler,
+            default_data_channel_message_handler, client->data_channel));
 
         // Un-reference data channel parameters
         mem_deref(channel_parameters);
@@ -147,10 +137,9 @@ static void connection_state_change_handler(
 }
 
 static void local_candidate_handler(
-        struct rawrtc_peer_connection_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg
-) {
+    struct rawrtc_peer_connection_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    void* const arg) {
     struct peer_connection_client* const client = arg;
 
     // Print local candidate
@@ -162,35 +151,32 @@ static void local_candidate_handler(
     }
 }
 
-static void client_init(
-        struct peer_connection_client* const client
-) {
+static void client_init(struct peer_connection_client* const client) {
     struct rawrtc_data_channel_parameters* channel_parameters;
 
     // Create peer connection
     EOE(rawrtc_peer_connection_create(
-            &client->connection, client->configuration,
-            negotiation_needed_handler, local_candidate_handler,
-            default_peer_connection_local_candidate_error_handler,
-            default_signaling_state_change_handler, default_ice_transport_state_change_handler,
-            default_ice_gatherer_state_change_handler, connection_state_change_handler,
-            default_data_channel_handler, client));
+        &client->connection, client->configuration, negotiation_needed_handler,
+        local_candidate_handler, default_peer_connection_local_candidate_error_handler,
+        default_signaling_state_change_handler, default_ice_transport_state_change_handler,
+        default_ice_gatherer_state_change_handler, connection_state_change_handler,
+        default_data_channel_handler, client));
 
     // Create data channel helper for pre-negotiated data channel
     data_channel_helper_create(
-            &client->data_channel_negotiated, (struct client *) client, "cat-noises");
+        &client->data_channel_negotiated, (struct client*) client, "cat-noises");
 
     // Create data channel parameters
     EOE(rawrtc_data_channel_parameters_create(
-            &channel_parameters, client->data_channel_negotiated->label,
-            RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED, 0, NULL, true, 0));
+        &channel_parameters, client->data_channel_negotiated->label,
+        RAWRTC_DATA_CHANNEL_TYPE_RELIABLE_ORDERED, 0, NULL, true, 0));
 
     // Create pre-negotiated data channel
     EOE(rawrtc_peer_connection_create_data_channel(
-            &client->data_channel_negotiated->channel, client->connection, channel_parameters,
-            data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
-            default_data_channel_error_handler, default_data_channel_close_handler,
-            default_data_channel_message_handler, client->data_channel_negotiated));
+        &client->data_channel_negotiated->channel, client->connection, channel_parameters,
+        data_channel_open_handler, default_data_channel_buffered_amount_low_handler,
+        default_data_channel_error_handler, default_data_channel_close_handler,
+        default_data_channel_message_handler, client->data_channel_negotiated));
 
     // TODO: Create in-band negotiated data channel
     // TODO: Return some kind of promise that resolves once the data channel can be created
@@ -199,9 +185,7 @@ static void client_init(
     mem_deref(channel_parameters);
 }
 
-static void client_stop(
-        struct peer_connection_client* const client
-) {
+static void client_stop(struct peer_connection_client* const client) {
     EOE(rawrtc_peer_connection_close(client->connection));
 
     // Un-reference & close
@@ -214,10 +198,7 @@ static void client_stop(
     fd_close(STDIN_FILENO);
 }
 
-static void parse_remote_description(
-        int flags,
-        void* arg
-) {
+static void parse_remote_description(int flags, void* arg) {
     struct peer_connection_client* const client = arg;
     enum rawrtc_code error;
     bool do_exit = false;
@@ -282,9 +263,7 @@ out:
     }
 }
 
-static void print_local_description(
-        struct peer_connection_client* const client
-) {
+static void print_local_description(struct peer_connection_client* const client) {
     struct rawrtc_peer_connection_description* description;
     enum rawrtc_sdp_type type;
     char* sdp;
@@ -325,7 +304,8 @@ int main(int argc, char* argv[argc + 1]) {
                                           "stun:stun1.l.google.com:19302"};
     char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct peer_connection_client client = {0};
-    (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
+    (void) client.ice_candidate_types;
+    (void) client.n_ice_candidate_types;
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
@@ -352,17 +332,16 @@ int main(int argc, char* argv[argc + 1]) {
     }
 
     // Create peer connection configuration
-    EOE(rawrtc_peer_connection_configuration_create(
-            &configuration, RAWRTC_ICE_GATHER_POLICY_ALL));
+    EOE(rawrtc_peer_connection_configuration_create(&configuration, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to configuration
     EOE(rawrtc_peer_connection_configuration_add_ice_server(
-            configuration, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        configuration, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls), NULL, NULL,
+        RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_peer_connection_configuration_add_ice_server(
-            configuration, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
-            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
-            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
+        configuration, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls), "threema-angular",
+        "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+        RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Set client fields
     client.name = "A";

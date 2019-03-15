@@ -7,9 +7,7 @@
  * Print debug information for an ICE candidate.
  */
 int rawrtc_peer_connection_ice_candidate_debug(
-        struct re_printf* const pf,
-        struct rawrtc_peer_connection_ice_candidate* const candidate
-) {
+    struct re_printf* const pf, struct rawrtc_peer_connection_ice_candidate* const candidate) {
     int err = 0;
 
     // Check arguments
@@ -31,7 +29,7 @@ int rawrtc_peer_connection_ice_candidate_debug(
     // Media line index
     err |= re_hprintf(pf, "    media_line_index=");
     if (candidate->media_line_index >= 0 && candidate->media_line_index <= UINT8_MAX) {
-        err |= re_hprintf(pf, "%"PRId16"\n", candidate->media_line_index);
+        err |= re_hprintf(pf, "%" PRId16 "\n", candidate->media_line_index);
     } else {
         err |= re_hprintf(pf, "n/a\n");
     }

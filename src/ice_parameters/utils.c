@@ -5,9 +5,7 @@
  * Print debug information for ICE parameters.
  */
 int rawrtc_ice_parameters_debug(
-        struct re_printf* const pf,
-        struct rawrtc_ice_parameters const* const parameters
-) {
+    struct re_printf* const pf, struct rawrtc_ice_parameters const* const parameters) {
     int err = 0;
 
     // Check arguments

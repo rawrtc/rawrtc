@@ -3,9 +3,7 @@
 /*
  * Get the corresponding name for a signaling state.
  */
-char const * rawrtc_signaling_state_to_name(
-        enum rawrtc_signaling_state const state
-) {
+char const* rawrtc_signaling_state_to_name(enum rawrtc_signaling_state const state) {
     switch (state) {
         case RAWRTC_SIGNALING_STATE_STABLE:
             return "stable";
@@ -27,9 +25,7 @@ char const * rawrtc_signaling_state_to_name(
 /*
  * Get the corresponding name for a peer connection state.
  */
-char const * rawrtc_peer_connection_state_to_name(
-        enum rawrtc_peer_connection_state const state
-) {
+char const* rawrtc_peer_connection_state_to_name(enum rawrtc_peer_connection_state const state) {
     switch (state) {
         case RAWRTC_PEER_CONNECTION_STATE_NEW:
             return "new";

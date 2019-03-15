@@ -5,9 +5,9 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <stdlib.h> // exit
-#include <string.h> // memcpy
-#include <unistd.h> // STDIN_FILENO
+#include <stdlib.h>  // exit
+#include <string.h>  // memcpy
+#include <unistd.h>  // STDIN_FILENO
 
 #define DEBUG_MODULE "sctp-redirect-transport-app"
 #define DEBUG_LEVEL 7
@@ -38,15 +38,12 @@ struct sctp_redirect_transport_client {
     struct parameters remote_parameters;
 };
 
-static void print_local_parameters(
-    struct sctp_redirect_transport_client *client
-);
+static void print_local_parameters(struct sctp_redirect_transport_client* client);
 
 static void ice_gatherer_local_candidate_handler(
-        struct rawrtc_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg
-) {
+    struct rawrtc_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    void* const arg) {
     struct sctp_redirect_transport_client* const client = arg;
 
     // Print local candidate
@@ -58,9 +55,7 @@ static void ice_gatherer_local_candidate_handler(
     }
 }
 
-static void client_init(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_init(struct sctp_redirect_transport_client* const client) {
     struct rawrtc_certificate* certificates[1];
 
     // Generate certificates
@@ -69,83 +64,67 @@ static void client_init(
 
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
-            &client->gatherer, client->gather_options,
-            default_ice_gatherer_state_change_handler, default_ice_gatherer_error_handler,
-            ice_gatherer_local_candidate_handler, client));
+        &client->gatherer, client->gather_options, default_ice_gatherer_state_change_handler,
+        default_ice_gatherer_error_handler, ice_gatherer_local_candidate_handler, client));
 
     // Create ICE transport
     EOE(rawrtc_ice_transport_create(
-            &client->ice_transport, client->gatherer,
-            default_ice_transport_state_change_handler,
-            default_ice_transport_candidate_pair_change_handler, client));
+        &client->ice_transport, client->gatherer, default_ice_transport_state_change_handler,
+        default_ice_transport_candidate_pair_change_handler, client));
 
     // Create DTLS transport
     EOE(rawrtc_dtls_transport_create(
-            &client->dtls_transport, client->ice_transport, certificates, ARRAY_SIZE(certificates),
-            default_dtls_transport_state_change_handler, default_dtls_transport_error_handler,
-            client));
+        &client->dtls_transport, client->ice_transport, certificates, ARRAY_SIZE(certificates),
+        default_dtls_transport_state_change_handler, default_dtls_transport_error_handler, client));
 
     // Create SCTP redirect transport
     EOE(rawrtc_sctp_redirect_transport_create(
-            &client->sctp_redirect_transport, client->dtls_transport,
-            0, client->redirect_ip, client->redirect_port,
-            default_sctp_redirect_transport_state_change_handler, client));
+        &client->sctp_redirect_transport, client->dtls_transport, 0, client->redirect_ip,
+        client->redirect_port, default_sctp_redirect_transport_state_change_handler, client));
 }
 
-static void client_start_gathering(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_start_gathering(struct sctp_redirect_transport_client* const client) {
     // Start gathering
     EOE(rawrtc_ice_gatherer_gather(client->gatherer, NULL));
 }
 
-static void client_set_parameters(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_set_parameters(struct sctp_redirect_transport_client* const client) {
     struct parameters* const remote_parameters = &client->remote_parameters;
 
     // Set remote ICE candidates
     EOE(rawrtc_ice_transport_set_remote_candidates(
-            client->ice_transport, remote_parameters->ice_candidates->candidates,
-            remote_parameters->ice_candidates->n_candidates));
+        client->ice_transport, remote_parameters->ice_candidates->candidates,
+        remote_parameters->ice_candidates->n_candidates));
 }
 
-static void client_start_transports(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_start_transports(struct sctp_redirect_transport_client* const client) {
     struct parameters* const remote_parameters = &client->remote_parameters;
 
     // Start ICE transport
     EOE(rawrtc_ice_transport_start(
-            client->ice_transport, client->gatherer, remote_parameters->ice_parameters,
-            client->role));
+        client->ice_transport, client->gatherer, remote_parameters->ice_parameters, client->role));
 
     // Start DTLS transport
-    EOE(rawrtc_dtls_transport_start(
-            client->dtls_transport, remote_parameters->dtls_parameters));
+    EOE(rawrtc_dtls_transport_start(client->dtls_transport, remote_parameters->dtls_parameters));
 
     // Start SCTP redirect transport
     EOE(rawrtc_sctp_redirect_transport_start(
-            client->sctp_redirect_transport, remote_parameters->sctp_parameters.capabilities,
-            remote_parameters->sctp_parameters.port));
+        client->sctp_redirect_transport, remote_parameters->sctp_parameters.capabilities,
+        remote_parameters->sctp_parameters.port));
 }
 
-static void parameters_destroy(
-        struct parameters* const parameters
-) {
+static void parameters_destroy(struct parameters* const parameters) {
     // Un-reference
     parameters->ice_parameters = mem_deref(parameters->ice_parameters);
     parameters->ice_candidates = mem_deref(parameters->ice_candidates);
     parameters->dtls_parameters = mem_deref(parameters->dtls_parameters);
     if (parameters->sctp_parameters.capabilities) {
         parameters->sctp_parameters.capabilities =
-                mem_deref(parameters->sctp_parameters.capabilities);
+            mem_deref(parameters->sctp_parameters.capabilities);
     }
 }
 
-static void client_stop(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_stop(struct sctp_redirect_transport_client* const client) {
     if (client->sctp_redirect_transport) {
         EOE(rawrtc_sctp_redirect_transport_stop(client->sctp_redirect_transport));
     }
@@ -173,10 +152,7 @@ static void client_stop(
     fd_close(STDIN_FILENO);
 }
 
-static void parse_remote_parameters(
-        int flags,
-        void* arg
-) {
+static void parse_remote_parameters(int flags, void* arg) {
     struct sctp_redirect_transport_client* const client = arg;
     enum rawrtc_code error;
     struct odict* dict = NULL;
@@ -238,31 +214,27 @@ out:
     }
 }
 
-static void client_get_parameters(
-        struct sctp_redirect_transport_client* const client
-) {
+static void client_get_parameters(struct sctp_redirect_transport_client* const client) {
     struct parameters* const local_parameters = &client->local_parameters;
 
     // Get local ICE parameters
     EOE(rawrtc_ice_gatherer_get_local_parameters(
-            &local_parameters->ice_parameters, client->gatherer));
+        &local_parameters->ice_parameters, client->gatherer));
 
     // Get local ICE candidates
     EOE(rawrtc_ice_gatherer_get_local_candidates(
-            &local_parameters->ice_candidates, client->gatherer));
+        &local_parameters->ice_candidates, client->gatherer));
 
     // Get local DTLS parameters
     EOE(rawrtc_dtls_transport_get_local_parameters(
-            &local_parameters->dtls_parameters, client->dtls_transport));
+        &local_parameters->dtls_parameters, client->dtls_transport));
 
     // Get redirected local SCTP port
     EOE(rawrtc_sctp_redirect_transport_get_port(
-            &local_parameters->sctp_parameters.port, client->sctp_redirect_transport));
+        &local_parameters->sctp_parameters.port, client->sctp_redirect_transport));
 }
 
-static void print_local_parameters(
-        struct sctp_redirect_transport_client *client
-) {
+static void print_local_parameters(struct sctp_redirect_transport_client* client) {
     struct odict* dict;
     struct odict* node;
 
@@ -287,7 +259,7 @@ static void print_local_parameters(
     mem_deref(node);
     EOR(odict_alloc(&node, 16));
     set_sctp_redirect_parameters(
-            client->sctp_redirect_transport, &client->local_parameters.sctp_parameters, node);
+        client->sctp_redirect_transport, &client->local_parameters.sctp_parameters, node);
     EOR(odict_entry_add(dict, "sctpParameters", ODICT_OBJECT, node));
     mem_deref(node);
 
@@ -299,8 +271,10 @@ static void print_local_parameters(
 }
 
 static void exit_with_usage(char* program) {
-    DEBUG_WARNING("Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port> [<sctp-port>] "
-                  "[<maximum-message-size>] [<ice-candidate-type> ...]", program);
+    DEBUG_WARNING(
+        "Usage: %s <0|1 (ice-role)> <redirect-ip> <redirect-port> [<sctp-port>] "
+        "[<maximum-message-size>] [<ice-candidate-type> ...]",
+        program);
     exit(1);
 }
 
@@ -315,7 +289,8 @@ int main(int argc, char* argv[argc + 1]) {
                                           "stun:stun1.l.google.com:19302"};
     char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct sctp_redirect_transport_client client = {0};
-    (void) client.ice_candidate_types; (void) client.n_ice_candidate_types;
+    (void) client.ice_candidate_types;
+    (void) client.n_ice_candidate_types;
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
@@ -359,19 +334,19 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Create local SCTP capabilities
     rawrtc_sctp_capabilities_create(
-            &client.local_parameters.sctp_parameters.capabilities, maximum_message_size);
+        &client.local_parameters.sctp_parameters.capabilities, maximum_message_size);
 
     // Create ICE gather options
     EOE(rawrtc_ice_gather_options_create(&gather_options, RAWRTC_ICE_GATHER_POLICY_ALL));
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls), NULL, NULL,
+        RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
-            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
-            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
+        gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls), "threema-angular",
+        "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+        RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Set client fields
     client.name = "A";

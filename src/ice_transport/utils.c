@@ -7,9 +7,7 @@
 /*
  * Get the corresponding name for an ICE transport state.
  */
-char const * rawrtc_ice_transport_state_to_name(
-        enum rawrtc_ice_transport_state const state
-) {
+char const* rawrtc_ice_transport_state_to_name(enum rawrtc_ice_transport_state const state) {
     switch (state) {
         case RAWRTC_ICE_TRANSPORT_STATE_NEW:
             return "new";
@@ -35,7 +33,7 @@ static enum rawrtc_ice_role const map_enum_ice_role[] = {
     RAWRTC_ICE_ROLE_CONTROLLED,
 };
 
-static char const * const map_str_ice_role[] = {
+static char const* const map_str_ice_role[] = {
     "controlling",
     "controlled",
 };
@@ -45,9 +43,7 @@ static size_t const map_ice_role_length = ARRAY_SIZE(map_enum_ice_role);
 /*
  * Translate an ICE role to str.
  */
-char const * rawrtc_ice_role_to_str(
-        enum rawrtc_ice_role const role
-) {
+char const* rawrtc_ice_role_to_str(enum rawrtc_ice_role const role) {
     size_t i;
 
     for (i = 0; i < map_ice_role_length; ++i) {
@@ -63,9 +59,8 @@ char const * rawrtc_ice_role_to_str(
  * Translate a str to an ICE role (case-insensitive).
  */
 enum rawrtc_code rawrtc_str_to_ice_role(
-        enum rawrtc_ice_role* const rolep, // de-referenced
-        char const* const str
-) {
+    enum rawrtc_ice_role* const rolep,  // de-referenced
+    char const* const str) {
     size_t i;
 
     // Check arguments
@@ -86,9 +81,7 @@ enum rawrtc_code rawrtc_str_to_ice_role(
 /*
  * Translate an ICE role to the corresponding re type.
  */
-enum ice_role rawrtc_ice_role_to_re_ice_role(
-        enum rawrtc_ice_role const role
-) {
+enum ice_role rawrtc_ice_role_to_re_ice_role(enum rawrtc_ice_role const role) {
     // No conversion needed
     return (enum ice_role) role;
 }
@@ -97,9 +90,8 @@ enum ice_role rawrtc_ice_role_to_re_ice_role(
  * Translate a re ICE role to the corresponding rawrtc role.
  */
 enum rawrtc_code rawrtc_re_ice_role_to_ice_role(
-        enum rawrtc_ice_role* const rolep, // de-referenced
-        enum ice_role const re_role
-) {
+    enum rawrtc_ice_role* const rolep,  // de-referenced
+    enum ice_role const re_role) {
     // Check arguments
     if (!rolep) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

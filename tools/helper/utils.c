@@ -4,9 +4,9 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <limits.h> // ULONG_MAX
-#include <stdlib.h> // strto*
-#include <string.h> // strlen
+#include <limits.h>  // ULONG_MAX
+#include <stdlib.h>  // strto*
+#include <string.h>  // strlen
 
 #define DEBUG_MODULE "helper-utils"
 #define DEBUG_LEVEL 7
@@ -15,10 +15,7 @@
 /*
  * Convert string to uint16.
  */
-bool str_to_uint16(
-        uint16_t* const numberp,
-        char* const str
-) {
+bool str_to_uint16(uint16_t* const numberp, char* const str) {
     char* end;
     unsigned long number = strtoul(str, &end, 10);
 
@@ -42,10 +39,7 @@ bool str_to_uint16(
 /*
  * Convert string to uint64.
  */
-bool str_to_uint64(
-        uint64_t* const numberp,
-        char* const str
-) {
+bool str_to_uint64(uint64_t* const numberp, char* const str) {
     char* end;
     unsigned long long number = strtoull(str, &end, 10);
 
@@ -70,13 +64,12 @@ bool str_to_uint64(
  * Get a dictionary entry and store it in `*valuep`.
  */
 enum rawrtc_code dict_get_entry(
-        void* const valuep,
-        struct odict* const parent,
-        char* const key,
-        enum odict_type const type,
-        bool required
-) {
-    struct odict_entry const * entry;
+    void* const valuep,
+    struct odict* const parent,
+    char* const key,
+    enum odict_type const type,
+    bool required) {
+    struct odict_entry const* entry;
 
     // Check arguments
     if (!valuep || !parent || !key) {
@@ -106,7 +99,7 @@ enum rawrtc_code dict_get_entry(
     switch (type) {
         case ODICT_OBJECT:
         case ODICT_ARRAY:
-            *((struct odict** const) valuep) = entry->u.odict;
+            *((struct odict * * const) valuep) = entry->u.odict;
             break;
         case ODICT_STRING:
             *((char** const) valuep) = entry->u.str;
@@ -121,7 +114,7 @@ enum rawrtc_code dict_get_entry(
             *((bool* const) valuep) = entry->u.boolean;
             break;
         case ODICT_NULL:
-            *((char** const) valuep) = NULL; // meh!
+            *((char** const) valuep) = NULL;  // meh!
             break;
         default:
             return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -135,11 +128,7 @@ enum rawrtc_code dict_get_entry(
  * Get a uint32 entry and store it in `*valuep`.
  */
 enum rawrtc_code dict_get_uint32(
-        uint32_t* const valuep,
-        struct odict* const parent,
-        char* const key,
-        bool required
-) {
+    uint32_t* const valuep, struct odict* const parent, char* const key, bool required) {
     enum rawrtc_code error;
     int64_t value;
 
@@ -168,11 +157,7 @@ enum rawrtc_code dict_get_uint32(
  * Get a uint16 entry and store it in `*valuep`.
  */
 enum rawrtc_code dict_get_uint16(
-        uint16_t* const valuep,
-        struct odict* const parent,
-        char* const key,
-        bool required
-) {
+    uint16_t* const valuep, struct odict* const parent, char* const key, bool required) {
     enum rawrtc_code error;
     int64_t value;
 
@@ -200,8 +185,7 @@ enum rawrtc_code dict_get_uint16(
 /*
  * Get JSON from stdin and parse it to a dictionary.
  */
-enum rawrtc_code get_json_stdin(
-        struct odict** const dictp // de-referenced
+enum rawrtc_code get_json_stdin(struct odict** const dictp  // de-referenced
 ) {
     char buffer[PARAMETERS_MAX_LENGTH];
     size_t length;
@@ -226,9 +210,8 @@ enum rawrtc_code get_json_stdin(
  * Get the ICE role from a string.
  */
 enum rawrtc_code get_ice_role(
-        enum rawrtc_ice_role* const rolep, // de-referenced
-        char const* const str
-) {
+    enum rawrtc_ice_role* const rolep,  // de-referenced
+    char const* const str) {
     // Get ICE role
     switch (str[0]) {
         case '0':
@@ -242,9 +225,7 @@ enum rawrtc_code get_ice_role(
     }
 }
 
-static void data_channel_helper_destroy(
-        void* arg
-) {
+static void data_channel_helper_destroy(void* arg) {
     struct data_channel_helper* const channel = arg;
 
     // Unset handler argument & handlers of the channel
@@ -265,13 +246,12 @@ static void data_channel_helper_destroy(
  * Create a data channel helper instance.
  */
 void data_channel_helper_create(
-        struct data_channel_helper** const channel_helperp, // de-referenced
-        struct client* const client,
-        char* const label
-) {
+    struct data_channel_helper** const channel_helperp,  // de-referenced
+    struct client* const client,
+    char* const label) {
     // Allocate
     struct data_channel_helper* const channel =
-            mem_zalloc(sizeof(*channel), data_channel_helper_destroy);
+        mem_zalloc(sizeof(*channel), data_channel_helper_destroy);
     if (!channel) {
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
@@ -289,10 +269,10 @@ void data_channel_helper_create(
  * Create a data channel helper instance from parameters.
  */
 void data_channel_helper_create_from_channel(
-        struct data_channel_helper** const channel_helperp, // de-referenced
-        struct rawrtc_data_channel* channel,
-        struct client* const client,
-        void* const arg // nullable
+    struct data_channel_helper** const channel_helperp,  // de-referenced
+    struct rawrtc_data_channel* channel,
+    struct client* const client,
+    void* const arg  // nullable
 ) {
     enum rawrtc_code error;
     struct rawrtc_data_channel_parameters* parameters;
@@ -300,7 +280,7 @@ void data_channel_helper_create_from_channel(
 
     // Allocate
     struct data_channel_helper* const channel_helper =
-            mem_zalloc(sizeof(*channel_helper), data_channel_helper_destroy);
+        mem_zalloc(sizeof(*channel_helper), data_channel_helper_destroy);
     if (!channel_helper) {
         EOE(RAWRTC_CODE_NO_MEMORY);
         return;
@@ -340,10 +320,9 @@ void data_channel_helper_create_from_channel(
  * candidate type is enabled.
  */
 void add_to_other_if_ice_candidate_type_enabled(
-        struct client* const client,
-        struct rawrtc_ice_candidate* const candidate,
-        struct rawrtc_ice_transport* const transport
-) {
+    struct client* const client,
+    struct rawrtc_ice_candidate* const candidate,
+    struct rawrtc_ice_transport* const transport) {
     if (candidate) {
         enum rawrtc_ice_candidate_type type;
 

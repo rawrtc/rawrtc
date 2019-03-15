@@ -7,9 +7,7 @@
 /*
  * Destructor for an existing ICE gather options instance.
  */
-static void rawrtc_ice_gather_options_destroy(
-        void* arg
-) {
+static void rawrtc_ice_gather_options_destroy(void* arg) {
     struct rawrtc_ice_gather_options* const options = arg;
 
     // Un-reference
@@ -21,9 +19,8 @@ static void rawrtc_ice_gather_options_destroy(
  * `*optionsp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_gather_options_create(
-        struct rawrtc_ice_gather_options** const optionsp, // de-referenced
-        enum rawrtc_ice_gather_policy const gather_policy
-) {
+    struct rawrtc_ice_gather_options** const optionsp,  // de-referenced
+    enum rawrtc_ice_gather_policy const gather_policy) {
     struct rawrtc_ice_gather_options* options;
 
     // Check arguments
@@ -50,9 +47,7 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
  * Add an ICE server instance to the gather options.
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server_internal(
-        struct rawrtc_ice_gather_options* const options,
-        struct rawrtc_ice_server* const server
-) {
+    struct rawrtc_ice_gather_options* const options, struct rawrtc_ice_server* const server) {
     // Check arguments
     if (!options || !server) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -67,13 +62,12 @@ enum rawrtc_code rawrtc_ice_gather_options_add_server_internal(
  * Add an ICE server to the gather options.
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(
-        struct rawrtc_ice_gather_options* const options,
-        char* const * const urls, // copied
-        size_t const n_urls,
-        char* const username, // nullable, copied
-        char* const credential, // nullable, copied
-        enum rawrtc_ice_credential_type const credential_type
-) {
+    struct rawrtc_ice_gather_options* const options,
+    char* const* const urls,  // copied
+    size_t const n_urls,
+    char* const username,  // nullable, copied
+    char* const credential,  // nullable, copied
+    enum rawrtc_ice_credential_type const credential_type) {
     struct rawrtc_ice_server* server;
     enum rawrtc_code error;
 

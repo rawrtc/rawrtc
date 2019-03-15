@@ -18,8 +18,8 @@
  * Pass DTLS application data to the SCTP transport as inbound data.
  */
 static void sctp_transport_inbound_handler(
-        struct mbuf* const buffer, // not checked
-        void* const arg // not checked
+    struct mbuf* const buffer,  // not checked
+    void* const arg  // not checked
 ) {
     struct rawrtc_sctp_transport* const transport = arg;
 
@@ -27,17 +27,15 @@ static void sctp_transport_inbound_handler(
     // TODO: What about ECN bits?
     enum rawrtc_code const error = rawrtc_sctp_transport_feed_inbound(transport, buffer, 0x00);
     if (error) {
-        DEBUG_WARNING("Unable to feed data into the SCTP transport, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Unable to feed data into the SCTP transport, reason: %s\n", rawrtc_code_to_str(error));
     }
 }
 
 /*
  * Destructor for an existing SCTP transport.
  */
-static void rawrtc_sctp_transport_destroy(
-        void* const arg
-) {
+static void rawrtc_sctp_transport_destroy(void* const arg) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
 
     // Un-reference
@@ -49,12 +47,12 @@ static void rawrtc_sctp_transport_destroy(
  * `*transportp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_sctp_transport_create(
-        struct rawrtc_sctp_transport** const transportp, // de-referenced
-        struct rawrtc_dtls_transport* const dtls_transport, // referenced
-        uint16_t const port, // zeroable
-        rawrtc_data_channel_handler const data_channel_handler, // nullable
-        rawrtc_sctp_transport_state_change_handler const state_change_handler, // nullable
-        void* const arg // nullable
+    struct rawrtc_sctp_transport** const transportp,  // de-referenced
+    struct rawrtc_dtls_transport* const dtls_transport,  // referenced
+    uint16_t const port,  // zeroable
+    rawrtc_data_channel_handler const data_channel_handler,  // nullable
+    rawrtc_sctp_transport_state_change_handler const state_change_handler,  // nullable
+    void* const arg  // nullable
 ) {
     enum rawrtc_code error;
     bool have_data_transport;
@@ -67,7 +65,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
         .outbound_handler = rawrtc_sctp_common_sctp_transport_outbound_handler,
         .detach_handler = rawrtc_sctp_common_sctp_transport_detach_handler,
         .destroyed_handler = rawrtc_sctp_transport_destroy,
-        .trace_packets = false, // TODO: Make this configurable
+        .trace_packets = false,  // TODO: Make this configurable
         .arg = mem_ref(dtls_transport),
     };
 
@@ -83,7 +81,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
 
     // Create SCTP transport
     error = rawrtc_sctp_transport_create_from_external(
-            &transport, &context, port, data_channel_handler, state_change_handler, arg);
+        &transport, &context, port, data_channel_handler, state_change_handler, arg);
     if (error) {
         goto out;
     }
@@ -93,7 +91,7 @@ enum rawrtc_code rawrtc_sctp_transport_create(
     // Attach to DTLS transport
     DEBUG_PRINTF("Attaching as data transport\n");
     error = rawrtc_dtls_transport_set_data_transport(
-            dtls_transport, sctp_transport_inbound_handler, transport);
+        dtls_transport, sctp_transport_inbound_handler, transport);
     if (error) {
         goto out;
     }

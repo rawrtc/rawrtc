@@ -19,7 +19,7 @@
 #include <rawrtcdc/sctp_capabilities.h>
 #include <rawrtcdc/sctp_transport.h>
 #include <re.h>
-#include <string.h> // strlen
+#include <string.h>  // strlen
 
 #define DEBUG_MODULE "peer-connection-description"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -28,13 +28,13 @@
 // Constants
 static uint16_t const discard_port = 9;
 static char const sdp_application_dtls_sctp_regex[] = "application [0-9]+ [^ ]+";
-static char const * const sdp_application_dtls_sctp_variants[] = {
+static char const* const sdp_application_dtls_sctp_variants[] = {
     "DTLS/SCTP",
     "UDP/DTLS/SCTP",
     "TCP/DTLS/SCTP",
 };
 static size_t const sdp_application_dtls_sctp_variants_length =
-        ARRAY_SIZE(sdp_application_dtls_sctp_variants);
+    ARRAY_SIZE(sdp_application_dtls_sctp_variants);
 static char const sdp_group_regex[] = "group:BUNDLE [^]+";
 static char const sdp_mid_regex[] = "mid:[^]+";
 static char const sdp_ice_options_trickle[] = "ice-options:trickle";
@@ -47,13 +47,12 @@ static enum rawrtc_dtls_role const map_enum_dtls_role[] = {
     RAWRTC_DTLS_ROLE_CLIENT,
     RAWRTC_DTLS_ROLE_SERVER,
 };
-static char const * const map_str_dtls_role[] = {
+static char const* const map_str_dtls_role[] = {
     "actpass",
     "active",
     "passive",
 };
-static size_t const map_dtls_role_length =
-        ARRAY_SIZE(map_enum_dtls_role);
+static size_t const map_dtls_role_length = ARRAY_SIZE(map_enum_dtls_role);
 static char const sdp_dtls_fingerprint_regex[] = "fingerprint:[^ ]+ [^]+";
 static char const sdp_sctp_port_sctmap_regex[] = "sctpmap:[0-9]+[^]*";
 static char const sdp_sctp_port_regex[] = "sctp-port:[0-9]+";
@@ -72,16 +71,15 @@ struct candidate_line {
  * Set session boilerplate
  */
 static enum rawrtc_code set_session_boilerplate(
-        struct mbuf* const sdp, // not checked
-        char const* const version, // not checked
-        uint32_t const id
-) {
+    struct mbuf* const sdp,  // not checked
+    char const* const version,  // not checked
+    uint32_t const id) {
     int err;
 
     // Write session boilerplate
     err = mbuf_write_str(sdp, "v=0\r\n");
-    err |= mbuf_printf(
-            sdp, "o=sdpartanic-rawrtc-%s %"PRIu32" 1 IN IP4 127.0.0.1\r\n", version, id);
+    err |=
+        mbuf_printf(sdp, "o=sdpartanic-rawrtc-%s %" PRIu32 " 1 IN IP4 127.0.0.1\r\n", version, id);
     err |= mbuf_write_str(sdp, "s=-\r\n");
     err |= mbuf_write_str(sdp, "t=0 0\r\n");
 
@@ -93,10 +91,9 @@ static enum rawrtc_code set_session_boilerplate(
  * Set session attributes on SDP.
  */
 static enum rawrtc_code set_session_attributes(
-        struct mbuf* const sdp, // not checked
-        bool const trickle_ice,
-        char const* const bundled_mids
-) {
+    struct mbuf* const sdp,  // not checked
+    bool const trickle_ice,
+    char const* const bundled_mids) {
     int err = 0;
 
     // Trickle ICE
@@ -119,9 +116,9 @@ static enum rawrtc_code set_session_attributes(
  * Get general attributes from an SDP line.
  */
 static enum rawrtc_code get_general_attributes(
-        char** const bundled_midsp, // de-referenced, not checked
-        char** const midp, // de-referenced, not checked
-        struct pl* const line // not checked
+    char** const bundled_midsp,  // de-referenced, not checked
+    char** const midp,  // de-referenced, not checked
+    struct pl* const line  // not checked
 ) {
     enum rawrtc_code error;
     struct pl value;
@@ -161,8 +158,8 @@ static enum rawrtc_code get_general_attributes(
  * Add ICE attributes to SDP media line.
  */
 static enum rawrtc_code add_ice_attributes(
-        struct mbuf* const sdp, // not checked
-        struct rawrtc_peer_connection_context* const context // not checked
+    struct mbuf* const sdp,  // not checked
+    struct rawrtc_peer_connection_context* const context  // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_ice_parameters* parameters;
@@ -199,11 +196,11 @@ out:
  * Get ICE attributes from SDP line.
  */
 static enum rawrtc_code get_ice_attributes(
-        bool* const trickle_icep, // de-referenced, not checked
-        char** const username_fragmentp, // de-referenced, not checked
-        char** const passwordp, // de-referenced, not checked
-        bool* const ice_litep, // de-referenced, not checked
-        struct pl* const line // not checked
+    bool* const trickle_icep,  // de-referenced, not checked
+    char** const username_fragmentp,  // de-referenced, not checked
+    char** const passwordp,  // de-referenced, not checked
+    bool* const ice_litep,  // de-referenced, not checked
+    struct pl* const line  // not checked
 ) {
     struct pl value;
 
@@ -237,8 +234,8 @@ static enum rawrtc_code get_ice_attributes(
  * Add DTLS fingerprint attributes to SDP media line.
  */
 static enum rawrtc_code add_dtls_fingerprint_attributes(
-        struct mbuf* const sdp, // not checked
-        struct rawrtc_dtls_parameters* const parameters // not checked
+    struct mbuf* const sdp,  // not checked
+    struct rawrtc_dtls_parameters* const parameters  // not checked
 ) {
     enum rawrtc_code error;
     struct rawrtc_dtls_fingerprints* fingerprints;
@@ -270,8 +267,8 @@ static enum rawrtc_code add_dtls_fingerprint_attributes(
 
         // Add fingerprint attribute
         error = rawrtc_error_to_code(mbuf_printf(
-                sdp, "a=fingerprint:%s %s\r\n",
-                rawrtc_certificate_sign_algorithm_to_str(sign_algorithm), value));
+            sdp, "a=fingerprint:%s %s\r\n",
+            rawrtc_certificate_sign_algorithm_to_str(sign_algorithm), value));
         if (error) {
             goto out;
         }
@@ -291,8 +288,8 @@ out:
  * Get DTLS fingerprint attribute from an SDP line.
  */
 static enum rawrtc_code get_dtls_fingerprint_attributes(
-        struct rawrtc_dtls_fingerprint** const fingerprintp, // de-referenced, not checked
-        struct pl* const line // not checked
+    struct rawrtc_dtls_fingerprint** const fingerprintp,  // de-referenced, not checked
+    struct pl* const line  // not checked
 ) {
     struct pl algorithm_pl;
     struct pl value_pl;
@@ -343,10 +340,9 @@ out:
  * Add DTLS transport attributes to SDP media line.
  */
 static enum rawrtc_code add_dtls_attributes(
-        struct mbuf* const sdp, // not checked
-        struct rawrtc_peer_connection_context* const context, // not checked
-        bool const offering
-) {
+    struct mbuf* const sdp,  // not checked
+    struct rawrtc_peer_connection_context* const context,  // not checked
+    bool const offering) {
     enum rawrtc_code error;
     struct rawrtc_dtls_parameters* parameters;
     enum rawrtc_dtls_role role;
@@ -410,9 +406,9 @@ out:
  * Get DTLS transport attribute from an SDP line.
  */
 static enum rawrtc_code get_dtls_attributes(
-        enum rawrtc_dtls_role* const rolep, // de-referenced, not checked
-        struct list* const fingerprints, // not checked
-        struct pl* const line // not checked
+    enum rawrtc_dtls_role* const rolep,  // de-referenced, not checked
+    struct list* const fingerprints,  // not checked
+    struct pl* const line  // not checked
 ) {
     enum rawrtc_code error;
     struct pl role_pl;
@@ -441,14 +437,13 @@ static enum rawrtc_code get_dtls_attributes(
  * Add SCTP transport attributes to SDP session.
  */
 static enum rawrtc_code add_sctp_attributes(
-        struct mbuf* const sdp, // not checked
-        struct rawrtc_sctp_transport* const transport, // not checked
-        struct rawrtc_peer_connection_context* const context, // not checked
-        bool const offering,
-        char const* const remote_media_line,
-        char const* const mid,
-        bool const sctp_sdp_05
-) {
+    struct mbuf* const sdp,  // not checked
+    struct rawrtc_sctp_transport* const transport,  // not checked
+    struct rawrtc_peer_connection_context* const context,  // not checked
+    bool const offering,
+    char const* const remote_media_line,
+    char const* const mid,
+    bool const sctp_sdp_05) {
     enum rawrtc_code error;
     uint16_t sctp_port;
     uint16_t sctp_n_streams;
@@ -476,12 +471,12 @@ static enum rawrtc_code add_sctp_attributes(
             //       candidates.
             // See also: https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-25#section-12.2
             err = mbuf_printf(
-                    sdp, "m=application %"PRIu16" UDP/DTLS/SCTP webrtc-datachannel\r\n",
-                    discard_port);
+                sdp, "m=application %" PRIu16 " UDP/DTLS/SCTP webrtc-datachannel\r\n",
+                discard_port);
         } else {
             err = mbuf_printf(
-                    sdp, "m=application %"PRIu16" DTLS/SCTP %"PRIu16"\r\n",
-                    discard_port, sctp_port);
+                sdp, "m=application %" PRIu16 " DTLS/SCTP %" PRIu16 "\r\n", discard_port,
+                sctp_port);
         }
     }
     // Add dummy 'c'-line
@@ -512,12 +507,12 @@ static enum rawrtc_code add_sctp_attributes(
     if (!sctp_sdp_05) {
         // Set SCTP port
         // Note: Last time I checked, Chrome wasn't able to cope with this
-        err = mbuf_printf(sdp, "a=sctp-port:%"PRIu16"\r\n", sctp_port);
+        err = mbuf_printf(sdp, "a=sctp-port:%" PRIu16 "\r\n", sctp_port);
     } else {
         // Set SCTP port, upper layer protocol and number of streams
         err = mbuf_printf(
-                sdp, "a=sctpmap:%"PRIu16" webrtc-datachannel %"PRIu16"\r\n",
-                sctp_port, sctp_n_streams);
+            sdp, "a=sctpmap:%" PRIu16 " webrtc-datachannel %" PRIu16 "\r\n", sctp_port,
+            sctp_n_streams);
     }
     if (err) {
         return rawrtc_error_to_code(err);
@@ -540,22 +535,22 @@ static enum rawrtc_code add_sctp_attributes(
  * Get SCTP transport attributes from an SDP line.
  */
 static enum rawrtc_code get_sctp_attributes(
-        uint16_t* const portp, // de-referenced, not checked
-        uint64_t* const max_message_sizep, // de-referenced, not checked
-        struct pl* const line // not checked
+    uint16_t* const portp,  // de-referenced, not checked
+    uint64_t* const max_message_sizep,  // de-referenced, not checked
+    struct pl* const line  // not checked
 ) {
     struct pl port_pl;
     uint32_t port;
     struct pl max_message_size_pl;
 
     // SCTP port (from 'sctpmap' or 'sctp-port')
-    if (!re_regex(line->p, line->l, sdp_sctp_port_sctmap_regex, &port_pl, NULL)
-        || !re_regex(line->p, line->l, sdp_sctp_port_regex, &port_pl)) {
+    if (!re_regex(line->p, line->l, sdp_sctp_port_sctmap_regex, &port_pl, NULL) ||
+        !re_regex(line->p, line->l, sdp_sctp_port_regex, &port_pl)) {
         port = pl_u32(&port_pl);
 
         // Validate port
         if (port == 0 || port > UINT16_MAX) {
-            DEBUG_WARNING("Invalid SCTP port: %"PRIu32"\n", port);
+            DEBUG_WARNING("Invalid SCTP port: %" PRIu32 "\n", port);
             return RAWRTC_CODE_INVALID_ARGUMENT;
         }
 
@@ -580,9 +575,9 @@ static enum rawrtc_code get_sctp_attributes(
  * Get an ICE candidate from the description.
  */
 static enum rawrtc_code get_ice_candidate_attributes(
-        struct list* const candidate_lines, // not checked
-        bool* const end_of_candidatesp, // de-referenced, not checked
-        struct pl* const line // not checked
+    struct list* const candidate_lines,  // not checked
+    bool* const end_of_candidatesp,  // de-referenced, not checked
+    struct pl* const line  // not checked
 ) {
     bool add_candidate_line = false;
     struct pl* use_line = NULL;
@@ -590,8 +585,8 @@ static enum rawrtc_code get_ice_candidate_attributes(
     // ICE candidate
     if (line->l >= sdp_ice_candidate_head_length) {
         struct pl candidate_pl = {
-                .p = line->p,
-                .l = sdp_ice_candidate_head_length - 1,
+            .p = line->p,
+            .l = sdp_ice_candidate_head_length - 1,
         };
         if (pl_strcmp(&candidate_pl, sdp_ice_candidate_head) == 0) {
             add_candidate_line = true;
@@ -632,9 +627,7 @@ static enum rawrtc_code get_ice_candidate_attributes(
 /*
  * Destructor for an existing peer connection description.
  */
-static void rawrtc_peer_connection_description_destroy(
-        void* arg
-) {
+static void rawrtc_peer_connection_description_destroy(void* arg) {
     struct rawrtc_peer_connection_description* const description = arg;
 
     // Un-reference
@@ -653,10 +646,9 @@ static void rawrtc_peer_connection_description_destroy(
  * Create a description by creating an offer or answer.
  */
 enum rawrtc_code rawrtc_peer_connection_description_create_internal(
-        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        struct rawrtc_peer_connection* const connection,
-        bool const offering
-) {
+    struct rawrtc_peer_connection_description** const descriptionp,  // de-referenced
+    struct rawrtc_peer_connection* const connection,
+    bool const offering) {
     struct rawrtc_peer_connection_context* context;
     struct rawrtc_peer_connection_description* remote_description;
     struct rawrtc_peer_connection_description* local_description;
@@ -687,24 +679,24 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
     }
 
     // Allocate
-    local_description = mem_zalloc(
-            sizeof(*local_description), rawrtc_peer_connection_description_destroy);
+    local_description =
+        mem_zalloc(sizeof(*local_description), rawrtc_peer_connection_description_destroy);
     if (!local_description) {
         return RAWRTC_CODE_NO_MEMORY;
     }
 
     // Set initial values
-    local_description->connection = mem_ref(connection); // Warning: Circular reference
+    local_description->connection = mem_ref(connection);  // Warning: Circular reference
     local_description->end_of_candidates = false;
     if (offering) {
         local_description->type = RAWRTC_SDP_TYPE_OFFER;
         local_description->trickle_ice = true;
-        error = rawrtc_strdup(
-                &local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
+        error =
+            rawrtc_strdup(&local_description->bundled_mids, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
         if (error) {
             goto out;
         }
-        local_description->media_line_index = 0; // Since we only support one media line...
+        local_description->media_line_index = 0;  // Since we only support one media line...
         error = rawrtc_strdup(&local_description->mid, RAWRTC_PEER_CONNECTION_DESCRIPTION_MID);
         if (error) {
             goto out;
@@ -735,14 +727,14 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
 
     // Set session attributes
     error = set_session_attributes(
-            sdp, local_description->trickle_ice, local_description->bundled_mids);
+        sdp, local_description->trickle_ice, local_description->bundled_mids);
     if (error) {
         goto out;
     }
 
     // Get data transport
     error = rawrtc_data_transport_get_transport(
-            &data_transport_type, &data_transport, context->data_transport);
+        &data_transport_type, &data_transport, context->data_transport);
     if (error) {
         return error;
     }
@@ -752,8 +744,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP:
             // Add SCTP transport
             error = add_sctp_attributes(
-                    sdp, data_transport, context, offering, local_description->remote_media_line,
-                    local_description->mid, local_description->sctp_sdp_05);
+                sdp, data_transport, context, offering, local_description->remote_media_line,
+                local_description->mid, local_description->sctp_sdp_05);
             if (error) {
                 goto out;
             }
@@ -768,8 +760,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create_internal(
 
     // Debug
     DEBUG_PRINTF(
-            "Description (internal):\n%H\n",
-            rawrtc_peer_connection_description_debug, local_description);
+        "Description (internal):\n%H\n", rawrtc_peer_connection_description_debug,
+        local_description);
 
 out:
     mem_deref(data_transport);
@@ -787,8 +779,8 @@ out:
  * Add an ICE candidate to the description.
  */
 enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
-        struct rawrtc_peer_connection_description* const description,
-        struct rawrtc_peer_connection_ice_candidate* const candidate // nullable
+    struct rawrtc_peer_connection_description* const description,
+    struct rawrtc_peer_connection_ice_candidate* const candidate  // nullable
 ) {
     enum rawrtc_code error;
 
@@ -821,11 +813,10 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
 
         // Write candidate to SDP
         // Note: We only have one media line, so it should be fine to append this to the end
-        error = rawrtc_error_to_code(mbuf_printf(
-                description->sdp, "a=%s\r\n", candidate_sdp));
+        error = rawrtc_error_to_code(mbuf_printf(description->sdp, "a=%s\r\n", candidate_sdp));
         if (error) {
-            DEBUG_WARNING("Couldn't write candidate to description, reason: %s\n",
-                          rawrtc_code_to_str(error));
+            DEBUG_WARNING(
+                "Couldn't write candidate to description, reason: %s\n", rawrtc_code_to_str(error));
             mem_deref(candidate_sdp);
             return error;
         }
@@ -849,8 +840,8 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
 
         // Debug
         DEBUG_PRINTF(
-                "Description (end-of-candidates):\n%H\n",
-                rawrtc_peer_connection_description_debug, description);
+            "Description (end-of-candidates):\n%H\n", rawrtc_peer_connection_description_debug,
+            description);
     }
 
     // Done
@@ -858,24 +849,23 @@ enum rawrtc_code rawrtc_peer_connection_description_add_candidate(
 }
 
 // Helper for parsing SDP attributes
-#define HANDLE_ATTRIBUTE(code)\
-error = code;\
-if (error == RAWRTC_CODE_SUCCESS) {\
-    break;\
-} else if (error != RAWRTC_CODE_NO_VALUE) {\
-    goto out;\
-    break;\
-}\
+#define HANDLE_ATTRIBUTE(code) \
+    error = code; \
+    if (error == RAWRTC_CODE_SUCCESS) { \
+        break; \
+    } else if (error != RAWRTC_CODE_NO_VALUE) { \
+        goto out; \
+        break; \
+    }
 
 /*
  * Create a description by parsing it from SDP.
  * `*descriptionp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_peer_connection_description_create(
-        struct rawrtc_peer_connection_description** const descriptionp, // de-referenced
-        enum rawrtc_sdp_type const type,
-        char const* const sdp
-) {
+    struct rawrtc_peer_connection_description** const descriptionp,  // de-referenced
+    enum rawrtc_sdp_type const type,
+    char const* const sdp) {
     enum rawrtc_code error;
     struct rawrtc_peer_connection_description* remote_description;
     char const* cursor;
@@ -910,8 +900,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     }
 
     // Allocate
-    remote_description = mem_zalloc(
-            sizeof(*remote_description), rawrtc_peer_connection_description_destroy);
+    remote_description =
+        mem_zalloc(sizeof(*remote_description), rawrtc_peer_connection_description_destroy);
     if (!remote_description) {
         return RAWRTC_CODE_NO_MEMORY;
     }
@@ -919,7 +909,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     // Set fields to initial values
     remote_description->type = type;
     remote_description->trickle_ice = false;
-    remote_description->media_line_index = 0; // Since we only support one media line...
+    remote_description->media_line_index = 0;  // Since we only support one media line...
     remote_description->sctp_sdp_05 = true;
     list_init(&remote_description->ice_candidates);
     remote_description->sctp_port = RAWRTC_PEER_CONNECTION_DESCRIPTION_DEFAULT_SCTP_PORT;
@@ -937,9 +927,9 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         }
 
         // Find next line or end of string
-        for (line.p = cursor, line.l = 0;
-             *cursor != '\r' && *cursor != '\n' && *cursor != '\0';
-             ++cursor, ++line.l) {}
+        for (line.p = cursor, line.l = 0; *cursor != '\r' && *cursor != '\n' && *cursor != '\0';
+             ++cursor, ++line.l) {
+        }
 
         // Get line type and move line cursor to value
         if (line.l < 2) {
@@ -961,16 +951,15 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                 // * if the function returns anything else (which indicates an error), set 'error'
                 //   and jump to 'out'.
                 HANDLE_ATTRIBUTE(get_general_attributes(
-                        &remote_description->bundled_mids, &remote_description->mid, &line));
+                    &remote_description->bundled_mids, &remote_description->mid, &line));
                 HANDLE_ATTRIBUTE(get_ice_attributes(
-                        &remote_description->trickle_ice, &ice_username_fragment, &ice_password,
-                        &ice_lite, &line));
+                    &remote_description->trickle_ice, &ice_username_fragment, &ice_password,
+                    &ice_lite, &line));
                 HANDLE_ATTRIBUTE(get_dtls_attributes(&dtls_role, &dtls_fingerprints, &line));
                 HANDLE_ATTRIBUTE(get_sctp_attributes(
-                        &remote_description->sctp_port, &sctp_max_message_size, &line));
+                    &remote_description->sctp_port, &sctp_max_message_size, &line));
                 HANDLE_ATTRIBUTE(get_ice_candidate_attributes(
-                        &ice_candidate_lines, &remote_description->end_of_candidates,
-                        &line));
+                    &ice_candidate_lines, &remote_description->end_of_candidates, &line));
                 break;
             }
             case 'm': {
@@ -1013,8 +1002,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
                 break;
             }
             default:
-                DEBUG_PRINTF("Ignoring %s line: %c=%r\n",
-                             media_line ? "media" : "session", sdp_type, &line);
+                DEBUG_PRINTF(
+                    "Ignoring %s line: %c=%r\n", media_line ? "media" : "session", sdp_type, &line);
                 break;
         }
     }
@@ -1028,7 +1017,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     // Create ICE parameters (if possible)
     if (ice_username_fragment && ice_password) {
         error = rawrtc_ice_parameters_create(
-                &remote_description->ice_parameters, ice_username_fragment, ice_password, ice_lite);
+            &remote_description->ice_parameters, ice_username_fragment, ice_password, ice_lite);
         if (error) {
             goto out;
         }
@@ -1037,7 +1026,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
     // Create DTLS parameters (if possible)
     if (!list_isempty(&dtls_fingerprints)) {
         error = rawrtc_dtls_parameters_create_internal(
-                &remote_description->dtls_parameters, dtls_role, &dtls_fingerprints);
+            &remote_description->dtls_parameters, dtls_role, &dtls_fingerprints);
         if (error) {
             goto out;
         }
@@ -1045,7 +1034,7 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
     // Create SCTP capabilities
     error = rawrtc_sctp_capabilities_create(
-            &remote_description->sctp_capabilities, sctp_max_message_size);
+        &remote_description->sctp_capabilities, sctp_max_message_size);
     if (error) {
         goto out;
     }
@@ -1059,8 +1048,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
         // Create ICE candidate
         struct rawrtc_peer_connection_ice_candidate* candidate;
         error = rawrtc_peer_connection_ice_candidate_create_internal(
-                &candidate, &candidate_line->line, remote_description->mid,
-                &remote_description->media_line_index, ice_username_fragment);
+            &candidate, &candidate_line->line, remote_description->mid,
+            &remote_description->media_line_index, ice_username_fragment);
         if (error) {
             goto out;
         }
@@ -1080,8 +1069,8 @@ enum rawrtc_code rawrtc_peer_connection_description_create(
 
     // Debug
     DEBUG_PRINTF(
-            "Description (parsed):\n%H\n",
-            rawrtc_peer_connection_description_debug, remote_description);
+        "Description (parsed):\n%H\n", rawrtc_peer_connection_description_debug,
+        remote_description);
 
     // Done
     error = RAWRTC_CODE_SUCCESS;

@@ -7,9 +7,8 @@
  * Check for an existing data transport (on top of DTLS).
  */
 enum rawrtc_code rawrtc_dtls_transport_have_data_transport(
-        bool* const have_data_transportp, // de-referenced
-        struct rawrtc_dtls_transport* const transport
-) {
+    bool* const have_data_transportp,  // de-referenced
+    struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!have_data_transportp || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -28,9 +27,8 @@ enum rawrtc_code rawrtc_dtls_transport_have_data_transport(
  * Get the current state of the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_state(
-        enum rawrtc_dtls_transport_state* const statep, // de-referenced
-        struct rawrtc_dtls_transport* const transport
-) {
+    enum rawrtc_dtls_transport_state* const statep,  // de-referenced
+    struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!statep || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

@@ -17,25 +17,24 @@
  * data.
  */
 static void sctp_redirect_transport_inbound_handler(
-        struct mbuf* const buffer, // not checked
-        void* const arg // not checked
+    struct mbuf* const buffer,  // not checked
+    void* const arg  // not checked
 ) {
     struct rawrtc_sctp_redirect_transport* const transport = arg;
 
     // Feed data
     enum rawrtc_code const error = rawrtc_sctp_redirect_transport_feed_inbound(transport, buffer);
     if (error) {
-        DEBUG_WARNING("Unable to feed data into the SCTP redirect transport, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Unable to feed data into the SCTP redirect transport, reason: %s\n",
+            rawrtc_code_to_str(error));
     }
 }
 
 /*
  * Destructor for an existing SCTP redirect transport.
  */
-static void rawrtc_sctp_redirect_transport_destroy(
-        void* const arg
-) {
+static void rawrtc_sctp_redirect_transport_destroy(void* const arg) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
 
     // Un-reference
@@ -53,13 +52,13 @@ static void rawrtc_sctp_redirect_transport_destroy(
  *  to.
  */
 enum rawrtc_code rawrtc_sctp_redirect_transport_create(
-        struct rawrtc_sctp_redirect_transport** const transportp, // de-referenced
-        struct rawrtc_dtls_transport* const dtls_transport, // referenced
-        uint16_t const port, // zeroable
-        char* const redirect_ip, // copied
-        uint16_t const redirect_port,
-        rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler, // nullable
-        void* const arg // nullable
+    struct rawrtc_sctp_redirect_transport** const transportp,  // de-referenced
+    struct rawrtc_dtls_transport* const dtls_transport,  // referenced
+    uint16_t const port,  // zeroable
+    char* const redirect_ip,  // copied
+    uint16_t const redirect_port,
+    rawrtc_sctp_redirect_transport_state_change_handler const state_change_handler,  // nullable
+    void* const arg  // nullable
 ) {
     enum rawrtc_code error;
     bool have_data_transport;
@@ -87,7 +86,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
 
     // Create SCTP redirect transport
     error = rawrtc_sctp_redirect_transport_create_from_external(
-            &transport, &context, port, redirect_ip, redirect_port, state_change_handler, arg);
+        &transport, &context, port, redirect_ip, redirect_port, state_change_handler, arg);
     if (error) {
         goto out;
     }
@@ -95,7 +94,7 @@ enum rawrtc_code rawrtc_sctp_redirect_transport_create(
     // Attach to DTLS transport
     DEBUG_PRINTF("Attaching as data transport\n");
     error = rawrtc_dtls_transport_set_data_transport(
-            dtls_transport, sctp_redirect_transport_inbound_handler, transport);
+        dtls_transport, sctp_redirect_transport_inbound_handler, transport);
     if (error) {
         goto out;
     }

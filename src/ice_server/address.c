@@ -6,9 +6,7 @@
 /*
  * Destructor for an ICE server URL address.
  */
-static void rawrtc_ice_server_url_address_destroy(
-        void* arg
-) {
+static void rawrtc_ice_server_url_address_destroy(void* arg) {
     struct rawrtc_ice_server_url_address* const address = arg;
 
     // Remove from list
@@ -22,9 +20,9 @@ static void rawrtc_ice_server_url_address_destroy(
  * Create an ICE server URL address.
  */
 enum rawrtc_code rawrtc_ice_server_url_address_create(
-        struct rawrtc_ice_server_url_address** const addressp, // de-referenced
-        struct rawrtc_ice_server_url* const url, // referenced
-        struct sa* const address // copied
+    struct rawrtc_ice_server_url_address** const addressp,  // de-referenced
+    struct rawrtc_ice_server_url* const url,  // referenced
+    struct sa* const address  // copied
 ) {
     struct rawrtc_ice_server_url_address* url_address;
 

@@ -2,11 +2,11 @@
 #include <rawrtc/config.h>
 #include <rawrtcc/code.h>
 #include <re.h>
-#include <openssl/bio.h> // BIO_new_mem_buf
-#include <openssl/dh.h> // DH, DH_check_params
-#include <openssl/err.h> // ERR_clear_error
-#include <openssl/pem.h> // PEM_read_bio_DHparams
-#include <openssl/ssl.h> // SSL_CTX_set_tmp_dh, SSL_CTX_set_ecdh_auto
+#include <openssl/bio.h>  // BIO_new_mem_buf
+#include <openssl/dh.h>  // DH, DH_check_params
+#include <openssl/err.h>  // ERR_clear_error
+#include <openssl/pem.h>  // PEM_read_bio_DHparams
+#include <openssl/ssl.h>  // SSL_CTX_set_tmp_dh, SSL_CTX_set_ecdh_auto
 
 #define DEBUG_MODULE "diffie-hellman-parameters"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -16,8 +16,8 @@
  * Apply Diffie-Hellman parameters on an OpenSSL context.
  */
 static enum rawrtc_code set_dh_parameters(
-        struct ssl_ctx_st* const ssl_context, // not checked
-        DH const* const dh // not checked
+    struct ssl_ctx_st* const ssl_context,  // not checked
+    DH const* const dh  // not checked
 ) {
     int codes;
 
@@ -84,10 +84,7 @@ static enum rawrtc_code set_dh_parameters(
  * Set Diffie-Hellman parameters on an OpenSSL context using DER encoding.
  */
 enum rawrtc_code rawrtc_set_dh_parameters_der(
-        struct tls* const tls,
-        uint8_t const* const der,
-        size_t const der_size
-) {
+    struct tls* const tls, uint8_t const* const der, size_t const der_size) {
     struct ssl_ctx_st* const ssl_context = tls_openssl_context(tls);
     DH* dh = NULL;
     enum rawrtc_code error = RAWRTC_CODE_UNKNOWN_ERROR;
@@ -98,7 +95,7 @@ enum rawrtc_code rawrtc_set_dh_parameters_der(
     }
 
     // Decode PKCS#3 Diffie-Hellman parameters
-    dh = d2i_DHparams(NULL, (unsigned char const **) &der, der_size);
+    dh = d2i_DHparams(NULL, (unsigned char const**) &der, der_size);
     if (!dh) {
         goto out;
     }
@@ -126,10 +123,7 @@ out:
  * Set Diffie-Hellman parameters on an OpenSSL context using PEM encoding.
  */
 enum rawrtc_code rawrtc_set_dh_parameters_pem(
-        struct tls* const tls,
-        char const* const pem,
-        size_t const pem_size
-) {
+    struct tls* const tls, char const* const pem, size_t const pem_size) {
     struct ssl_ctx_st* const ssl_context = tls_openssl_context(tls);
     BIO* bio = NULL;
     DH* dh = NULL;
@@ -176,9 +170,7 @@ out:
 /*
  * Enable elliptic-curve Diffie-Hellman on an OpenSSL context.
  */
-enum rawrtc_code rawrtc_enable_ecdh(
-        struct tls* const tls
-) {
+enum rawrtc_code rawrtc_enable_ecdh(struct tls* const tls) {
     struct ssl_ctx_st* const ssl_context = tls_openssl_context(tls);
 
     // Check arguments

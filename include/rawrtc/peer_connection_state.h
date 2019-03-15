@@ -27,13 +27,9 @@ enum rawrtc_peer_connection_state {
 /*
  * Get the corresponding name for a signaling state.
  */
-char const * rawrtc_signaling_state_to_name(
-    enum rawrtc_signaling_state const state
-);
+char const* rawrtc_signaling_state_to_name(enum rawrtc_signaling_state const state);
 
 /*
  * Get the corresponding name for a peer connection state.
  */
-char const * rawrtc_peer_connection_state_to_name(
-    enum rawrtc_peer_connection_state const state
-);
+char const* rawrtc_peer_connection_state_to_name(enum rawrtc_peer_connection_state const state);

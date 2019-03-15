@@ -49,9 +49,9 @@ extern size_t const ignore_success_length;
 #define EOEIGN(code, ignore) exit_on_error(code, ignore, ARRAY_SIZE(ignore), __FILE__, __LINE__)
 #define EOR(code) exit_on_posix_error(code, __FILE__, __LINE__)
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || (__GNUC__ >= 3)
-#define EWE(...) exit_with_error(__FILE__, __LINE__, __VA_ARGS__)
+#    define EWE(...) exit_with_error(__FILE__, __LINE__, __VA_ARGS__)
 #elif defined(__GNUC__)
-#define EWE(args...) exit_with_error(__FILE__, __LINE__, args)
+#    define EWE(args...) exit_with_error(__FILE__, __LINE__, args)
 #endif
 
 /*
@@ -67,42 +67,29 @@ void exit_on_error(
     enum rawrtc_code const ignore[],
     size_t const n_ignore,
     char const* const file,
-    uint32_t const line
-);
+    uint32_t const line);
 
 /*
-* Exit on POSIX error code.
-*/
-void exit_on_posix_error(
-    int code,
-    char const* const file,
-    uint32_t line
-);
+ * Exit on POSIX error code.
+ */
+void exit_on_posix_error(int code, char const* const file, uint32_t line);
 
 /*
-* Exit with a custom error message.
-*/
-void exit_with_error(
-    char const* const file,
-    uint32_t line,
-    char const* const formatter,
-    ...
-);
+ * Exit with a custom error message.
+ */
+void exit_with_error(char const* const file, uint32_t line, char const* const formatter, ...);
 
 /*
-* Check if the ICE candidate type is enabled.
-*/
+ * Check if the ICE candidate type is enabled.
+ */
 bool ice_candidate_type_enabled(
-    struct client* const client,
-    enum rawrtc_ice_candidate_type const type
-);
+    struct client* const client, enum rawrtc_ice_candidate_type const type);
 
 /*
  * Print ICE candidate information.
  */
 void print_ice_candidate(
     struct rawrtc_ice_candidate* const candidate,
-    char const* const url, // read-only
-    struct rawrtc_peer_connection_ice_candidate* const pc_candidate, // nullable
-    struct client* const client
-);
+    char const* const url,  // read-only
+    struct rawrtc_peer_connection_ice_candidate* const pc_candidate,  // nullable
+    struct client* const client);

@@ -3,8 +3,8 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <stdlib.h> // exit
-#include <string.h> // strerror
+#include <stdlib.h>  // exit
+#include <string.h>  // strerror
 
 #define DEBUG_MODULE "helper-common"
 #define DEBUG_LEVEL 7
@@ -32,12 +32,11 @@ void before_exit(void) {
  * Exit on error code.
  */
 void exit_on_error(
-        enum rawrtc_code const code,
-        enum rawrtc_code const ignore[],
-        size_t const n_ignore,
-        char const* const file,
-        uint32_t const line
-) {
+    enum rawrtc_code const code,
+    enum rawrtc_code const ignore[],
+    size_t const n_ignore,
+    char const* const file,
+    uint32_t const line) {
     size_t i;
 
     // Ignore?
@@ -52,12 +51,11 @@ void exit_on_error(
         case RAWRTC_CODE_SUCCESS:
             return;
         case RAWRTC_CODE_NOT_IMPLEMENTED:
-            DEBUG_WARNING("Not implemented in %s %"PRIu32"\n",
-                          file, line);
+            DEBUG_WARNING("Not implemented in %s %" PRIu32 "\n", file, line);
             return;
         default:
-            DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n",
-                          file, line, code, rawrtc_code_to_str(code));
+            DEBUG_WARNING(
+                "Error in %s %" PRIu32 " (%d): %s\n", file, line, code, rawrtc_code_to_str(code));
             before_exit();
             exit((int) code);
     }
@@ -66,13 +64,9 @@ void exit_on_error(
 /*
  * Exit on POSIX error code.
  */
-void exit_on_posix_error(
-        int code,
-        char const* const file,
-        uint32_t line
-) {
+void exit_on_posix_error(int code, char const* const file, uint32_t line) {
     if (code != 0) {
-        DEBUG_WARNING("Error in %s %"PRIu32" (%d): %s\n", file, line, code, strerror(code));
+        DEBUG_WARNING("Error in %s %" PRIu32 " (%d): %s\n", file, line, code, strerror(code));
         before_exit();
         exit(code);
     }
@@ -81,12 +75,7 @@ void exit_on_posix_error(
 /*
  * Exit with a custom error message.
  */
-void exit_with_error(
-        char const* const file,
-        uint32_t line,
-        char const* const formatter,
-        ...
-) {
+void exit_with_error(char const* const file, uint32_t line, char const* const formatter, ...) {
     char* message;
 
     // Format message
@@ -96,7 +85,7 @@ void exit_with_error(
     va_end(ap);
 
     // Print message
-    DEBUG_WARNING("%s %"PRIu32": %s\n", file, line, message);
+    DEBUG_WARNING("%s %" PRIu32 ": %s\n", file, line, message);
 
     // Un-reference & bye
     mem_deref(message);
@@ -108,9 +97,7 @@ void exit_with_error(
  * Check if the ICE candidate type is enabled.
  */
 bool ice_candidate_type_enabled(
-        struct client* const client,
-        enum rawrtc_ice_candidate_type const type
-) {
+    struct client* const client, enum rawrtc_ice_candidate_type const type) {
     char const* const type_str = rawrtc_ice_candidate_type_to_str(type);
     size_t i;
 
@@ -134,11 +121,10 @@ bool ice_candidate_type_enabled(
  * Print ICE candidate information.
  */
 void print_ice_candidate(
-        struct rawrtc_ice_candidate* const candidate,
-        char const* const url, // read-only
-        struct rawrtc_peer_connection_ice_candidate* const pc_candidate, // nullable
-        struct client* const client
-) {
+    struct rawrtc_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    struct rawrtc_peer_connection_ice_candidate* const pc_candidate,  // nullable
+    struct client* const client) {
     if (candidate) {
         enum rawrtc_code const ignore[] = {RAWRTC_CODE_NO_VALUE};
         enum rawrtc_code error;
@@ -182,10 +168,10 @@ void print_ice_candidate(
         if (pc_candidate) {
             EOEIGN(rawrtc_peer_connection_ice_candidate_get_sdp_mid(&mid, pc_candidate), ignore);
             error = rawrtc_peer_connection_ice_candidate_get_sdp_media_line_index(
-                    &media_line_index, pc_candidate);
+                &media_line_index, pc_candidate);
             switch (error) {
                 case RAWRTC_CODE_SUCCESS:
-                    EOE(rawrtc_sdprintf(&media_line_index_str, "%"PRIu8, media_line_index));
+                    EOE(rawrtc_sdprintf(&media_line_index_str, "%" PRIu8, media_line_index));
                     break;
                 case RAWRTC_CODE_NO_VALUE:
                     break;
@@ -193,8 +179,10 @@ void print_ice_candidate(
                     EOE(error);
                     break;
             }
-            EOEIGN(rawrtc_peer_connection_ice_candidate_get_username_fragment(
-                    &username_fragment, pc_candidate), ignore);
+            EOEIGN(
+                rawrtc_peer_connection_ice_candidate_get_username_fragment(
+                    &username_fragment, pc_candidate),
+                ignore);
         }
         is_enabled = ice_candidate_type_enabled(client, type);
 
@@ -202,27 +190,26 @@ void print_ice_candidate(
         level = is_enabled ? DBG_INFO : DBG_DEBUG;
         if (!pc_candidate) {
             dbg_printf(
-                    level,
-                    "(%s) ICE candidate: foundation=%s, protocol=%s"
-                    ", priority=%"PRIu32", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s"
-                    ", related-address=%s, related-port=%"PRIu16"; URL: %s; %s\n",
-                    client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority,
-                    ip, port, rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
-                    related_address ? related_address : "n/a", related_port, url ? url : "n/a",
-                    is_enabled ? "enabled" : "disabled");
+                level,
+                "(%s) ICE candidate: foundation=%s, protocol=%s"
+                ", priority=%" PRIu32 ", ip=%s, port=%" PRIu16 ", type=%s, tcp-type=%s"
+                ", related-address=%s, related-port=%" PRIu16 "; URL: %s; %s\n",
+                client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority, ip, port,
+                rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
+                related_address ? related_address : "n/a", related_port, url ? url : "n/a",
+                is_enabled ? "enabled" : "disabled");
         } else {
             dbg_printf(
-                    level,
-                    "(%s) ICE candidate: foundation=%s, protocol=%s"
-                    ", priority=%"PRIu32", ip=%s, port=%"PRIu16", type=%s, tcp-type=%s"
-                    ", related-address=%s, related-port=%"PRIu16"; URL: %s"
-                    "; mid=%s, media_line_index=%s, username_fragment=%s; %s\n",
-                    client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority,
-                    ip, port, rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
-                    related_address ? related_address : "n/a", related_port, url ? url : "n/a",
-                    mid ? mid : "n/a", media_line_index_str ? media_line_index_str : "n/a",
-                    username_fragment ? username_fragment : "n/a",
-                    is_enabled ? "enabled" : "disabled");
+                level,
+                "(%s) ICE candidate: foundation=%s, protocol=%s"
+                ", priority=%" PRIu32 ", ip=%s, port=%" PRIu16 ", type=%s, tcp-type=%s"
+                ", related-address=%s, related-port=%" PRIu16 "; URL: %s"
+                "; mid=%s, media_line_index=%s, username_fragment=%s; %s\n",
+                client->name, foundation, rawrtc_ice_protocol_to_str(protocol), priority, ip, port,
+                rawrtc_ice_candidate_type_to_str(type), tcp_type_str,
+                related_address ? related_address : "n/a", related_port, url ? url : "n/a",
+                mid ? mid : "n/a", media_line_index_str ? media_line_index_str : "n/a",
+                username_fragment ? username_fragment : "n/a", is_enabled ? "enabled" : "disabled");
         }
 
         // Unreference

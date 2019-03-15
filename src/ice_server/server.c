@@ -6,7 +6,7 @@
 #include <rawrtcc/code.h>
 #include <rawrtcc/utils.h>
 #include <re.h>
-#include <string.h> // strlen
+#include <string.h>  // strlen
 
 #define DEBUG_MODULE "ice-server"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
@@ -97,17 +97,16 @@ static enum rawrtc_ice_server_transport ice_server_transport_secure_transport_ma
  * Parse ICE server's transport.
  */
 static enum rawrtc_code decode_ice_server_transport(
-        enum rawrtc_ice_server_transport* const transportp, // de-referenced, not checked
-        struct pl* const query, // not checked
-        bool const secure
-) {
+    enum rawrtc_ice_server_transport* const transportp,  // de-referenced, not checked
+    struct pl* const query,  // not checked
+    bool const secure) {
     enum rawrtc_code error;
     struct pl transport;
     size_t i;
 
     // Decode transport
-    error = rawrtc_error_to_code(re_regex(
-            query->p, query->l, ice_server_transport_regex, &transport));
+    error =
+        rawrtc_error_to_code(re_regex(query->p, query->l, ice_server_transport_regex, &transport));
     if (error) {
         return error;
     }
@@ -133,10 +132,10 @@ static enum rawrtc_code decode_ice_server_transport(
  * default port.
  */
 static enum rawrtc_code decode_ice_server_scheme(
-        enum rawrtc_ice_server_type* const typep, // de-referenced, not checked
-        bool* const securep, // de-referenced, not checked
-        uint_fast16_t* const portp, // de-referenced, not checked
-        struct pl* const scheme // not checked
+    enum rawrtc_ice_server_type* const typep,  // de-referenced, not checked
+    bool* const securep,  // de-referenced, not checked
+    uint_fast16_t* const portp,  // de-referenced, not checked
+    struct pl* const scheme  // not checked
 ) {
     size_t i;
 
@@ -163,7 +162,7 @@ static enum rawrtc_code decode_ice_server_scheme(
  * seems useful)
  */
 static enum rawrtc_code decode_ice_server_url(
-        struct rawrtc_ice_server_url* const url // not checked
+    struct rawrtc_ice_server_url* const url  // not checked
 ) {
     enum rawrtc_code error;
     struct pl scheme;
@@ -174,8 +173,8 @@ static enum rawrtc_code decode_ice_server_url(
     uint_fast16_t port;
 
     // Decode URL
-    error = rawrtc_error_to_code(re_regex(
-            url->url, strlen(url->url), ice_server_url_regex, &scheme, &host_port, &query));
+    error = rawrtc_error_to_code(
+        re_regex(url->url, strlen(url->url), ice_server_url_regex, &scheme, &host_port, &query));
     if (error) {
         DEBUG_WARNING("Invalid ICE server URL: %s\n", url->url);
         goto out;
@@ -196,13 +195,13 @@ static enum rawrtc_code decode_ice_server_url(
     // Decode host: Either IPv4 or IPv6 including the port (if any)
     // Try IPv6 first, then normal hostname/IPv4.
     error = rawrtc_error_to_code(re_regex(
-            host_port.p, host_port.l, ice_server_host_port_ipv6_regex, &url->host, NULL, &port_pl));
+        host_port.p, host_port.l, ice_server_host_port_ipv6_regex, &url->host, NULL, &port_pl));
     if (error) {
         error = rawrtc_error_to_code(re_regex(
-                host_port.p, host_port.l, ice_server_host_port_regex, &url->host, NULL, &port_pl));
+            host_port.p, host_port.l, ice_server_host_port_regex, &url->host, NULL, &port_pl));
         if (error) {
-            DEBUG_WARNING("Invalid host or port in ICE server URL (%s): %r\n",
-                          url->url, &host_port);
+            DEBUG_WARNING(
+                "Invalid host or port in ICE server URL (%s): %r\n", url->url, &host_port);
             goto out;
         }
 
@@ -212,8 +211,8 @@ static enum rawrtc_code decode_ice_server_url(
         // Try decoding IPv6
         error = rawrtc_error_to_code(sa_set(&url->resolved_address, &url->host, (uint16_t) port));
         if (error) {
-            DEBUG_WARNING("Invalid IPv6 address in ICE server URL (%s): %r\n",
-                          url->url, &host_port);
+            DEBUG_WARNING(
+                "Invalid IPv6 address in ICE server URL (%s): %r\n", url->url, &host_port);
             goto out;
         }
     }
@@ -225,8 +224,8 @@ static enum rawrtc_code decode_ice_server_url(
         // Get port
         port_u32 = pl_u32(&port_pl);
         if (port_u32 == 0 || port_u32 > UINT16_MAX) {
-            DEBUG_WARNING("Invalid port number in ICE server URL (%s): %"PRIu32"\n",
-                    url->url, port_u32);
+            DEBUG_WARNING(
+                "Invalid port number in ICE server URL (%s): %" PRIu32 "\n", url->url, port_u32);
             error = RAWRTC_CODE_INVALID_ARGUMENT;
             goto out;
         }
@@ -261,9 +260,7 @@ out:
 /*
  * Destructor for URLs of the ICE gatherer.
  */
-static void rawrtc_ice_server_url_destroy(
-        void* arg
-) {
+static void rawrtc_ice_server_url_destroy(void* arg) {
     struct rawrtc_ice_server_url* const url = arg;
 
     // Remove from list
@@ -277,8 +274,8 @@ static void rawrtc_ice_server_url_destroy(
  * Copy a URL for the ICE gatherer.
  */
 static enum rawrtc_code rawrtc_ice_server_url_create(
-        struct rawrtc_ice_server_url** const urlp, // de-referenced
-        char* const url_s // copied
+    struct rawrtc_ice_server_url** const urlp,  // de-referenced
+    char* const url_s  // copied
 ) {
     struct rawrtc_ice_server_url* url;
     enum rawrtc_code error;
@@ -323,9 +320,7 @@ out:
 /*
  * Destructor for an existing ICE server.
  */
-static void rawrtc_ice_server_destroy(
-        void* arg
-) {
+static void rawrtc_ice_server_destroy(void* arg) {
     struct rawrtc_ice_server* const server = arg;
 
     // Un-reference
@@ -338,13 +333,12 @@ static void rawrtc_ice_server_destroy(
  * Create an ICE server.
  */
 enum rawrtc_code rawrtc_ice_server_create(
-        struct rawrtc_ice_server** const serverp, // de-referenced
-        char* const * const urls, // copied
-        size_t const n_urls,
-        char* const username, // nullable, copied
-        char* const credential, // nullable, copied
-        enum rawrtc_ice_credential_type const credential_type
-) {
+    struct rawrtc_ice_server** const serverp,  // de-referenced
+    char* const* const urls,  // copied
+    size_t const n_urls,
+    char* const username,  // nullable, copied
+    char* const credential,  // nullable, copied
+    enum rawrtc_ice_credential_type const credential_type) {
     struct rawrtc_ice_server* server;
     enum rawrtc_code error = RAWRTC_CODE_SUCCESS;
     size_t i;
@@ -396,7 +390,7 @@ enum rawrtc_code rawrtc_ice_server_create(
             }
         }
     }
-    server->credential_type = credential_type; // TODO: Validation needed in case TOKEN is used?
+    server->credential_type = credential_type;  // TODO: Validation needed in case TOKEN is used?
 
 out:
     if (error) {
@@ -412,9 +406,8 @@ out:
  * Copy an ICE server.
  */
 enum rawrtc_code rawrtc_ice_server_copy(
-        struct rawrtc_ice_server** const serverp, // de-referenced
-        struct rawrtc_ice_server* const source_server
-) {
+    struct rawrtc_ice_server** const serverp,  // de-referenced
+    struct rawrtc_ice_server* const source_server) {
     size_t n_urls;
     char** urls = NULL;
     struct le* le;
@@ -429,7 +422,7 @@ enum rawrtc_code rawrtc_ice_server_copy(
     // Create temporary ICE server URL array
     n_urls = list_count(&source_server->urls);
     if (n_urls > 0) {
-        urls = mem_alloc(sizeof(char *) * n_urls, NULL);
+        urls = mem_alloc(sizeof(char*) * n_urls, NULL);
         if (!urls) {
             return RAWRTC_CODE_NO_MEMORY;
         }
@@ -443,8 +436,8 @@ enum rawrtc_code rawrtc_ice_server_copy(
 
     // Copy
     error = rawrtc_ice_server_create(
-            serverp, urls, n_urls, source_server->username, source_server->credential,
-            source_server->credential_type);
+        serverp, urls, n_urls, source_server->username, source_server->credential,
+        source_server->credential_type);
     if (error) {
         goto out;
     }

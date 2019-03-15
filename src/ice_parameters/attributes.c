@@ -8,9 +8,8 @@
  * `*username_fragmentp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_parameters_get_username_fragment(
-        char** const username_fragmentp, // de-referenced
-        struct rawrtc_ice_parameters* const parameters
-) {
+    char** const username_fragmentp,  // de-referenced
+    struct rawrtc_ice_parameters* const parameters) {
     // Check arguments
     if (!username_fragmentp || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -26,9 +25,8 @@ enum rawrtc_code rawrtc_ice_parameters_get_username_fragment(
  * `*passwordp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_ice_parameters_get_password(
-        char** const passwordp, // de-referenced
-        struct rawrtc_ice_parameters* const parameters
-) {
+    char** const passwordp,  // de-referenced
+    struct rawrtc_ice_parameters* const parameters) {
     // Check arguments
     if (!passwordp || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -43,9 +41,8 @@ enum rawrtc_code rawrtc_ice_parameters_get_password(
  * Get the ICE parameter's ICE lite value.
  */
 enum rawrtc_code rawrtc_ice_parameters_get_ice_lite(
-        bool* const ice_litep, // de-referenced
-        struct rawrtc_ice_parameters* const parameters
-) {
+    bool* const ice_litep,  // de-referenced
+    struct rawrtc_ice_parameters* const parameters) {
     // Check arguments
     if (!ice_litep || !parameters) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

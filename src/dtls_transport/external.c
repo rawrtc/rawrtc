@@ -7,9 +7,8 @@
  * Get external DTLS role.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_external_role(
-        enum rawrtc_external_dtls_role* const rolep, // de-referenced
-        struct rawrtc_dtls_transport* const transport
-) {
+    enum rawrtc_external_dtls_role* const rolep,  // de-referenced
+    struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!rolep || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -35,9 +34,8 @@ enum rawrtc_code rawrtc_dtls_transport_get_external_role(
  * Convert DTLS transport state to external DTLS transport state.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_external_state(
-        enum rawrtc_external_dtls_transport_state* const statep, // de-referenced
-        struct rawrtc_dtls_transport* const transport
-) {
+    enum rawrtc_external_dtls_transport_state* const statep,  // de-referenced
+    struct rawrtc_dtls_transport* const transport) {
     // Check arguments
     if (!statep || !transport) {
         return RAWRTC_CODE_INVALID_ARGUMENT;

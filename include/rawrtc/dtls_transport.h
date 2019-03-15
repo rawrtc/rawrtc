@@ -36,30 +36,27 @@ struct rawrtc_dtls_transport;
  * DTLS transport state change handler.
  */
 typedef void (*rawrtc_dtls_transport_state_change_handler)(
-    enum rawrtc_dtls_transport_state const state,
-    void* const arg
-);
+    enum rawrtc_dtls_transport_state const state, void* const arg);
 
 /*
  * DTLS transport error handler.
  */
 typedef void (*rawrtc_dtls_transport_error_handler)(
     // TODO: error.message (probably from OpenSSL)
-    void* const arg
-);
+    void* const arg);
 
 /*
  * Create a new DTLS transport.
  * `*transport` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_transport_create(
-    struct rawrtc_dtls_transport** const transportp, // de-referenced
-    struct rawrtc_ice_transport* const ice_transport, // referenced
-    struct rawrtc_certificate* const certificates[], // copied (each item)
+    struct rawrtc_dtls_transport** const transportp,  // de-referenced
+    struct rawrtc_ice_transport* const ice_transport,  // referenced
+    struct rawrtc_certificate* const certificates[],  // copied (each item)
     size_t const n_certificates,
-    rawrtc_dtls_transport_state_change_handler const state_change_handler, // nullable
-    rawrtc_dtls_transport_error_handler const error_handler, // nullable
-    void* const arg // nullable
+    rawrtc_dtls_transport_state_change_handler const state_change_handler,  // nullable
+    rawrtc_dtls_transport_error_handler const error_handler,  // nullable
+    void* const arg  // nullable
 );
 
 /*
@@ -67,15 +64,13 @@ enum rawrtc_code rawrtc_dtls_transport_create(
  */
 enum rawrtc_code rawrtc_dtls_transport_start(
     struct rawrtc_dtls_transport* const transport,
-    struct rawrtc_dtls_parameters* const remote_parameters // copied
+    struct rawrtc_dtls_parameters* const remote_parameters  // copied
 );
 
 /*
  * Stop and close the DTLS transport.
  */
-enum rawrtc_code rawrtc_dtls_transport_stop(
-    struct rawrtc_dtls_transport* const transport
-);
+enum rawrtc_code rawrtc_dtls_transport_stop(struct rawrtc_dtls_transport* const transport);
 
 /*
  * TODO (from RTCIceTransport interface)
@@ -87,18 +82,16 @@ enum rawrtc_code rawrtc_dtls_transport_stop(
  * Get the current state of the DTLS transport.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_state(
-    enum rawrtc_dtls_transport_state* const statep, // de-referenced
-    struct rawrtc_dtls_transport* const transport
-);
+    enum rawrtc_dtls_transport_state* const statep,  // de-referenced
+    struct rawrtc_dtls_transport* const transport);
 
 /*
  * Get local DTLS parameters of a transport.
  * `*parametersp` must be unreferenced.
  */
 enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
-    struct rawrtc_dtls_parameters** const parametersp, // de-referenced
-    struct rawrtc_dtls_transport* const transport
-);
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
+    struct rawrtc_dtls_transport* const transport);
 
 /*
  * TODO (from RTCIceTransport interface)
@@ -109,23 +102,18 @@ enum rawrtc_code rawrtc_dtls_transport_get_local_parameters(
  */
 
 /*
-* Get the corresponding name for an ICE transport state.
-*/
-char const * rawrtc_dtls_transport_state_to_name(
-    enum rawrtc_dtls_transport_state const state
-);
+ * Get the corresponding name for an ICE transport state.
+ */
+char const* rawrtc_dtls_transport_state_to_name(enum rawrtc_dtls_transport_state const state);
 
 /*
  * Translate a DTLS role to str.
  */
-char const * rawrtc_dtls_role_to_str(
-    enum rawrtc_dtls_role const role
-);
+char const* rawrtc_dtls_role_to_str(enum rawrtc_dtls_role const role);
 
 /*
  * Translate a str to a DTLS role (case-insensitive).
  */
 enum rawrtc_code rawrtc_str_to_dtls_role(
-    enum rawrtc_dtls_role* const rolep, // de-referenced
-    char const* const str
-);
+    enum rawrtc_dtls_role* const rolep,  // de-referenced
+    char const* const str);

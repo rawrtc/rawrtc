@@ -1,5 +1,5 @@
-#include "address.h"
 #include "resolver.h"
+#include "address.h"
 #include "server.h"
 #include <rawrtc/config.h>
 #include <rawrtcc/code.h>
@@ -13,10 +13,7 @@
 /*
  * DNS A or AAAA record handler.
  */
-static bool dns_record_result_handler(
-        struct dnsrr* resource_record,
-        void* arg
-) {
+static bool dns_record_result_handler(struct dnsrr* resource_record, void* arg) {
     struct rawrtc_ice_server_url_resolver* const resolver = arg;
     struct rawrtc_ice_server_url* const url = resolver->url;
     struct sa address;
@@ -39,17 +36,18 @@ static bool dns_record_result_handler(
             break;
 
         default:
-            DEBUG_WARNING("Invalid DNS resource record, expected A/AAAA record, got: %H\n",
-                          dns_rr_print, resource_record);
-            return true; // stop traversing
+            DEBUG_WARNING(
+                "Invalid DNS resource record, expected A/AAAA record, got: %H\n", dns_rr_print,
+                resource_record);
+            return true;  // stop traversing
     }
 
     // Create URL address
     error = rawrtc_ice_server_url_address_create(&url_address, url, &address);
     if (error) {
-        DEBUG_WARNING("Unable to create ICE server URL address, reason: %s\n",
-                      rawrtc_code_to_str(error));
-        return true; // stop traversing
+        DEBUG_WARNING(
+            "Unable to create ICE server URL address, reason: %s\n", rawrtc_code_to_str(error));
+        return true;  // stop traversing
     }
 
     // Announce resolved IP address
@@ -66,23 +64,25 @@ static bool dns_record_result_handler(
  * DNS query result handler.
  */
 static void dns_query_handler(
-        int err,
-        struct dnshdr const* header,
-        struct list* answer_records,
-        struct list* authoritive_records,
-        struct list* additional_records,
-        void* arg
-) {
+    int err,
+    struct dnshdr const* header,
+    struct list* answer_records,
+    struct list* authoritive_records,
+    struct list* additional_records,
+    void* arg) {
     struct rawrtc_ice_server_url_resolver* const resolver = arg;
-    (void) header; (void) authoritive_records; (void) additional_records;
+    (void) header;
+    (void) authoritive_records;
+    (void) additional_records;
 
     // Handle error (if any)
     if (err) {
         DEBUG_WARNING("Could not query DNS record for '%r', reason: %m\n", &resolver->url->host);
         goto out;
     } else if (header->rcode != 0) {
-        DEBUG_NOTICE("DNS record query for '%r' unsuccessful: %s (%"PRIu8")\n",
-                     &resolver->url->host, dns_hdr_rcodename(header->rcode), header->rcode);
+        DEBUG_NOTICE(
+            "DNS record query for '%r' unsuccessful: %s (%" PRIu8 ")\n", &resolver->url->host,
+            dns_hdr_rcodename(header->rcode), header->rcode);
         goto out;
     }
 
@@ -90,8 +90,9 @@ static void dns_query_handler(
     list_unlink(&resolver->le);
 
     // Handle A or AAAA record
-    dns_rrlist_apply2(answer_records, NULL, DNS_TYPE_A, DNS_TYPE_AAAA, DNS_CLASS_IN, true,
-                      dns_record_result_handler, resolver);
+    dns_rrlist_apply2(
+        answer_records, NULL, DNS_TYPE_A, DNS_TYPE_AAAA, DNS_CLASS_IN, true,
+        dns_record_result_handler, resolver);
 
 out:
     // Unlink & un-reference self
@@ -104,9 +105,7 @@ out:
 /*
  * Destructor for an ICE server URL.
  */
-static void rawrtc_ice_server_url_resolver_destroy(
-        void* arg
-) {
+static void rawrtc_ice_server_url_resolver_destroy(void* arg) {
     struct rawrtc_ice_server_url_resolver* const resolver = arg;
 
     // Remove from list
@@ -124,13 +123,12 @@ static void rawrtc_ice_server_url_resolver_destroy(
  *            from an associated list and un-reference itself.
  */
 enum rawrtc_code rawrtc_ice_server_url_resolver_create(
-        struct rawrtc_ice_server_url_resolver** const resolverp, // de-referenced
-        struct dnsc* const dns_client,
-        uint_fast16_t const dns_type,
-        struct rawrtc_ice_server_url* const url, // referenced
-        rawrtc_ice_server_url_address_resolved_handler address_handler,
-        void* const arg
-) {
+    struct rawrtc_ice_server_url_resolver** const resolverp,  // de-referenced
+    struct dnsc* const dns_client,
+    uint_fast16_t const dns_type,
+    struct rawrtc_ice_server_url* const url,  // referenced
+    rawrtc_ice_server_url_address_resolved_handler address_handler,
+    void* const arg) {
     enum rawrtc_code error;
     struct rawrtc_ice_server_url_resolver* resolver;
     char* host_str;
@@ -160,8 +158,8 @@ enum rawrtc_code rawrtc_ice_server_url_resolver_create(
 
     // Query A or AAAA record
     error = rawrtc_error_to_code(dnsc_query(
-            &resolver->dns_query, dns_client, host_str, (uint16_t) dns_type,
-            DNS_CLASS_IN, true, dns_query_handler, resolver));
+        &resolver->dns_query, dns_client, host_str, (uint16_t) dns_type, DNS_CLASS_IN, true,
+        dns_query_handler, resolver));
     if (error) {
         goto out;
     }

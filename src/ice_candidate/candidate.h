@@ -18,14 +18,14 @@ enum rawrtc_ice_candidate_storage {
  * Raw ICE candidate (pending candidate).
  */
 struct rawrtc_ice_candidate_raw {
-    char* foundation; // copied
+    char* foundation;  // copied
     uint32_t priority;
-    char* ip; // copied
+    char* ip;  // copied
     enum rawrtc_ice_protocol protocol;
     uint16_t port;
     enum rawrtc_ice_candidate_type type;
     enum rawrtc_ice_tcp_candidate_type tcp_type;
-    char* related_address; // copied, nullable
+    char* related_address;  // copied, nullable
     uint16_t related_port;
 };
 
@@ -43,51 +43,43 @@ uint32_t rawrtc_ice_candidate_calculate_priority(
     enum ice_cand_type const candidate_type,
     int const protocol,
     int const address_family,
-    enum ice_tcptype const tcp_type
-);
+    enum ice_tcptype const tcp_type);
 
 enum rawrtc_code rawrtc_ice_candidate_create_internal(
-    struct rawrtc_ice_candidate** const candidatep, // de-referenced
-    struct pl* const foundation, // copied
+    struct rawrtc_ice_candidate** const candidatep,  // de-referenced
+    struct pl* const foundation,  // copied
     uint32_t const priority,
-    struct pl* const ip, // copied
+    struct pl* const ip,  // copied
     enum rawrtc_ice_protocol const protocol,
     uint16_t const port,
     enum rawrtc_ice_candidate_type const type,
     enum rawrtc_ice_tcp_candidate_type const tcp_type,
-    struct pl* const related_address, // copied, nullable
-    uint16_t const related_port
-);
+    struct pl* const related_address,  // copied, nullable
+    uint16_t const related_port);
 
 enum rawrtc_code rawrtc_ice_candidate_create_from_local_candidate(
-    struct rawrtc_ice_candidate** const candidatep, // de-referenced
-    struct ice_lcand* const local_candidate // referenced
+    struct rawrtc_ice_candidate** const candidatep,  // de-referenced
+    struct ice_lcand* const local_candidate  // referenced
 );
 
 enum rawrtc_code rawrtc_ice_candidate_create_from_remote_candidate(
-    struct rawrtc_ice_candidate** const candidatep, // de-referenced
-    struct ice_rcand* const remote_candidate // referenced
+    struct rawrtc_ice_candidate** const candidatep,  // de-referenced
+    struct ice_rcand* const remote_candidate  // referenced
 );
 
 int rawrtc_ice_candidate_debug(
-    struct re_printf* const pf,
-    struct rawrtc_ice_candidate* const candidate
-);
+    struct re_printf* const pf, struct rawrtc_ice_candidate* const candidate);
 
 enum ice_cand_type rawrtc_ice_candidate_type_to_ice_cand_type(
-    enum rawrtc_ice_candidate_type const type
-);
+    enum rawrtc_ice_candidate_type const type);
 
 enum rawrtc_code rawrtc_ice_cand_type_to_ice_candidate_type(
-    enum rawrtc_ice_candidate_type* const typep, // de-referenced
-    const enum ice_cand_type re_type
-);
+    enum rawrtc_ice_candidate_type* const typep,  // de-referenced
+    const enum ice_cand_type re_type);
 
 enum ice_tcptype rawrtc_ice_tcp_candidate_type_to_ice_tcptype(
-    const enum rawrtc_ice_tcp_candidate_type type
-);
+    const enum rawrtc_ice_tcp_candidate_type type);
 
 enum rawrtc_code rawrtc_ice_tcptype_to_ice_tcp_candidate_type(
-    enum rawrtc_ice_tcp_candidate_type* const typep, // de-referenced
-    const enum ice_tcptype re_type
-);
+    enum rawrtc_ice_tcp_candidate_type* const typep,  // de-referenced
+    const enum ice_tcptype re_type);

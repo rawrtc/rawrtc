@@ -17,8 +17,8 @@
  * Warning: `rolep` and `arg` will not be validated.
  */
 enum rawrtc_code rawrtc_sctp_common_dtls_role_getter(
-        enum rawrtc_external_dtls_role* const rolep, // de-referenced, not checked
-        void* const arg // not checked
+    enum rawrtc_external_dtls_role* const rolep,  // de-referenced, not checked
+    void* const arg  // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
     return rawrtc_dtls_transport_get_external_role(rolep, dtls_transport);
@@ -29,8 +29,8 @@ enum rawrtc_code rawrtc_sctp_common_dtls_role_getter(
  * Warning: `statep` and `arg` will not be validated.
  */
 enum rawrtc_code rawrtc_sctp_common_dtls_transport_state_getter(
-        enum rawrtc_external_dtls_transport_state* const statep, // de-referenced, not checked
-        void* const arg // not checked
+    enum rawrtc_external_dtls_transport_state* const statep,  // de-referenced, not checked
+    void* const arg  // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
     return rawrtc_dtls_transport_get_external_state(statep, dtls_transport);
@@ -43,16 +43,17 @@ enum rawrtc_code rawrtc_sctp_common_dtls_transport_state_getter(
  * Warning: `buffer` and `arg` will not be validated.
  */
 enum rawrtc_code rawrtc_sctp_common_sctp_transport_outbound_handler(
-        struct mbuf* const buffer, // not checked
-        uint8_t const tos,
-        uint8_t const set_df,
-        void* const arg // not checked
+    struct mbuf* const buffer,  // not checked
+    uint8_t const tos,
+    uint8_t const set_df,
+    void* const arg  // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
     enum rawrtc_code error;
 
     // TODO: Handle
-    (void) tos; (void) set_df;
+    (void) tos;
+    (void) set_df;
 
     // Note: We only need to copy the buffer if we add it to the outgoing queue
     if (dtls_transport->state == RAWRTC_DTLS_TRANSPORT_STATE_CONNECTED) {
@@ -98,15 +99,14 @@ enum rawrtc_code rawrtc_sctp_common_sctp_transport_outbound_handler(
  * don't feed any DTLS application data to the SCTP transport.
  * Warning: `arg` will not be validated.
  */
-void rawrtc_sctp_common_sctp_transport_detach_handler(
-        void* const arg // not checked
+void rawrtc_sctp_common_sctp_transport_detach_handler(void* const arg  // not checked
 ) {
     struct rawrtc_dtls_transport* const dtls_transport = arg;
 
     // Detach from DTLS transport
     enum rawrtc_code error = rawrtc_dtls_transport_clear_data_transport(dtls_transport);
     if (error) {
-        DEBUG_WARNING("Unable to detach from DTLS transport, reason: %s\n",
-                      rawrtc_code_to_str(error));
+        DEBUG_WARNING(
+            "Unable to detach from DTLS transport, reason: %s\n", rawrtc_code_to_str(error));
     }
 }

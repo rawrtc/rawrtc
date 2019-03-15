@@ -11,12 +11,9 @@ struct rawrtc_dtls_parameters {
 };
 
 enum rawrtc_code rawrtc_dtls_parameters_create_internal(
-    struct rawrtc_dtls_parameters** const parametersp, // de-referenced
+    struct rawrtc_dtls_parameters** const parametersp,  // de-referenced
     enum rawrtc_dtls_role const role,
-    struct list* const fingerprints
-);
+    struct list* const fingerprints);
 
 int rawrtc_dtls_parameters_debug(
-    struct re_printf* const pf,
-    struct rawrtc_dtls_parameters const* const parameters
-);
+    struct re_printf* const pf, struct rawrtc_dtls_parameters const* const parameters);

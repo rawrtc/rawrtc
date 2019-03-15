@@ -2,19 +2,18 @@
 #include <rawrtc/utils.h>
 #include <rawrtcc/code.h>
 #include <re.h>
-#include <stdio.h> // sprintf
-#include <string.h> // strlen
-#include <stdarg.h> // va_*
+#include <stdarg.h>  // va_*
+#include <stdio.h>  // sprintf
+#include <string.h>  // strlen
 
 /*
  * Convert binary to hex string where each value is separated by a
  * colon.
  */
 enum rawrtc_code rawrtc_bin_to_colon_hex(
-        char** const destinationp, // de-referenced
-        uint8_t* const source,
-        size_t const length
-) {
+    char** const destinationp,  // de-referenced
+    uint8_t* const source,
+    size_t const length) {
     char* hex_str;
     char* hex_ptr;
     size_t i;
@@ -62,11 +61,10 @@ out:
  * Convert hex string with colon-separated hex values to binary.
  */
 enum rawrtc_code rawrtc_colon_hex_to_bin(
-        size_t* const bytes_written, // de-referenced
-        uint8_t* const buffer, // written into
-        size_t const buffer_size,
-        char* source
-) {
+    size_t* const bytes_written,  // de-referenced
+    uint8_t* const buffer,  // written into
+    size_t const buffer_size,
+    char* source) {
     size_t hex_length;
     size_t bin_length;
     size_t i;
@@ -83,7 +81,7 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
     }
 
     // Determine size
-    bin_length = hex_length > 0 ? (size_t) ((hex_length + 1) / 3) : 0;
+    bin_length = hex_length > 0 ? (size_t)((hex_length + 1) / 3) : 0;
     if (bin_length > buffer_size) {
         return RAWRTC_CODE_INSUFFICIENT_SPACE;
     }
@@ -109,9 +107,7 @@ enum rawrtc_code rawrtc_colon_hex_to_bin(
  * Destructor for an existing array container that did reference each
  * item.
  */
-static void rawrtc_array_container_destroy(
-        void* arg
-) {
+static void rawrtc_array_container_destroy(void* arg) {
     struct rawrtc_array_container* const container = arg;
     size_t i;
 
@@ -121,7 +117,6 @@ static void rawrtc_array_container_destroy(
     }
 }
 
-
 /*
  * Convert a list to a dynamically allocated array container.
  *
@@ -130,10 +125,9 @@ static void rawrtc_array_container_destroy(
  * item when unreferencing the array.
  */
 enum rawrtc_code rawrtc_list_to_array(
-        struct rawrtc_array_container** containerp, // de-referenced
-        struct list const* const list,
-        bool reference
-) {
+    struct rawrtc_array_container** containerp,  // de-referenced
+    struct list const* const list,
+    bool reference) {
     size_t n;
     struct rawrtc_array_container* container;
     struct le* le;
@@ -149,8 +143,7 @@ enum rawrtc_code rawrtc_list_to_array(
 
     // Allocate array & set length immediately
     container = mem_zalloc(
-            sizeof(*container) + sizeof(void*) * n,
-            reference ? rawrtc_array_container_destroy : NULL);
+        sizeof(*container) + sizeof(void*) * n, reference ? rawrtc_array_container_destroy : NULL);
     if (!container) {
         return RAWRTC_CODE_NO_MEMORY;
     }

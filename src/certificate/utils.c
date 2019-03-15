@@ -7,8 +7,7 @@
  * Translate a certificate key type to the corresponding re type.
  */
 enum tls_keytype rawrtc_certificate_key_type_to_tls_keytype(
-        enum rawrtc_certificate_key_type const type
-) {
+    enum rawrtc_certificate_key_type const type) {
     // No conversion needed
     return (enum tls_keytype) type;
 }
@@ -17,9 +16,8 @@ enum tls_keytype rawrtc_certificate_key_type_to_tls_keytype(
  * Translate a re key type to the corresponding rawrtc type.
  */
 enum rawrtc_code rawrtc_tls_keytype_to_certificate_key_type(
-        enum rawrtc_certificate_key_type* const typep, // de-referenced
-        enum tls_keytype const re_type
-) {
+    enum rawrtc_certificate_key_type* const typep,  // de-referenced
+    enum tls_keytype const re_type) {
     // Check arguments
     if (!typep) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -42,9 +40,8 @@ enum rawrtc_code rawrtc_tls_keytype_to_certificate_key_type(
  * Translate a certificate sign algorithm to the corresponding re fingerprint algorithm.
  */
 enum rawrtc_code rawrtc_certificate_sign_algorithm_to_tls_fingerprint(
-        enum tls_fingerprint* const fingerprintp, // de-referenced
-        enum rawrtc_certificate_sign_algorithm const algorithm
-) {
+    enum tls_fingerprint* const fingerprintp,  // de-referenced
+    enum rawrtc_certificate_sign_algorithm const algorithm) {
     switch (algorithm) {
         case RAWRTC_CERTIFICATE_SIGN_ALGORITHM_NONE:
             return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -65,9 +62,8 @@ enum rawrtc_code rawrtc_certificate_sign_algorithm_to_tls_fingerprint(
  * Translate a re fingerprint algorithm to the corresponding rawrtc algorithm.
  */
 enum rawrtc_code rawrtc_tls_fingerprint_to_certificate_sign_algorithm(
-        enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
-        enum tls_fingerprint re_algorithm
-) {
+    enum rawrtc_certificate_sign_algorithm* const algorithmp,  // de-referenced
+    enum tls_fingerprint re_algorithm) {
     // Check arguments
     if (!algorithmp) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
@@ -90,7 +86,7 @@ static enum rawrtc_certificate_sign_algorithm const map_enum_certificate_sign_al
     RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA512,
 };
 
-static char const * const map_str_certificate_sign_algorithm[] = {
+static char const* const map_str_certificate_sign_algorithm[] = {
     "sha-256",
     "sha-384",
     "sha-512",
@@ -102,9 +98,8 @@ static size_t const map_certificate_sign_algorithm_length =
 /*
  * Translate a certificate sign algorithm to str.
  */
-char const * rawrtc_certificate_sign_algorithm_to_str(
-        enum rawrtc_certificate_sign_algorithm const algorithm
-) {
+char const* rawrtc_certificate_sign_algorithm_to_str(
+    enum rawrtc_certificate_sign_algorithm const algorithm) {
     size_t i;
 
     for (i = 0; i < map_certificate_sign_algorithm_length; ++i) {
@@ -120,9 +115,8 @@ char const * rawrtc_certificate_sign_algorithm_to_str(
  * Translate a str to a certificate sign algorithm (case-insensitive).
  */
 enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
-        enum rawrtc_certificate_sign_algorithm* const algorithmp, // de-referenced
-        char const* const str
-) {
+    enum rawrtc_certificate_sign_algorithm* const algorithmp,  // de-referenced
+    char const* const str) {
     size_t i;
 
     // Check arguments
@@ -143,9 +137,7 @@ enum rawrtc_code rawrtc_str_to_certificate_sign_algorithm(
 /*
  * Get the EVP_MD* structure for a certificate sign algorithm type.
  */
-EVP_MD const * rawrtc_get_sign_function(
-        enum rawrtc_certificate_sign_algorithm const type
-) {
+EVP_MD const* rawrtc_get_sign_function(enum rawrtc_certificate_sign_algorithm const type) {
     switch (type) {
         case RAWRTC_CERTIFICATE_SIGN_ALGORITHM_SHA256:
             return EVP_sha256();
@@ -162,10 +154,9 @@ EVP_MD const * rawrtc_get_sign_function(
  * Get the length of the fingerprint to a certificate sign algorithm type.
  */
 enum rawrtc_code rawrtc_get_sign_algorithm_length(
-        size_t* const sizep, // de-referenced
-        enum rawrtc_certificate_sign_algorithm const type
-) {
-    EVP_MD const * sign_function;
+    size_t* const sizep,  // de-referenced
+    enum rawrtc_certificate_sign_algorithm const type) {
+    EVP_MD const* sign_function;
     int size;
 
     // Get sign algorithm function

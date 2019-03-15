@@ -7,7 +7,7 @@
 #include <re.h>
 
 static char const sdp_ice_candidate_regex[] =
-        "candidate:[^ ]+ [0-9]+ [^ ]+ [0-9]+ [^ ]+ [0-9]+ typ [^ ]+[^]*";
+    "candidate:[^ ]+ [0-9]+ [^ ]+ [0-9]+ [^ ]+ [0-9]+ typ [^ ]+[^]*";
 static char const sdp_ice_candidate_related_address_regex[] = "[^]* raddr [^ ]+";
 static char const sdp_ice_candidate_related_port_regex[] = "[^]* rport [0-9]+";
 static char const sdp_ice_candidate_tcp_type_regex[] = "[^]* tcptype [^ ]+";
@@ -15,9 +15,7 @@ static char const sdp_ice_candidate_tcp_type_regex[] = "[^]* tcptype [^ ]+";
 /*
  * Destructor for an existing peer connection.
  */
-static void rawrtc_peer_connection_ice_candidate_destroy(
-        void* arg
-) {
+static void rawrtc_peer_connection_ice_candidate_destroy(void* arg) {
     struct rawrtc_peer_connection_ice_candidate* const candidate = arg;
 
     // Un-reference
@@ -30,11 +28,11 @@ static void rawrtc_peer_connection_ice_candidate_destroy(
  * Create a new ICE candidate from an existing (ORTC) ICE candidate.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
-        struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
-        struct rawrtc_ice_candidate* const ortc_candidate, // nullable
-        char* const mid, // nullable, referenced
-        uint8_t const* const media_line_index, // nullable, copied
-        char* const username_fragment // nullable, referenced
+    struct rawrtc_peer_connection_ice_candidate** const candidatep,  // de-referenced
+    struct rawrtc_ice_candidate* const ortc_candidate,  // nullable
+    char* const mid,  // nullable, referenced
+    uint8_t const* const media_line_index,  // nullable, copied
+    char* const username_fragment  // nullable, referenced
 ) {
     struct rawrtc_peer_connection_ice_candidate* candidate;
 
@@ -52,7 +50,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
     // Set fields
     candidate->candidate = mem_ref(ortc_candidate);
     candidate->mid = mem_ref(mid);
-    candidate->media_line_index = (int16_t) (media_line_index ? *media_line_index : -1);
+    candidate->media_line_index = (int16_t)(media_line_index ? *media_line_index : -1);
     candidate->username_fragment = mem_ref(username_fragment);
 
     // Set pointer & done
@@ -64,11 +62,11 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
  * Create a new ICE candidate from SDP (pl variant).
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
-        struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
-        struct pl* const sdp,
-        char* const mid, // nullable, referenced
-        uint8_t const* const media_line_index, // nullable, copied
-        char* const username_fragment // nullable, referenced
+    struct rawrtc_peer_connection_ice_candidate** const candidatep,  // de-referenced
+    struct pl* const sdp,
+    char* const mid,  // nullable, referenced
+    uint8_t const* const media_line_index,  // nullable, copied
+    char* const username_fragment  // nullable, referenced
 ) {
     enum rawrtc_code error;
     struct pl optional;
@@ -120,10 +118,10 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
 
         // Get optional ICE candidate fields
         re_regex(
-                optional.p, optional.l, sdp_ice_candidate_related_address_regex,
-                NULL, &related_address_pl);
-        re_regex(optional.p, optional.l, sdp_ice_candidate_related_port_regex, NULL,
-                 &related_port_pl);
+            optional.p, optional.l, sdp_ice_candidate_related_address_regex, NULL,
+            &related_address_pl);
+        re_regex(
+            optional.p, optional.l, sdp_ice_candidate_related_port_regex, NULL, &related_port_pl);
         re_regex(optional.p, optional.l, sdp_ice_candidate_tcp_type_regex, NULL, &tcp_type_pl);
 
         // Component ID
@@ -171,8 +169,8 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
 
         // Create (ORTC) ICE candidate
         error = rawrtc_ice_candidate_create_internal(
-                &ortc_candidate, &foundation_pl, priority, &ip_pl, protocol, port, type, tcp_type,
-                &related_address_pl, related_port);
+            &ortc_candidate, &foundation_pl, priority, &ip_pl, protocol, port, type, tcp_type,
+            &related_address_pl, related_port);
         if (error) {
             return error;
         }
@@ -182,7 +180,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
 
     // Create ICE candidate
     error = rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
-            &candidate, ortc_candidate, mid, media_line_index, username_fragment);
+        &candidate, ortc_candidate, mid, media_line_index, username_fragment);
     if (error) {
         goto out;
     }
@@ -206,11 +204,11 @@ out:
  *       specification.
  */
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_create(
-        struct rawrtc_peer_connection_ice_candidate** const candidatep, // de-referenced
-        char* const sdp,
-        char* const mid, // nullable, copied
-        uint8_t const* const media_line_index, // nullable, copied
-        char* const username_fragment // nullable, copied
+    struct rawrtc_peer_connection_ice_candidate** const candidatep,  // de-referenced
+    char* const sdp,
+    char* const mid,  // nullable, copied
+    uint8_t const* const media_line_index,  // nullable, copied
+    char* const username_fragment  // nullable, copied
 ) {
     struct pl sdp_pl;
     enum rawrtc_code error;
@@ -241,7 +239,7 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_create(
 
     // Create ICE candidate
     error = rawrtc_peer_connection_ice_candidate_create_internal(
-            candidatep, &sdp_pl, mid_copy, media_line_index, username_fragment_copy);
+        candidatep, &sdp_pl, mid_copy, media_line_index, username_fragment_copy);
     if (error) {
         goto out;
     }

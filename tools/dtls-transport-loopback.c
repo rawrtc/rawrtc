@@ -4,8 +4,8 @@
 #include <rawrtcc.h>
 #include <rawrtcdc.h>
 #include <re.h>
-#include <stdlib.h> // exit
-#include <unistd.h> // STDIN_FILENO
+#include <stdlib.h>  // exit
+#include <unistd.h>  // STDIN_FILENO
 
 #define DEBUG_MODULE "dtls-transport-loopback-app"
 #define DEBUG_LEVEL 7
@@ -28,23 +28,19 @@ struct dtls_transport_client {
 };
 
 static void ice_gatherer_local_candidate_handler(
-        struct rawrtc_ice_candidate* const candidate,
-        char const * const url, // read-only
-        void* const arg
-) {
+    struct rawrtc_ice_candidate* const candidate,
+    char const* const url,  // read-only
+    void* const arg) {
     struct dtls_transport_client* const client = arg;
 
     // Print local candidate
     default_ice_gatherer_local_candidate_handler(candidate, url, arg);
 
     // Add to other client as remote candidate (if type enabled)
-    add_to_other_if_ice_candidate_type_enabled(
-            arg, candidate, client->other_client->ice_transport);
+    add_to_other_if_ice_candidate_type_enabled(arg, candidate, client->other_client->ice_transport);
 }
 
-static void client_init(
-        struct dtls_transport_client* const local
-) {
+static void client_init(struct dtls_transport_client* const local) {
     struct rawrtc_certificate* certificates[1];
 
     // Generate certificates
@@ -53,49 +49,41 @@ static void client_init(
 
     // Create ICE gatherer
     EOE(rawrtc_ice_gatherer_create(
-            &local->gatherer, local->gather_options,
-            default_ice_gatherer_state_change_handler, default_ice_gatherer_error_handler,
-            ice_gatherer_local_candidate_handler, local));
+        &local->gatherer, local->gather_options, default_ice_gatherer_state_change_handler,
+        default_ice_gatherer_error_handler, ice_gatherer_local_candidate_handler, local));
 
     // Create ICE transport
     EOE(rawrtc_ice_transport_create(
-            &local->ice_transport, local->gatherer,
-            default_ice_transport_state_change_handler,
-            default_ice_transport_candidate_pair_change_handler, local));
+        &local->ice_transport, local->gatherer, default_ice_transport_state_change_handler,
+        default_ice_transport_candidate_pair_change_handler, local));
 
     // Create DTLS transport
     EOE(rawrtc_dtls_transport_create(
-            &local->dtls_transport, local->ice_transport, certificates, ARRAY_SIZE(certificates),
-            default_dtls_transport_state_change_handler, default_dtls_transport_error_handler, local));
+        &local->dtls_transport, local->ice_transport, certificates, ARRAY_SIZE(certificates),
+        default_dtls_transport_state_change_handler, default_dtls_transport_error_handler, local));
 }
 
 static void client_start(
-        struct dtls_transport_client* const local,
-        struct dtls_transport_client* const remote
-) {
+    struct dtls_transport_client* const local, struct dtls_transport_client* const remote) {
     // Get & set ICE parameters
-    EOE(rawrtc_ice_gatherer_get_local_parameters(
-            &local->ice_parameters, remote->gatherer));
+    EOE(rawrtc_ice_gatherer_get_local_parameters(&local->ice_parameters, remote->gatherer));
 
     // Start gathering
     EOE(rawrtc_ice_gatherer_gather(local->gatherer, NULL));
 
     // Start ICE transport
     EOE(rawrtc_ice_transport_start(
-            local->ice_transport, local->gatherer, local->ice_parameters, local->role));
+        local->ice_transport, local->gatherer, local->ice_parameters, local->role));
 
     // Get & set DTLS parameters
     EOE(rawrtc_dtls_transport_get_local_parameters(
-            &local->dtls_parameters, remote->dtls_transport));
+        &local->dtls_parameters, remote->dtls_transport));
 
     // Start DTLS transport
-    EOE(rawrtc_dtls_transport_start(
-            local->dtls_transport, local->dtls_parameters));
+    EOE(rawrtc_dtls_transport_start(local->dtls_transport, local->dtls_parameters));
 }
 
-static void client_stop(
-        struct dtls_transport_client* const client
-) {
+static void client_stop(struct dtls_transport_client* const client) {
     // Stop transports & close gatherer
     EOE(rawrtc_dtls_transport_stop(client->dtls_transport));
     EOE(rawrtc_ice_transport_stop(client->ice_transport));
@@ -119,8 +107,10 @@ int main(int argc, char* argv[argc + 1]) {
     char* const turn_threema_ch_urls[] = {"turn:turn.threema.ch:443"};
     struct dtls_transport_client a = {0};
     struct dtls_transport_client b = {0};
-    (void) a.ice_candidate_types; (void) a.n_ice_candidate_types;
-    (void) b.ice_candidate_types; (void) b.n_ice_candidate_types;
+    (void) a.ice_candidate_types;
+    (void) a.n_ice_candidate_types;
+    (void) b.ice_candidate_types;
+    (void) b.n_ice_candidate_types;
 
     // Debug
     dbg_init(DBG_DEBUG, DBG_ALL);
@@ -140,12 +130,12 @@ int main(int argc, char* argv[argc + 1]) {
 
     // Add ICE servers to ICE gather options
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls),
-            NULL, NULL, RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, stun_google_com_urls, ARRAY_SIZE(stun_google_com_urls), NULL, NULL,
+        RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls),
-            "threema-angular", "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
-            RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
+        gather_options, turn_threema_ch_urls, ARRAY_SIZE(turn_threema_ch_urls), "threema-angular",
+        "Uv0LcCq3kyx6EiRwQW5jVigkhzbp70CjN2CJqzmRxG3UGIdJHSJV6tpo7Gj7YnGB",
+        RAWRTC_ICE_CREDENTIAL_TYPE_PASSWORD));
 
     // Setup client A
     a.name = "A";
