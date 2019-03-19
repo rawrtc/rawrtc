@@ -90,7 +90,7 @@ out:
     } else {
         // Set pointer
         *candidatep = candidate;
-        DEBUG_PRINTF("Created candidate (raw): %s\n", ip);
+        DEBUG_PRINTF("Created candidate (raw): %r\n", ip);
     }
     return error;
 }
