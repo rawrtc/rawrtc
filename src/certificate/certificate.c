@@ -17,7 +17,7 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
-#include <limits.h>
+#include <limits.h>  // INT_MAX, LONG_MAX
 #include <string.h>  // strlen
 
 #define DEBUG_MODULE "certificate"

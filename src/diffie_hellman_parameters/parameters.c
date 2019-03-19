@@ -7,6 +7,7 @@
 #include <openssl/err.h>  // ERR_clear_error
 #include <openssl/pem.h>  // PEM_read_bio_DHparams
 #include <openssl/ssl.h>  // SSL_CTX_set_tmp_dh, SSL_CTX_set_ecdh_auto
+#include <limits.h>  // INT_MAX, LONG_MAX
 
 #define DEBUG_MODULE "diffie-hellman-parameters"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
