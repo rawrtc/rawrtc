@@ -55,46 +55,23 @@ Features with a check mark are already implemented.
 
 ## Prerequisites
 
-The following packages are required:
+The following tools are required:
 
 * [git][git]
 * [ninja][ninja] >= 1.5
-* [meson][meson] >= 0.46.0
-* [cmake][cmake] >= 3.2
+* [meson][meson] >= 0.48.0
 * pkg-config (`pkgconf` for newer FreeBSD versions)
-* SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and FreeBSD)
-* GNU make (`gmake` on FreeBSD for `re` and `rew` dependencies)
+* SSL development libraries (`libssl-dev` on Debian, `openssl` on OSX and
+  FreeBSD)
 
 ## Build
 
-The following instruction will use a custom *prefix* to avoid installing
-the necessary dependencies and this library system-wide.
-
-### Dependencies
-
 ```bash
 cd <path-to-rawrtc>
-./make-dependencies.sh
-```
-
-### Package Configuration Path
-
-The following environment variable is required for both Meson and CMake to find
-the previously built dependencies:
-
-```bash
-export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig
-```
-
-Note that this command will need to be repeated once the terminal has been
-closed.
-
-### Compile
-
-```bash
-cd <path-to-rawrtc>/build
-cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix ..
-make install
+mkdir build
+meson build
+cd build
+ninja
 ```
 
 ## Run
@@ -105,16 +82,6 @@ data channels and browser interoperation, skip to the
 [`peer-connection` tool section](#peer-connection) which uses the WebRTC API or
 to the [`data-channel-sctp` tool section](#data-channel-sctp) which uses the
 ORTC API.
-
-Because we have used a custom *prefix*, we need to add the prefix to the
-path to run the various binaries. To be able to find the shared library
-when running a binary, the library path has to be set as well.
-Note: We assume that you are in the `build` directory.
-
-```bash
-export LD_LIBRARY_PATH=${PWD}/prefix/lib:${LD_LIBRARY_PATH}
-export PATH=${PWD}/prefix/bin:${PATH}
-```
 
 Most of the tools have required or optional arguments which are shared among
 tools. Below is a description for the various shared arguments:
@@ -213,17 +180,14 @@ testing tool is [dctt][dctt] which uses the kernel SCTP stack of FreeBSD.
 
 Building:
 
-This tool is not built by default. In order to build it, set the environment
-variable `SCTP_REDIRECT_TRANSPORT` to `ON` when building:
+This tool is not built by default. You can enable building it in the following
+way:
 
 ```bash
 cd <path-to-rawrtc>/build
-cmake -DCMAKE_INSTALL_PREFIX=${PWD}/prefix -DSCTP_REDIRECT_TRANSPORT=ON ..
-make install
+meson configure -Dsctp_redirect_transport=true
+ninja
 ```
-    
-Note, that this tool will not build on systems that do not have SSE 4.2 support
-such as ARM.
 
 Usage:
 
@@ -373,7 +337,7 @@ Usage:
 
 Special arguments:
 
-* `message-size`: Is the message size used for throughput testing. The
+* `message-size`: Is the message size in bytes used for throughput testing. The
   controlling peer will determine the message size for both peers, so this
   argument is being ignored for the controlled peer.
 * `n-times`: Is the amount of times the message will be sent. Again, this
@@ -443,6 +407,11 @@ Usage:
 
     peer-connection <0|1 (offering)> [<ice-candidate-type> ...]
 
+## Contributing
+
+When creating a pull request, it is recommended to run `format-all.sh` to
+apply a consistent code style.
+
 
 
 [circleci-badge]: https://circleci.com/gh/rawrtc/rawrtc.svg?style=shield
@@ -461,7 +430,7 @@ Usage:
 [sctp-dc]: https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13
 [jsep]: https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-19
 [w3c-webrtc]: https://www.w3.org/TR/webrtc/
-[w3c-ortc]: http://draft.ortc.org
+[w3c-ortc]: https://draft.ortc.org
 
 [re-lock]: http://www.creytiv.com/doxygen/re-dox/html/re__main_8h.html#ad335fcaa56e36b39cb1192af1a6b9904
 [re-mqueue]: http://www.creytiv.com/doxygen/re-dox/html/re__mqueue_8h.html
@@ -470,9 +439,8 @@ Usage:
 [git]: (https://git-scm.com)
 [meson]: https://mesonbuild.com
 [ninja]: https://ninja-build.org
-[cmake]: https://cmake.org
 
-[webrtc-ortc-example]: http://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
-[webrtc-example]: http://rawgit.com/rawrtc/rawrtc/master/htdocs/webrtc/index.html
+[webrtc-ortc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/ortc/index.html
+[webrtc-example]: https://rawgit.com/rawrtc/rawrtc/master/htdocs/webrtc/index.html
 [dctt]: https://github.com/nplab/dctt
 [demystifying-webrtc-dc-size-limit]: https://lgrahl.de/articles/demystifying-webrtc-dc-size-limit.html
