@@ -468,7 +468,8 @@ static void reflexive_candidate_handler(
     // Add server reflexive candidate
     // TODO: Using the candidate's protocol, TCP type and component id correct?
     priority = rawrtc_ice_candidate_calculate_priority(
-        ICE_CAND_TYPE_SRFLX, re_candidate->attr.proto, sa_af(address), re_candidate->attr.tcptype);
+        list_count(trice_lcandl(gatherer->ice)), ICE_CAND_TYPE_SRFLX, re_candidate->attr.proto,
+        sa_af(address), re_candidate->attr.tcptype);
     err = trice_lcand_add(
         &srflx_candidate, gatherer->ice, re_candidate->attr.compid, re_candidate->attr.proto,
         priority, address, &re_candidate->attr.addr, ICE_CAND_TYPE_SRFLX, &re_candidate->attr.addr,
@@ -693,7 +694,8 @@ static enum rawrtc_code add_candidate(
 
     // Add host candidate
     priority = rawrtc_ice_candidate_calculate_priority(
-        ICE_CAND_TYPE_HOST, ipproto, sa_af(address), tcp_type);
+        list_count(trice_lcandl(gatherer->ice)), ICE_CAND_TYPE_HOST, ipproto, sa_af(address),
+        tcp_type);
     // TODO: Set component id properly
     err = trice_lcand_add(
         &re_candidate, gatherer->ice, 1, ipproto, priority, address, NULL, ICE_CAND_TYPE_HOST, NULL,
