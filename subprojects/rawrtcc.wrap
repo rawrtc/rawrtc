@@ -1,0 +1,4 @@
+[wrap-git]
+directory = rawrtcc
+url = https://github.com/rawrtc/rawrtc-common.git
+revision = v0.1.1

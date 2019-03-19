@@ -1,126 +1,210 @@
-version: 2.0
+version: 2
 
-shared: &shared
-  working_directory: ~/rawrtc
-  steps:
-  - checkout
+shared:
+  host: &shared-host
+    working_directory: ~/rawrtc
+    steps:
+      - checkout
 
-  # Diagnostics
-  - run:
-      name: Show versions
-      command: |
-        $CC -v
-        cmake --version
-        openssl version
+      # Set dynamic library path and binary path (since we prefix)
+      - run:
+          name: Setup environment variables
+          command: |
+            echo 'export PREFIX=/tmp/prefix' >> ${BASH_ENV}
+            echo 'export LD_LIBRARY_PATH=${PREFIX}/lib:${PREFIX}/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}' >> ${BASH_ENV}
+            echo 'export PATH=${PREFIX}/bin:${PATH}' >> ${BASH_ENV}
 
-  # Build library dependencies
-  - run:
-      name: Build dependencies
-      command: ./make-dependencies.sh
+      # Configure library
+      - run:
+          name: Configure
+          command: |
+            mkdir build
+            meson build --prefix ${PREFIX}
 
-  # Set pkg-config path, dynamic library path and binary path (since we prefix)
-  - run:
-      name: "Setup environment variables"
-      command: |
-        echo 'export PKG_CONFIG_PATH=${PWD}/build/prefix/lib/pkgconfig:${PKG_CONFIG_PATH}' >> ${BASH_ENV}
-        echo 'export LD_LIBRARY_PATH=${PWD}/build/prefix/lib:${LD_LIBRARY_PATH}' >> ${BASH_ENV}
-        echo 'export PATH=${PWD}/build/prefix/bin:${PATH}' >> ${BASH_ENV}
+      # Build library
+      - run:
+          name: Build
+          command: |
+            cd build
+            ninja install
 
-  # Build library
-  - run:
-      name: Build
-      command: |
-        cd build
-        cmake \
-          -DCMAKE_INSTALL_PREFIX=${PWD}/prefix \
-          -DCMAKE_C_FLAGS="-Werror -Wall -Wno-unused-function" \
-          ..
-        make install
+      # Run ICE gatherer
+      - run:
+          name: Run ICE gatherer
+          command: |
+            ulimit -c unlimited -S
+            ice-gatherer
 
-  # Run ICE gatherer
-  - run:
-      name: Run ICE gatherer
-      command: |
-        ulimit -c unlimited -S
-        ice-gatherer
+      # Store core dumps on failure
+      - run:
+          command: |
+            mkdir -p /tmp/core_dumps
+            cp core.* /tmp/core_dumps
+          when: on_fail
 
-  # Store core dumps on failure
-  - run:
-      command: |
-        mkdir -p /tmp/core_dumps
-        cp core.* /tmp/core_dumps
-      when: on_fail
+      - store_artifacts:
+          path: /tmp/core_dumps
 
-  - store_artifacts:
-      path: /tmp/core_dumps
+  cross: &shared-cross
+    working_directory: ~/rawrtc
+    steps:
+      - checkout
+
+      # Configure library
+      - run:
+          name: Configure
+          command: |
+            mkdir build
+            meson build --prefix /tmp/prefix --cross-file ${CROSS_FILE_NAME}
+
+      # Build library
+      - run:
+          name: Build
+          command: |
+            cd build
+            ninja install
 
 
 jobs:
-  # Ubuntu 14.04 LTS
+  # Host: Ubuntu 14.04 LTS
   trusty-gcc:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:trusty
+      - image: rawrtc/ci-image:trusty
     environment:
       CC: gcc
   trusty-clang:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:trusty
+      - image: rawrtc/ci-image:trusty
     environment:
       CC: clang
 
-  # Ubuntu 16.04 LTS
+  # Host: Ubuntu 16.04 LTS
   xenial-gcc:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:xenial
+      - image: rawrtc/ci-image:xenial
     environment:
       CC: gcc
   xenial-clang:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:xenial
+      - image: rawrtc/ci-image:xenial
     environment:
       CC: clang
 
-  # Ubuntu 18.04 LTS
+  # Host: Ubuntu 18.04 LTS
   bionic-gcc:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:bionic
+      - image: rawrtc/ci-image:bionic
     environment:
       CC: gcc
   bionic-clang:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:bionic
+      - image: rawrtc/ci-image:bionic
     environment:
       CC: clang
 
-  # Arch Linux Latest
+  # Host: Arch Linux
   archlinux-gcc:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:archlinux
+      - image: rawrtc/ci-image:archlinux
     environment:
       CC: gcc
   archlinux-clang:
-    <<: *shared
+    <<: *shared-host
     docker:
-    - image: rawrtc/ci-image:archlinux
+      - image: rawrtc/ci-image:archlinux
     environment:
       CC: clang
 
+  # Cross: Linux ARMv6
+  linux-armv6:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:linux-armv6
+
+  # Cross: Linux ARMv7
+  linux-armv7:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:linux-armv7
+
+  # Cross: Android API 16 ARM
+  android-16-arm:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-16-arm
+
+  # Cross: Android API 16 x86
+  android-16-x86:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-16-x86
+
+  # Cross: Android API 28 ARM
+  android-28-arm:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-28-arm
+
+  # Cross: Android API 28 ARM64
+  android-28-arm64:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-28-arm64
+
+  # Cross: Android API 28 x86
+  android-28-x86:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-28-x86
+
+  # Cross: Android API 28 x86_64
+  # TODO: https://github.com/mesonbuild/meson/issues/5102
+  #android-28-x86_64:
+  #  <<: *shared-cross
+  #  docker:
+  #    - image: rawrtc/cross-build:android-28-x86_64
+
+  # Cross: Windows x86
+  #windows-x86:
+  #  <<: *shared-cross
+  #  docker:
+  #    - image: rawrtc/cross-build:windows-x86
+
+  # Cross: Windows x64
+  #windows-x64:
+  #  <<: *shared-cross
+  #  docker:
+  #    - image: rawrtc/cross-build:windows-x64
+
+
 workflows:
   version: 2
+
+  # Build all
   build:
     jobs:
-    - trusty-gcc
-    - trusty-clang
-    - xenial-gcc
-    - xenial-clang
-    - bionic-gcc
-    - bionic-clang
-    - archlinux-gcc
-    - archlinux-clang
+      - trusty-gcc
+      - trusty-clang
+      - xenial-gcc
+      - xenial-clang
+      - bionic-gcc
+      - bionic-clang
+      - archlinux-gcc
+      - archlinux-clang
+      - linux-armv6
+      - linux-armv7
+      - android-16-arm
+      - android-16-x86
+      - android-28-arm
+      - android-28-arm64
+      - android-28-x86
+      #- android-28-x86_64
+      #- windows-x86
+      #- windows-x64

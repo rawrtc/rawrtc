@@ -1,0 +1,15 @@
+#pragma once
+
+/// Current version of the library.
+///
+/// Follows [Semantic Versioning 2.0.0](https://semver.org)
+#mesondefine RAWRTC_VERSION
+#mesondefine RAWRTC_VERSION_MAJOR
+#mesondefine RAWRTC_VERSION_MINOR
+#mesondefine RAWRTC_VERSION_PATCH
+
+/// Debug level
+#mesondefine RAWRTC_DEBUG_LEVEL
+
+/// Whether the SCTP redirect transport has been compiled
+#mesondefine RAWRTC_HAVE_SCTP_REDIRECT_TRANSPORT
