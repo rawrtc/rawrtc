@@ -23,7 +23,7 @@ static enum rawrtc_code set_dh_parameters(
     int codes;
 
     // Check that the parameters are "likely enough to be valid"
-#if OPENSSL_VERSION_NUMBER < 0x1010000fL
+#if OPENSSL_VERSION_NUMBER < 0x1010000fL || defined(OPENSSL_IS_BORINGSSL)
     if (!DH_check(dh, &codes)) {
         return RAWRTC_CODE_INVALID_ARGUMENT;
     }
