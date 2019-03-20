@@ -12,19 +12,29 @@
 
 /*
  * Calculate the ICE candidate priority.
- * TODO: Update argument types, use own
- * TODO: https://tools.ietf.org/html/draft-ietf-ice-rfc5245bis-04#section-4.1.2.1
+ *
+ * We prefer:
+ *
+ * 1. UDP over TCP, then
+ * 2. IPv6 over IPv4, then
+ * 3. Older candidates over newer candidates.
+ *
+ * TODO: We should follow ICE Dual-Stack Recommendations.
+ *       See: https://tools.ietf.org/html/rfc8421#section-4
  */
 uint32_t rawrtc_ice_candidate_calculate_priority(
+    uint32_t const n_candidates,
     enum ice_cand_type const candidate_type,
     int const protocol,
     int const address_family,
     enum ice_tcptype const tcp_type) {
-    (void) candidate_type;
-    (void) protocol;
-    (void) address_family;
+    uint16_t const age =
+        n_candidates > (1 << 13) ? (uint16_t) 0 : (uint16_t)((1 << 13) - n_candidates);
+    uint16_t const is_udp = protocol == IPPROTO_UDP ? (uint16_t) 1 : (uint16_t) 0;
+    uint16_t const is_ipv6 = address_family == AF_INET6 ? (uint16_t) 1 : (uint16_t) 0;
     (void) tcp_type;
-    return 1;
+    // TODO: Set correct component ID
+    return ice_cand_calc_prio(candidate_type, age | is_ipv6 << 14 | is_udp << 15, 1);
 }
 
 /*

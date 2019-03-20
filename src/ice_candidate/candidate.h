@@ -40,6 +40,7 @@ struct rawrtc_ice_candidate {
 
 // Note: Cannot be public until it uses fixed size types in signature (stdint)
 uint32_t rawrtc_ice_candidate_calculate_priority(
+    uint32_t const n_candidates,
     enum ice_cand_type const candidate_type,
     int const protocol,
     int const address_family,

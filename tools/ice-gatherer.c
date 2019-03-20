@@ -51,8 +51,8 @@ int main(int argc, char* argv[argc + 1]) {
         gather_options, stun_google_com_ip_urls, ARRAY_SIZE(stun_google_com_ip_urls), NULL, NULL,
         RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
     EOE(rawrtc_ice_gather_options_add_server(
-            gather_options, unreachable_urls, ARRAY_SIZE(unreachable_urls), NULL, NULL,
-            RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+        gather_options, unreachable_urls, ARRAY_SIZE(unreachable_urls), NULL, NULL,
+        RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
 
     // Setup client
     client.name = "A";
