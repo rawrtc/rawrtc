@@ -366,7 +366,7 @@ channels:
    
    ```js
    peerConnection.createDataChannel('bear-noises', {
-       ordered: true,
+       ordered: false,
        maxRetransmits: 0
    });
    ```
