@@ -35,7 +35,7 @@ Features with a check mark are already implemented.
     [[draft-ietf-rtcweb-jsep-24]][jsep]
   - [x] ORTC C-API based on the [W3C CG ORTC API][w3c-ortc]
 
-## Threading
+## FAQ
 
 1. *Does this use multiple threads?*
 
