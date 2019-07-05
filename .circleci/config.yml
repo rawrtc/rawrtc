@@ -165,11 +165,10 @@ jobs:
       - image: rawrtc/cross-build:android-28-x86
 
   # Cross: Android API 28 x86_64
-  # TODO: https://github.com/mesonbuild/meson/issues/5102
-  #android-28-x86_64:
-  #  <<: *shared-cross
-  #  docker:
-  #    - image: rawrtc/cross-build:android-28-x86_64
+  android-28-x86_64:
+    <<: *shared-cross
+    docker:
+      - image: rawrtc/cross-build:android-28-x86_64
 
   # Cross: Windows x86
   #windows-x86:
@@ -205,6 +204,6 @@ workflows:
       - android-28-arm
       - android-28-arm64
       - android-28-x86
-      #- android-28-x86_64
+      - android-28-x86_64
       #- windows-x86
       #- windows-x64
