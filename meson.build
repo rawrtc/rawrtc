@@ -1,6 +1,6 @@
 # Project definition
 project('rawrtc', 'c',
-    version: '0.5.0',
+    version: '0.5.1',
     default_options: ['c_std=c99'],
     meson_version: '>=0.48.0')
 

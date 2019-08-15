@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.1] (2019-08-15)
+
+* Re-enable peer reflexive candidates (#141)
+
 ## [0.5.0] (2019-08-15)
 
 * Fix BoringSSL compatibility (#139)
