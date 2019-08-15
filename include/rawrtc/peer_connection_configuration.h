@@ -1,6 +1,7 @@
 #pragma once
 #include "ice_gather_options.h"
 #include <rawrtcc/code.h>
+#include <rawrtcdc/sctp_transport.h>
 #include <re.h>
 
 // Dependencies
@@ -62,4 +63,34 @@ enum rawrtc_code rawrtc_peer_connection_configuration_get_certificates(
  * Note: Legacy SDP for data channels is on by default due to parsing problems in Chrome.
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_05(
-    struct rawrtc_peer_connection_configuration* configuration, bool const on);
+    struct rawrtc_peer_connection_configuration* configuration, bool on);
+
+/*
+ * Set the SCTP transport's send and receive buffer length in bytes.
+ * If both values are zero, the default buffer length will be used. Otherwise,
+ * zero is invalid.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_buffer_length(
+    struct rawrtc_peer_connection_configuration* configuration,
+    uint32_t send_buffer_length,
+    uint32_t receive_buffer_length);
+
+/*
+ * Set the SCTP transport's congestion control algorithm.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_congestion_ctrl_algorithm(
+    struct rawrtc_peer_connection_configuration* configuration,
+    enum rawrtc_sctp_transport_congestion_ctrl algorithm);
+
+/*
+ * Set the SCTP transport's maximum transmission unit (MTU).
+ * A value of zero indicates that the default MTU should be used.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu(
+    struct rawrtc_peer_connection_configuration* configuration, uint32_t mtu);
+
+/*
+ * Enable or disable MTU discovery on the SCTP transport.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu_discovery(
+    struct rawrtc_peer_connection_configuration* configuration, bool on);

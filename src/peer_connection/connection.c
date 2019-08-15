@@ -28,6 +28,7 @@
 #define DEBUG_MODULE "peer-connection"
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include <rawrtcc/debug.h>
+#include <src/peer_connection_configuration/configuration.h>
 
 /*
  * Change the signalling state.
@@ -155,6 +156,43 @@ out:
 }
 
 /*
+ * Start the SCTP transport.
+ */
+static enum rawrtc_code sctp_transport_start(
+    struct rawrtc_sctp_transport* const sctp_transport,  // not checked
+    struct rawrtc_peer_connection* const connection,  // not checked
+    struct rawrtc_peer_connection_description* const description  // not checked
+) {
+    enum rawrtc_code error;
+
+    // Start SCTP transport
+    error = rawrtc_sctp_transport_start(
+        sctp_transport, description->sctp_capabilities, description->sctp_port);
+    if (error) {
+        return error;
+    }
+
+    // Set MTU (if necessary)
+    if (connection->configuration->sctp.mtu != 0) {
+        error = rawrtc_sctp_transport_set_mtu(sctp_transport, connection->configuration->sctp.mtu);
+        if (error) {
+            return error;
+        }
+    }
+
+    // Enable path MTU discovery (if necessary)
+    if (connection->configuration->sctp.mtu_discovery) {
+        error = rawrtc_sctp_transport_enable_mtu_discovery(sctp_transport);
+        if (error) {
+            return error;
+        }
+    }
+
+    // Done
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
  * All the nasty SDP stuff has been done. Fire it all up - YAY!
  */
 static enum rawrtc_code peer_connection_start(
@@ -209,8 +247,6 @@ static enum rawrtc_code peer_connection_start(
     // Start data transport
     switch (data_transport_type) {
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
-            struct rawrtc_sctp_transport* const sctp_transport = data_transport;
-
             // Start DTLS transport
             error =
                 rawrtc_dtls_transport_start(context->dtls_transport, description->dtls_parameters);
@@ -219,8 +255,7 @@ static enum rawrtc_code peer_connection_start(
             }
 
             // Start SCTP transport
-            error = rawrtc_sctp_transport_start(
-                sctp_transport, description->sctp_capabilities, description->sctp_port);
+            error = sctp_transport_start(data_transport, connection, description);
             if (error) {
                 goto out;
             }
@@ -677,14 +712,71 @@ static void sctp_transport_state_change_handler(
 }
 
 /*
+ * Lazy-create an SCTP transport.
+ */
+static enum rawrtc_code get_sctp_transport(
+    struct rawrtc_peer_connection_context* const context,  // not checked
+    struct rawrtc_peer_connection* const connection  // not checked
+) {
+    enum rawrtc_code error;
+    struct rawrtc_sctp_transport* sctp_transport;
+
+    // Get DTLS transport
+    error = get_dtls_transport(context, connection);
+    if (error) {
+        return error;
+    }
+
+    // Create SCTP transport
+    error = rawrtc_sctp_transport_create(
+        &sctp_transport, context->dtls_transport, RAWRTC_PEER_CONNECTION_SCTP_TRANSPORT_PORT,
+        connection->data_channel_handler, sctp_transport_state_change_handler, connection->arg);
+    if (error) {
+        return error;
+    }
+
+    // Set send/receive buffer length (if necessary)
+    if (connection->configuration->sctp.send_buffer_length != 0 &&
+        connection->configuration->sctp.receive_buffer_length != 0) {
+        error = rawrtc_sctp_transport_set_buffer_length(
+            sctp_transport, connection->configuration->sctp.send_buffer_length,
+            connection->configuration->sctp.receive_buffer_length);
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Set congestion control algorithm (if necessary)
+    if (connection->configuration->sctp.congestion_ctrl_algorithm !=
+        RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RFC2581) {
+        error = rawrtc_sctp_transport_set_congestion_ctrl_algorithm(
+            sctp_transport, connection->configuration->sctp.congestion_ctrl_algorithm);
+        if (error) {
+            goto out;
+        }
+    }
+
+    // Get data transport
+    error = rawrtc_sctp_transport_get_data_transport(&context->data_transport, sctp_transport);
+    if (error) {
+        goto out;
+    }
+
+out:
+    // Un-reference
+    // Note: As the data transport has a reference to the SCTP transport, we can
+    //       still retrieve the reference later.
+    mem_deref(sctp_transport);
+    return error;
+}
+
+/*
  * Lazy-create the requested data transport.
  */
 static enum rawrtc_code get_data_transport(
     struct rawrtc_peer_connection_context* const context,  // not checked
     struct rawrtc_peer_connection* const connection  // not checked
 ) {
-    enum rawrtc_code error;
-
     // Already created?
     if (context->data_transport) {
         return RAWRTC_CODE_SUCCESS;
@@ -693,40 +785,11 @@ static enum rawrtc_code get_data_transport(
     // Create data transport depending on what we want to have
     switch (connection->data_transport_type) {
         case RAWRTC_DATA_TRANSPORT_TYPE_SCTP: {
-            struct rawrtc_sctp_transport* sctp_transport;
-
-            // Get DTLS transport
-            error = get_dtls_transport(context, connection);
-            if (error) {
-                return error;
-            }
-
-            // Create SCTP transport
-            error = rawrtc_sctp_transport_create(
-                &sctp_transport, context->dtls_transport,
-                RAWRTC_PEER_CONNECTION_SCTP_TRANSPORT_PORT, connection->data_channel_handler,
-                sctp_transport_state_change_handler, connection->arg);
-            if (error) {
-                return error;
-            }
-
-            // Get data transport
-            // Note: Since the data transport has a reference to the SCTP transport, we can still
-            //       retrieve the reference later.
-            error =
-                rawrtc_sctp_transport_get_data_transport(&context->data_transport, sctp_transport);
-            mem_deref(sctp_transport);
-            if (error) {
-                return error;
-            }
-            break;
+            return get_sctp_transport(context, connection);
         }
         default:
             return RAWRTC_CODE_NOT_IMPLEMENTED;
     }
-
-    // Done
-    return RAWRTC_CODE_SUCCESS;
 }
 
 /*
