@@ -11,6 +11,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+enum {
+    TRANSPORT_BUFFER_LENGTH = 1048576,  // 1 MiB
+};
+
 // Note: Shadows struct client
 struct peer_connection_client {
     char* name;
@@ -336,6 +340,10 @@ int main(int argc, char* argv[argc + 1]) {
     EOE(rawrtc_peer_connection_configuration_add_ice_server(
         configuration, turn_zwuenf_org_urls, ARRAY_SIZE(turn_zwuenf_org_urls), NULL, NULL,
         RAWRTC_ICE_CREDENTIAL_TYPE_NONE));
+
+    // Set the SCTP transport's buffer length
+    EOE(rawrtc_peer_connection_configuration_set_sctp_buffer_length(
+        configuration, TRANSPORT_BUFFER_LENGTH, TRANSPORT_BUFFER_LENGTH));
 
     // Set client fields
     client.name = "A";

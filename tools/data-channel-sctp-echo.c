@@ -13,6 +13,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+enum {
+    TRANSPORT_BUFFER_LENGTH = 1048576,  // 1 MiB
+};
+
 struct parameters {
     struct rawrtc_ice_parameters* ice_parameters;
     struct rawrtc_ice_candidates* ice_candidates;
@@ -138,6 +142,8 @@ static void client_init(struct data_channel_sctp_client* const client) {
         &client->sctp_transport, client->dtls_transport,
         client->local_parameters.sctp_parameters.port, data_channel_handler,
         default_sctp_transport_state_change_handler, client));
+    EOE(rawrtc_sctp_transport_set_buffer_length(
+        client->sctp_transport, TRANSPORT_BUFFER_LENGTH, TRANSPORT_BUFFER_LENGTH));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(&client->data_transport, client->sctp_transport));
