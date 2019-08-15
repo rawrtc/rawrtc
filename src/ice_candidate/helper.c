@@ -121,7 +121,7 @@ enum rawrtc_code rawrtc_candidate_helper_find(
     // Lookup candidate helper
     for (le = list_head(candidate_helpers); le != NULL; le = le->next) {
         struct rawrtc_candidate_helper* const candidate_helper = le->data;
-        if (candidate_helper->candidate == re_candidate) {
+        if (candidate_helper->candidate->us == re_candidate->us) {
             // Found
             *candidate_helperp = candidate_helper;
             return RAWRTC_CODE_SUCCESS;
