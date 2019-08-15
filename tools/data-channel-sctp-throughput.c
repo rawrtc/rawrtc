@@ -31,6 +31,9 @@ struct data_channel_sctp_throughput_client {
     size_t n_ice_candidate_types;
     uint64_t message_size;
     uint16_t n_times_left;
+    uint32_t buffer_length;
+    enum rawrtc_sctp_transport_congestion_ctrl congestion_ctrl_algorithm;
+    uint32_t mtu;
     struct rawrtc_ice_gather_options* gather_options;
     enum rawrtc_ice_role role;
     struct mbuf* start_buffer;
@@ -215,7 +218,9 @@ static void client_init(struct data_channel_sctp_throughput_client* const client
         client->local_parameters.sctp_parameters.port, default_data_channel_handler,
         default_sctp_transport_state_change_handler, client));
     EOE(rawrtc_sctp_transport_set_buffer_length(
-        client->sctp_transport, TRANSPORT_BUFFER_LENGTH, TRANSPORT_BUFFER_LENGTH));
+        client->sctp_transport, client->buffer_length, client->buffer_length));
+    EOE(rawrtc_sctp_transport_set_congestion_ctrl_algorithm(
+        client->sctp_transport, client->congestion_ctrl_algorithm));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(&client->data_transport, client->sctp_transport));
@@ -258,6 +263,9 @@ static void client_start_transports(struct data_channel_sctp_throughput_client* 
     EOE(rawrtc_sctp_transport_start(
         client->sctp_transport, remote_parameters->sctp_parameters.capabilities,
         remote_parameters->sctp_parameters.port));
+    if (client->mtu != 0) {
+        EOE(rawrtc_sctp_transport_set_mtu(client->sctp_transport, client->mtu));
+    }
 }
 
 static void parameters_destroy(struct parameters* const parameters) {
@@ -434,7 +442,7 @@ static void print_local_parameters(struct data_channel_sctp_throughput_client* c
 static void exit_with_usage(char* program) {
     DEBUG_WARNING(
         "Usage: %s <0|1 (ice-role)> <message-size> [<n-times>] [<sctp-port>] "
-        "[<ice-candidate-type> ...]\n",
+        "[<buffer-length>] [<cc-algorithm>] [<mtu>] [<ice-candidate-type> ...]\n",
         program);
     exit(1);
 }
@@ -483,10 +491,27 @@ int main(int argc, char* argv[argc + 1]) {
         exit_with_usage(argv[0]);
     }
 
+    // Get send/receiver buffer length (optional)
+    client.buffer_length = TRANSPORT_BUFFER_LENGTH;
+    if (argc >= 6 && !str_to_uint32(&client.buffer_length, argv[5])) {
+        exit_with_usage(argv[0]);
+    }
+
+    // Get congestion control algorithm (optional)
+    client.congestion_ctrl_algorithm = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RFC2581;
+    if (argc >= 7 && get_congestion_control_algorithm(&client.congestion_ctrl_algorithm, argv[6])) {
+        exit_with_usage(argv[0]);
+    }
+
+    // Get MTU (optional)
+    if (argc >= 8 && !str_to_uint32(&client.mtu, argv[7])) {
+        exit_with_usage(argv[0]);
+    }
+
     // Get enabled ICE candidate types to be added (optional)
-    if (argc >= 6) {
-        ice_candidate_types = &argv[5];
-        n_ice_candidate_types = (size_t) argc - 5;
+    if (argc >= 9) {
+        ice_candidate_types = &argv[8];
+        n_ice_candidate_types = (size_t) argc - 8;
     }
 
     // Create ICE gather options

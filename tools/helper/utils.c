@@ -61,6 +61,23 @@ bool str_to_uint64(uint64_t* const numberp, char* const str) {
 }
 
 /*
+ * Convert string to uint32.
+ */
+bool str_to_uint32(uint32_t* const numberp, char* const str) {
+    uint64_t number;
+    bool success = str_to_uint64(&number, str);
+
+    // Validate
+    if (!success || number > UINT32_MAX) {
+        return false;
+    }
+
+    // Done
+    *numberp = (uint32_t) number;
+    return true;
+}
+
+/*
  * Get a dictionary entry and store it in `*valuep`.
  */
 enum rawrtc_code dict_get_entry(
@@ -222,6 +239,29 @@ enum rawrtc_code get_ice_role(
             return RAWRTC_CODE_SUCCESS;
         default:
             return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+}
+
+/*
+ * Get the congestion control algorithm from a string.
+ */
+enum rawrtc_code get_congestion_control_algorithm(
+    enum rawrtc_sctp_transport_congestion_ctrl* const algorithmp,  // de-referenced
+    char const* const str) {
+    if (str_casecmp(str, "RFC2581") == 0) {
+        *algorithmp = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RFC2581;
+        return RAWRTC_CODE_SUCCESS;
+    } else if (str_casecmp(str, "HSTCP") == 0) {
+        *algorithmp = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_HSTCP;
+        return RAWRTC_CODE_SUCCESS;
+    } else if (str_casecmp(str, "HTCP") == 0) {
+        *algorithmp = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_HTCP;
+        return RAWRTC_CODE_SUCCESS;
+    } else if (str_casecmp(str, "RTCC") == 0) {
+        *algorithmp = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RTCC;
+        return RAWRTC_CODE_SUCCESS;
+    } else {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
     }
 }
 
