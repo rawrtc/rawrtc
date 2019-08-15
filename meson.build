@@ -109,6 +109,6 @@ rawrtc_dep = declare_dependency(
     link_with: rawrtc)
 
 # Tools (optional)
-if get_option('build_tools')
+if get_option('tools')
     subdir('tools')
 endif
