@@ -14,7 +14,8 @@
 #include <re_dbg.h>
 
 enum {
-    DEFAULT_MESSAGE_SIZE = 1073741823,
+    TRANSPORT_BUFFER_LENGTH = 1048576,  // 1 MiB
+    DEFAULT_MESSAGE_LENGTH = 1073741823,  // 1 GiB
 };
 
 struct parameters {
@@ -52,7 +53,7 @@ static void timer_handler(void* arg) {
     struct data_channel_helper* const channel = arg;
     struct data_channel_sctp_streamed_client* const client =
         (struct data_channel_sctp_streamed_client*) channel->client;
-    uint64_t max_message_size = DEFAULT_MESSAGE_SIZE;  // Default to 1 GiB
+    uint64_t max_message_size = DEFAULT_MESSAGE_LENGTH;  // Default to 1 GiB
     struct mbuf* buffer;
     enum rawrtc_code error;
     enum rawrtc_dtls_role role;
@@ -61,9 +62,9 @@ static void timer_handler(void* arg) {
     EOE(rawrtc_sctp_capabilities_get_max_message_size(
         &max_message_size, client->remote_parameters.sctp_parameters.capabilities));
     if (max_message_size > 0) {
-        max_message_size = min(DEFAULT_MESSAGE_SIZE, max_message_size);
+        max_message_size = min(DEFAULT_MESSAGE_LENGTH, max_message_size);
     } else {
-        max_message_size = DEFAULT_MESSAGE_SIZE;
+        max_message_size = DEFAULT_MESSAGE_LENGTH;
     }
 
     // Compose message
@@ -243,6 +244,8 @@ static void client_init(struct data_channel_sctp_streamed_client* const client) 
         &client->sctp_transport, client->dtls_transport,
         client->local_parameters.sctp_parameters.port, data_channel_handler,
         default_sctp_transport_state_change_handler, client));
+    EOE(rawrtc_sctp_transport_set_buffer_length(
+        client->sctp_transport, TRANSPORT_BUFFER_LENGTH, TRANSPORT_BUFFER_LENGTH));
 
     // Get data transport
     EOE(rawrtc_sctp_transport_get_data_transport(&client->data_transport, client->sctp_transport));

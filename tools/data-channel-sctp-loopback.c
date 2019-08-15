@@ -11,6 +11,10 @@
 #define DEBUG_LEVEL 7
 #include <re_dbg.h>
 
+enum {
+    TRANSPORT_BUFFER_LENGTH = 1048576,  // 1 MiB
+};
+
 // Note: Shadows struct client
 struct data_channel_sctp_client {
     char* name;
@@ -185,6 +189,8 @@ static void client_init(struct data_channel_sctp_client* const local) {
     EOE(rawrtc_sctp_transport_create(
         &local->sctp_transport, local->dtls_transport, local->sctp_port,
         default_data_channel_handler, default_sctp_transport_state_change_handler, local));
+    EOE(rawrtc_sctp_transport_set_buffer_length(
+        local->sctp_transport, TRANSPORT_BUFFER_LENGTH, TRANSPORT_BUFFER_LENGTH));
 
     // Get SCTP capabilities
     EOE(rawrtc_sctp_transport_get_capabilities(&local->sctp_capabilities));

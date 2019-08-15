@@ -6,7 +6,9 @@
 #include <rawrtc/peer_connection_configuration.h>
 #include <rawrtc/utils.h>
 #include <rawrtcc/code.h>
+#include <rawrtcdc/sctp_transport.h>
 #include <re.h>
+#include <limits.h>  // INT_MAX
 
 /*
  * Destructor for an existing peer connection configuration.
@@ -45,6 +47,11 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
     list_init(&configuration->ice_servers);
     list_init(&configuration->certificates);
     configuration->sctp_sdp_05 = true;
+    configuration->sctp.send_buffer_length = 0;
+    configuration->sctp.receive_buffer_length = 0;
+    configuration->sctp.congestion_ctrl_algorithm = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RFC2581;
+    configuration->sctp.mtu = 0;
+    configuration->sctp.mtu_discovery = false;
 
     // Set pointer and return
     *configurationp = configuration;
@@ -180,5 +187,74 @@ enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_sdp_05(
 
     // Set
     configuration->sctp_sdp_05 = on;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Set the SCTP transport's send and receive buffer length in bytes.
+ * If both values are zero, the default buffer length will be used. Otherwise,
+ * zero is invalid.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_buffer_length(
+    struct rawrtc_peer_connection_configuration* configuration,
+    uint32_t const send_buffer_length,
+    uint32_t const receive_buffer_length) {
+    // Check arguments
+    if (!configuration || send_buffer_length > INT_MAX || receive_buffer_length > INT_MAX ||
+        (send_buffer_length == 0 && receive_buffer_length != 0) ||
+        (send_buffer_length != 0 && receive_buffer_length == 0)) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set length for send/receive buffer
+    configuration->sctp.send_buffer_length = send_buffer_length;
+    configuration->sctp.receive_buffer_length = receive_buffer_length;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Set the SCTP transport's congestion control algorithm.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_congestion_ctrl_algorithm(
+    struct rawrtc_peer_connection_configuration* configuration,
+    enum rawrtc_sctp_transport_congestion_ctrl const algorithm) {
+    // Check arguments
+    if (!configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set
+    configuration->sctp.congestion_ctrl_algorithm = algorithm;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Set the SCTP transport's maximum transmission unit (MTU).
+ * A value of zero indicates that the default MTU should be used.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu(
+    struct rawrtc_peer_connection_configuration* configuration, uint32_t const mtu) {
+    // Check arguments
+    if (!configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set
+    configuration->sctp.mtu = mtu;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * Enable or disable MTU discovery on the SCTP transport.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu_discovery(
+    struct rawrtc_peer_connection_configuration* configuration, bool const on) {
+    // Check arguments
+    if (!configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Set
+    configuration->sctp.mtu_discovery = on;
     return RAWRTC_CODE_SUCCESS;
 }

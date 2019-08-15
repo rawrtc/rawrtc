@@ -16,6 +16,11 @@ bool str_to_uint16(uint16_t* const numberp, char* const str);
 bool str_to_uint64(uint64_t* const numberp, char* const str);
 
 /*
+ * Convert string to uint32.
+ */
+bool str_to_uint32(uint32_t* const numberp, char* const str);
+
+/*
  * Get a dictionary entry and store it in `*valuep`.
  */
 enum rawrtc_code dict_get_entry(
@@ -48,6 +53,13 @@ enum rawrtc_code get_json_stdin(struct odict** const dictp  // de-referenced
  */
 enum rawrtc_code get_ice_role(
     enum rawrtc_ice_role* const rolep,  // de-referenced
+    char const* const str);
+
+/*
+ * Get the congestion control algorithm from a string.
+ */
+enum rawrtc_code get_congestion_control_algorithm(
+    enum rawrtc_sctp_transport_congestion_ctrl* const algorithmp,  // de-referenced
     char const* const str);
 
 /*
