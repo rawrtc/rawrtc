@@ -40,6 +40,8 @@ struct rawrtc_certificate_options rawrtc_default_certificate_options = {
  * Print and flush the OpenSSL error queue.
  */
 static int print_openssl_error(char const* message, size_t length, void* arg) {
+    (void) message;
+    (void) length;
     (void) arg;
     DEBUG_WARNING("%b", message, length);
 
