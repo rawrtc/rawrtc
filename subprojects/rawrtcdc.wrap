@@ -1,4 +1,4 @@
 [wrap-git]
 directory = rawrtcdc
 url = https://github.com/rawrtc/rawrtc-data-channel.git
-revision = v0.1.2
+revision = v0.1.3

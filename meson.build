@@ -49,13 +49,13 @@ rew_dep = dependency('librawrrew',
 
 # Dependency: rawrtcc
 rawrtcc_dep = dependency('rawrtcc',
-    version: '>=0.1.1',
+    version: '>=0.1.2',
     fallback: ['rawrtcc', 'rawrtcc_dep'],
     required: true)
 
 # Dependency: rawrtcdc
 rawrtcdc_dep = dependency('rawrtcdc',
-    version: '>=0.1.2',
+    version: '>=0.1.3',
     fallback: ['rawrtcdc', 'rawrtcdc_dep'],
     required: true)
 
