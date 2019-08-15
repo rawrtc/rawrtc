@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0] (2019-08-15)
+
+* Fix BoringSSL compatibility (#139)
+* Calculate ICE candidate priority (#140)
+* Use [upstream usrsctp](https://github.com/sctplab/usrsctp/)
+* Expose more transport parameters (#146)
+  - Add getter/setter for send/receiver buffer length
+  - Add getter/setter for congestion control algorithm
+  - Add getter/setter for MTU
+
 ## [0.4.0] (2019-03-19)
 
 * Replace CMake with Meson build system
@@ -33,6 +43,7 @@
 
 
 
+[0.5.0]: https://github.com/rawrtc/rawrtc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rawrtc/rawrtc/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rawrtc/rawrtc/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/rawrtc/rawrtc/compare/v0.2.1...v0.2.2
