@@ -13,7 +13,9 @@ struct rawrtc_ice_transport {
     rawrtc_ice_transport_state_change_handler state_change_handler;  // nullable
     rawrtc_ice_transport_candidate_pair_change_handler candidate_pair_change_handler;  // nullable
     void* arg;  // nullable
+    struct list mdns_resolvers;
     struct stun* stun_client;
+    struct dnsc* mdns_client;
     struct rawrtc_ice_parameters* remote_parameters;  // referenced
     struct rawrtc_dtls_transport* dtls_transport;  // referenced, nullable
     bool remote_end_of_candidates;

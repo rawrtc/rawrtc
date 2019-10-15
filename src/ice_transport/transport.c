@@ -2,6 +2,7 @@
 #include "../dtls_transport/transport.h"
 #include "../ice_candidate/candidate.h"
 #include "../ice_candidate/helper.h"
+#include "../ice_candidate/resolver.h"
 #include "../ice_gatherer/gatherer.h"
 #include "../ice_parameters/parameters.h"
 #include "../main/config.h"
@@ -18,6 +19,12 @@
 //#define RAWRTC_DEBUG_MODULE_LEVEL 7 // Note: Uncomment this to debug this module only
 #include <rawrtcc/debug.h>
 
+static enum rawrtc_code add_remote_candidate(
+    struct rawrtc_ice_transport* const transport,
+    struct rawrtc_ice_candidate* const candidate,  // nullable
+    struct sa* const resolved_mdns_address  // nullable
+);
+
 /*
  * Destructor for an existing ICE transport.
  */
@@ -29,7 +36,9 @@ static void rawrtc_ice_transport_destroy(void* arg) {
     rawrtc_ice_transport_stop(transport);
 
     // Un-reference
+    list_flush(&transport->mdns_resolvers);
     mem_deref(transport->stun_client);
+    mem_deref(transport->mdns_client);
     mem_deref(transport->remote_parameters);
     mem_deref(transport->gatherer);
 }
@@ -56,6 +65,7 @@ enum rawrtc_code rawrtc_ice_transport_create(
         .tos = 0x00,
     };
     enum rawrtc_code error;
+    struct sa mdns_servers[2] = {0};
 
     // Check arguments
     if (!transportp || !gatherer) {
@@ -80,11 +90,35 @@ enum rawrtc_code rawrtc_ice_transport_create(
     transport->state_change_handler = state_change_handler;
     transport->candidate_pair_change_handler = candidate_pair_change_handler;
     transport->arg = arg;
+    list_init(&transport->mdns_resolvers);
     transport->remote_end_of_candidates = false;
 
     // Create STUN client
     error = rawrtc_error_to_code(stun_alloc(&transport->stun_client, &stun_config, NULL, NULL));
     if (error) {
+        DEBUG_WARNING(
+            "Unable to create STUN client instance, reason: %s\n", rawrtc_code_to_str(error));
+        goto out;
+    }
+
+    // Create mDNS client
+    error = rawrtc_error_to_code(sa_set_str(&mdns_servers[0], "224.0.0.251", 5353));
+    if (error) {
+        DEBUG_WARNING(
+            "Unable to set IPv4 mDNS multicast address, reason: %s\n", rawrtc_code_to_str(error));
+        goto out;
+    }
+    error = rawrtc_error_to_code(sa_set_str(&mdns_servers[1], "ff02::fb", 5353));
+    if (error) {
+        DEBUG_WARNING(
+            "Unable to set IPv6 mDNS multicast address, reason: %s\n", rawrtc_code_to_str(error));
+        goto out;
+    }
+    error = rawrtc_error_to_code(
+        dnsc_alloc(&transport->mdns_client, NULL, mdns_servers, ARRAY_SIZE(mdns_servers)));
+    if (error) {
+        DEBUG_WARNING(
+            "Unable to create mDNS client instance, reason: %s\n", rawrtc_code_to_str(error));
         goto out;
     }
 
@@ -352,22 +386,111 @@ enum rawrtc_code rawrtc_ice_transport_stop(struct rawrtc_ice_transport* const tr
 
     // TODO: Remove from RTCICETransportController (once we have it)
 
+    // Remove ICE candidate mDNS hostname resolvers
+    list_flush(&transport->mdns_resolvers);
+
+    return RAWRTC_CODE_SUCCESS;
+}
+
+/*
+ * mDNS hostname address resolved handler.
+ */
+static bool mdns_hostname_address_result_handler(
+    struct rawrtc_ice_candidate* const candidate,  // not checked, referenced
+    char* const hostname,  // not checked
+    struct sa* const address,  // not checked
+    void* const arg  // not checked
+) {
+    struct rawrtc_ice_transport* const transport = arg;
+    enum rawrtc_code error;
+    (void) hostname;
+    DEBUG_INFO("Resolved mDNS hostname %s to address %j\n", hostname, address);
+
+    // Add the resolved remote candidate
+    error = add_remote_candidate(transport, candidate, address);
+    if (error) {
+        DEBUG_WARNING(
+            "Unable to add remote mDNS candidate, reason: %m\n", rawrtc_code_to_str(error));
+    }
+
+    // Done, stop traversing, the draft doesn't allow more than one address per mDNS hostname
+    return true;
+}
+
+/*
+ * Resolve an mDNS hostname.
+ */
+static enum rawrtc_code resolve_mdns_hostname(
+    struct rawrtc_ice_transport* const transport,  // not checked
+    struct rawrtc_ice_candidate* candidate  // not checked
+) {
+    enum rawrtc_code error;
+    char* hostname;
+
+    // Get hostname
+    error = rawrtc_ice_candidate_get_ip(&hostname, candidate);
+    if (error) {
+        return error;
+    }
+    DEBUG_PRINTF("Attempting to resolve mDNS hostname: %s\n", hostname);
+
+    // Create URL resolver for A record (if enabled)
+    if (rawrtc_default_config.ipv4_enable) {
+        struct rawrtc_ice_candidate_mdns_resolver* resolver;
+        error = rawrtc_ice_candidate_mdns_resolver_create(
+            &resolver, transport->mdns_client, DNS_TYPE_A, candidate, hostname,
+            mdns_hostname_address_result_handler, transport);
+        if (error) {
+            DEBUG_WARNING(
+                "Unable to query A record for mDNS hostname %s, reason: %s\n", hostname,
+                rawrtc_code_to_str(error));
+            // Continue - not considered critical
+        } else {
+            // Append to list of URL resolvers
+            list_append(&transport->mdns_resolvers, &resolver->le, resolver);
+        }
+    }
+
+    // Create URL resolver for AAAA record (if enabled)
+    if (rawrtc_default_config.ipv6_enable) {
+        struct rawrtc_ice_candidate_mdns_resolver* resolver;
+        error = rawrtc_ice_candidate_mdns_resolver_create(
+            &resolver, transport->mdns_client, DNS_TYPE_AAAA, candidate, hostname,
+            mdns_hostname_address_result_handler, transport);
+        if (error) {
+            DEBUG_WARNING(
+                "Unable to query AAAA record for mDNS hostname %s, reason: %s\n", hostname,
+                rawrtc_code_to_str(error));
+            // Continue - not considered critical
+        } else {
+            // Append to list of URL resolvers
+            list_append(&transport->mdns_resolvers, &resolver->le, resolver);
+        }
+    }
+
+    // Done
+    mem_deref(hostname);
     return RAWRTC_CODE_SUCCESS;
 }
 
 /*
  * Add a remote candidate ot the ICE transport.
+ * *mdns_address` may be `NULL` or contain an address resolved from an
+ * mDNS hostname (with the port being set to `0`).
+ *
  * Note: 'candidate' must be NULL to inform the transport that the
  * remote site finished gathering.
  */
-enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
+static enum rawrtc_code add_remote_candidate(
     struct rawrtc_ice_transport* const transport,
-    struct rawrtc_ice_candidate* candidate  // nullable
+    struct rawrtc_ice_candidate* const candidate,  // nullable
+    struct sa* const resolved_mdns_address  // nullable
 ) {
     struct ice_rcand* re_candidate = NULL;
     enum rawrtc_code error;
-    char* ip = NULL;
+    bool is_mdns_hostname;
     uint16_t port;
+    char* ip = NULL;
     struct sa address = {0};
     int af;
     enum rawrtc_ice_protocol protocol;
@@ -416,18 +539,39 @@ enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
         return RAWRTC_CODE_INVALID_STATE;
     }
 
-    // Get IP and port
-    error = rawrtc_ice_candidate_get_ip(&ip, candidate);
-    if (error) {
-        goto out;
+    // Resolve mDNS hostname asynchronously (if any and if needed)
+    if (!resolved_mdns_address) {
+        error = rawrtc_ice_candidate_is_mdns_hostname(&is_mdns_hostname, candidate);
+        if (error) {
+            goto out;
+        }
+        if (is_mdns_hostname) {
+            error = resolve_mdns_hostname(transport, candidate);
+            goto out;
+        }
     }
+
+    // Get port
     error = rawrtc_ice_candidate_get_port(&port, candidate);
     if (error) {
         goto out;
     }
-    error = rawrtc_error_to_code(sa_set_str(&address, ip, port));
-    if (error) {
-        goto out;
+
+    // Determine address
+    if (resolved_mdns_address) {
+        // Copy resolved mDNS address and set port
+        sa_cpy(&address, resolved_mdns_address);
+        sa_set_port(&address, port);
+    } else {
+        // Set IP and port
+        error = rawrtc_ice_candidate_get_ip(&ip, candidate);
+        if (error) {
+            goto out;
+        }
+        error = rawrtc_error_to_code(sa_set_str(&address, ip, port));
+        if (error) {
+            goto out;
+        }
     }
 
     // Skip IPv4, IPv6 if requested
@@ -542,6 +686,18 @@ out:
     mem_deref(ip);
 
     return error;
+}
+
+/*
+ * Add a remote candidate ot the ICE transport.
+ * Note: 'candidate' must be NULL to inform the transport that the
+ * remote site finished gathering.
+ */
+enum rawrtc_code rawrtc_ice_transport_add_remote_candidate(
+    struct rawrtc_ice_transport* const transport,
+    struct rawrtc_ice_candidate* const candidate  // nullable
+) {
+    return add_remote_candidate(transport, candidate, NULL);
 }
 
 /*
