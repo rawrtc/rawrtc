@@ -315,16 +315,14 @@ enum rawrtc_code rawrtc_ice_transport_start(
     // TODO: Get more states from trice
     set_state(transport, RAWRTC_ICE_TRANSPORT_STATE_CHECKING);
 
-    // Start checklist (if remote candidates exist)
-    if (!list_isempty(trice_rcandl(transport->gatherer->ice))) {
-        // TODO: Get config from struct
-        DEBUG_INFO("Starting checklist due to start event\n");
-        error = rawrtc_error_to_code(trice_checklist_start(
-            transport->gatherer->ice, transport->stun_client, rawrtc_default_config.pacing_interval,
-            ice_established_handler, ice_failed_handler, transport));
-        if (error) {
-            return error;
-        }
+    // Start checklist
+    // TODO: Get config from struct
+    DEBUG_INFO("Starting checklist due to start event\n");
+    error = rawrtc_error_to_code(trice_checklist_start(
+        transport->gatherer->ice, transport->stun_client, rawrtc_default_config.pacing_interval,
+        ice_established_handler, ice_failed_handler, transport));
+    if (error) {
+        return error;
     }
 
     // Done
