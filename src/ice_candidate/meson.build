@@ -3,4 +3,5 @@ sources += files([
     'candidate.c',
     'helper.c',
     'utils.c',
+    'resolver.c',
 ])

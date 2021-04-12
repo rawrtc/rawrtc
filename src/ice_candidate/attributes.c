@@ -4,6 +4,10 @@
 #include <rawrtcc/utils.h>
 #include <re.h>
 #include <rew.h>
+#include <string.h>  // strlen
+
+// Constants
+static char const mdns_hostname_regex[] = "[^\\.]+\\.local";
 
 /*
  * Get the ICE candidate's foundation.
@@ -57,6 +61,32 @@ enum rawrtc_code rawrtc_ice_candidate_get_priority(
             return RAWRTC_CODE_SUCCESS;
         default:
             return RAWRTC_CODE_INVALID_STATE;
+    }
+}
+
+/*
+ * Check if the ICE candidate contains an mDNS address.
+ */
+enum rawrtc_code rawrtc_ice_candidate_is_mdns_hostname(
+    bool* const is_mdnsp,  // de-referenced
+    struct rawrtc_ice_candidate* const candidate) {
+    // Check arguments
+    if (!candidate || !is_mdnsp) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    // Check if it contains an mDNS address
+    switch (candidate->storage_type) {
+        case RAWRTC_ICE_CANDIDATE_STORAGE_RAW:
+            *is_mdnsp =
+                re_regex(
+                    candidate->candidate.raw_candidate->ip,
+                    strlen(candidate->candidate.raw_candidate->ip), mdns_hostname_regex, NULL)
+                    ? false
+                    : true;
+            return RAWRTC_CODE_SUCCESS;
+        default:
+            return false;
     }
 }
 

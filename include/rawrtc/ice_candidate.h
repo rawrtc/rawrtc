@@ -77,6 +77,13 @@ enum rawrtc_code rawrtc_ice_candidate_get_priority(
     struct rawrtc_ice_candidate* const candidate);
 
 /*
+ * Check if the ICE candidate contains an mDNS address.
+ */
+enum rawrtc_code rawrtc_ice_candidate_is_mdns_hostname(
+    bool* const is_mdnsp,  // de-referenced
+    struct rawrtc_ice_candidate* const candidate);
+
+/*
  * Get the ICE candidate's IP address.
  * `*ipp` will be set to a copy of the IP address that must be
  * unreferenced.
