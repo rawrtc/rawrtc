@@ -52,6 +52,8 @@ enum rawrtc_code rawrtc_peer_connection_configuration_create(
     configuration->sctp.congestion_ctrl_algorithm = RAWRTC_SCTP_TRANSPORT_CONGESTION_CTRL_RFC2581;
     configuration->sctp.mtu = 0;
     configuration->sctp.mtu_discovery = false;
+    configuration->ice_udp_port_range.min = 0;
+    configuration->ice_udp_port_range.max = 0;
 
     // Set pointer and return
     *configurationp = configuration;
@@ -256,5 +258,20 @@ enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu_discovery(
 
     // Set
     configuration->sctp.mtu_discovery = on;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+enum rawrtc_code rawrtc_peer_connection_configuration_set_ice_udp_port_range(
+    struct rawrtc_peer_connection_configuration* configuration,
+    uint16_t min_port,
+    uint16_t max_port) {
+    if (!configuration) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+    if (max_port < min_port) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+    configuration->ice_udp_port_range.min = min_port;
+    configuration->ice_udp_port_range.max = max_port;
     return RAWRTC_CODE_SUCCESS;
 }

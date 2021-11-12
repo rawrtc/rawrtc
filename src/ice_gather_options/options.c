@@ -37,9 +37,27 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
     // Set fields/reference
     options->gather_policy = gather_policy;
     list_init(&options->ice_servers);
+    options->udp_port_range.min = 0;
+    options->udp_port_range.max = 0;
 
     // Set pointer and return
     *optionsp = options;
+    return RAWRTC_CODE_SUCCESS;
+}
+
+enum rawrtc_code rawrtc_ice_gather_options_set_udp_port_range(
+    struct rawrtc_ice_gather_options* const options, uint16_t min_udp_port, uint16_t max_udp_port) {
+    if (!options) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    if (max_udp_port < min_udp_port) {
+        return RAWRTC_CODE_INVALID_ARGUMENT;
+    }
+
+    options->udp_port_range.min = min_udp_port;
+    options->udp_port_range.max = max_udp_port;
+
     return RAWRTC_CODE_SUCCESS;
 }
 

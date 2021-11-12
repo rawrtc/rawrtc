@@ -520,6 +520,13 @@ static enum rawrtc_code get_ice_gatherer(
         return error;
     }
 
+    error = rawrtc_ice_gather_options_set_udp_port_range(
+        options, connection->configuration->ice_udp_port_range.min,
+        connection->configuration->ice_udp_port_range.max);
+    if (error) {
+        return error;
+    }
+
     // Add ICE servers to gather options
     for (le = list_head(&connection->configuration->ice_servers); le != NULL; le = le->next) {
         struct rawrtc_ice_server* const source_server = le->data;

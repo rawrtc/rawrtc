@@ -94,3 +94,11 @@ enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu(
  */
 enum rawrtc_code rawrtc_peer_connection_configuration_set_sctp_mtu_discovery(
     struct rawrtc_peer_connection_configuration* configuration, bool on);
+
+/*
+ * Force local ICE candidate generation to use the specified local UDP ports.
+ */
+enum rawrtc_code rawrtc_peer_connection_configuration_set_ice_udp_port_range(
+    struct rawrtc_peer_connection_configuration* configuration,
+    uint16_t min_port,
+    uint16_t max_port);
