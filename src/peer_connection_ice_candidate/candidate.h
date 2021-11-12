@@ -27,6 +27,6 @@ enum rawrtc_code rawrtc_peer_connection_ice_candidate_from_ortc_candidate(
 enum rawrtc_code rawrtc_peer_connection_ice_candidate_create_internal(
     struct rawrtc_peer_connection_ice_candidate** const candidatep,  // de-referenced
     struct pl* const sdp,
-    char* const mid,  // nullable
+    char const* const mid,  // nullable
     uint8_t const* const media_line_index,  // nullable
     char* const username_fragment);

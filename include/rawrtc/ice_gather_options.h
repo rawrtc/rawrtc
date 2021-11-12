@@ -44,10 +44,10 @@ enum rawrtc_code rawrtc_ice_gather_options_set_udp_port_range(
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(
     struct rawrtc_ice_gather_options* const options,
-    char* const* const urls,  // copied
+    char const* const* const urls,  // copied
     size_t const n_urls,
-    char* const username,  // nullable, copied
-    char* const credential,  // nullable, copied
+    char const* const username,  // nullable, copied
+    char const* const credential,  // nullable, copied
     enum rawrtc_ice_credential_type const credential_type);
 
 /*
