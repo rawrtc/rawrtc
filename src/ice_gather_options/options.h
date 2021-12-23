@@ -7,6 +7,10 @@
 struct rawrtc_ice_gather_options {
     enum rawrtc_ice_gather_policy gather_policy;
     struct list ice_servers;
+    struct {
+        uint16_t min;
+        uint16_t max;
+    } udp_port_range;
 };
 
 enum rawrtc_code rawrtc_ice_gather_options_add_server_internal(

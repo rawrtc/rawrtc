@@ -17,6 +17,10 @@ struct rawrtc_peer_connection_configuration {
         uint32_t mtu;
         bool mtu_discovery;
     } sctp;
+    struct {
+        uint16_t min;
+        uint16_t max;
+    } ice_udp_port_range;
 };
 
 enum rawrtc_code rawrtc_peer_connection_configuration_add_ice_server_internal(

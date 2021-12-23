@@ -106,6 +106,13 @@ enum rawrtc_code rawrtc_ice_gatherer_create(
         goto out;
     }
 
+    err = trice_set_port_range(
+        gatherer->ice, options->udp_port_range.min, options->udp_port_range.max);
+    if (err) {
+        DEBUG_WARNING("Unable to set ICE port range, reason: %m\n", err);
+        goto out;
+    }
+
     // Get local DNS servers
     err = dns_srv_get(NULL, 0, dns_servers, &n_dns_servers);
     if (err) {

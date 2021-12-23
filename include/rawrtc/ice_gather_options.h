@@ -34,6 +34,12 @@ enum rawrtc_code rawrtc_ice_gather_options_create(
     enum rawrtc_ice_gather_policy const gather_policy);
 
 /*
+ * Force ICE candidates to be generated within a specific range of UDP ports.
+ */
+enum rawrtc_code rawrtc_ice_gather_options_set_udp_port_range(
+    struct rawrtc_ice_gather_options* const options, uint16_t min_udp_port, uint16_t max_udp_port);
+
+/*
  * Add an ICE server to the gather options.
  */
 enum rawrtc_code rawrtc_ice_gather_options_add_server(

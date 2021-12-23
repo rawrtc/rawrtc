@@ -26,10 +26,10 @@ int main(int argc, char* argv[argc + 1]) {
     struct rawrtc_ice_gather_options* gather_options;
     struct rawrtc_ice_gatherer* gatherer;
     char* const turn_zwuenf_org_urls[] = {"stun:turn.zwuenf.org"};
-    char* const stun_google_com_ip_urls[] = {"stun:[2a00:1450:400c:c08::7f]:19302",
-                                             "stun:74.125.140.127:19302"};
-    char* const unreachable_urls[] = {"stun:example.com:12345",
-                                      "stun:lets.assume.no-one-will-ever-register-this"};
+    char* const stun_google_com_ip_urls[] = {
+        "stun:[2a00:1450:400c:c08::7f]:19302", "stun:74.125.140.127:19302"};
+    char* const unreachable_urls[] = {
+        "stun:example.com:12345", "stun:lets.assume.no-one-will-ever-register-this"};
     struct client client = {0};
     (void) argv;
 
